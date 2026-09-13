@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KaiLionCrafts Studio Pro · 智能场景反推与双手解剖修复引擎 V1.5.1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #060911;
+      --bg-surface: #0d1322;
+      --bg-card: rgba(15, 23, 42, 0.7);
+      --bg-card-hover: rgba(26, 38, 66, 0.85);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(245, 158, 11, 0.4);
+      --accent: #f59e0b;
+      --accent-hover: #d97706;
+      --accent-glow: rgba(245, 158, 11, 0.25);
+      --accent-light: rgba(245, 158, 11, 0.12);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --code-bg: #070a12;
+      --radius-lg: 16px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
+      --shadow-main: 0 16px 40px -10px rgba(0, 0, 0, 0.6);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      background: var(--bg-base);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 10% 10%, rgba(245, 158, 11, 0.06) 0%, transparent 40%),
+        radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.05) 0%, transparent 45%),
+        linear-gradient(180deg, rgba(6, 9, 17, 0.8) 0%, var(--bg-base) 100%);
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    /* Top Navigation Dashboard */
+    .header {
+      background: rgba(13, 19, 34, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 12px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--accent) 0%, #b45309 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .brand-logo svg { fill: #fff; width: 22px; height: 22px; }
+    .header-brand .name {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.4px;
+      background: linear-gradient(135deg, #fff 30%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header-brand .badge {
+      font-size: 10px;
+      font-weight: 800;
+      background: var(--accent-light);
+      color: var(--accent);
+      border: 1px solid var(--border-active);
+      padding: 3px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+    
+    .header-metrics {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .metric-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .metric-pill strong { color: var(--text-main); font-weight: 700; }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #10b981;
+      animation: pulse 2s infinite;
+    }
+
+    /* Main Container Grid */
+    .main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      max-width: 1720px;
+      margin: 0 auto;
+      width: 100%;
+      gap: 20px;
+      padding: 20px 28px;
+    }
+    @media (max-width: 1200px) {
+      .main { grid-template-columns: 1fr; padding: 16px; }
+    }
+
+    /* Panel Card Styles */
+    .panel-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      box-shadow: var(--shadow-main);
+      transition: border-color 0.3s;
+    }
+    .panel-card:hover { border-color: rgba(255, 255, 255, 0.12); }
+
+    /* Left Control Dock */
+    .left-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      max-height: calc(100vh - 100px);
+      overflow-y: auto;
+    }
+    
+    .section-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .step-num {
+      width: 22px;
+      height: 22px;
+      background: var(--accent-light);
+      border: 1px solid var(--border-active);
+      color: var(--accent);
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .section-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: 0.2px;
+    }
+
+    /* Upload Drag Zone */
+    .upload-zone {
+      border: 2px dashed var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 18px 14px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      background: rgba(255, 255, 255, 0.01);
+      position: relative;
+      overflow: hidden;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .upload-zone.has-image {
+      border-style: solid;
+      border-color: var(--border-active);
+      padding: 8px;
+      background: rgba(0,0,0,0.4);
+    }
+    .upload-zone img {
+      max-width: 100%;
+      max-height: 140px;
+      border-radius: 8px;
+      display: block;
+      margin: 0 auto;
+      object-fit: contain;
+    }
+    .upload-zone .placeholder {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .upload-zone .placeholder-icon {
+      margin-bottom: 6px;
+      color: var(--accent);
+      display: flex;
+      justify-content: center;
+    }
+    .upload-zone .placeholder strong {
+      color: var(--text-main);
+      display: block;
+      margin-bottom: 2px;
+      font-size: 13px;
+    }
+    .upload-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .upload-clear {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 13px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .upload-clear:hover { background: #ef4444; border-color: #ef4444; }
+    .upload-zone.has-image .upload-clear { display: flex; }
+
+    /* Form Controls */
+    select, input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(6, 9, 17, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      color: var(--text-main);
+      outline: none;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    select:focus, input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+    .form-row { margin-bottom: 12px; }
+    .form-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Modifiers & Style Selector Chips */
+    .chip-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .chip-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .chip-btn:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      color: var(--text-main);
+    }
+    .chip-btn.active {
+      background: var(--accent-light);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      font-family: inherit;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, #d97706 100%);
+      color: #fff;
+      width: 100%;
+      box-shadow: 0 6px 20px var(--accent-glow);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 25px rgba(245, 158, 11, 0.45);
+    }
+    .btn-primary:disabled {
+      background: #334155;
+      color: #64748b;
+      box-shadow: none;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: 1px solid var(--border-subtle);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: var(--radius-sm); }
+
+    /* Right Workspace Panel */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      max-height: calc(100vh - 100px);
+      overflow-y: auto;
+    }
+
+    /* Format Tabs Bar */
+    .format-tab-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(13, 19, 34, 0.6);
+      border: 1px solid var(--border-subtle);
+      padding: 6px 12px;
+      border-radius: var(--radius-md);
+    }
+    .tab-group {
+      display: flex;
+      gap: 6px;
+    }
+    .tab-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      border: 1px solid var(--border-subtle);
+    }
+
+    /* Analysis Cards */
+    .result-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-main);
+    }
+    .result-card h3 {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 700px) { .analysis-grid { grid-template-columns: 1fr; } }
+    
+    .analysis-item {
+      background: rgba(6, 9, 17, 0.7);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      position: relative;
+    }
+    .analysis-item::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--accent);
+      border-radius: 3px 0 0 3px;
+    }
+    .analysis-item.full-width { grid-column: span 2; }
+    @media (max-width: 700px) { .analysis-item.full-width { grid-column: span 1; } }
+    
+    .analysis-item .label {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .analysis-item .value {
+      font-size: 12.5px;
+      color: var(--text-main);
+      line-height: 1.5;
+    }
+
+    /* Terminal Prompt Box */
+    .prompt-box-wrapper {
+      position: relative;
+      background: var(--code-bg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .terminal-header {
+      background: rgba(255, 255, 255, 0.02);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .terminal-dots { display: flex; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-red { background: #ef4444; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-green { background: #10b981; }
+    
+    .prompt-box {
+      color: #e2e8f0;
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+
+    /* Action Toolbar */
+    .action-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ratio-group {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      background: rgba(6, 9, 17, 0.8);
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+    }
+    .ratio-group span {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 700;
+      padding: 0 6px;
+    }
+    .ratio-btn {
+      padding: 4px 10px;
+      border: none;
+      border-radius: 5px;
+      background: transparent;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+    .ratio-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    /* Inspiration Presets Gallery Deck */
+    .inspiration-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 10px;
+    }
+    @media (max-width: 900px) { .inspiration-grid { grid-template-columns: 1fr; } }
+    .inspiration-card {
+      background: rgba(6, 9, 17, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+    .inspiration-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      background: var(--accent-light);
+    }
+    .inspiration-card .tag {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .inspiration-card .title {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+    .inspiration-card .desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* History Timeline Drawer */
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(6, 9, 17, 0.5);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      font-size: 11.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .history-item:hover { border-color: rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.03); }
+    .history-item .time { color: var(--text-dim); font-size: 10px; }
+
+    /* Empty Placeholder Studio */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      background: var(--bg-card);
+      border: 1px dashed var(--border-subtle);
+      border-radius: var(--radius-lg);
+    }
+    .empty-state .icon-wrapper {
+      width: 56px;
+      height: 56px;
+      background: var(--accent-light);
+      border: 1px solid var(--border-active);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      color: var(--accent);
+    }
+    .empty-state h3 {
+      font-size: 16px;
+      color: var(--text-main);
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+    .empty-state p {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      max-width: 480px;
+      margin: 0 auto 20px;
+    }
+
+    /* Overlay Loading */
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 9, 17, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 18px;
+      color: #fff;
+    }
+    .loading-overlay.show { display: flex; }
+    
+    .spinner-ring {
+      width: 52px;
+      height: 52px;
+      border: 3px solid rgba(245, 158, 11, 0.15);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      box-shadow: 0 0 25px var(--accent-glow);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: #0d1322;
+      border: 1px solid var(--accent);
+      color: var(--text-main);
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+
+    .tips-card {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      padding: 10px 12px;
+      background: rgba(6, 9, 17, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+    .tips-card a { color: var(--accent); text-decoration: none; }
+    .tips-card a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Dashboard Bar -->
+  <div class="header">
+    <div class="header-brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="name">KaiLionCrafts Studio Pro</span>
+          <span class="badge">V1.5.1 演示版</span>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top:1px;">智能场景反推与双手解剖防畸变引擎</div>
+      </div>
+    </div>
+    <div class="header-metrics">
+      <div class="metric-pill">
+        <span>双手防护模块:</span>
+        <strong style="color:#10b981;">已激活 (Active Shield)</strong>
+      </div>
+      <div class="metric-pill">
+        <span>算力响应:</span>
+        <strong>28ms</strong>
+      </div>
+      <div class="metric-pill">
+        <div class="status-dot"></div>
+        <strong>多模态 Vision 在线</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- Left Dock -->
+    <div class="left-panel panel-card">
+      
+      <!-- 1. Reference Image Drag Zone -->
+      <div>
+        <div class="section-head">
+          <span class="step-num">01</span>
+          <span class="section-title">上传参考场景图（反推构图、氛围与动作姿态）</span>
+        </div>
+        <div class="upload-zone" id="refZone">
+          <div class="placeholder" id="refPlaceholder">
+            <div class="placeholder-icon">
+              <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </div>
+            <strong>点击或拖拽上传参考场景图</strong>
+            系统将提取光影、氛围、食材以及【双手真实人体工程学姿态】
+          </div>
+          <img id="refPreview" style="display:none;" alt="参考图">
+          <button class="upload-clear" id="refClear" title="清除">✕</button>
+          <input type="file" id="refInput" accept="image/*">
+        </div>
+      </div>
+
+      <!-- 2. Category -->
+      <div>
+        <div class="section-head">
+          <span class="step-num">02</span>
+          <span class="section-title">选择目标产品品类</span>
+        </div>
+        <select id="categorySelect">
+          <option value="kitchen_knife">厨刀 (Kitchen Knife)</option>
+          <option value="scissors">剪刀 (Scissors)</option>
+          <option value="outdoor_knife">户外刀 (Outdoor Knife)</option>
+          <option value="accessory">厨房配件 (Kitchen Accessory)</option>
+        </select>
+      </div>
+
+      <!-- 3. Product Image Drag Zone -->
+      <div>
+        <div class="section-head">
+          <span class="step-num">03</span>
+          <span class="section-title">上传我的产品白底图（强制 100% 锁定外观）</span>
+        </div>
+        <div class="upload-zone" id="prodZone">
+          <div class="placeholder" id="prodPlaceholder">
+            <div class="placeholder-icon">
+              <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            </div>
+            <strong>上传白底图（强制锁定外观细节）</strong>
+            AI 将 100% 复制白底图产品的尺寸、弧度、锤纹与手柄结构
+          </div>
+          <img id="prodPreview" style="display:none;" alt="产品图">
+          <button class="upload-clear" id="prodClear" title="清除">✕</button>
+          <input type="file" id="prodInput" accept="image/*">
+        </div>
+      </div>
+
+      <!-- Style Modifiers / Quality Presets -->
+      <div>
+        <div class="section-head">
+          <span class="step-num">04</span>
+          <span class="section-title">商业渲染微调 (Style Enhancers)</span>
+        </div>
+        <div class="form-row">
+          <span class="form-label">光影氛围微调标签</span>
+          <div class="chip-group" id="lightingChips">
+            <button class="chip-btn active" onclick="toggleChip(this)">📸 商业摄影光效</button>
+            <button class="chip-btn active" onclick="toggleChip(this)">✨ 真实金属反射</button>
+            <button class="chip-btn" onclick="toggleChip(this)">🌅 暖阳侧逆光</button>
+            <button class="chip-btn" onclick="toggleChip(this)">🔪 浅景深焦外虚化</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. API Settings -->
+      <div>
+        <div class="section-head">
+          <span class="step-num">05</span>
+          <span class="section-title">模型 API 设置（国内云端驱动）</span>
+        </div>
+        <div class="form-row">
+          <label class="form-label">视觉多模态大模型</label>
+          <select id="modelSelect">
+            <option value="qwen-vl-max">通义千问 qwen-vl-max（推荐：多图与手部分析最准）</option>
+            <option value="qwen-vl-plus">通义千问 qwen-vl-plus</option>
+            <option value="qwen3-vl-plus">通义千问 qwen3-vl-plus</option>
+            <option value="qwen3-vl-flash">通义千问 qwen3-vl-flash（便宜）</option>
+            <option value="glm-4v-plus">智谱 GLM-4V-Plus</option>
+            <option value="glm-4v">智谱 GLM-4V</option>
+            <option value="glm-4v-flash">智谱 GLM-4V-Flash（免费额度）</option>
+          </select>
+          <div style="font-size:11px; color:var(--text-dim); margin-top:4px;" id="modelHint">通义千问：阿里云百炼控制台获取 Key</div>
+        </div>
+        <div class="form-row">
+          <label class="form-label">API Key（仅保存在本地浏览器）</label>
+          <input type="password" id="apiKeyInput" placeholder="粘贴你的 API Key">
+        </div>
+        <div class="tips-card">
+          <strong>通义千问</strong>：去 <a href="https://bailian.console.aliyun.com/" target="_blank">阿里云百炼</a> 创建 API Key<br>
+          <strong>智谱</strong>：去 <a href="https://open.bigmodel.cn/" target="_blank">智谱开放平台</a> 创建 API Key
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="runBtn" onclick="runReverse()">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        ✨ 开始智能反推与合并 Prompt
+      </button>
+
+    </div>
+
+    <!-- Right Workspace -->
+    <div class="right-panel">
+      
+      <!-- Inspiration Presets Gallery Deck (Always Visible) -->
+      <div class="result-card">
+        <h3>
+          <span style="display:flex; align-items:center; gap:8px;">
+            <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-2a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            快速灵感与案例库（课上演示点击推荐）
+          </span>
+          <span style="font-size:11px; color:var(--text-dim);">点击快速了解场景构图模式</span>
+        </h3>
+        <div class="inspiration-grid">
+          <div class="inspiration-card" onclick="applyPreset('sashimi')">
+            <div class="tag">日式刺身 · 双手切配</div>
+            <div class="title">暗调胡桃木三文鱼分切</div>
+            <div class="desc">右手自然握持柳刃刀，左手按压鱼肉，斜侧光高光反射。</div>
+          </div>
+          <div class="inspiration-card" onclick="applyPreset('steak')">
+            <div class="tag">欧美牛排 · 静态平铺</div>
+            <div class="title">战斧牛排与迷迭香平铺</div>
+            <div class="desc">45度俯视视角，铸铁锅与岩板质感，无手部干涉。</div>
+          </div>
+          <div class="inspiration-card" onclick="applyPreset('cleaver')">
+            <div class="tag">复古厨房 · 斩骨场景</div>
+            <div class="title">老木砧板肉类分切姿态</div>
+            <div class="desc">强烈的肌理质感，双手符合自然解剖抓握锤纹刀。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="emptyState">
+        <div class="icon-wrapper">
+          <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+        </div>
+        <h3>等待反推指令</h3>
+        <p>请上传参考场景图与产品白底图后点击「开始反推」。系统将精准提炼双手解剖姿态与白底图产品特征，一键组装商业级 Prompt。</p>
+      </div>
+
+      <!-- Result Workspace Area -->
+      <div id="resultArea" style="display:none;" class="right-panel">
+        
+        <!-- Format Selection Switcher Bar -->
+        <div class="format-tab-bar">
+          <div class="tab-group">
+            <button class="tab-btn active" onclick="switchOutputEngine('mj', this)">Midjourney v6 格式</button>
+            <button class="tab-btn" onclick="switchOutputEngine('sd', this)">Stable Diffusion XL 格式</button>
+            <button class="tab-btn" onclick="switchOutputEngine('flux', this)">FLUX.1 格式</button>
+          </div>
+          <div style="font-size:11px; color:var(--text-muted);" id="tokenStats">预估 Token: 284 | 字符数: 1,420</div>
+        </div>
+
+        <!-- Result Card 1: Visual Analysis -->
+        <div class="result-card">
+          <h3>
+            <span style="display:flex; align-items:center; gap:8px;">
+              <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              📊 多模态智能分析诊断结果
+            </span>
+            <span style="font-size:11px; color:#10b981; background:rgba(16,185,129,0.1); padding:2px 8px; border-radius:10px;">解剖学姿态校准成功</span>
+          </h3>
+          <div class="analysis-grid">
+            <div class="analysis-item">
+              <div class="label">场景交互类型</div>
+              <div class="value" id="interactionTypeResult">—</div>
+            </div>
+            <div class="analysis-item">
+              <div class="label">场景氛围与调性</div>
+              <div class="value" id="sceneTypeResult">—</div>
+            </div>
+            <div class="analysis-item full-width">
+              <div class="label">双手解剖学姿态描述</div>
+              <div class="value" id="actionResult">—</div>
+            </div>
+          </div>
+          <div class="analysis-item" style="margin-bottom:0;">
+            <div class="label">场景环境关键词</div>
+            <div class="value" id="keywordsResult">—</div>
+          </div>
+        </div>
+
+        <!-- Result Card 2: Prompt Generator -->
+        <div class="result-card">
+          <h3>
+            <span style="display:flex; align-items:center; gap:8px;">
+              <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><path d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              🎯 最终合并 Prompt (可直接复制生图)
+            </span>
+          </h3>
+          <div class="prompt-box-wrapper">
+            <div class="terminal-header">
+              <div class="terminal-dots">
+                <div class="dot dot-red"></div>
+                <div class="dot dot-yellow"></div>
+                <div class="dot dot-green"></div>
+              </div>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim);" id="promptFormatTitle">MJ_V6_PROMPT_PAYLOAD.txt</span>
+            </div>
+            <div class="prompt-box" id="finalPromptBox">—</div>
+          </div>
+          <div class="action-bar">
+            <div class="ratio-group">
+              <span>画面比例</span>
+              <button class="ratio-btn active" data-ratio="1:1" onclick="setRatio('1:1', this)">1:1</button>
+              <button class="ratio-btn" data-ratio="16:9" onclick="setRatio('16:9', this)">16:9</button>
+              <button class="ratio-btn" data-ratio="4:3" onclick="setRatio('4:3', this)">4:3</button>
+              <button class="ratio-btn" data-ratio="3:2" onclick="setRatio('3:2', this)">3:2</button>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-secondary btn-sm" id="langBtn" onclick="toggleLang()">🌐 切换中文</button>
+              <button class="btn btn-primary btn-sm" onclick="copyPrompt()">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                一键复制 Prompt
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Result Card 3: Pure Scene Box -->
+        <div class="result-card">
+          <h3>🖼️ 纯场景与环境描述（非组合版本）</h3>
+          <div class="prompt-box-wrapper">
+            <div class="prompt-box" id="sceneOnlyBox" style="max-height:150px;">—</div>
+          </div>
+        </div>
+
+        <!-- Session History Manager -->
+        <div class="result-card">
+          <h3>
+            <span style="display:flex; align-items:center; gap:8px;">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              🕒 本次会话反推历史记录
+            </span>
+          </h3>
+          <div class="history-list" id="historyList">
+            <!-- Dynamically populates history items -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loading">
+    <div class="spinner-ring"></div>
+    <div style="font-weight:700; font-size:15px; letter-spacing:0.3px;">AI 正在多维分析图层中...</div>
+    <div style="font-size:12px; color:var(--text-muted);">正在精准提取场景氛围、双手物理解剖姿态与白底图特征</div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast">
+    <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+    <span id="toastMsg">已复制</span>
+  </div>
+
+<script>
+  let refBase64 = null;
+  let prodBase64 = null;
+  let currentRatio = '1:1';
+  let isZh = false;
+  let lastResult = null;
+  let historyData = [];
+
+  const categoryMap = {
+    kitchen_knife: { en: 'kitchen knife', zh: '厨刀' },
+    scissors: { en: 'scissors / shears', zh: '剪刀' },
+    outdoor_knife: { en: 'outdoor knife', zh: '户外刀' },
+    accessory: { en: 'kitchen accessory', zh: '厨房配件' }
+  };
+
+  const QC_EN = `
+STRICT PRODUCT IDENTITY PROTECTION (MANDATORY):
+The hero product MUST be a 100% physical match to the attached white-background product image reference.
+- Absolute Geometry & Dimension Lock: Preserve exact blade height, edge profile, spine curvature, knife size proportions, tip angle, and bolster design.
+- Material & Pattern Lock: Faithfully reproduce the exact hammered texture (Tsuchime), Damascus steel pattern, brushed steel grain, handle rivets/screws, and handle material from the white-background product image.
+- DO NOT redesign, simplify, alter proportions, or add fantasy elements.
+
+ANATOMICAL HAND ERGONOMICS & POSE REALISM (CRITICAL):
+- Hand Identity & Separation: The human hands MUST be anatomically correct. The DOMINANT HAND (right hand) MUST grip the knife handle with fingers wrapped naturally and thumb resting on the handle/bolster. The NON-DOMINANT HAND (left hand) MUST rest naturally on top of or near the ingredient (e.g., cabbage) to stabilize it.
+- ZERO ANATOMICAL DEFECTS: Strict prohibition of swapped hands, inverted thumbs, twisted wrists, backward palms, floating fingers, or extra/missing digits. Each hand must have exactly 5 distinct, realistically articulated fingers following true human bone structure.
+- Pose Matching: If the scene reference image depicts a hand-held cutting action, replicate that active cutting stance. If it shows a static flat-lay product without hands, render NO HANDS.
+
+COMMERCIAL QUALITY:
+- Professional culinary photography, natural directional lighting, realistic metal reflections, soft depth of field. No AI CGI look.
+`;
+
+  const QC_ZH = `
+绝对产品身份锁定（强制规范）：
+主角产品必须与上传的白底图产品绝对一致（100% 物理还原）：
+- 几何与尺寸锁：严格维持白底图的刀身高度、刃线弧度、刀脊曲线、整体比例、刀尖角度及刀枕结构。
+- 材质纹理锁：完美保留白底图上的锤纹（槌目纹）、大马士革纹理、钢材拉丝感、手柄铆钉数量及手柄真实材质。
+- 严禁随意修改、简化、更改产品尺寸比例或添加幻想装饰。
+
+人体工程学双手解剖学规范（核心锁定）：
+- 左右手分工与抓握逻辑：手部必须符合真实解剖学。主用手（右手）必须自然紧握刀柄，四指包裹手柄，拇指抵住刀柄/刀枕侧边；辅助手（左手）必须自然放置在食材（如紫甘蓝）上方起固定辅助作用。
+- 严禁畸变错误：绝对禁止左右手倒置、拇指方向反转、手腕扭曲、反向手掌或悬浮手指。每只手必须拥有精确的5根手指，符合真实骨骼形态。
+- 姿态匹配：若参考场景图为手持切菜操作，必须复刻双手配合的切菜姿态；若参考场景图为平铺摆放且无手，则绝对禁止出现手部。
+
+商业级画质：
+- 欧美专业厨房商业摄影，遵循自然方向光影，真实的金属高光与自然阴影，无 AI 假感。
+`;
+
+  window.onload = () => {
+    const savedKey = localStorage.getItem('klc_api_key_v15');
+    const savedModel = localStorage.getItem('klc_model_v15');
+    if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
+    if (savedModel) document.getElementById('modelSelect').value = savedModel;
+    updateModelHint();
+
+    setupUpload('ref', (b64) => { refBase64 = b64; });
+    setupUpload('prod', (b64) => { prodBase64 = b64; });
+
+    document.getElementById('apiKeyInput').addEventListener('change', (e) => {
+      localStorage.setItem('klc_api_key_v15', e.target.value.trim());
+    });
+    document.getElementById('modelSelect').addEventListener('change', (e) => {
+      localStorage.setItem('klc_model_v15', e.target.value);
+      updateModelHint();
+    });
+  };
+
+  function updateModelHint() {
+    const m = document.getElementById('modelSelect').value;
+    const hint = document.getElementById('modelHint');
+    if (m.startsWith('qwen') || m.startsWith('qwen3')) {
+      hint.textContent = '通义千问：阿里云百炼控制台 → API-KEY 管理';
+    } else {
+      hint.textContent = '智谱：open.bigmodel.cn → API Keys';
+    }
+  }
+
+  function setupUpload(prefix, onLoad) {
+    const zone = document.getElementById(prefix + 'Zone');
+    const input = document.getElementById(prefix + 'Input');
+    const preview = document.getElementById(prefix + 'Preview');
+    const placeholder = document.getElementById(prefix + 'Placeholder');
+    const clearBtn = document.getElementById(prefix + 'Clear');
+
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.classList.remove('dragover');
+      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    input.addEventListener('change', () => { if (input.files[0]) handleFile(input.files[0]); });
+    clearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      input.value = '';
+      preview.style.display = 'none';
+      preview.src = '';
+      placeholder.style.display = 'block';
+      zone.classList.remove('has-image');
+      onLoad(null);
+    });
+
+    function handleFile(file) {
+      if (!file.type.startsWith('image/')) { showToast('请上传图片文件'); return; }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const b64 = e.target.result;
+        preview.src = b64;
+        preview.style.display = 'block';
+        placeholder.style.display = 'none';
+        zone.classList.add('has-image');
+        onLoad(b64);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function toggleChip(el) {
+    el.classList.toggle('active');
+    if (lastResult) updateFinalPrompt();
+  }
+
+  function applyPreset(type) {
+    showToast('已载入 ' + type + ' 场景范例数据');
+  }
+
+  function setTextSafely(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val || '—';
+  }
+
+  function buildSystemPrompt() {
+    return `你是 KaiLionCrafts 专属的商业产品摄影提示词工程师，专注于刀剪与厨房配件产品。
+
+你的任务：
+1. 分析输入的场景图（图1）：
+   - 判断交互模式："hand_held"（手持操作/切菜场景） 或 "static_flatlay"（纯产品平铺摆放/无手场景）。
+   - 提取环境光影、调色、背景食材与台面质感。
+   - 【手部解剖提取】：如果是手持场景，必须极其精准地拆解双手的解剖分工：哪只手（如右手）握持刀柄、手指的抓握方式、哪只手（如左手）按压食材、以及手掌和手腕的角度朝向。
+
+2. 分析输入的产品白底图（图2，若提供）：
+   - 极其详细地提取图2中刀具/产品的绝对真实外观：刀型弧度、刀身高度与长宽比例、特殊的锤纹/大马士革/拉丝纹理、刀柄材质（如黑色复合材质/木柄）、铆钉分布与螺丝细节。
+
+3. 按照格式输出 JSON（严禁使用 markdown 代码块或额外文本）：
+
+{
+  "interaction_type": "手持使用 (hand_held) 或 静态平铺 (static_flatlay)",
+  "action_pose_zh": "手部解剖姿态描述（例如：主用右手自然握持刀柄切入紫甘蓝，左手自然按压在紫甘蓝顶部固定，左右手符合真实人体解剖学）",
+  "action_pose_en": "Anatomical hand pose description (e.g., human right hand naturally gripping the knife handle to cut vertically into red cabbage, while the left hand rests firmly on top of the cabbage to steady it. Anatomically correct hands and fingers.)",
+  "scene_type": "场景类型与整体氛围（如：暗调暖光复古厨房 / 木质切菜台）",
+  "keywords": "场景核心关键词，逗号分隔（侧光, 人体工程学双手, 紫甘蓝, 木质砧板, 暗调氛围）",
+  "scene_description_en": "图1纯场景、光影、构图与【双手解剖学动作】描述（英文）。详细描绘光源分布、食材排列、以及左右手的物理解剖位置。绝不包含图1原刀具的外观细节。",
+  "scene_description_zh": "图1纯场景、光影与【双手解剖学动作】描述（中文）",
+  "product_description_en": "图2白底图产品的外观物理细节描述（英文）。涵盖刃型几何、刀身高度比例、锤纹/大马士革纹理、手柄颜色与铆钉结构。",
+  "product_description_zh": "图2白底图产品的外观物理细节描述（中文）"
+}`;
+  }
+
+  function assembleFinalPrompt(result, categoryKey, ratio, useZh) {
+    const cat = categoryMap[categoryKey] || categoryMap.kitchen_knife;
+    const scene = useZh ? result.scene_description_zh : result.scene_description_en;
+    const actionPose = useZh ? result.action_pose_zh : result.action_pose_en;
+    const prodDesc = useZh ? result.product_description_zh : result.product_description_en;
+    const productName = useZh ? cat.zh : cat.en;
+    const qc = useZh ? QC_ZH : QC_EN;
+    const ratioLine = useZh
+      ? `输出比例：${ratio} (--ar ${ratio})`
+      : `Aspect ratio: ${ratio} (--ar ${ratio})`;
+
+    const isHandHeld = (result.interaction_type || '').includes('hand_held') || (result.interaction_type || '').includes('手持');
+
+    const activeChips = Array.from(document.querySelectorAll('#lightingChips .chip-btn.active'))
+      .map(btn => btn.textContent.trim())
+      .join(', ');
+
+    const actionMandate = useZh
+      ? `【姿态与手部解剖锁定】：
+交互模式：${result.interaction_type}
+手部姿态规范：${actionPose}
+${isHandHeld ? '注意：必须确保主用手与辅助手解剖结构完全正确，无左右手倒置、无反向手掌、无畸变手指。' : '注意：此场景为平铺摆放，画面中严禁出现任何手部或人体部位。'}`
+      : `【POSE & ANATOMICAL HAND LOCK】:
+Interaction Stance: ${result.interaction_type}
+Anatomical Hand Specification: ${actionPose}
+${isHandHeld ? 'CRITICAL: Ensure correct left/right hand separation. Dominant hand on knife handle, non-dominant hand steadying food. Zero inverted thumbs or backwards palms.' : 'CRITICAL: Static product layout. DO NOT render any human hands or limbs in the frame.'}`;
+
+    const productSection = useZh
+      ? `【目标产品主体与外观锁（参考白底图）】：
+目标产品分类：${productName}
+白底图物理外观特征：${prodDesc}
+请严格保持上述白底图产品的形状、尺寸比例、花纹纹理与手柄结构，不要做任何擅自修改。`
+      : `【HERO PRODUCT IDENTITY LOCK (From attached white-background product image)】:
+Target Category: ${productName}
+Product Visual Features: ${prodDesc}
+Seamlessly replace the knife with this exact product, maintaining 100% physical fidelity to its shape, height-to-length proportions, blade finish, pattern, and handle design.`;
+
+    const extraModifiers = activeChips ? `\n【商业光效增强】: ${activeChips}\n` : '';
+
+    return `${scene}${extraModifiers}
+
+${actionMandate}
+
+${productSection}
+
+${qc}
+
+${ratioLine}`.trim();
+  }
+
+  async function callVisionAPI(model, apiKey, refBase64, prodBase64) {
+    const systemPrompt = buildSystemPrompt();
+    
+    let imageContent = [
+      { type: 'image_url', image_url: { url: refBase64 } }
+    ];
+    let userPromptText = '图1是参考场景图。请分析场景环境及【双手人体工程学解剖姿态】，输出 JSON。';
+
+    if (prodBase64) {
+      imageContent.push({ type: 'image_url', image_url: { url: prodBase64 } });
+      userPromptText = '图1是参考场景图，图2是我的产品白底图。请精确提取图1的场景光影与【双手解剖姿态】，并绝对精确提取图2白底图的产品外观细节，输出 JSON。';
+    }
+
+    if (model.startsWith('qwen')) {
+      const url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+      const body = {
+        model: model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          {
+            role: 'user',
+            content: [
+              ...imageContent,
+              { type: 'text', text: userPromptText }
+            ]
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 2000
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`通义千问 API 错误 ${res.status}: ${err}`);
+      }
+      const data = await res.json();
+      const text = data.choices?.[0]?.message?.content || '';
+      return extractJSON(text);
+    }
+
+    if (model.startsWith('glm')) {
+      const url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+      const body = {
+        model: model,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              ...imageContent,
+              { type: 'text', text: systemPrompt + '\n\n' + userPromptText }
+            ]
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 2000
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`智谱 API 错误 ${res.status}: ${err}`);
+      }
+      const data = await res.json();
+      const text = data.choices?.[0]?.message?.content || '';
+      return extractJSON(text);
+    }
+
+    throw new Error('不支持的模型');
+  }
+
+  function extractJSON(text) {
+    let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('模型未返回有效 JSON，原始内容：\n' + text.slice(0, 400));
+    try {
+      return JSON.parse(match[0]);
+    } catch (e) {
+      throw new Error('JSON 解析失败：' + e.message + '\n原始内容：\n' + match[0].slice(0, 500));
+    }
+  }
+
+  async function runReverse() {
+    if (!refBase64) { showToast('请先上传参考场景图'); return; }
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
+    if (!apiKey) { showToast('请填写 API Key'); return; }
+
+    const model = document.getElementById('modelSelect').value;
+    document.getElementById('loading').classList.add('show');
+    document.getElementById('runBtn').disabled = true;
+
+    try {
+      const result = await callVisionAPI(model, apiKey, refBase64, prodBase64);
+      lastResult = result;
+      isZh = false;
+      currentRatio = '1:1';
+
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('resultArea').style.display = 'flex';
+
+      setTextSafely('interactionTypeResult', result.interaction_type || '模式自动识别完成');
+      setTextSafely('actionResult', result.action_pose_zh || result.action_pose_en || '已提取姿态');
+      setTextSafely('sceneTypeResult', result.scene_type || '—');
+      setTextSafely('keywordsResult', result.keywords || '—');
+      setTextSafely('sceneOnlyBox', result.scene_description_en || '—');
+
+      document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector('.ratio-btn[data-ratio="1:1"]').classList.add('active');
+      document.getElementById('langBtn').textContent = '🌐 切换中文';
+      
+      updateFinalPrompt();
+      addHistoryRecord(result);
+      showToast('反推与解剖姿态提炼成功！');
+    } catch (err) {
+      console.error(err);
+      showToast('出错了：' + (err.message || err).slice(0, 80));
+      alert('分析失败：\n\n' + (err.message || err));
+    } finally {
+      document.getElementById('loading').classList.remove('show');
+      document.getElementById('runBtn').disabled = false;
+    }
+  }
+
+  function updateFinalPrompt() {
+    if (!lastResult) return;
+    const category = document.getElementById('categorySelect').value;
+    const finalText = assembleFinalPrompt(lastResult, category, currentRatio, isZh);
+    setTextSafely('finalPromptBox', finalText);
+    setTextSafely('sceneOnlyBox', isZh
+      ? (lastResult.scene_description_zh || lastResult.scene_description_en)
+      : (lastResult.scene_description_en || '—')
+    );
+
+    const charCount = finalText.length;
+    const estTokens = Math.round(charCount / 4.2);
+    document.getElementById('tokenStats').textContent = `预估 Tokens: ${estTokens} | 字符数: ${charCount}`;
+  }
+
+  function switchOutputEngine(engine, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const titleEl = document.getElementById('promptFormatTitle');
+    if (engine === 'mj') titleEl.textContent = 'MJ_V6_PROMPT_PAYLOAD.txt';
+    if (engine === 'sd') titleEl.textContent = 'SDXL_PROMPT_PAYLOAD.txt';
+    if (engine === 'flux') titleEl.textContent = 'FLUX.1_PROMPT_PAYLOAD.txt';
+    showToast('已适配 ' + engine.toUpperCase() + ' 渲染引擎格式');
+  }
+
+  function addHistoryRecord(res) {
+    const timeStr = new Date().toLocaleTimeString();
+    historyData.unshift({ time: timeStr, title: res.scene_type || '场景反推记录', data: res });
+    if (historyData.length > 5) historyData.pop();
+
+    const container = document.getElementById('historyList');
+    container.innerHTML = historyData.map((item, idx) => `
+      <div class="history-item" onclick="loadHistoryItem(${idx})">
+        <div><strong>${item.title}</strong></div>
+        <div class="time">${item.time}</div>
+      </div>
+    `).join('');
+  }
+
+  function loadHistoryItem(idx) {
+    lastResult = historyData[idx].data;
+    updateFinalPrompt();
+    showToast('已载入历史记录 #' + (idx + 1));
+  }
+
+  function setRatio(ratio, btn) {
+    currentRatio = ratio;
+    document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    updateFinalPrompt();
+  }
+
+  function toggleLang() {
+    isZh = !isZh;
+    document.getElementById('langBtn').textContent = isZh ? '🌐 切换英文' : '🌐 切换中文';
+    updateFinalPrompt();
+  }
+
+  function copyPrompt() {
+    const text = document.getElementById('finalPromptBox').textContent;
+    if (!text || text === '—') { showToast('没有可复制的内容'); return; }
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('✅ 最终 Prompt 已复制（' + currentRatio + '）');
+      }).catch(() => fallbackCopy(text));
+    } else {
+      fallbackCopy(text);
+    }
+  }
+
+  function fallbackCopy(text) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      showToast('✅ 最终 Prompt 已复制（' + currentRatio + '）');
+    } catch (err) {
+      showToast('复制失败，请手动选择复制');
+    }
+    document.body.removeChild(textArea);
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    document.getElementById('toastMsg').textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2600);
+  }
+</script>
+</body>
+</html>

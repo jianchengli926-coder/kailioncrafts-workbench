@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>KaiLionCrafts Studio Pro - 专业白平衡与调色工作站</title>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg-base: #121214;
+            --bg-panel: #1a1a1e;
+            --bg-card: #242429;
+            --bg-hover: #2e2e35;
+            --border-color: #33333b;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-main: #ededf0;
+            --text-sub: #9ca3af;
+            --text-muted: #6b7280;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--bg-base); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 12px; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg-panel); }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+        /* 顶部导航 */
+        header { height: 52px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 10; }
+        .brand-area { display: flex; align-items: center; gap: 10px; }
+        .brand-logo-img { height: 28px; width: auto; object-fit: contain; }
+        .brand-title { font-size: 16px; font-weight: 700; color: #ffffff; letter-spacing: -0.2px; }
+        .brand-tag { font-size: 10px; background: rgba(59, 130, 246, 0.15); color: var(--accent); padding: 2px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase; border: 1px solid rgba(59, 130, 246, 0.3); }
+
+        .top-actions { display: flex; gap: 8px; align-items: center; }
+        .btn { padding: 6px 14px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: var(--accent); color: #ffffff; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-batch { background: #059669; color: #ffffff; }
+        .btn-batch:hover { background: #047857; }
+        .btn-zip { background: #7c3aed; color: #ffffff; }
+        .btn-zip:hover { background: #6d28d9; }
+        .btn-outline { background: var(--bg-card); border-color: var(--border-color); color: var(--text-main); }
+        .btn-outline:hover { background: var(--bg-hover); border-color: #4b5563; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 主体布局 */
+        .app-body { display: flex; flex: 1; overflow: hidden; }
+        .main-stage { flex: 1; background: #0a0a0c; display: flex; flex-direction: column; position: relative; }
+        .stage-header { height: 36px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; color: var(--text-sub); font-size: 11px; }
+        .canvas-container { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; padding: 16px; }
+        
+        .split-wrapper { position: relative; display: inline-block; box-shadow: 0 20px 40px rgba(0,0,0,0.6); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color); }
+        canvas { display: block; max-width: 72vw; max-height: 60vh; background: #000; }
+        #canvasProc { position: absolute; top: 0; left: 0; clip-path: polygon(50% 0, 100% 0, 100% 100%, 50% 100%); }
+        .split-bar { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: var(--accent); cursor: ew-resize; transform: translateX(-50%); z-index: 10; box-shadow: 0 0 8px rgba(59, 130, 246, 0.8); }
+        .split-handle { position: absolute; top: 50%; left: 50%; width: 24px; height: 24px; background: #ffffff; border: 2px solid var(--accent); border-radius: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; color: var(--accent); font-weight: bold; font-size: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+        
+        /* 底部胶卷栏 */
+        .filmstrip-container { height: 96px; background: var(--bg-panel); border-top: 1px solid var(--border-color); display: flex; align-items: center; padding: 0 16px; gap: 10px; overflow-x: auto; }
+        .thumb-card { width: 75px; height: 68px; border: 2px solid transparent; border-radius: 6px; overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0; background: var(--bg-card); transition: all 0.2s; opacity: 0.7; }
+        .thumb-card:hover { opacity: 1; }
+        .thumb-card.active { border-color: var(--accent); opacity: 1; box-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
+        .thumb-card img { width: 100%; height: 100%; object-fit: cover; }
+        .thumb-status { position: absolute; top: 4px; right: 4px; background: #059669; color: #fff; border-radius: 50%; width: 10px; height: 10px; display: none; box-shadow: 0 0 4px rgba(0,0,0,0.5); }
+        .thumb-card.done .thumb-status { display: block; }
+        
+        /* 单独下载按钮 */
+        .thumb-dl { position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: #fff; border-radius: 4px; padding: 3px 5px; font-size: 11px; display: none; z-index: 2; border: 1px solid #4b5563; }
+        .thumb-card:hover .thumb-dl { display: block; }
+        .thumb-dl:hover { background: var(--accent); border-color: var(--accent-hover); }
+
+        /* 右侧侧边栏 */
+        .sidebar-right { width: 340px; background: var(--bg-panel); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; overflow-y: auto; padding: 16px; gap: 16px; }
+        
+        .panel-group { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; }
+        .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .panel-title { color: var(--text-main); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+        
+        .btn-ai { width: 100%; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; padding: 9px; border-radius: 6px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; }
+        .btn-ai:hover { background: rgba(59, 130, 246, 0.25); border-color: var(--accent); color: #fff; }
+        .btn-tool { width: 100%; background: var(--bg-hover); border: 1px solid var(--border-color); color: var(--text-main); padding: 7px; border-radius: 6px; cursor: pointer; margin-top: 8px; font-size: 11px; font-weight: 500; transition: all 0.15s; }
+        .btn-tool:hover { background: #3f3f46; }
+        .btn-tool.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+        /* 预设滤镜网格 */
+        .preset-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px; }
+        .preset-chip { background: var(--bg-hover); border: 1px solid var(--border-color); color: var(--text-sub); padding: 7px 8px; border-radius: 5px; font-size: 11px; font-weight: 500; cursor: pointer; text-align: center; transition: all 0.15s; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .preset-chip:hover { color: var(--text-main); border-color: #52525b; }
+        .preset-chip.active { background: rgba(59, 130, 246, 0.15); border-color: var(--accent); color: #60a5fa; font-weight: 600; }
+
+        /* 调整滑块 */
+        .slider-group { margin-bottom: 12px; }
+        .slider-head { display: flex; justify-content: space-between; color: var(--text-sub); margin-bottom: 5px; font-size: 11px; }
+        .slider-head span.val { color: #60a5fa; font-family: monospace; font-weight: 600; }
+        input[type="range"] { width: 100%; accent-color: var(--accent); background: #33333b; height: 3px; appearance: none; outline: none; border-radius: 2px; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 11px; height: 11px; border-radius: 50%; background: #ffffff; cursor: pointer; box-shadow: 0 0 4px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="brand-area">
+        <img src="logo.png" alt="Logo" class="brand-logo-img" onerror="this.style.display='none'">
+        <span class="brand-title">KaiLionCrafts Studio</span>
+        <span class="brand-tag">PRO v9.7</span>
+    </div>
+    <div class="top-actions">
+        <input type="file" id="fileInput" accept="image/*" multiple style="display:none;">
+        <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">+ 批量导入照片</button>
+        <button class="btn btn-primary" id="btnBatchAuto">⚡ 批量自动校正</button>
+        <button class="btn btn-outline" id="btnExportCurrent">💾 导出当前</button>
+        <button class="btn btn-batch" id="btnExportBatch" title="将处理好的图片逐个下载">📦 导出全部 (多文件)</button>
+        <button class="btn btn-zip" id="btnExportZip" title="将所有图片打包成一个ZIP下载">🗜️ 批量打包 (ZIP)</button>
+    </div>
+</header>
+
+<div class="app-body">
+    <div class="main-stage">
+        <div class="stage-header">
+            <span id="fileName">未选择图片</span>
+            <span style="color: var(--accent); font-weight: 600; font-family: monospace;">COLOR ENGINE READY</span>
+        </div>
+        
+        <div class="canvas-container">
+            <div class="split-wrapper" id="stageWrapper" style="display:none;">
+                <canvas id="canvasOrig"></canvas>
+                <canvas id="canvasProc"></canvas>
+                <div class="split-bar" id="splitBar"><div class="split-handle">↔</div></div>
+            </div>
+            <div id="emptyHint" style="color: var(--text-muted); font-size: 13px; text-align: center;">
+                <p style="font-size: 15px; font-weight: 600; color: var(--text-sub); margin-bottom: 6px;">工作台就绪</p>
+                点击右上角“批量导入照片”开始处理
+            </div>
+        </div>
+
+        <div class="filmstrip-container" id="filmstrip"></div>
+    </div>
+
+    <div class="sidebar-right">
+        <div class="panel-group">
+            <div class="panel-header">
+                <span class="panel-title">⚡ AI 智能校正引擎</span>
+            </div>
+            <button class="btn-ai" id="btnAutoWB">自动推演白平衡 (AUTO AWB)</button>
+            <button class="btn-tool" id="btnPicker">🎯 吸管手动取色校准</button>
+        </div>
+
+        <div class="panel-group">
+            <div class="panel-header">
+                <span class="panel-title">🎨 专业色彩预设 (PRESETS)</span>
+            </div>
+            
+            <div style="color: var(--text-muted); font-size: 10px; margin-bottom: 6px; text-transform: uppercase;">刀具/金属静物</div>
+            <div class="preset-grid">
+                <div class="preset-chip active" data-preset="none">原图/标准</div>
+                <div class="preset-chip" data-preset="coolMetal">冷银金属 (刀具)</div>
+            </div>
+
+            <div style="color: var(--text-muted); font-size: 10px; margin-bottom: 6px; text-transform: uppercase;">人像调色</div>
+            <div class="preset-grid">
+                <div class="preset-chip" data-preset="portra400">柯达 Portra 400</div>
+                <div class="preset-chip" data-preset="fujiPro">富士 Pro 400H</div>
+                <div class="preset-chip" data-preset="warmCream">暖阳奶油肤色</div>
+                <div class="preset-chip" data-preset="japanHighkey">日系清透</div>
+                <div class="preset-chip" data-preset="bwClassic">经典黑白胶片</div>
+            </div>
+
+            <div style="color: var(--text-muted); font-size: 10px; margin-bottom: 6px; text-transform: uppercase;">风光/电影</div>
+            <div class="preset-grid">
+                <div class="preset-chip" data-preset="fujiClassic">富士 Classic Chrome</div>
+                <div class="preset-chip" data-preset="fujiVelvia">富士 Velvia (极彩)</div>
+                <div class="preset-chip" data-preset="tealOrange">极光青橙 (Teal Orange)</div>
+                <div class="preset-chip" data-preset="leicaVivid">徕卡典雅 (Leica)</div>
+                <div class="preset-chip" data-preset="vividLandscape">通透风光</div>
+                <div class="preset-chip" data-preset="cinematic">电影冷调</div>
+            </div>
+
+            <div class="slider-group" style="margin-top: 8px;">
+                <div class="slider-head"><span>预设应用强度 (Strength)</span><span class="val" id="valPresetDensity">100%</span></div>
+                <input type="range" id="sldPresetDensity" min="0" max="100" value="100">
+            </div>
+        </div>
+
+        <div class="panel-group">
+            <div class="panel-header">
+                <span class="panel-title">🎛️ 基础参数调节 (BASE COLOR)</span>
+            </div>
+            
+            <div class="slider-group">
+                <div class="slider-head"><span>色温 (Temperature)</span><span class="val" id="valTemp">5500K</span></div>
+                <input type="range" id="sldTemp" min="2000" max="10000" value="5500">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-head"><span>色调 (Tint)</span><span class="val" id="valTint">0</span></div>
+                <input type="range" id="sldTint" min="-50" max="50" value="0">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-head"><span>曝光微调 (Exposure)</span><span class="val" id="valExp">0</span></div>
+                <input type="range" id="sldExp" min="-100" max="100" value="0">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-head"><span>对比度 (Contrast)</span><span class="val" id="valContrast">0</span></div>
+                <input type="range" id="sldContrast" min="-100" max="100" value="0">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-head"><span>饱和度 (Saturation)</span><span class="val" id="valSat">0</span></div>
+                <input type="range" id="sldSat" min="-100" max="100" value="0">
+            </div>
+
+            <button class="btn-tool" id="btnReset">重置所有参数</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const filmstrip = document.getElementById('filmstrip');
+    const canvasOrig = document.getElementById('canvasOrig');
+    const canvasProc = document.getElementById('canvasProc');
+    const ctxOrig = canvasOrig.getContext('2d');
+    const ctxProc = canvasProc.getContext('2d');
+    const stageWrapper = document.getElementById('stageWrapper');
+    const emptyHint = document.getElementById('emptyHint');
+    const splitBar = document.getElementById('splitBar');
+
+    let imageList = [];
+    let activeIndex = -1;
+    let isPickerMode = false;
+
+    // 性能优化：渲染防抖节流
+    let renderRAF = null;
+
+    const sldTemp = document.getElementById('sldTemp');
+    const sldTint = document.getElementById('sldTint');
+    const sldExp = document.getElementById('sldExp');
+    const sldContrast = document.getElementById('sldContrast');
+    const sldSat = document.getElementById('sldSat');
+    const sldPresetDensity = document.getElementById('sldPresetDensity');
+
+    // 导入图片
+    fileInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        for (let file of files) {
+            const imgUrl = URL.createObjectURL(file);
+            const img = await loadImage(imgUrl);
+            const rawData = getRawImageData(img);
+            
+            imageList.push({
+                name: file.name,
+                imgUrl: imgUrl,
+                img: img,
+                rawData: rawData,
+                params: { 
+                    temp: 5500, 
+                    tint: 0, 
+                    exp: 0, 
+                    contrast: 0, 
+                    sat: 0,
+                    preset: 'none',
+                    presetDensity: 100
+                },
+                isDone: false
+            });
+        }
+
+        renderFilmstrip();
+        if (activeIndex === -1 && imageList.length > 0) {
+            selectImage(0);
+        }
+        fileInput.value = '';
+    });
+
+    function loadImage(url) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.src = url;
+        });
+    }
+
+    function getRawImageData(img) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        const ctx = tempCanvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        return ctx.getImageData(0, 0, img.width, img.height);
+    }
+
+    function selectImage(index) {
+        if (index < 0 || index >= imageList.length) return;
+        activeIndex = index;
+        const item = imageList[activeIndex];
+
+        document.getElementById('fileName').innerText = item.name;
+        canvasOrig.width = canvasProc.width = item.img.width;
+        canvasOrig.height = canvasProc.height = item.img.height;
+
+        ctxOrig.drawImage(item.img, 0, 0);
+        
+        emptyHint.style.display = 'none';
+        stageWrapper.style.display = 'inline-block';
+
+        loadParamsToUI(item.params);
+        renderCurrent();
+        updateFilmstripHighlight();
+    }
+
+    function renderFilmstrip() {
+        filmstrip.innerHTML = '';
+        imageList.forEach((item, idx) => {
+            const card = document.createElement('div');
+            card.className = `thumb-card ${idx === activeIndex ? 'active' : ''} ${item.isDone ? 'done' : ''}`;
+            card.onclick = () => selectImage(idx);
+
+            const imgEl = document.createElement('img');
+            imgEl.src = item.imgUrl;
+
+            const statusEl = document.createElement('div');
+            statusEl.className = 'thumb-status';
+
+            // 新增功能：单独下载按钮
+            const dlBtn = document.createElement('div');
+            dlBtn.className = 'thumb-dl';
+            dlBtn.innerHTML = '⬇️';
+            dlBtn.title = '单独导出此照片';
+            dlBtn.onclick = (e) => {
+                e.stopPropagation(); // 阻止触发切换图片的点击事件
+                exportSingleImage(idx);
+            };
+
+            card.appendChild(imgEl);
+            card.appendChild(statusEl);
+            card.appendChild(dlBtn);
+            filmstrip.appendChild(card);
+        });
+    }
+
+    function updateFilmstripHighlight() {
+        const cards = filmstrip.children;
+        for (let i = 0; i < cards.length; i++) {
+            if (i === activeIndex) cards[i].classList.add('active');
+            else cards[i].classList.remove('active');
+            if (imageList[i].isDone) cards[i].classList.add('done');
+        }
+    }
+
+    // -------------------------------------------------------------
+    // 【核心绝对不动点】：保留原封不动的自适应双引擎 AI 白平衡推演算法
+    // -------------------------------------------------------------
+    function calculateAutoWB(rawData) {
+        const d = rawData.data;
+        const len = d.length;
+        const stride = Math.max(4, Math.floor(len / (60000 * 4))) * 4;
+
+        let bgNeutralCount = 0;
+        let totalValidCount = 0;
+
+        let rSumBg = 0, gSumBg = 0, bSumBg = 0;
+        let highlightSamples = [];
+
+        for (let i = 0; i < len; i += stride) {
+            const r = d[i], g = d[i+1], b = d[i+2];
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+            if (lum < 15 || lum > 250) continue; 
+            totalValidCount++;
+
+            const sat = max === 0 ? 0 : (max - min) / max;
+
+            if (lum > 40 && lum < 220 && (max - min) < 18) {
+                rSumBg += r;
+                gSumBg += g;
+                bSumBg += b;
+                bgNeutralCount++;
+            }
+
+            if (lum > 120 && sat < 0.30) {
+                highlightSamples.push({ r, g, b, lum, sat });
+            }
+        }
+
+        const neutralRatio = bgNeutralCount / (totalValidCount || 1);
+        let finalTemp = 5500;
+        let finalTint = 0;
+
+        if (neutralRatio > 0.10 && bgNeutralCount > 30) {
+            const avgR = rSumBg / bgNeutralCount;
+            const avgG = gSumBg / bgNeutralCount;
+            const avgB = bSumBg / bgNeutralCount;
+
+            const rRatio = avgR / (avgG || 1);
+            const bRatio = avgB / (avgG || 1);
+
+            finalTemp = Math.round(5500 * (bRatio / (rRatio || 1))) + 50;
+            finalTint = Math.round((avgG - (avgR + avgB) / 2) * 1.2) + 2;
+        } 
+        else if (highlightSamples.length > 15) {
+            highlightSamples.sort((a, b) => a.sat - b.sat);
+            const sampleSize = Math.max(10, Math.floor(highlightSamples.length * 0.25));
+
+            let sumR = 0, sumG = 0, sumB = 0;
+            for (let k = 0; k < sampleSize; k++) {
+                sumR += highlightSamples[k].r;
+                sumG += highlightSamples[k].g;
+                sumB += highlightSamples[k].b;
+            }
+
+            const avgR = sumR / sampleSize;
+            const avgG = sumG / sampleSize;
+            const avgB = sumB / sampleSize;
+
+            const rRatio = avgR / (avgG || 1);
+            const bRatio = avgB / (avgG || 1);
+
+            finalTemp = Math.round(5500 * (bRatio / (rRatio || 1)));
+            finalTint = Math.round((avgG - (avgR + avgB) / 2) * 0.8);
+        }
+
+        return {
+            temp: Math.max(2000, Math.min(10000, finalTemp)),
+            tint: Math.max(-50, Math.min(50, finalTint))
+        };
+    }
+
+    document.getElementById('btnAutoWB').addEventListener('click', () => {
+        if (activeIndex === -1) return;
+        const item = imageList[activeIndex];
+        const res = calculateAutoWB(item.rawData);
+        item.params.temp = res.temp;
+        item.params.tint = res.tint;
+        item.isDone = true;
+
+        loadParamsToUI(item.params);
+        renderCurrent();
+        updateFilmstripHighlight();
+    });
+
+    document.getElementById('btnBatchAuto').addEventListener('click', () => {
+        if (imageList.length === 0) return alert('请先导入照片！');
+        
+        imageList.forEach(item => {
+            const res = calculateAutoWB(item.rawData);
+            item.params.temp = res.temp;
+            item.params.tint = res.tint;
+            item.isDone = true;
+        });
+
+        loadParamsToUI(imageList[activeIndex].params);
+        renderCurrent();
+        updateFilmstripHighlight();
+        alert(`已完成 ${imageList.length} 张照片的一键白平衡自动校正！`);
+    });
+
+    // 防抖渲染包装器：解决拖动滑块卡顿问题
+    function throttledRender() {
+        if (renderRAF) cancelAnimationFrame(renderRAF);
+        renderRAF = requestAnimationFrame(() => {
+            renderCurrent();
+        });
+    }
+
+    function renderCurrent() {
+        if (activeIndex === -1) return;
+        const item = imageList[activeIndex];
+        processImageData(item.rawData, ctxProc, item.params);
+    }
+
+    // -------------------------------------------------------------
+    // 色彩处理渲染引擎（底层未改动）
+    // -------------------------------------------------------------
+    function processImageData(srcRaw, targetCtx, params) {
+        const out = targetCtx.createImageData(srcRaw.width, srcRaw.height);
+        const src = srcRaw.data;
+        const dst = out.data;
+
+        // 基础 WB 增益
+        const tempFactor = (params.temp - 5500) / 4500;
+        let gainR = tempFactor > 0 ? 1 + tempFactor * 0.2 : 1 + tempFactor * 0.15;
+        let gainB = tempFactor > 0 ? 1 - tempFactor * 0.15 : 1 - tempFactor * 0.25;
+        let gainG = 1 - (params.tint / 50) * 0.15;
+
+        const expGain = Math.pow(2, params.exp / 50);
+        const contrastFactor = (259 * (params.contrast + 255)) / (255 * (259 - params.contrast));
+        const satFactor = 1 + (params.sat / 100);
+
+        const alpha = (params.presetDensity !== undefined ? params.presetDensity : 100) / 100;
+        const presetKey = params.preset || 'none';
+
+        for (let i = 0; i < src.length; i += 4) {
+            // 1. 底层 AI 白平衡及基础调色
+            let r = src[i] * gainR * expGain;
+            let g = src[i+1] * gainG * expGain;
+            let b = src[i+2] * gainB * expGain;
+
+            r = contrastFactor * (r - 128) + 128;
+            g = contrastFactor * (g - 128) + 128;
+            b = contrastFactor * (b - 128) + 128;
+
+            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            r = gray + satFactor * (r - gray);
+            g = gray + satFactor * (g - gray);
+            b = gray + satFactor * (b - gray);
+
+            let baseR = Math.min(255, Math.max(0, r));
+            let baseG = Math.min(255, Math.max(0, g));
+            let baseB = Math.min(255, Math.max(0, b));
+
+            // 2. 预设滤镜叠加
+            if (presetKey === 'none' || alpha === 0) {
+                dst[i]   = baseR;
+                dst[i+1] = baseG;
+                dst[i+2] = baseB;
+            } else {
+                let filterR = baseR, filterG = baseG, filterB = baseB;
+
+                if (presetKey === 'coolMetal') {
+                    filterR = baseR * 0.95;
+                    filterG = baseG * 0.98;
+                    filterB = baseB * 1.08;
+                }
+                else if (presetKey === 'portra400') { 
+                    filterR = baseR * 1.05 + 5;
+                    filterG = baseG * 0.99 + 2;
+                    filterB = baseB * 0.91;
+                } else if (presetKey === 'fujiPro') { 
+                    filterR = baseR * 0.98 + 4;
+                    filterG = baseG * 1.02;
+                    filterB = baseB * 1.03 + 4;
+                } else if (presetKey === 'warmCream') { 
+                    filterR = baseR * 1.06 + 8;
+                    filterG = baseG * 1.01 + 4;
+                    filterB = baseB * 0.88;
+                } else if (presetKey === 'japanHighkey') { 
+                    filterR = baseR * 1.03 + 12;
+                    filterG = baseG * 1.04 + 10;
+                    filterB = baseB * 1.06 + 14;
+                } else if (presetKey === 'bwClassic') { 
+                    const mono = 0.299 * baseR + 0.587 * baseG + 0.114 * baseB;
+                    filterR = filterG = filterB = mono;
+                }
+                else if (presetKey === 'fujiClassic') { 
+                    const gVal = 0.299 * baseR + 0.587 * baseG + 0.114 * baseB;
+                    filterR = gVal + 0.72 * (baseR - gVal) + 4;
+                    filterG = gVal + 0.75 * (baseG - gVal);
+                    filterB = gVal + 0.70 * (baseB - gVal) - 3;
+                } else if (presetKey === 'fujiVelvia') { 
+                    const gVal = 0.299 * baseR + 0.587 * baseG + 0.114 * baseB;
+                    filterR = gVal + 1.25 * (baseR - gVal);
+                    filterG = gVal + 1.35 * (baseG - gVal);
+                    filterB = gVal + 1.30 * (baseB - gVal);
+                } else if (presetKey === 'tealOrange') { 
+                    if (baseB > baseR && baseB > baseG * 0.9) { 
+                        filterR = baseR * 0.75;
+                        filterG = baseG * 1.02;
+                        filterB = baseB * 1.12;
+                    } else if (baseR > baseB) { 
+                        filterR = baseR * 1.10 + 4;
+                        filterG = baseG * 0.96;
+                        filterB = baseB * 0.82;
+                    } else {
+                        filterR = baseR; filterG = baseG; filterB = baseB;
+                    }
+                } else if (presetKey === 'leicaVivid') { 
+                    filterR = baseR > 120 ? baseR * 1.08 : baseR * 0.92;
+                    filterG = baseG > 120 ? baseG * 1.05 : baseG * 0.95;
+                    filterB = baseB > 120 ? baseB * 1.10 : baseB * 0.88;
+                } else if (presetKey === 'vividLandscape') { 
+                    filterR = baseR * 1.04;
+                    filterG = baseG * 1.06;
+                    filterB = baseB * 1.10;
+                } else if (presetKey === 'cinematic') { 
+                    filterR = baseR * 0.88;
+                    filterG = baseG * 0.95 + 4;
+                    filterB = baseB * 1.08 + 8;
+                }
+
+                // 预设强度线性混合
+                dst[i]   = Math.min(255, Math.max(0, baseR * (1 - alpha) + filterR * alpha));
+                dst[i+1] = Math.min(255, Math.max(0, baseG * (1 - alpha) + filterG * alpha));
+                dst[i+2] = Math.min(255, Math.max(0, baseB * (1 - alpha) + filterB * alpha));
+            }
+            dst[i + 3] = src[i + 3];
+        }
+        targetCtx.putImageData(out, 0, 0);
+    }
+
+    // 预设点击绑定
+    document.querySelectorAll('.preset-chip').forEach(chip => {
+        chip.addEventListener('click', (e) => {
+            if (activeIndex === -1) return;
+            document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+            e.target.classList.add('active');
+
+            const item = imageList[activeIndex];
+            item.params.preset = e.target.dataset.preset;
+            renderCurrent();
+        });
+    });
+
+    // 预设强度控制 (应用防抖)
+    sldPresetDensity.addEventListener('input', () => {
+        if (activeIndex === -1) return;
+        const p = imageList[activeIndex].params;
+        p.presetDensity = parseInt(sldPresetDensity.value);
+        document.getElementById('valPresetDensity').innerText = sldPresetDensity.value + '%';
+        throttledRender();
+    });
+
+    // 基础参数滑块绑定 (应用防抖)
+    [sldTemp, sldTint, sldExp, sldContrast, sldSat].forEach(s => {
+        s.addEventListener('input', () => {
+            if (activeIndex === -1) return;
+            const p = imageList[activeIndex].params;
+            p.temp = parseInt(sldTemp.value);
+            p.tint = parseInt(sldTint.value);
+            p.exp = parseInt(sldExp.value);
+            p.contrast = parseInt(sldContrast.value);
+            p.sat = parseInt(sldSat.value);
+            updateLabels();
+            throttledRender();
+        });
+    });
+
+    function loadParamsToUI(p) {
+        sldTemp.value = p.temp;
+        sldTint.value = p.tint;
+        sldExp.value = p.exp;
+        sldContrast.value = p.contrast;
+        sldSat.value = p.sat;
+        sldPresetDensity.value = p.presetDensity !== undefined ? p.presetDensity : 100;
+        
+        document.querySelectorAll('.preset-chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.preset === (p.preset || 'none'));
+        });
+
+        updateLabels();
+    }
+
+    function updateLabels() {
+        document.getElementById('valTemp').innerText = sldTemp.value + 'K';
+        document.getElementById('valTint').innerText = sldTint.value;
+        document.getElementById('valExp').innerText = sldExp.value;
+        document.getElementById('valContrast').innerText = sldContrast.value;
+        document.getElementById('valSat').innerText = sldSat.value;
+        document.getElementById('valPresetDensity').innerText = sldPresetDensity.value + '%';
+    }
+
+    document.getElementById('btnReset').addEventListener('click', () => {
+        if (activeIndex === -1) return;
+        imageList[activeIndex].params = { 
+            temp: 5500, 
+            tint: 0, 
+            exp: 0, 
+            contrast: 0, 
+            sat: 0,
+            preset: 'none',
+            presetDensity: 100
+        };
+        loadParamsToUI(imageList[activeIndex].params);
+        renderCurrent();
+    });
+
+    // -------------------------------------------------------------
+    // 导出功能优化
+    // -------------------------------------------------------------
+    
+    // 利用 Blob 代替原先慢速且耗内存的 toDataURL
+    function exportCanvasToBlob(canvas, filename) {
+        canvas.toBlob((blob) => {
+            if(!blob) return;
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            // 释放内存
+            setTimeout(() => URL.revokeObjectURL(link.href), 100);
+        }, 'image/png');
+    }
+
+    // 1. 导出当前显示图片
+    document.getElementById('btnExportCurrent').addEventListener('click', () => {
+        if (activeIndex === -1) return;
+        exportSingleImage(activeIndex);
+    });
+
+    // 2. 导出单独图片 (供缩略图独立下载按钮使用)
+    function exportSingleImage(index) {
+        const item = imageList[index];
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = item.img.width;
+        tempCanvas.height = item.img.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        processImageData(item.rawData, tempCtx, item.params);
+        exportCanvasToBlob(tempCanvas, `KaiLionCrafts_${item.name.replace(/\.[^/.]+$/, "")}.png`);
+    }
+
+    // 3. 批量分别导出 (多文件并发版，优化了崩溃风险)
+    document.getElementById('btnExportBatch').addEventListener('click', async () => {
+        if (imageList.length === 0) return alert('没有可导出的照片！');
+        if(!confirm('将会连续触发多次下载，可能需要允许浏览器“自动下载多个文件”权限。推荐使用旁边的 [批量打包(ZIP)] 功能。是否继续？')) return;
+        
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+
+        for (let i = 0; i < imageList.length; i++) {
+            const item = imageList[i];
+            tempCanvas.width = item.img.width;
+            tempCanvas.height = item.img.height;
+            processImageData(item.rawData, tempCtx, item.params);
+            
+            const fileName = `KaiLionCrafts_${item.name.replace(/\.[^/.]+$/, "")}.png`;
+            exportCanvasToBlob(tempCanvas, fileName);
+            // 留出时间让浏览器响应下载，防止被拦截
+            await new Promise(r => setTimeout(r, 400));
+        }
+    });
+
+    // 4. 新增功能：批量打包 ZIP 导出
+    document.getElementById('btnExportZip').addEventListener('click', async () => {
+        if (imageList.length === 0) return alert('没有可导出的照片！');
+        if (typeof JSZip === 'undefined') return alert('压缩包组件正在加载，请检查网络是否通畅。');
+
+        const btnZip = document.getElementById('btnExportZip');
+        const originalText = btnZip.innerHTML;
+        btnZip.innerHTML = '⏳ 正在压缩打包...';
+        btnZip.disabled = true;
+
+        try {
+            const zip = new JSZip();
+            const folder = zip.folder("KaiLionCrafts_Export");
+            
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // 串行处理防止大批量高分辨率图片引发内存溢出 (OOM)
+            for (let i = 0; i < imageList.length; i++) {
+                const item = imageList[i];
+                await new Promise((resolve) => {
+                    tempCanvas.width = item.img.width;
+                    tempCanvas.height = item.img.height;
+                    processImageData(item.rawData, tempCtx, item.params);
+                    
+                    tempCanvas.toBlob((blob) => {
+                        const fileName = `${item.name.replace(/\.[^/.]+$/, "")}.png`;
+                        folder.file(fileName, blob);
+                        resolve();
+                    }, 'image/png');
+                });
+            }
+
+            // 生成最终压缩包并下载
+            const content = await zip.generateAsync({ type: "blob" });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = "KaiLionCrafts_Batch_Export.zip";
+            link.click();
+            URL.revokeObjectURL(link.href);
+        } catch (err) {
+            console.error(err);
+            alert("打包导出失败，您的设备内存可能不足以处理该批次图片。");
+        } finally {
+            btnZip.innerHTML = originalText;
+            btnZip.disabled = false;
+        }
+    });
+
+    // 分割线拖拽
+    let isDragging = false;
+    splitBar.addEventListener('mousedown', () => isDragging = true);
+    window.addEventListener('mouseup', () => isDragging = false);
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const rect = stageWrapper.getBoundingClientRect();
+        let x = e.clientX - rect.left;
+        x = Math.max(0, Math.min(x, rect.width));
+        const pct = (x / rect.width) * 100;
+        splitBar.style.left = pct + '%';
+        canvasProc.style.clipPath = `polygon(${pct}% 0, 100% 0, 100% 100%, ${pct}% 100%)`;
+    });
+
+    // 手动吸管校准
+    document.getElementById('btnPicker').addEventListener('click', (e) => {
+        isPickerMode = !isPickerMode;
+        e.target.classList.toggle('active', isPickerMode);
+        canvasProc.style.cursor = isPickerMode ? 'crosshair' : 'default';
+    });
+
+    canvasProc.addEventListener('click', (e) => {
+        if (!isPickerMode || activeIndex === -1) return;
+        const rect = canvasProc.getBoundingClientRect();
+        const x = Math.floor((e.clientX - rect.left) * (canvasProc.width / rect.width));
+        const y = Math.floor((e.clientY - rect.top) * (canvasProc.height / rect.height));
+
+        const item = imageList[activeIndex];
+        const idx = (y * canvasProc.width + x) * 4;
+        const r = item.rawData.data[idx];
+        const g = item.rawData.data[idx+1];
+        const b = item.rawData.data[idx+2];
+
+        const avg = (r + g + b) / 3;
+        const tempAdj = Math.round(((b - r) / (avg || 1)) * 2500);
+        
+        item.params.temp = Math.max(2000, Math.min(10000, 5500 + tempAdj));
+        isPickerMode = false;
+        document.getElementById('btnPicker').classList.remove('active');
+        canvasProc.style.cursor = 'default';
+        
+        loadParamsToUI(item.params);
+        renderCurrent();
+    });
+</script>
+</body>
+</html>

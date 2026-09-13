@@ -1,0 +1,7 @@
+.env
+data/ai_providers.json
+data/customers.json
+data/competitor_sites.csv
+__pycache__/
+*.pyc
+.streamlit/secrets.toml

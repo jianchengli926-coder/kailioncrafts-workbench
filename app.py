@@ -175,11 +175,11 @@ with st.sidebar:
         "📥 独立站管理", "📊 订单台账",
         # 产品部
         "📦 产品库",
-        "📊 SEO表格工具", "📦 独立站上品SEO工作台",
+        "📊 独立站SEO中心",
         # 市场部
         "🔎 竞品与资源库",
         # 知识部
-        "📚 知识库", "💡 博客SEO工作台",
+        "📚 知识库",
         "📱 飞书协同",
         # 管理
         "⚙️ 设置中心",
@@ -3439,6 +3439,47 @@ elif page == "📦 锴利自研AI工具库":
             - 支持JPG/PNG格式
             - 处理后的图片可直接下载使用
             """)
+
+# ============ 独立站SEO中心（合并三个SEO功能） ============
+elif page == "📊 独立站SEO中心":
+    st.title("📊 独立站SEO中心")
+    st.caption("SEO表格工具 · 独立站上品SEO · 博客SEO · 一体化管理")
+
+    # 三个大按钮
+    s1, s2, s3 = st.columns(3)
+    with s1:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:12px 12px 0 0;padding:24px;text-align:center;">
+        <div style="font-size:36px;">📊</div>
+        <div style="font-weight:700;margin-top:8px;">SEO表格工具</div>
+        <div style="font-size:12px;color:#1e40af;margin-top:4px;">关键词密度 · 表格分析</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("进入SEO表格", key="goto_seo_table", use_container_width=True):
+            st.session_state["main_nav"] = "📊 SEO表格工具"
+            st.rerun()
+    with s2:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:12px 12px 0 0;padding:24px;text-align:center;">
+        <div style="font-size:36px;">📦</div>
+        <div style="font-weight:700;margin-top:8px;">独立站上品SEO</div>
+        <div style="font-size:12px;color:#92400e;margin-top:4px;">SKU命名 · 上品优化</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("进入上品SEO", key="goto_seo_listing", use_container_width=True):
+            st.session_state["main_nav"] = "📦 独立站上品SEO工作台"
+            st.rerun()
+    with s3:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-radius:12px 12px 0 0;padding:24px;text-align:center;">
+        <div style="font-size:36px;">💡</div>
+        <div style="font-weight:700;margin-top:8px;">博客SEO工作台</div>
+        <div style="font-size:12px;color:#065f46;margin-top:4px;">博客内容 · SEO写作</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("进入博客SEO", key="goto_seo_blog", use_container_width=True):
+            st.session_state["main_nav"] = "💡 博客SEO工作台"
+            st.rerun()
 
 elif page == "📦 独立站上品SEO工作台":
     st.title("📦 独立站商品上架SEO工作台")

@@ -3586,15 +3586,14 @@ elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "l
 - 我们产品的差异化优势
     
 请开始联网搜索，确保信息真实准确。"""
-    
-    st.session_state['search_prompt'] = search_prompt
-    st.success("✅ 联网搜索Prompt已生成！")
-    
-    # 显示搜索Prompt
-    if 'search_prompt' in st.session_state:
-        st.markdown("#### 联网搜索Prompt（复制到豆包/AI工具）")
-    st.code(st.session_state['search_prompt'], language=None)
-    st.info("💡 将此Prompt复制到豆包专家模式，上传产品图片，让AI联网搜索竞品信息")
+            st.session_state['search_prompt'] = search_prompt
+            st.success("✅ 联网搜索Prompt已生成！")
+
+        # 显示搜索Prompt
+        if 'search_prompt' in st.session_state:
+            st.markdown("#### 联网搜索Prompt（复制到豆包/AI工具）")
+            st.code(st.session_state['search_prompt'], language=None)
+            st.info("💡 将此Prompt复制到豆包专家模式，上传产品图片，让AI联网搜索竞品信息")
     
     st.markdown("---")
     
@@ -3740,11 +3739,11 @@ elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "t
 
     if uploaded_image:
         col1, col2 = st.columns([1, 2])
-    with col1:
-        st.image(uploaded_image, width=200, caption="上传的产品图")
-    with col2:
-        st.success("✅ 图片已上传")
-    st.caption("图片将用于AI视觉识别和以图搜图")
+        with col1:
+            st.image(uploaded_image, width=200, caption="上传的产品图")
+        with col2:
+            st.success("✅ 图片已上传")
+        st.caption("图片将用于AI视觉识别和以图搜图")
 
     st.markdown("---")
 

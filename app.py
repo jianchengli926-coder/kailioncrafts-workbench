@@ -324,6 +324,30 @@ if page == "📊 仪表盘":
 
     st.markdown("---")
 
+    # 近7天趋势
+    st.markdown("##### 📈 近7天趋势")
+    try:
+        import json as _j, os
+        from datetime import datetime as _dt, timedelta as _td
+        inbox_file = "data/inbox/inquiries.json"
+        if os.path.exists(inbox_file):
+            inqs = _j.load(open(inbox_file, encoding="utf-8"))
+        else:
+            inqs = []
+        dates = [(datetime.now() - _td(days=i)).strftime("%m-%d") for i in range(6, -1, -1)]
+        inq_counts = [0] * 7
+        for q in inqs:
+            d = q.get("date", "")
+            for i, ds in enumerate(dates):
+                if ds in d:
+                    inq_counts[i] += 1
+        trend_df = pd.DataFrame({"日期": dates, "询盘数": inq_counts})
+        st.bar_chart(trend_df.set_index("日期"))
+    except Exception as e:
+        st.caption(f"趋势数据加载中...")
+
+    st.markdown("---")
+
     # 最近客户 + 图表
     col1, col2 = st.columns([2, 1])
     with col1:

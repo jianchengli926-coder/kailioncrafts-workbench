@@ -310,6 +310,30 @@ if page == "📊 仪表盘":
             st.rerun()
         st.caption("竞品 · 蓝海 · 选品")
 
+    # 更多快捷入口
+    st.markdown("---")
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        if st.button("📥 独立站管理", use_container_width=True):
+            st.session_state["main_nav"] = "📥 独立站管理"
+            st.rerun()
+        st.caption("询盘 · WooCommerce")
+    with m2:
+        if st.button("👥 客户中心", use_container_width=True):
+            st.session_state["main_nav"] = "👥 客户中心"
+            st.rerun()
+        st.caption("CRM · 销售漏斗")
+    with m3:
+        if st.button("📚 知识库", use_container_width=True):
+            st.session_state["main_nav"] = "📚 知识库"
+            st.rerun()
+        st.caption("搜索 · 管理 · 版本")
+    with m4:
+        if st.button("⚙️ 设置中心", use_container_width=True):
+            st.session_state["main_nav"] = "⚙️ 设置中心"
+            st.rerun()
+        st.caption("模型 · 追踪 · 日志")
+
     st.markdown("---")
 
     # 今日待办

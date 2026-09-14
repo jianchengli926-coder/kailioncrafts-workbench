@@ -315,7 +315,7 @@ if page == "📊 仪表盘":
         <div style="font-size:28px;">📦</div><div style="font-weight:700;margin-top:4px;">产品与SEO</div>
         </div>""", unsafe_allow_html=True)
         if st.button("进入", key="goto_seo", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📦 独立站上品SEO工作台"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📊 独立站SEO中心"; st.rerun()
     with row1c3:
         st.markdown("""<div style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-radius:12px 12px 0 0;padding:16px;text-align:center;">
         <div style="font-size:28px;">🛠️</div><div style="font-weight:700;margin-top:4px;">AI工具库</div>

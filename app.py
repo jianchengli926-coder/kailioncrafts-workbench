@@ -629,6 +629,26 @@ elif page == "📥 独立站管理":
         s3.metric("已回复", len([i for i in inquiries if i["status"]=="已回复"]))
         s4.metric("评论", len(comments))
 
+    # WooCommerce后台
+    st.markdown("---")
+    st.markdown("##### 🛒 WooCommerce订单")
+    if st.button("🔄 拉取最新订单", key="wc_pull"):
+        with st.spinner("正在从WooCommerce拉取..."):
+            try:
+                import requests
+                r = requests.get("https://kailioncrafts.com/wp-json/wc/v3/orders",
+                    auth=("ck_081563431476ddb5de3b7622b5103c36ae5dfa5e", "cs_14f604031a3c0afef77660ccd18d121670bffe84"),
+                    params={"per_page": 10}, timeout=15)
+                if r.status_code == 200:
+                    orders = r.json()
+                    st.success(f"拉取到 {len(orders)} 个订单")
+                    for o in orders:
+                        st.write(f"#{o.get('id')} | {o.get('status')} | {o.get('total')} {o.get('currency')} | {o.get('billing',{}).get('first_name','')}")
+                else:
+                    st.error(f"API错误: {r.status_code}")
+            except Exception as e:
+                st.error(f"连接失败：{e}")
+
 # ============ 页面2：晨间简报 ============
 elif page == "🌅 晨间简报":
     st.title("🌅 今日外贸晨间简报")

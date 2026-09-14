@@ -170,6 +170,7 @@ with st.sidebar:
         "🔎 竞品与资源库",
         # 知识部
         "📚 知识库", "💡 博客SEO工作台",
+        "📱 飞书协同",
         # 管理
         "⚙️ 设置中心",
     ]
@@ -4896,7 +4897,46 @@ Slug: ...
                 st.write("引用知识库：")
                 for ref in t.get("knowledge_refs", []):
                     st.write(f"- {ref}")
-    
+
+# ============ 飞书协同 ============
+elif page == "📱 飞书协同":
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
+    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · FEISHU</div>
+    <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">飞书协同</h2>
+    <div style="color:rgba(255,243,224,.6);font-size:13px;">飞书云盘 · 消息通知 · 文档同步</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    fs1, fs2, fs3 = st.columns(3)
+    with fs1:
+        st.markdown("""
+        <div style="background:#f8f9fa;border-radius:12px;padding:20px;">
+        <div style="font-size:32px;">📁</div>
+        <div style="font-weight:600;margin:8px 0;">飞书云盘</div>
+        <div style="font-size:12px;color:#888;">文档同步 · 知识库备份</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with fs2:
+        st.markdown("""
+        <div style="background:#f8f9fa;border-radius:12px;padding:20px;">
+        <div style="font-size:32px;">🔔</div>
+        <div style="font-weight:600;margin:8px 0;">消息通知</div>
+        <div style="font-size:12px;color:#888;">新询盘 · 订单 · 提醒</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with fs3:
+        st.markdown("""
+        <div style="background:#f8f9fa;border-radius:12px;padding:20px;">
+        <div style="font-size:32px;">📄</div>
+        <div style="font-weight:600;margin:8px 0;">文档同步</div>
+        <div style="font-size:12px;color:#888;">报告 · 资料 · 备份</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.info("飞书App ID: cli_aa2c7e3b30b8dbd8 | 云盘文件夹已连接")
+
 # ============ 设置中心 ============
 elif page == "⚙️ 设置中心":
     st.markdown("""

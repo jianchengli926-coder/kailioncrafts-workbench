@@ -49,6 +49,40 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ============ 密码门 ============
+if "authed" not in st.session_state:
+    st.session_state["authed"] = False
+
+if not st.session_state["authed"]:
+    st.markdown("""
+    <div style="max-width:400px;margin:80px auto;text-align:center;">
+    <div style="font-size:64px;">🔪</div>
+    <h1 style="color:#1a1a2e;margin:16px 0 8px;">KaiLionCrafts</h1>
+    <div style="color:#888;margin-bottom:32px;">企业级AI工作台 · 请输入密码</div>
+    </div>
+    """, unsafe_allow_html=True)
+    pwd = st.text_input("密码", type="password", label_visibility="collapsed", placeholder="输入访问密码")
+    if st.button("进入", use_container_width=True, type="primary"):
+        if pwd == "441723":
+            st.session_state["authed"] = True
+            # 记录访问日志
+            try:
+                import json, os
+                from datetime import datetime
+                log_file = "data/auth_log.json"
+                os.makedirs("data", exist_ok=True)
+                logs = []
+                if os.path.exists(log_file):
+                    logs = json.load(open(log_file, encoding="utf-8"))
+                logs.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "登录成功"})
+                json.dump(logs[-100:], open(log_file, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+            except:
+                pass
+            st.rerun()
+        else:
+            st.error("密码错误")
+    st.stop()
+
 # ============ 回到顶部浮动按钮 ============
 st.markdown("""
 <style>

@@ -247,41 +247,46 @@ if page == "📊 仪表盘":
 
     st.markdown("---")
 
-    # 快捷功能入口卡片
+    # 快捷功能入口卡片（可点击）
     st.markdown("##### 🚀 快捷功能")
     f1, f2, f3, f4 = st.columns(4)
-    with f1:
-        st.markdown("""
-        <div style="background:#fef3c7;border-radius:12px;padding:18px;height:120px;">
-            <div style="font-size:28px;">🎯</div>
-            <div style="font-weight:600;margin-top:6px;">客户开发</div>
-            <div style="font-size:12px;color:#666;">分析 · 背调 · 开发信</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with f2:
-        st.markdown("""
-        <div style="background:#dbeafe;border-radius:12px;padding:18px;height:120px;">
-            <div style="font-size:28px;">📦</div>
-            <div style="font-weight:600;margin-top:6px;">产品与SEO</div>
-            <div style="font-size:12px;color:#666;">SKU · SEO · 上品</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with f3:
-        st.markdown("""
-        <div style="background:#d1fae5;border-radius:12px;padding:18px;height:120px;">
-            <div style="font-size:28px;">🛠️</div>
-            <div style="font-weight:600;margin-top:6px;">AI工具库</div>
-            <div style="font-size:12px;color:#666;">7个自研视觉工具</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with f4:
-        st.markdown("""
-        <div style="background:#ede9fe;border-radius:12px;padding:18px;height:120px;">
-            <div style="font-size:28px;">🌍</div>
-            <div style="font-weight:600;margin-top:6px;">市场分析</div>
-            <div style="font-size:12px;color:#666;">竞品 · 蓝海 · 选品</div>
-        </div>
-        """, unsafe_allow_html=True)
+    if f1.button("🎯\n客户开发\n分析·背调·开发信", use_container_width=True):
+        st.session_state["main_nav"] = "👥 客户中心"
+        st.rerun()
+    if f2.button("📦\n产品与SEO\nSKU·SEO·上品", use_container_width=True):
+        st.session_state["main_nav"] = "📦 独立站上品SEO工作台"
+        st.rerun()
+    if f3.button("🛠️\nAI工具库\n7个自研视觉工具", use_container_width=True):
+        st.session_state["main_nav"] = "📦 锴利自研AI工具库"
+        st.rerun()
+    if f4.button("🌍\n市场分析\n竞品·蓝海·选品", use_container_width=True):
+        st.session_state["main_nav"] = "🌍 市场分析"
+        st.rerun()
+
+    st.markdown("---")
+
+    # 今日待办
+    st.markdown("##### 📋 今日待办")
+    todo_file = Path("data/todo/todos.json")
+    todo_file.parent.mkdir(parents=True, exist_ok=True)
+    if todo_file.exists():
+        todos = _json.loads(todo_file.read_text(encoding="utf-8"))
+    else:
+        todos = []
+    t1, t2 = st.columns([3, 1])
+    with t1:
+        new_todo = st.text_input("添加待办", placeholder="例如：跟进德国客户OEM询价", label_visibility="collapsed")
+    with t2:
+        if st.button("➕ 添加", use_container_width=True):
+            if new_todo.strip():
+                todos.append({"task": new_todo.strip(), "done": False, "date": datetime.now().strftime("%Y-%m-%d")})
+                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+                st.rerun()
+    for i, t in enumerate(todos[:10]):
+        cb = st.checkbox(t["task"], value=t["done"], key=f"dash_todo_{i}")
+        if cb != t["done"]:
+            todos[i]["done"] = cb
+            todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
 
     st.markdown("---")
 

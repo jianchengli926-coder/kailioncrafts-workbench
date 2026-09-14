@@ -3647,13 +3647,12 @@ elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "l
 【12. 等其余模块...】
     
 请一次性生成全部内容，直接输出可复制粘贴的最终内容。"""
-    
-    st.session_state['seo_prompt'] = seo_prompt
-    st.success("✅ SEO内容生成Prompt已生成！")
-    
-    if 'seo_prompt' in st.session_state:
-        st.markdown("#### SEO内容生成Prompt（复制到豆包专家模式）")
-    st.code(st.session_state['seo_prompt'], language=None)
+            st.session_state['seo_prompt'] = seo_prompt
+            st.success("✅ SEO内容生成Prompt已生成！")
+
+        if 'seo_prompt' in st.session_state:
+            st.markdown("#### SEO内容生成Prompt（复制到豆包专家模式）")
+            st.code(st.session_state['seo_prompt'], language=None)
     
     st.markdown("---")
     

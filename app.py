@@ -4200,26 +4200,178 @@ elif page == "🌍 市场与产品分析":
                 st.markdown(result)
 
     elif mp_current == "📦 产品分析":
-        st.subheader("产品分析")
-        p1, p2 = st.tabs(["📋 Listing诊断", "✍️ 文案生成"])
+        st.subheader("📦 产品分析")
+        p1, p2, p3 = st.tabs(["📋 Listing诊断", "✍️ 文案生成", "🔍 竞品对比"])
         with p1:
-            asin = st.text_input("输入ASIN", placeholder="B0XXXXXX")
-            if st.button("🔍 诊断", use_container_width=True):
-                with st.spinner("分析中..."):
-                    st.info("诊断功能开发中")
+            st.markdown("##### Listing健康度诊断")
+            asin = st.text_input("输入ASIN或产品SKU", placeholder="B0XXXXXX 或 KL-KN-HM-003")
+            if st.button("🔍 AI诊断", use_container_width=True, type="primary"):
+                if asin:
+                    with st.spinner("AI正在诊断Listing..."):
+                        prompt = f"""# Amazon Listing 诊断任务
+
+请基于以下产品信息，诊断这个Listing的健康度，给出1-100分评分和改进建议：
+
+产品标识: {asin}
+
+请从以下维度分析：
+1. 标题质量（关键词覆盖、长度、可读性）
+2. 五点描述（卖点突出、关键词、长度）
+3. 产品描述（SEO友好度、信息完整度）
+4. 图片建议（主图、副图数量）
+5. 定价建议
+6. 竞品差异
+
+输出格式：总分 + 各维度得分 + 具体改进建议（中文，B2B视角）。"""
+                        result = ai.chat(prompt)
+                    st.markdown(result)
+                else:
+                    st.warning("请先输入ASIN或SKU")
         with p2:
-            product_desc = st.text_area("产品描述", height=100)
-            if st.button("✍️ 生成文案", use_container_width=True):
-                with st.spinner("生成中..."):
-                    st.info("文案生成开发中")
+            st.markdown("##### 产品文案生成")
+            col1, col2 = st.columns(2)
+            with col1:
+                p_name = st.text_input("产品名称", placeholder="German Steel Chef Knife 8 Inch")
+                p_cat = st.selectbox("品类", COMPANY["categories"])
+                p_features = st.text_area("产品卖点", placeholder="例如：高碳钢、热处理HRC60、人体工学手柄", height=80)
+            with col2:
+                p_target = st.selectbox("目标市场", ["美国", "欧洲", "日本", "澳大利亚"])
+                p_style = st.selectbox("文案风格", ["B2B批发专业风", "Amazon零售风", "独立站品牌风"])
+            if st.button("✍️ 生成Listing文案", use_container_width=True, type="primary"):
+                with st.spinner("AI正在生成..."):
+                    prompt = f"""# 产品Listing文案生成
+
+请根据以下信息生成完整的Amazon Listing文案：
+
+产品名称: {p_name}
+品类: {p_cat}
+卖点: {p_features}
+目标市场: {p_target}
+风格: {p_style}
+
+公司背景: {kb.get_company_brief()[:500]}
+
+请输出：
+1. SEO标题（含核心关键词）
+2. 五点描述（5条bullet points）
+3. 产品描述（200词）
+4. 焦点关键词建议（5个）
+全部英文，B2B专业风格。"""
+                    result = ai.chat(prompt)
+                st.markdown(result)
+        with p3:
+            st.markdown("##### 竞品对比")
+            col1, col2 = st.columns(2)
+            with col1:
+                my_asin = st.text_input("我方产品ASIN/SKU", key="my_asin")
+            with col2:
+                comp_asin = st.text_input("竞品ASIN/SKU", key="comp_asin")
+            if st.button("⚖️ AI对比分析", use_container_width=True, type="primary"):
+                with st.spinner("对比分析中..."):
+                    prompt = f"""# 竞品对比分析任务
+
+我方产品: {my_asin}
+竞品: {comp_asin}
+
+请分析：
+1. 价格对比
+2. 卖点差异
+3. 图片质量对比
+4. 评价关键词对比
+5. 我们的差异化机会
+6. 改进建议（3条）
+
+中文输出，B2B视角。"""
+                    result = ai.chat(prompt)
+                st.markdown(result)
 
     elif mp_current == "📈 广告分析":
-        st.subheader("广告分析")
-        st.info("广告分析功能开发中，上传广告报告后可自动分析")
+        st.subheader("📈 广告分析")
+        st.caption("上传Amazon广告报告 → AI分析产品角色 + 否定词建议")
+        a1, a2 = st.tabs(["🎯 广告策略", "🔧 广告调优"])
+        with a1:
+            st.markdown("##### 广告产品角色判断")
+            col1, col2 = st.columns(2)
+            with col1:
+                ad_sku = st.text_input("产品SKU", key="ad_sku")
+                ad_spend = st.number_input("日均广告花费($)", min_value=0, value=50)
+            with col2:
+                ad_sales = st.number_input("日均广告销售额($)", min_value=0, value=200)
+                ad_acos = st.number_input("ACOS(%)", min_value=0, max_value=100, value=35)
+            if st.button("🎯 AI判断产品角色", use_container_width=True, type="primary"):
+                with st.spinner("分析中..."):
+                    prompt = f"""# Amazon广告产品角色分析
+
+产品SKU: {ad_sku}
+日均花费: ${ad_spend}
+日均销售: ${ad_sales}
+ACOS: {ad_acos}%
+
+请判断这个产品在广告结构中的角色：
+1. 防御型（高ACOS，保护品牌词）
+2. 进攻型（低ACOS，抢竞品词）
+3. 收割型（精准转化，利润款）
+4. 测款型（高花费低转化，测试中）
+
+给出判断 + 优化建议。中文输出。"""
+                    result = ai.chat(prompt)
+                st.markdown(result)
+        with a2:
+            st.markdown("##### 搜索词报告分析")
+            st.info("上传Amazon搜索词报告CSV后，AI自动分析：高转化词加价 + 无效词否定")
+            uploaded_ad = st.file_uploader("上传搜索词报告", type=['csv'], key="ad_report")
+            if uploaded_ad:
+                st.success("文件已上传，AI分析功能开发中（当前版本仅支持手动输入）")
 
     elif mp_current == "🎨 视觉内容":
-        st.subheader("视觉内容")
-        st.info("视觉内容功能开发中")
+        st.subheader("🎨 视觉内容")
+        v1, v2 = st.tabs(["🖼️ 主副图提示词", "📄 A+布局规划"])
+        with v1:
+            st.markdown("##### AI生图提示词")
+            col1, col2 = st.columns(2)
+            with col1:
+                v_product = st.text_input("产品名称", placeholder="8寸主厨刀", key="v_product")
+                v_scene = st.selectbox("图片类型", ["主图（白底）", "场景图（厨房使用）", "细节图（刀刃特写）", "尺寸图", "包装图", "生活方式图"])
+            with col2:
+                v_style = st.selectbox("风格", ["亚马逊高端风格", "独立站品牌风格", "极简白底", "生活方式"])
+                v_ratio = st.selectbox("图片比例", ["1:1 (1000x1000)", "3:4 (750x1000)", "16:9", "4:5"])
+            if st.button("🎨 生成图片提示词", use_container_width=True, type="primary"):
+                with st.spinner("生成中..."):
+                    prompt = f"""# AI生图提示词生成
+
+产品: {v_product}
+图片类型: {v_scene}
+风格: {v_style}
+比例: {v_ratio}
+
+请输出Midjourney/DALL-E可用的英文提示词，包含：
+- 产品主体描述
+- 背景/场景
+- 光线/角度
+- 质量关键词（8k, professional, studio lighting）
+- 负面提示词"""
+                    result = ai.chat(prompt)
+                st.markdown(result)
+        with v2:
+            st.markdown("##### A+ Content 布局规划")
+            a_product = st.text_input("产品名称", key="a_plus_product")
+            if st.button("📐 生成A+布局", use_container_width=True, type="primary"):
+                with st.spinner("生成中..."):
+                    prompt = f"""# Amazon A+ Content 布局规划
+
+产品: {a_product}
+公司: {kb.get_company_brief()[:300]}
+
+请规划一个5模块的A+ Content布局：
+1. 品牌横幅
+2. 产品核心卖点（3个icon）
+3. 产品对比表
+4. 使用场景
+5. 品牌故事
+
+每个模块描述内容和图片建议。中文输出。"""
+                    result = ai.chat(prompt)
+                st.markdown(result)
 
 # ============ 页面12：竞品与资源库 ============
 elif page == "🔍 竞品与资源库":

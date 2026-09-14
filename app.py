@@ -192,6 +192,10 @@ with st.sidebar:
         key="main_nav",
     )
 
+    # 切换导航时清除SEO子页面状态
+    if page != "📊 独立站SEO中心":
+        st.session_state.pop("seo_sub", None)
+
     # 如果选择AI工具库，展开二级工具选择
     if page == "📦 锴利自研AI工具库":
         tool_options_with_prompt = ["📦 工具库首页"] + list(tool_options.keys())[1:]
@@ -3441,7 +3445,7 @@ elif page == "📦 锴利自研AI工具库":
             """)
 
 # ============ 独立站SEO中心（合并三个SEO功能） ============
-elif page == "📊 独立站SEO中心":
+elif page == "📊 独立站SEO中心" and "seo_sub" not in st.session_state:
     st.title("📊 独立站SEO中心")
     st.caption("SEO表格工具 · 独立站上品SEO · 博客SEO · 一体化管理")
 
@@ -3456,8 +3460,7 @@ elif page == "📊 独立站SEO中心":
         </div>
         """, unsafe_allow_html=True)
         if st.button("进入SEO表格", key="goto_seo_table", use_container_width=True):
-            st.session_state.pop("main_nav", None)
-            st.session_state["main_nav"] = "📊 SEO表格工具"
+            st.session_state["seo_sub"] = "table"
             st.rerun()
     with s2:
         st.markdown("""
@@ -3468,8 +3471,7 @@ elif page == "📊 独立站SEO中心":
         </div>
         """, unsafe_allow_html=True)
         if st.button("进入上品SEO", key="goto_seo_listing", use_container_width=True):
-            st.session_state.pop("main_nav", None)
-            st.session_state["main_nav"] = "📦 独立站上品SEO工作台"
+            st.session_state["seo_sub"] = "listing"
             st.rerun()
     with s3:
         st.markdown("""
@@ -3480,11 +3482,14 @@ elif page == "📊 独立站SEO中心":
         </div>
         """, unsafe_allow_html=True)
         if st.button("进入博客SEO", key="goto_seo_blog", use_container_width=True):
-            st.session_state.pop("main_nav", None)
-            st.session_state["main_nav"] = "💡 博客SEO工作台"
+            st.session_state["seo_sub"] = "blog"
             st.rerun()
 
-elif page == "📦 独立站上品SEO工作台":
+elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "listing":
+    # 返回SEO中心按钮
+    if st.button("← 返回SEO中心", key="back_seo_center_1"):
+        del st.session_state["seo_sub"]
+        st.rerun()
     st.title("📦 独立站商品上架SEO工作台")
     st.caption("KaiLionCrafts WooCommerce商品上架超级指令 · Rank Math SEO 84+分 · 生成即达标")
     
@@ -3712,7 +3717,10 @@ elif page == "📦 独立站上品SEO工作台":
     """)
     
 # ============ SEO表格工具页面 ============
-elif page == "📊 SEO表格工具":
+elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "table":
+    if st.button("← 返回SEO中心", key="back_seo_center_2"):
+        del st.session_state["seo_sub"]
+        st.rerun()
     st.title("📊 产品SEO表格生成工具")
     st.caption("上传产品白底图 → AI识别+联网搜索 → 生成完整SEO表格（Excel格式）· 连接公司知识库")
 
@@ -4731,7 +4739,10 @@ elif page == "📊 订单台账":
         st.info("还没有订单数据，点击上方录入第一笔")
     
 # ============ 页面：博客SEO工作台 ============
-elif page == "💡 博客SEO工作台":
+elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "blog":
+    if st.button("← 返回SEO中心", key="back_seo_center_3"):
+        del st.session_state["seo_sub"]
+        st.rerun()
     st.markdown("""
     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
     <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · BLOG SEO</div>

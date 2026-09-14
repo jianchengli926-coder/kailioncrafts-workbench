@@ -137,8 +137,7 @@ with st.sidebar:
         # 知识部
         "📚 知识库", "💡 博客SEO工作台",
         # 管理
-        "📜 AI调用Trace",
-        "⚙️ 设置",
+        "⚙️ 设置中心",
     ]
 
     page = st.radio(
@@ -4788,8 +4787,85 @@ Slug: ...
                 for ref in t.get("knowledge_refs", []):
                     st.write(f"- {ref}")
     
-# ============ 页面13.5：AI调用Trace ============
+# ============ 设置中心 ============
+elif page == "⚙️ 设置中心":
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
+    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · ADMIN</div>
+    <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">设置中心</h2>
+    <div style="color:rgba(255,243,224,.6);font-size:13px;">模型配置 · AI追踪 · 访问日志</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    sc_sections = {
+        "🤖 模型配置": "API Key · 模型选择",
+        "📊 AI调用统计": "Token消耗 · 模型用量",
+        "👥 访问日志": "登录记录 · 在线用户",
+    }
+    if "sc_sub" not in st.session_state:
+        st.session_state["sc_sub"] = "🤖 模型配置"
+    sc_current = st.session_state["sc_sub"]
+
+    sc_cols = st.columns(3)
+    for i, (name, desc) in enumerate(sc_sections.items()):
+        with sc_cols[i]:
+            is_active = st.session_state["sc_sub"] == name
+            if st.button(name, key=f"scbtn_{name}", use_container_width=True,
+                         type="primary" if is_active else "secondary"):
+                st.session_state["sc_sub"] = name
+                st.rerun()
+
+    sc_current = st.session_state["sc_sub"]
+    st.markdown(f"### {sc_current}")
+    st.caption(sc_sections[sc_current])
+    st.markdown("---")
+
+    if sc_current == "🤖 模型配置":
+        st.subheader("模型配置")
+        try:
+            cfg = get_current_config()
+            st.write(f"当前模型：{cfg.get('model', '未设置')}")
+            st.write(f"API Base：{cfg.get('api_base', '未设置')}")
+        except Exception as e:
+            st.error(f"加载配置失败：{e}")
+
+    elif sc_current == "📊 AI调用统计":
+        st.subheader("AI调用统计")
+        try:
+            import json, os
+            trace_file = "data/ai_trace.json"
+            if os.path.exists(trace_file):
+                with open(trace_file, encoding='utf-8') as f:
+                    traces = json.load(f)
+                st.metric("总调用次数", len(traces))
+                total_tokens = sum(t.get('tokens', 0) for t in traces)
+                st.metric("总Token消耗", total_tokens)
+                for t in traces[-20:]:
+                    st.write(f"- {t.get('time', '')} | {t.get('model', '')} | {t.get('tokens', 0)} tokens")
+            else:
+                st.info("暂无调用记录")
+        except Exception as e:
+            st.error(f"加载失败：{e}")
+
+    elif sc_current == "👥 访问日志":
+        st.subheader("访问日志")
+        try:
+            import json, os
+            auth_file = "data/auth_log.json"
+            if os.path.exists(auth_file):
+                with open(auth_file, encoding='utf-8') as f:
+                    logs = json.load(f)
+                st.metric("总登录次数", len(logs))
+                for log in logs[-20:]:
+                    st.write(f"- {log.get('time', '')} | IP: {log.get('ip', '')} | {log.get('event', '')}")
+            else:
+                st.info("暂无登录记录")
+        except Exception as e:
+            st.error(f"加载失败：{e}")
+
+# ============ AI调用Trace（旧） ============
 elif page == "📜 AI调用Trace":
+    st.info("已合并到「⚙️ 设置中心」")
     st.markdown("""
     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
     <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · AI TRACE</div>

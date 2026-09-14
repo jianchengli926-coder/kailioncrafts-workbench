@@ -55,7 +55,9 @@ if "authed" not in st.session_state:
 
 if not st.session_state["authed"]:
     logo_path = Path(__file__).parent / "assets" / "logo.png"
-    # 居中布局：左右留白
+    # 垂直居中：顶部留白
+    for _ in range(3):
+        st.write("")
     _, col_c, _ = st.columns([1, 2, 1])
     with col_c:
         if logo_path.exists():

@@ -3834,48 +3834,75 @@ elif page == "👥 客户管理":
     if cm.export_csv(export_path):
         st.success(f"已导出到 {export_path}")
 
-# ============ 页面11：市场分析 ============
+# ============ 市场与产品分析 ============
 elif page == "🌍 市场分析":
-    st.title("🌍 目标市场入市分析")
-    st.caption("入市作战地图：认证、关税、关键词、竞争格局、行动路线")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        target_market = st.selectbox("目标市场", [
-    "美国 (USA)", "德国 (Germany)", "英国 (UK)", "日本 (Japan)",
-    "澳大利亚 (Australia)", "加拿大 (Canada)", "法国 (France)",
-    "北欧 (Nordic)", "东南亚 (SEA)", "中东 (Middle East)", "其他"
-    ])
-    with col2:
-        product_category = st.selectbox("产品品类", COMPANY["categories"])
-
-    custom_market = st.text_input("自定义市场（可选）", placeholder="例如：波兰、巴西、南非...")
-
-    if st.button("🔬 AI生成入市分析", use_container_width=True, type="primary"):
-        market = custom_market if custom_market else target_market
-    with st.spinner("AI正在分析目标市场..."):
-        prompt = MARKET_ANALYSIS_PROMPT.format(
-        target_market=market,
-        product_category=product_category,
-        company_profile=kb.get_company_brief(),
-    )
-    result = ai.chat(prompt)
-
-    st.markdown("---")
-    st.subheader(f"📊 {market} - {product_category} 入市分析")
-    st.markdown(result)
-
-    st.markdown("---")
-    st.subheader("💡 分析维度说明")
     st.markdown("""
-    - **市场概况**：规模、增长趋势、进口来源
-    - **准入合规**：认证、标签、包装、关税、原产地证明
-    - **竞争格局**：主要对手、价格带、渠道结构
-    - **消费者偏好**：产品偏好、决策因素、热门品类
-    - **关键词武器库**：SEO关键词、开发信术语
-    - **3秒钩子**：最有效的开发信开头
-    - **行动路线图**：6个月分阶段计划
-    """)
+    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
+    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · MARKET & PRODUCT</div>
+    <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">市场与产品分析</h2>
+    <div style="color:rgba(255,243,224,.6);font-size:13px;">市场分析 · 产品分析 · 广告分析 · 视觉内容</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    mp_sections = {
+        "📊 市场分析": "蓝海选品 · VOC · 关键词",
+        "📦 产品分析": "Listing诊断 · 文案生成 · 竞品对比",
+        "📈 广告分析": "广告策略 · 广告调优",
+        "🎨 视觉内容": "主副图提示词 · A+布局",
+    }
+    if "mp_sub" not in st.session_state:
+        st.session_state["mp_sub"] = "📊 市场分析"
+    mp_current = st.session_state["mp_sub"]
+
+    mp_cols = st.columns(4)
+    for i, (name, desc) in enumerate(mp_sections.items()):
+        with mp_cols[i]:
+            is_active = st.session_state["mp_sub"] == name
+            if st.button(name, key=f"mpbtn_{name}", use_container_width=True,
+                         type="primary" if is_active else "secondary"):
+                st.session_state["mp_sub"] = name
+                st.rerun()
+
+    mp_current = st.session_state["mp_sub"]
+    st.markdown(f"### {mp_current}")
+    st.caption(mp_sections[mp_current])
+    st.markdown("---")
+
+    if mp_current == "📊 市场分析":
+        st.subheader("目标市场入市分析")
+        st.caption("入市作战地图：认证、关税、关键词、竞争格局、行动路线")
+        col1, col2 = st.columns(2)
+        with col1:
+            target_market = st.selectbox("目标市场", ["美国 (USA)", "德国 (Germany)", "英国 (UK)", "日本 (Japan)", "澳大利亚 (Australia)", "加拿大 (Canada)", "其他"])
+        with col2:
+            product_category = st.selectbox("产品品类", COMPANY["categories"])
+        if st.button("🔬 AI生成入市分析", use_container_width=True, type="primary"):
+            with st.spinner("AI分析中..."):
+                prompt = MARKET_ANALYSIS_PROMPT.format(target_market=target_market, product_category=product_category, company_profile=kb.get_company_brief())
+                result = ai.chat(prompt)
+                st.markdown(result)
+
+    elif mp_current == "📦 产品分析":
+        st.subheader("产品分析")
+        p1, p2 = st.tabs(["📋 Listing诊断", "✍️ 文案生成"])
+        with p1:
+            asin = st.text_input("输入ASIN", placeholder="B0XXXXXX")
+            if st.button("🔍 诊断", use_container_width=True):
+                with st.spinner("分析中..."):
+                    st.info("诊断功能开发中")
+        with p2:
+            product_desc = st.text_area("产品描述", height=100)
+            if st.button("✍️ 生成文案", use_container_width=True):
+                with st.spinner("生成中..."):
+                    st.info("文案生成开发中")
+
+    elif mp_current == "📈 广告分析":
+        st.subheader("广告分析")
+        st.info("广告分析功能开发中，上传广告报告后可自动分析")
+
+    elif mp_current == "🎨 视觉内容":
+        st.subheader("视觉内容")
+        st.info("视觉内容功能开发中")
 
 # ============ 页面12：竞品与资源库 ============
 elif page == "🔍 竞品与资源库":

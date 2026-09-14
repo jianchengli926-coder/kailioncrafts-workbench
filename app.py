@@ -285,35 +285,70 @@ if page == "📊 仪表盘":
 
     st.markdown("---")
 
-    # 快捷功能（8个按钮一排）
+    # 快捷功能（彩色大卡片）
     st.markdown("##### 🚀 快捷功能")
-    q1, q2, q3, q4 = st.columns(4)
-    with q1:
-        if st.button("🎯 客户开发", use_container_width=True):
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:12px;padding:20px;height:110px;cursor:pointer;">
+        <div style="font-size:32px;">🎯</div>
+        <div style="font-weight:700;margin-top:8px;">客户开发</div>
+        <div style="font-size:12px;color:#92400e;">分析 · 背调 · 开发信</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("进入客户中心", key="goto_crm", use_container_width=True):
             st.session_state["main_nav"] = "👥 客户中心"
             st.rerun()
-        if st.button("📦 产品SEO", use_container_width=True):
+    with c2:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:12px;padding:20px;height:110px;cursor:pointer;">
+        <div style="font-size:32px;">📦</div>
+        <div style="font-weight:700;margin-top:8px;">产品与SEO</div>
+        <div style="font-size:12px;color:#1e40af;">SKU · SEO · 上品</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("进入产品SEO", key="goto_seo", use_container_width=True):
             st.session_state["main_nav"] = "📦 独立站上品SEO工作台"
             st.rerun()
-    with q2:
-        if st.button("🛠️ AI工具库", use_container_width=True):
+    with c3:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-radius:12px;padding:20px;height:110px;cursor:pointer;">
+        <div style="font-size:32px;">🛠️</div>
+        <div style="font-weight:700;margin-top:8px;">AI工具库</div>
+        <div style="font-size:12px;color:#065f46;">7个自研视觉工具</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("进入工具库", key="goto_tools", use_container_width=True):
             st.session_state["main_nav"] = "📦 锴利自研AI工具库"
             st.rerun()
-        if st.button("🌍 市场分析", use_container_width=True):
+    with c4:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);border-radius:12px;padding:20px;height:110px;cursor:pointer;">
+        <div style="font-size:32px;">🌍</div>
+        <div style="font-weight:700;margin-top:8px;">市场分析</div>
+        <div style="font-size:12px;color:#5b21b6;">竞品 · 蓝海 · 选品</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("进入市场分析", key="goto_market", use_container_width=True):
             st.session_state["main_nav"] = "🌍 市场分析"
             st.rerun()
-    with q3:
-        if st.button("📥 独立站", use_container_width=True):
+
+    # 次要入口
+    s1, s2, s3, s4 = st.columns(4)
+    with s1:
+        if st.button("📥 独立站管理", key="goto_website", use_container_width=True):
             st.session_state["main_nav"] = "📥 独立站管理"
             st.rerun()
-        if st.button("📚 知识库", use_container_width=True):
+    with s2:
+        if st.button("📚 知识库", key="goto_kb", use_container_width=True):
             st.session_state["main_nav"] = "📚 知识库"
             st.rerun()
-    with q4:
-        if st.button("📊 订单台账", use_container_width=True):
+    with s3:
+        if st.button("📊 订单台账", key="goto_orders", use_container_width=True):
             st.session_state["main_nav"] = "📊 订单台账"
             st.rerun()
-        if st.button("⚙️ 设置", use_container_width=True):
+    with s4:
+        if st.button("⚙️ 设置中心", key="goto_settings", use_container_width=True):
             st.session_state["main_nav"] = "⚙️ 设置中心"
             st.rerun()
 

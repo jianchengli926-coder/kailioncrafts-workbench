@@ -170,7 +170,7 @@ with st.sidebar:
         "📊 仪表盘",
         # 业务部
         "📦 锴利自研AI工具库",
-        "🌍 市场分析",
+        "🌍 市场与产品分析",
         "👥 客户中心",
         "📥 独立站管理", "📊 订单台账",
         # 产品部
@@ -327,7 +327,7 @@ if page == "📊 仪表盘":
         <div style="font-size:28px;">🌍</div><div style="font-weight:700;margin-top:4px;">市场分析</div>
         </div>""", unsafe_allow_html=True)
         if st.button("进入", key="goto_market", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🌍 市场分析"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🌍 市场与产品分析"; st.rerun()
 
     row2c1, row2c2, row2c3, row2c4 = st.columns(4)
     with row2c1:
@@ -4152,7 +4152,7 @@ elif page == "👥 客户管理":
         st.success(f"已导出到 {export_path}")
 
 # ============ 市场与产品分析 ============
-elif page == "🌍 市场分析":
+elif page == "🌍 市场与产品分析":
     st.markdown("""
     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
     <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · MARKET & PRODUCT</div>

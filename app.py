@@ -188,11 +188,13 @@ with st.sidebar:
 
     # 如果选择AI工具库，展开二级工具选择
     if page == "📦 锴利自研AI工具库":
+        tool_options_with_prompt = ["📦 工具库首页"] + list(tool_options.keys())[1:]
         tool_choice = st.selectbox(
             "🔧 选择AI工具",
-            list(tool_options.keys())[1:],
+            tool_options_with_prompt,
             label_visibility="collapsed",
-            key="tool_select"
+            key="tool_select",
+            index=0
         )
         # 把工具选择映射到实际工具ID
         selected_tool = tool_options.get(tool_choice, None)
@@ -200,6 +202,10 @@ with st.sidebar:
             # 通过session_state传递给工具库页面
             st.session_state['_auto_tool_id'] = selected_tool
             page = "📦 锴利自研AI工具库"
+        else:
+            # 选择"工具库首页"时清除选中工具
+            st.session_state.pop('selected_tool_id', None)
+            st.session_state.pop('_auto_tool_id', None)
 
     st.markdown("---")
 

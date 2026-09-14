@@ -168,7 +168,7 @@ with st.sidebar:
         "👥 客户中心",
         "📥 独立站管理", "📊 订单台账",
         # 产品部
-        "📦 产品推荐", "🏭 产品库",
+        "📦 产品库",
         "📊 SEO表格工具", "📦 独立站上品SEO工作台",
         # 市场部
         "🔎 竞品与资源库",
@@ -1347,8 +1347,70 @@ elif page == "📦 产品推荐":
             display_cols = [c for c in ["SKU", "中文名", "英文名", "一级类目", "材质", "规格", "MOQ", "价格带"] if c in df.columns]
             st.dataframe(df[display_cols], use_container_width=True)
 
-# ============ 产品库页面（增强版：统一产品数据库） ============
+# ============ 产品库页面（增强版：统一产品数据库 + 智能推荐） ============
 elif page == "🏭 产品库":
+    # 子导航：产品库浏览 / 智能产品推荐
+    sub_nav = st.radio(
+        "产品库工作台",
+        ["🏭 产品库浏览", "🎯 智能产品推荐"],
+        horizontal=True,
+        key="product_sub_nav",
+        label_visibility="collapsed"
+    )
+
+    if sub_nav == "🎯 智能产品推荐":
+        st.title("📦 智能产品推荐")
+        st.caption("根据客户需求，从200+SKU中推荐最匹配的产品")
+
+        with st.form("product_recommend_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                company_name = st.text_input("客户公司", placeholder="可选")
+                requirement = st.text_area("客户需求描述 *", placeholder="客户需要什么产品？例如：高端厨刀套装，带礼盒，适合亚马逊销售", height=100)
+                target_market = st.text_input("目标市场", placeholder="例如：北美/欧洲/东南亚")
+            with col2:
+                budget = st.text_input("预算范围", placeholder="例如：$5-15/件")
+                order_volume = st.text_input("订单量预估", placeholder="例如：500-2000件")
+                category = st.selectbox("优先品类", ["全部"] + COMPANY["categories"])
+
+            submitted = st.form_submit_button("🔍 AI推荐产品", use_container_width=True)
+
+        if submitted and requirement:
+            with st.spinner("AI正在匹配产品..."):
+                if category == "全部":
+                    sku_data = kb.get_sku_data(limit=80)
+                else:
+                    sku_data = kb.get_sku_by_category(category, limit=40)
+
+                sku_text = "\n".join([
+                    f"- {r.get('SKU','')}: {r.get('英文名','')} | {r.get('材质','')} | {r.get('规格','')} | MOQ:{r.get('MOQ','')} | {r.get('价格带','')}"
+                    for r in sku_data[:60]
+                ])
+
+                prompt = PRODUCT_RECOMMEND_PROMPT.format(
+                    company_name=company_name or "未知",
+                    requirement=requirement,
+                    target_market=target_market or "未指定",
+                    budget=budget or "未指定",
+                    order_volume=order_volume or "未指定",
+                    sku_data=sku_text,
+                    product_specs=kb.get_product_specs(),
+                )
+                result = ai.chat(prompt)
+
+            st.markdown("---")
+            st.subheader("🎯 AI推荐结果")
+            st.markdown(result)
+
+            st.markdown("---")
+            st.subheader("📊 相关SKU参考")
+            if sku_data:
+                df = pd.DataFrame(sku_data[:20])
+                display_cols = [c for c in ["SKU", "中文名", "英文名", "一级类目", "材质", "规格", "MOQ", "价格带"] if c in df.columns]
+                st.dataframe(df[display_cols], use_container_width=True)
+
+        st.stop()
+
     st.title("🏭 产品图片与SEO知识库")
     st.caption("127个已上架产品 · 827张SEO优化图片 · 输入SKU快速查询产品图片和SEO资料")
 

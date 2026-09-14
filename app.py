@@ -305,39 +305,39 @@ if page == "📊 仪表盘":
         <div style="font-size:28px;">🎯</div><div style="font-weight:700;margin-top:4px;">客户开发</div>
         </div>""", unsafe_allow_html=True)
         if st.button("进入", key="goto_crm", use_container_width=True):
-            st.session_state["main_nav"] = "👥 客户中心"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "👥 客户中心"; st.rerun()
     with row1c2:
         st.markdown("""<div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:12px 12px 0 0;padding:16px;text-align:center;">
         <div style="font-size:28px;">📦</div><div style="font-weight:700;margin-top:4px;">产品与SEO</div>
         </div>""", unsafe_allow_html=True)
         if st.button("进入", key="goto_seo", use_container_width=True):
-            st.session_state["main_nav"] = "📦 独立站上品SEO工作台"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📦 独立站上品SEO工作台"; st.rerun()
     with row1c3:
         st.markdown("""<div style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-radius:12px 12px 0 0;padding:16px;text-align:center;">
         <div style="font-size:28px;">🛠️</div><div style="font-weight:700;margin-top:4px;">AI工具库</div>
         </div>""", unsafe_allow_html=True)
         if st.button("进入", key="goto_tools", use_container_width=True):
-            st.session_state["main_nav"] = "📦 锴利自研AI工具库"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📦 锴利自研AI工具库"; st.rerun()
     with row1c4:
         st.markdown("""<div style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);border-radius:12px 12px 0 0;padding:16px;text-align:center;">
         <div style="font-size:28px;">🌍</div><div style="font-weight:700;margin-top:4px;">市场分析</div>
         </div>""", unsafe_allow_html=True)
         if st.button("进入", key="goto_market", use_container_width=True):
-            st.session_state["main_nav"] = "🌍 市场分析"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🌍 市场分析"; st.rerun()
 
     row2c1, row2c2, row2c3, row2c4 = st.columns(4)
     with row2c1:
         if st.button("📥 独立站管理", key="goto_website", use_container_width=True):
-            st.session_state["main_nav"] = "📥 独立站管理"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📥 独立站管理"; st.rerun()
     with row2c2:
         if st.button("📚 知识库", key="goto_kb", use_container_width=True):
-            st.session_state["main_nav"] = "📚 知识库"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📚 知识库"; st.rerun()
     with row2c3:
         if st.button("📊 订单台账", key="goto_orders", use_container_width=True):
-            st.session_state["main_nav"] = "📊 订单台账"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📊 订单台账"; st.rerun()
     with row2c4:
         if st.button("⚙️ 设置中心", key="goto_settings", use_container_width=True):
-            st.session_state["main_nav"] = "⚙️ 设置中心"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "⚙️ 设置中心"; st.rerun()
 
     st.markdown("---")
 
@@ -3456,6 +3456,7 @@ elif page == "📊 独立站SEO中心":
         </div>
         """, unsafe_allow_html=True)
         if st.button("进入SEO表格", key="goto_seo_table", use_container_width=True):
+            st.session_state.pop("main_nav", None)
             st.session_state["main_nav"] = "📊 SEO表格工具"
             st.rerun()
     with s2:
@@ -3467,6 +3468,7 @@ elif page == "📊 独立站SEO中心":
         </div>
         """, unsafe_allow_html=True)
         if st.button("进入上品SEO", key="goto_seo_listing", use_container_width=True):
+            st.session_state.pop("main_nav", None)
             st.session_state["main_nav"] = "📦 独立站上品SEO工作台"
             st.rerun()
     with s3:
@@ -3478,6 +3480,7 @@ elif page == "📊 独立站SEO中心":
         </div>
         """, unsafe_allow_html=True)
         if st.button("进入博客SEO", key="goto_seo_blog", use_container_width=True):
+            st.session_state.pop("main_nav", None)
             st.session_state["main_nav"] = "💡 博客SEO工作台"
             st.rerun()
 

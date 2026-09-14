@@ -55,17 +55,18 @@ if "authed" not in st.session_state:
 
 if not st.session_state["authed"]:
     st.markdown("""
-    <div style="max-width:400px;margin:80px auto;text-align:center;">
-    <div style="font-size:64px;">🔪</div>
-    <h1 style="color:#1a1a2e;margin:16px 0 8px;">KaiLionCrafts</h1>
-    <div style="color:#888;margin-bottom:32px;">企业级AI工作台 · 请输入密码</div>
+    <div style="max-width:450px;margin:60px auto;text-align:center;">
+    <div style="margin-bottom:24px;">
+        <div style="font-size:72px;font-weight:900;color:#1a1a2e;letter-spacing:-2px;">KaiLion<span style="color:#D4AF37;">Crafts</span></div>
+        <div style="color:#D4AF37;font-size:14px;letter-spacing:6px;margin-top:8px;">锴 利 匠 心</div>
+    </div>
+    <div style="color:#888;font-size:15px;margin-bottom:32px;">企业级AI工作台 · 请输入密码进入</div>
     </div>
     """, unsafe_allow_html=True)
-    pwd = st.text_input("密码", type="password", label_visibility="collapsed", placeholder="输入访问密码")
-    if st.button("进入", use_container_width=True, type="primary"):
+    pwd = st.text_input("", type="password", label_visibility="collapsed", placeholder="输入访问密码")
+    if st.button("进 入", use_container_width=True, type="primary"):
         if pwd == "441723":
             st.session_state["authed"] = True
-            # 记录访问日志
             try:
                 import json, os
                 from datetime import datetime

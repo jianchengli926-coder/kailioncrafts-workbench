@@ -123,17 +123,17 @@ with st.sidebar:
 
     nav_options = [
         # 总览
-        "📊 仪表盘", "🌅 晨间简报", "📋 今日待办",
+        "📊 仪表盘",
         # 业务部
         "📦 锴利自研AI工具库",
+        "🌍 市场分析",
+        "👥 客户中心",
         "📥 独立站询盘管理", "📊 订单台账",
-        "🎯 客户分析", "🔍 客户背调",
-        "✉️ 开发信生成", "🔄 跟进序列", "💬 客户问答", "📈 销售管道", "👥 客户管理",
         # 产品部
         "📦 产品推荐", "🏭 产品库",
         "📊 SEO表格工具", "📦 独立站上品SEO工作台",
         # 市场部
-        "🌍 市场分析", "🔎 竞品与资源库",
+        "🔎 竞品与资源库",
         # 知识部
         "📚 知识库", "💡 博客SEO工作台",
         # 管理
@@ -643,8 +643,140 @@ elif page == "🌅 晨间简报":
         for c in overdue:
             st.warning(f"**{c.get('company_name','')}** - 应跟进日期：{c.get('next_follow_up','')}")
 
-# ============ 页面3：客户分析 ============
+# ============ 客户中心 ============
+elif page == "👥 客户中心":
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
+    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · CRM HUB</div>
+    <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">客户中心</h2>
+    <div style="color:rgba(255,243,224,.6);font-size:13px;">客户分析 · 客户开发 · 智能问答 · 客户管理（CRM）</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    cc_sections = {
+        "🎯 客户分析": "客户背调 · 智能分析",
+        "✉️ 客户开发": "开发信 · 多轮跟进",
+        "💬 客户问答": "知识库 · 智能回复",
+        "📊 客户管理": "销售漏斗 · 客户列表",
+    }
+    if "cc_sub" not in st.session_state:
+        st.session_state["cc_sub"] = "🎯 客户分析"
+    cc_current = st.session_state["cc_sub"]
+
+    cc_cols = st.columns(4)
+    for i, (name, desc) in enumerate(cc_sections.items()):
+        with cc_cols[i]:
+            is_active = st.session_state["cc_sub"] == name
+            if st.button(name, key=f"ccbtn_{name}", use_container_width=True,
+                         type="primary" if is_active else "secondary"):
+                st.session_state["cc_sub"] = name
+                st.rerun()
+
+    cc_current = st.session_state["cc_sub"]
+    st.markdown(f"### {cc_current}")
+    st.caption(cc_sections[cc_current])
+    st.markdown("---")
+
+    if cc_current == "🎯 客户分析":
+        cc_t1, cc_t2 = st.tabs(["📊 客户分析", "🔍 深度背调"])
+        with cc_t1:
+            st.subheader("潜在客户分析")
+            with st.form("ca_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    ca_company = st.text_input("公司名称 *")
+                    ca_country = st.text_input("国家 *")
+                with col2:
+                    ca_products = st.text_area("主营产品 *", height=80)
+                ca_submit = st.form_submit_button("🔍 AI分析", use_container_width=True, type="primary")
+            if ca_submit and ca_company and ca_country and ca_products:
+                with st.spinner("AI分析中..."):
+                    try:
+                        result = ai.chat(f"分析这个客户：{ca_company}, {ca_country}, 产品：{ca_products}。我们是阳江刀剪工厂KaiLionCrafts，主营厨房刀/剪刀/户外刀/厨房用品。给出匹配度评分、等级、切入策略。")
+                        st.markdown(result)
+                    except Exception as e:
+                        st.error(f"AI错误：{e}")
+        with cc_t2:
+            st.subheader("客户深度背调")
+            bg_company = st.text_input("客户公司名 *")
+            bg_submit = st.button("🔍 开始背调", use_container_width=True, type="primary")
+            if bg_submit and bg_company:
+                with st.spinner("背调中..."):
+                    try:
+                        result = ai.chat(f"对{bg_company}做B2B客户背调：公司规模、主营、采购潜力、切入策略。用中文详细回答。")
+                        st.markdown(result)
+                    except Exception as e:
+                        st.error(f"AI错误：{e}")
+
+    elif cc_current == "✉️ 客户开发":
+        cc_d1, cc_d2 = st.tabs(["✉️ 新开发信", "🔄 多轮跟进"])
+        with cc_d1:
+            st.subheader("开发信生成")
+            with st.form("ce_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    ce_company = st.text_input("客户公司 *")
+                    ce_country = st.text_input("国家 *")
+                with col2:
+                    ce_product = st.selectbox("推荐产品", ["厨房刀具", "专业剪刀", "户外刀具", "厨房用品"])
+                ce_submit = st.form_submit_button("✉️ 生成", use_container_width=True, type="primary")
+            if ce_submit and ce_company and ce_country:
+                with st.spinner("生成中..."):
+                    try:
+                        result = ai.chat(f"写一封英文B2B开发信给{ce_company}({ce_country})，推荐{ce_product}。我们是阳江KaiLionCrafts源头工厂，OEM/ODM/Private Label。150词左右，专业但不生硬。")
+                        st.markdown(result)
+                    except Exception as e:
+                        st.error(f"AI错误：{e}")
+        with cc_d2:
+            st.subheader("多轮跟进")
+            fol_num = st.selectbox("第几轮", [1, 2, 3, 4])
+            if st.button("🔄 生成跟进", use_container_width=True):
+                with st.spinner("生成中..."):
+                    try:
+                        result = ai.chat(f"写第{fol_num}轮英文跟进邮件，简短有价值，100词左右。")
+                        st.markdown(result)
+                    except Exception as e:
+                        st.error(f"AI错误：{e}")
+
+    elif cc_current == "💬 客户问答":
+        st.subheader("客户问题智能回复")
+        q = st.text_area("客户问题 *", height=100)
+        if st.button("🤖 AI回复", use_container_width=True, type="primary") and q:
+            with st.spinner("生成中..."):
+                try:
+                    result = ai.chat(f"用英文专业回答这个客户问题：{q}。我们是KaiLionCrafts阳江刀剪B2B工厂。")
+                    st.markdown(result)
+                except Exception as e:
+                    st.error(f"AI错误：{e}")
+
+    elif cc_current == "📊 客户管理":
+        cc_m1, cc_m2 = st.tabs(["📈 销售漏斗", "👥 客户列表"])
+        with cc_m1:
+            st.subheader("销售漏斗")
+            try:
+                customers = cm.list_customers()
+                total = len(customers)
+                deal = sum(1 for c in customers if c.get("status") == "已成交")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("总客户", total)
+                c2.metric("成交", deal)
+                c3.metric("转化率", f"{deal/total*100:.0f}%" if total else "0%")
+            except Exception as e:
+                st.error(f"加载失败：{e}")
+        with cc_m2:
+            st.subheader("客户列表")
+            try:
+                customers = cm.list_customers()
+                for c in customers[:20]:
+                    with st.expander(f"{c.get('company_name', '未知')} | {c.get('country', '')}"):
+                        st.write(f"产品：{c.get('products', '')}")
+                        st.write(f"等级：{c.get('grade', 'C')}")
+            except Exception as e:
+                st.error(f"加载失败：{e}")
+
+# ============ 页面3：客户分析（旧） ============
 elif page == "🎯 客户分析":
+    st.info("已合并到「👥 客户中心」")
     st.title("🎯 潜在客户分析")
     st.caption("AI分析客户匹配度，给出开发建议")
 

@@ -274,119 +274,97 @@ if page == "📊 仪表盘":
     stats = cm.get_statistics()
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.metric("总客户数", stats["total"])
+        st.metric("总客户数", stats["total"], delta=f"A级 {stats['by_grade'].get('A',0)}")
     with c2:
         st.metric("平均评分", f"{stats['avg_score']:.0f}/100")
     with c3:
-        a_count = stats["by_grade"].get("A", 0)
-        st.metric("A级高价值客户", a_count)
+        st.metric("待跟进", stats["by_status"].get("新客户", 0), delta="需处理")
     with c4:
-        new_count = stats["by_status"].get("新客户", 0)
-        st.metric("待跟进", new_count)
+        closed = stats["by_pipeline"].get("closed", 0)
+        st.metric("已成交", closed, delta=f"转化率 {closed/stats['total']*100:.0f}%" if stats["total"] else "0%")
 
     st.markdown("---")
 
-    # 快捷功能入口卡片（可点击）
+    # 快捷功能（8个按钮一排）
     st.markdown("##### 🚀 快捷功能")
-    f1, f2, f3, f4 = st.columns(4)
-    with f1:
+    q1, q2, q3, q4 = st.columns(4)
+    with q1:
         if st.button("🎯 客户开发", use_container_width=True):
             st.session_state["main_nav"] = "👥 客户中心"
             st.rerun()
-        st.caption("分析 · 背调 · 开发信")
-    with f2:
-        if st.button("📦 产品与SEO", use_container_width=True):
+        if st.button("📦 产品SEO", use_container_width=True):
             st.session_state["main_nav"] = "📦 独立站上品SEO工作台"
             st.rerun()
-        st.caption("SKU · SEO · 上品")
-    with f3:
+    with q2:
         if st.button("🛠️ AI工具库", use_container_width=True):
             st.session_state["main_nav"] = "📦 锴利自研AI工具库"
             st.rerun()
-        st.caption("7个自研视觉工具")
-    with f4:
         if st.button("🌍 市场分析", use_container_width=True):
             st.session_state["main_nav"] = "🌍 市场分析"
             st.rerun()
-        st.caption("竞品 · 蓝海 · 选品")
-
-    # 更多快捷入口
-    st.markdown("---")
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        if st.button("📥 独立站管理", use_container_width=True):
+    with q3:
+        if st.button("📥 独立站", use_container_width=True):
             st.session_state["main_nav"] = "📥 独立站管理"
             st.rerun()
-        st.caption("询盘 · WooCommerce")
-    with m2:
-        if st.button("👥 客户中心", use_container_width=True):
-            st.session_state["main_nav"] = "👥 客户中心"
-            st.rerun()
-        st.caption("CRM · 销售漏斗")
-    with m3:
         if st.button("📚 知识库", use_container_width=True):
             st.session_state["main_nav"] = "📚 知识库"
             st.rerun()
-        st.caption("搜索 · 管理 · 版本")
-    with m4:
-        if st.button("⚙️ 设置中心", use_container_width=True):
+    with q4:
+        if st.button("📊 订单台账", use_container_width=True):
+            st.session_state["main_nav"] = "📊 订单台账"
+            st.rerun()
+        if st.button("⚙️ 设置", use_container_width=True):
             st.session_state["main_nav"] = "⚙️ 设置中心"
             st.rerun()
-        st.caption("模型 · 追踪 · 日志")
 
     st.markdown("---")
 
-    # 今日待办
-    st.markdown("##### 📋 今日待办")
-    todo_file = Path("data/todo/todos.json")
-    todo_file.parent.mkdir(parents=True, exist_ok=True)
-    if todo_file.exists():
-        try:
-            todos = _json.loads(todo_file.read_text(encoding="utf-8"))
-        except:
-            todos = []
-    else:
-        todos = []
-
-    new_todo = st.text_input("添加待办事项", placeholder="例如：跟进德国客户OEM询价", key="new_todo_input")
-    if st.button("➕ 添加待办", use_container_width=True):
-        if new_todo.strip():
-            todos.append({"task": new_todo.strip(), "done": False, "date": datetime.now().strftime("%Y-%m-%d")})
-            todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
-            st.rerun()
-
-    if todos:
-        for i, t in enumerate(todos[:10]):
-            cb = st.checkbox(t["task"], value=t.get("done", False), key=f"dash_todo_{i}")
-            if cb != t.get("done", False):
-                todos[i]["done"] = cb
-                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
-    else:
-        st.info("暂无待办事项，添加一个吧！")
-
-    st.markdown("---")
-
-    # 近7天趋势
-    st.markdown("##### 📈 近7天趋势")
-    try:
-        import json as _j, os
-        from datetime import datetime as _dt, timedelta as _td
-        inbox_file = "data/inbox/inquiries.json"
-        if os.path.exists(inbox_file):
-            inqs = _j.load(open(inbox_file, encoding="utf-8"))
+    # 今日待办 + 近7天趋势（左右并排）
+    left, right = st.columns([1, 1])
+    with left:
+        st.markdown("##### 📋 今日待办")
+        todo_file = Path("data/todo/todos.json")
+        todo_file.parent.mkdir(parents=True, exist_ok=True)
+        if todo_file.exists():
+            try:
+                todos = _json.loads(todo_file.read_text(encoding="utf-8"))
+            except:
+                todos = []
         else:
-            inqs = []
-        dates = [(datetime.now() - _td(days=i)).strftime("%m-%d") for i in range(6, -1, -1)]
-        inq_counts = [0] * 7
-        for q in inqs:
-            d = q.get("date", "")
-            for i, ds in enumerate(dates):
-                if ds in d:
-                    inq_counts[i] += 1
-        trend_df = pd.DataFrame({"日期": dates, "询盘数": inq_counts})
-        st.bar_chart(trend_df.set_index("日期"))
-    except Exception as e:
-        st.caption(f"趋势数据加载中...")
+            todos = []
+        new_todo = st.text_input("添加待办", placeholder="跟进德国客户OEM...", key="new_todo_input", label_visibility="collapsed")
+        if st.button("➕ 添加", use_container_width=True):
+            if new_todo.strip():
+                todos.append({"task": new_todo.strip(), "done": False, "date": datetime.now().strftime("%Y-%m-%d")})
+                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+                st.rerun()
+        if todos:
+            for i, t in enumerate(todos[:8]):
+                st.checkbox(t["task"], value=t.get("done", False), key=f"dash_todo_{i}")
+        else:
+            st.caption("暂无待办")
+
+    with right:
+        st.markdown("##### 📈 近7天趋势")
+        try:
+            import json as _j, os
+            from datetime import datetime as _dt, timedelta as _td
+            inbox_file = "data/inbox/inquiries.json"
+            if os.path.exists(inbox_file):
+                inqs = _j.load(open(inbox_file, encoding="utf-8"))
+            else:
+                inqs = []
+            dates = [(datetime.now() - _td(days=i)).strftime("%m-%d") for i in range(6, -1, -1)]
+            inq_counts = [0] * 7
+            for q in inqs:
+                d = q.get("date", "")
+                for i, ds in enumerate(dates):
+                    if ds in d:
+                        inq_counts[i] += 1
+            trend_df = pd.DataFrame({"日期": dates, "询盘": inq_counts})
+            st.bar_chart(trend_df.set_index("日期"))
+        except:
+            st.caption("暂无数据")
 
     st.markdown("---")
 

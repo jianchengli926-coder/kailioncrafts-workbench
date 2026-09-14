@@ -4239,10 +4239,10 @@ elif page == "🔍 竞品与资源库":
             st.metric("分类数", df['分类'].nunique())
         with col3:
             high_priority = len(df[df['优先级'].str.contains('高', na=False)])
-        st.metric("高优先级", high_priority)
+            st.metric("高优先级", high_priority)
         with col4:
             potential_customers = len(df[df['分类'].str.contains('潜在客户', na=False)])
-        st.metric("潜在客户站", potential_customers)
+            st.metric("潜在客户站", potential_customers)
 
         st.markdown("---")
 
@@ -4256,16 +4256,15 @@ elif page == "🔍 竞品与资源库":
         for _, row in filtered_df.iterrows():
             with st.expander(f"🌐 {row['域名']}  |  {row['分类']}  |  优先级：{row['优先级']}"):
                 col1, col2 = st.columns([3, 1])
-            with col1:
-                st.markdown(f"**网址：** [{row['网址']}]({row['网址']})")
-                st.markdown(f"**用途：** {row['用途']}")
-            with col2:
-                if "潜在客户" in str(row['分类']):
-                    if st.button("🎯 加入客户分析", key=f"comp_{row['域名']}"):
-                        st.session_state['potential_customer'] = row['域名']
-                        st.switch_page("🎯 客户分析")
-                if st.button("📋 复制域名", key=f"copy_{row['域名']}"):
-                    st.toast(f"已复制: {row['域名']}")
+                with col1:
+                    st.markdown(f"**网址：** [{row['网址']}]({row['网址']})")
+                    st.markdown(f"**用途：** {row['用途']}")
+                with col2:
+                    if "潜在客户" in str(row['分类']):
+                        if st.button("🎯 加入客户分析", key=f"comp_{row['域名']}"):
+                            st.session_state['potential_customer'] = row['域名']
+                    if st.button("📋 复制域名", key=f"copy_{row['域名']}"):
+                        st.toast(f"已复制: {row['域名']}")
 
         st.markdown("---")
 

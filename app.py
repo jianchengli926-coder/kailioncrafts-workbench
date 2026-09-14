@@ -61,7 +61,7 @@ if not st.session_state["authed"]:
     _, col_c, _ = st.columns([1, 2, 1])
     with col_c:
         if logo_path.exists():
-            st.image(str(logo_path), width=320)
+            st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{__import__("base64").b64encode(open(logo_path,"rb").read()).decode()}" width="320"></div>', unsafe_allow_html=True)
         st.markdown("""
         <div style="text-align:center;margin-top:16px;">
         <div style="font-size:32px;font-weight:900;color:#1a1a2e;letter-spacing:-1px;">KaiLion<span style="color:#D4AF37;">Crafts</span></div>

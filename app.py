@@ -209,13 +209,14 @@ with st.sidebar:
         # 把工具选择映射到实际工具ID
         selected_tool = tool_options.get(tool_choice, None)
         if selected_tool:
-            # 通过session_state传递给工具库页面
-            st.session_state['_auto_tool_id'] = selected_tool
-            page = "📦 锴利自研AI工具库"
+            # 直接设置session_state并rerun
+            st.session_state['selected_tool_id'] = selected_tool
+            st.rerun()
         else:
             # 选择"工具库首页"时清除选中工具
-            st.session_state.pop('selected_tool_id', None)
-            st.session_state.pop('_auto_tool_id', None)
+            if 'selected_tool_id' in st.session_state:
+                del st.session_state['selected_tool_id']
+                st.rerun()
 
     st.markdown("---")
 

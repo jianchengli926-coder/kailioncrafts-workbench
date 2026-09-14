@@ -4357,9 +4357,23 @@ elif page == "📚 知识库":
 
     elif kb_current == "📊 管理统计":
         try:
+            import os
             sources = kb.get_kb_sources()
+            total_files = 0
             for s, info in sources.items():
-                st.write(f"- **{info.get('name', s)}**：{info.get('count', 0)}个文件")
+                p = info.get("path")
+                if p and os.path.exists(p):
+                    count = sum([len(files) for _, _, files in os.walk(p)])
+                else:
+                    count = 0
+                total_files += count
+                st.markdown(f"""
+                <div style="background:#f8f9fa;border-radius:8px;padding:12px;margin-bottom:8px;border-left:4px solid #D4AF37;">
+                <strong>{info.get('name', s)}</strong><span style="float:right;color:#D4AF37;font-weight:700;">{count} 个文件</span><br>
+                <small style="color:#888;">{info.get('description', '')}</small>
+                </div>
+                """, unsafe_allow_html=True)
+            st.markdown(f"### 总计：{total_files} 个文件")
         except Exception as e:
             st.error(f"加载失败：{e}")
 

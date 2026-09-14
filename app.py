@@ -286,18 +286,26 @@ if page == "📊 仪表盘":
     # 快捷功能入口卡片（可点击）
     st.markdown("##### 🚀 快捷功能")
     f1, f2, f3, f4 = st.columns(4)
-    if f1.button("🎯\n客户开发\n分析·背调·开发信", use_container_width=True):
-        st.session_state["main_nav"] = "👥 客户中心"
-        st.rerun()
-    if f2.button("📦\n产品与SEO\nSKU·SEO·上品", use_container_width=True):
-        st.session_state["main_nav"] = "📦 独立站上品SEO工作台"
-        st.rerun()
-    if f3.button("🛠️\nAI工具库\n7个自研视觉工具", use_container_width=True):
-        st.session_state["main_nav"] = "📦 锴利自研AI工具库"
-        st.rerun()
-    if f4.button("🌍\n市场分析\n竞品·蓝海·选品", use_container_width=True):
-        st.session_state["main_nav"] = "🌍 市场分析"
-        st.rerun()
+    with f1:
+        if st.button("🎯 客户开发", use_container_width=True):
+            st.session_state["main_nav"] = "👥 客户中心"
+            st.rerun()
+        st.caption("分析 · 背调 · 开发信")
+    with f2:
+        if st.button("📦 产品与SEO", use_container_width=True):
+            st.session_state["main_nav"] = "📦 独立站上品SEO工作台"
+            st.rerun()
+        st.caption("SKU · SEO · 上品")
+    with f3:
+        if st.button("🛠️ AI工具库", use_container_width=True):
+            st.session_state["main_nav"] = "📦 锴利自研AI工具库"
+            st.rerun()
+        st.caption("7个自研视觉工具")
+    with f4:
+        if st.button("🌍 市场分析", use_container_width=True):
+            st.session_state["main_nav"] = "🌍 市场分析"
+            st.rerun()
+        st.caption("竞品 · 蓝海 · 选品")
 
     st.markdown("---")
 

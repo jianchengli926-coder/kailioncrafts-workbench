@@ -4062,246 +4062,81 @@ elif page == "🔍 竞品与资源库":
     else:
         st.warning("竞品数据文件未找到，请确保 data/competitor_sites.csv 存在")
 
-# ============ 页面13：知识库浏览 ============
+# ============ 知识库 ============
 elif page == "📚 知识库":
-    st.title("📚 公司知识库")
-    st.caption("全文搜索 + 分类浏览 + 管理统计")
-    
-    kb_tab1, kb_tab2, kb_tab3 = st.tabs(["🔍 搜索浏览", "📊 管理统计", "➕ 添加新知识库"])
-    
-    with kb_tab1:
-    # 知识库源选择
-        kb_sources = kb.get_kb_sources()
-    source_options = {
-    "all": "全部知识库（搜索时）",
-    "standard": kb_sources["standard"]["name"],
-    "website": kb_sources["website"]["name"],
-    "sku_seo": kb_sources["sku_seo"]["name"],
-    "products": kb_sources["products"]["name"],
-    "customer_service": kb_sources["customer_service"]["name"],
-    "blog": kb_sources["blog"]["name"],
-    "yangjiang": kb_sources["yangjiang"]["name"],
-    "codex": kb_sources["codex"]["name"],
-    "website_materials": kb_sources["website_materials"]["name"],
-    "feishu": kb_sources["feishu"]["name"],
-    "trade_learning": kb_sources["trade_learning"]["name"],
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
+    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · KNOWLEDGE BASE</div>
+    <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">公司知识库</h2>
+    <div style="color:rgba(255,243,224,.6);font-size:13px;">搜索 · 管理 · 版本 · 添加 · 知识库化器</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    kb_sections = {
+        "🔍 搜索浏览": "全文搜索 · 分类浏览",
+        "📊 管理统计": "知识库数量 · 文件统计",
+        "📋 版本管理": "版本号 · 日期 · 回退",
+        "➕ 添加知识": "登记新知识库",
+        "🤖 知识库化器": "对话记录 → 知识库",
     }
-    selected_source = st.radio(
-    "知识库来源",
-    list(source_options.keys()),
-    format_func=lambda x: source_options[x],
-    horizontal=True,
-    index=1,
-    )
-    
+    if "kb_sub" not in st.session_state:
+        st.session_state["kb_sub"] = "🔍 搜索浏览"
+    kb_current = st.session_state["kb_sub"]
+
+    kb_cols = st.columns(5)
+    for i, (name, desc) in enumerate(kb_sections.items()):
+        with kb_cols[i]:
+            is_active = st.session_state["kb_sub"] == name
+            if st.button(name, key=f"kbbtn_{name}", use_container_width=True,
+                         type="primary" if is_active else "secondary"):
+                st.session_state["kb_sub"] = name
+                st.rerun()
+
+    kb_current = st.session_state["kb_sub"]
+    st.markdown(f"### {kb_current}")
+    st.caption(kb_sections[kb_current])
     st.markdown("---")
-    
-    # 搜索框
-    search_query = st.text_input(
-    "🔍 全文搜索知识库",
-    placeholder="输入关键词，如：MOQ、FDA认证、厨房刀、OEM定制、价格...",
-    help="支持中英文关键词搜索，搜索文件名和文件内容",
-    )
-    
-    results = []
-    if search_query:
-        with st.spinner("正在搜索知识库..."):
-            results = kb.search(search_query, source=selected_source, max_results=30)
-    
-    if results:
-        st.success(f"找到 {len(results)} 个相关结果")
-    for i, r in enumerate(results, 1):
-        source_label = "📘 标准化" if r["source"] == "standard" else "📙 飞书版"
-        with st.expander(f"**{i}. {r['file']}**  `{r['category']}`  {source_label}  相关度:{r['score']}"):
-            st.markdown(f"**路径**: `{r['path']}`")
-            st.markdown("**内容片段**:")
-            st.markdown(r["snippet"])
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                if st.button("📖 查看全文", key=f"view_{i}", use_container_width=True):
-                    st.session_state["kb_view_file"] = r["path"]
-                    st.session_state["kb_view_name"] = r["file"]
-                    st.rerun()
+
+    if kb_current == "🔍 搜索浏览":
+        search_query = st.text_input("🔍 全文搜索", placeholder="输入关键词：MOQ、FDA、OEM、厨房刀...")
+        if search_query:
+            with st.spinner("搜索中..."):
+                results = kb.search(search_query, max_results=20)
+                if results:
+                    st.success(f"找到 {len(results)} 个结果")
+                    for i, r in enumerate(results, 1):
+                        with st.expander(f"{i}. {r['file']}"):
+                            st.markdown(r["snippet"])
                 else:
-                    st.warning("未找到相关内容，试试其他关键词")
-    
-    # 查看全文模式
-    if "kb_view_file" in st.session_state and st.session_state["kb_view_file"]:
-        st.markdown("---")
-    st.subheader(f"📄 {st.session_state.get('kb_view_name', '')}")
-    col1, col2 = st.columns([1, 5])
-    with col1:
-        if st.button("← 返回列表", use_container_width=True):
-            st.session_state["kb_view_file"] = None
-        st.session_state["kb_view_name"] = None
-        st.rerun()
-    content = kb.read_file_by_path(st.session_state["kb_view_file"], max_chars=15000)
-    st.markdown(content)
-    st.stop()
-    
-    # 分类浏览（未搜索时显示）
-    if not search_query:
-        st.markdown("### 📂 分类浏览")
-    
-    # 快速模块
-    st.markdown("#### ⚡ 常用模块")
-    quick_cols = st.columns(4)
-    quick_modules = [
-    ("公司简介", "company_profile", "🏢"),
-    ("工厂供应链", "factory", "🏭"),
-    ("客户痛点", "pain_points", "💡"),
-    ("FAQ问答", "faq", "❓"),
-    ("产品术语", "terminology", "📖"),
-    ("产品规格", "product_specs", "📐"),
-    ("邮件模板", "email_templates", "✉️"),
-    ("SKU数据", "sku", "📦"),
-    ("谈客户技巧", "negotiation_tips", "🎯"),
-    ("谈判报价", "pricing_tips", "💰"),
-    ("邮件开发", "email_tips", "📧"),
-    ("营销攻略", "marketing_tips", "📣"),
-    ]
-    for i, (name, key, icon) in enumerate(quick_modules):
-        with quick_cols[i % 4]:
-            if st.button(f"{icon} {name}", use_container_width=True, key=f"quick_{key}"):
-                st.session_state["kb_quick_module"] = key
-    
-    if "kb_quick_module" in st.session_state:
-        st.markdown("---")
-    module = st.session_state["kb_quick_module"]
-    if module == "sku":
-        st.subheader("📦 SKU产品数据")
-        sku_data = kb.get_sku_data(limit=200)
-        if sku_data:
-            df = pd.DataFrame(sku_data)
-            display_cols = [c for c in ["SKU", "中文名", "英文名", "一级类目", "二级分类", "材质", "规格", "MOQ", "价格带"] if c in df.columns]
-            st.dataframe(df[display_cols], use_container_width=True, height=500)
-            st.caption(f"共 {len(sku_data)} 条产品数据")
-    elif module in ["negotiation_tips", "pricing_tips", "email_tips", "marketing_tips"]:
-        tips_map = {
-            "negotiation_tips": ("🎯 谈客户技巧", "get_negotiation_tips"),
-            "pricing_tips": ("💰 谈判与报价技巧", "get_pricing_tips"),
-            "email_tips": ("📧 邮件开发技巧", "get_email_tips"),
-            "marketing_tips": ("📣 营销攻略", "get_marketing_tips"),
-        }
-        title, method = tips_map[module]
-        st.subheader(title)
-        content = getattr(kb, method)()
-        st.markdown(content)
-    else:
-        content_map = {
-            "company_profile": "公司简介与创始人资料",
-            "factory": "工厂背景与供应链",
-            "pain_points": "客户痛点与公司卖点",
-            "faq": "客户常见问答",
-            "terminology": "中英术语库",
-            "product_specs": "产品规格参数",
-            "email_templates": "外贸邮件模板",
-        }
-        st.subheader(f"📄 {content_map.get(module, module)}")
-        content = getattr(kb, f"get_{module}")()
-        st.markdown(content)
-    
-    st.markdown("---")
-    
-    # 按目录浏览
-    browse_source = "standard" if selected_source == "all" else selected_source
-    st.markdown(f"#### 📁 按目录浏览（{source_options[browse_source]}）")
-
-    @st.cache_data(ttl=3600, show_spinner="正在加载分类目录...")
-    def _cached_categories(src):
-        return kb.list_categories(source=src)
-
-    categories = _cached_categories(browse_source)
-    
-    if categories:
-        cat_names = [f"{c['name']} ({c['file_count']}个文件)" for c in categories]
-    selected_cat = st.selectbox("选择分类", cat_names)
-    
-    if selected_cat:
-        cat_idx = cat_names.index(selected_cat)
-        cat_path = categories[cat_idx]["path"]
-
-        @st.cache_data(ttl=3600, show_spinner="正在加载文件列表...")
-        def _cached_files(p):
-            return kb.list_files(p)
-
-        files = _cached_files(cat_path)
-    
-        if files:
-            st.caption(f"共 {len(files)} 个文档")
-            # 按文件名搜索过滤
-            file_filter = st.text_input("在当前分类中筛选文件", placeholder="输入文件名关键词...")
-            if file_filter:
-                files = [f for f in files if file_filter.lower() in f["name"].lower()]
-    
-            for f in files[:50]:
-                col1, col2, col3 = st.columns([4, 1, 1])
-                with col1:
-                    st.markdown(f"📄 **{f['name']}**")
-                with col2:
-                    st.caption(f"{f['size_kb']} KB")
-                with col3:
-                    if st.button("查看", key=f"file_{f['path']}", use_container_width=True):
-                        st.session_state["kb_view_file"] = f["path"]
-                        st.session_state["kb_view_name"] = f["name"]
-                        st.rerun()
-            if len(files) > 50:
-                st.info(f"还有 {len(files) - 50} 个文件，请使用搜索框精确查找")
+                    st.info("未找到相关内容")
         else:
-            st.info("该分类下没有可浏览的文档")
-    else:
-        st.warning("知识库目录不存在或为空")
-    
-    with kb_tab2:
-        st.subheader("📊 知识库总览")
-        kb_sources = kb.get_kb_sources()
+            st.markdown("#### ⚡ 常用模块")
+            qc = st.columns(4)
+            modules = [("🏢 公司简介", "company"), ("🏭 工厂供应链", "factory"), ("❓ FAQ", "faq"), ("📐 产品规格", "specs")]
+            for i, (name, key) in enumerate(modules):
+                with qc[i]:
+                    st.button(name, use_container_width=True, key=f"kbq_{key}")
 
-        @st.cache_data(ttl=3600, show_spinner="正在扫描知识库文件...")
-        def _scan_kb_stats(_kb_sources):
-            total_docs = 0
-            total_size = 0
-            rows = []
-            for key, source in _kb_sources.items():
-                path = source["path"]
-                if path.exists():
-                    doc_count = 0
-                    dir_size = 0
-                    latest_mtime = 0
-                    for f in path.rglob("*"):
-                        if f.is_file():
-                            dir_size += f.stat().st_size
-                            if f.suffix.lower() in ['.md','.txt','.csv','.json','.xlsx']:
-                                doc_count += 1
-                            if f.suffix.lower() == '.md':
-                                mt = f.stat().st_mtime
-                                if mt > latest_mtime:
-                                    latest_mtime = mt
-                    total_docs += doc_count
-                    total_size += dir_size
-                    try:
-                        last_update = datetime.fromtimestamp(latest_mtime).strftime("%Y-%m-%d") if latest_mtime > 0 else "-"
-                    except:
-                        last_update = "-"
-                    rows.append({"知识库": source["name"], "文件数": doc_count, "大小KB": round(dir_size/1024,1), "最后更新": last_update, "路径": str(path)})
-            return total_docs, total_size, rows
+    elif kb_current == "📊 管理统计":
+        try:
+            sources = kb.get_kb_sources()
+            for s, info in sources.items():
+                st.write(f"- **{info.get('name', s)}**：{info.get('count', 0)}个文件")
+        except Exception as e:
+            st.error(f"加载失败：{e}")
 
-        total_docs, total_size, rows = _scan_kb_stats(kb_sources)
-        c1, c2 = st.columns(2)
-        c1.metric("总文档数", total_docs)
-        c2.metric("总大小", f"{total_size/1024/1024:.1f} MB")
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    elif kb_current == "📋 版本管理":
+        st.info("版本管理功能开发中")
 
-    with kb_tab3:
-        st.subheader("➕ 添加新知识库")
-        st.info("后续公司新增资料时，把文件夹放到项目目录下，然后在这里登记即可。")
-        with st.form("new_kb"):
-            kb_name = st.text_input("知识库名称")
-            kb_path = st.text_input("文件夹路径（绝对路径）")
-            kb_desc = st.text_area("描述")
-            if st.form_submit_button("登记"):
-                st.success(f"已记录：{kb_name}\n注意：目前知识库通过 config.py 的 KB_DIR 自动加载，新文件夹请联系开发者添加到配置中。")
+    elif kb_current == "➕ 添加知识":
+        kb_name = st.text_input("知识库名称")
+        kb_desc = st.text_area("描述")
+        if st.button("登记", use_container_width=True):
+            st.success(f"已记录：{kb_name}")
 
-# ============ 团队工作空间页面 ============
+    elif kb_current == "🤖 知识库化器":
+        st.info("对话记录自动整理成知识库功能开发中")
+
 elif page == "👥 团队工作空间":
     st.title("👥 团队工作空间")
     st.caption("每位成员独立工作空间，共享公司知识库，生成内容自动整合")

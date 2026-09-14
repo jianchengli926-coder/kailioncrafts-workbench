@@ -55,36 +55,40 @@ if "authed" not in st.session_state:
 
 if not st.session_state["authed"]:
     logo_path = Path(__file__).parent / "assets" / "logo.png"
-    col_l, col_c, col_r = st.columns([1, 1, 1])
+    # 居中布局：左右留白
+    _, col_c, _ = st.columns([1, 2, 1])
     with col_c:
         if logo_path.exists():
-            st.image(str(logo_path), width=180)
+            st.image(str(logo_path), width=320)
         st.markdown("""
-        <div style="text-align:center;margin-top:12px;">
-        <div style="font-size:28px;font-weight:900;color:#1a1a2e;letter-spacing:-1px;">KaiLion<span style="color:#D4AF37;">Crafts</span></div>
-        <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;margin-top:4px;">锴 利 匠 心</div>
-        <div style="color:#888;font-size:13px;margin-top:16px;">企业级AI工作台 · 请输入密码进入</div>
+        <div style="text-align:center;margin-top:16px;">
+        <div style="font-size:32px;font-weight:900;color:#1a1a2e;letter-spacing:-1px;">KaiLion<span style="color:#D4AF37;">Crafts</span></div>
+        <div style="color:#D4AF37;font-size:13px;letter-spacing:4px;margin-top:6px;">锴 利 匠 心</div>
+        <div style="color:#888;font-size:14px;margin-top:20px;">企业级AI工作台 · 请输入密码进入</div>
         </div>
         """, unsafe_allow_html=True)
-    pwd = st.text_input("", type="password", label_visibility="collapsed", placeholder="输入访问密码")
-    if st.button("进 入", use_container_width=True, type="primary"):
-        if pwd == "441723":
-            st.session_state["authed"] = True
-            try:
-                import json, os
-                from datetime import datetime
-                log_file = "data/auth_log.json"
-                os.makedirs("data", exist_ok=True)
-                logs = []
-                if os.path.exists(log_file):
-                    logs = json.load(open(log_file, encoding="utf-8"))
-                logs.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "登录成功"})
-                json.dump(logs[-100:], open(log_file, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-            except:
-                pass
-            st.rerun()
-        else:
-            st.error("密码错误")
+    # 密码输入框也居中
+    _, col_pwd, _ = st.columns([1, 2, 1])
+    with col_pwd:
+        pwd = st.text_input("", type="password", label_visibility="collapsed", placeholder="输入访问密码")
+        if st.button("进 入", use_container_width=True, type="primary"):
+            if pwd == "441723":
+                st.session_state["authed"] = True
+                try:
+                    import json, os
+                    from datetime import datetime
+                    log_file = "data/auth_log.json"
+                    os.makedirs("data", exist_ok=True)
+                    logs = []
+                    if os.path.exists(log_file):
+                        logs = json.load(open(log_file, encoding="utf-8"))
+                    logs.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "登录成功"})
+                    json.dump(logs[-100:], open(log_file, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+                except:
+                    pass
+                st.rerun()
+            else:
+                st.error("密码错误")
     st.stop()
 
 # ============ 回到顶部浮动按钮 ============

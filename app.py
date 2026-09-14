@@ -128,7 +128,7 @@ with st.sidebar:
         "📦 锴利自研AI工具库",
         "🌍 市场分析",
         "👥 客户中心",
-        "📥 独立站询盘管理", "📊 订单台账",
+        "📥 独立站管理", "📊 订单台账",
         # 产品部
         "📦 产品推荐", "🏭 产品库",
         "📊 SEO表格工具", "📦 独立站上品SEO工作台",
@@ -333,8 +333,8 @@ if page == "📊 仪表盘":
             </div>
             """, unsafe_allow_html=True)
 
-# ============ 页面1.5：独立站询盘管理 ============
-elif page == "📥 独立站询盘管理":
+# ============ 独立站管理 ============
+elif page == "📥 独立站管理":
     import json as _json
     from datetime import datetime as _dt
 

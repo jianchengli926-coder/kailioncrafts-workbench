@@ -341,23 +341,28 @@ if page == "📊 仪表盘":
     todo_file = Path("data/todo/todos.json")
     todo_file.parent.mkdir(parents=True, exist_ok=True)
     if todo_file.exists():
-        todos = _json.loads(todo_file.read_text(encoding="utf-8"))
+        try:
+            todos = _json.loads(todo_file.read_text(encoding="utf-8"))
+        except:
+            todos = []
     else:
         todos = []
-    t1, t2 = st.columns([3, 1])
-    with t1:
-        new_todo = st.text_input("添加待办", placeholder="例如：跟进德国客户OEM询价", label_visibility="collapsed")
-    with t2:
-        if st.button("➕ 添加", use_container_width=True):
-            if new_todo.strip():
-                todos.append({"task": new_todo.strip(), "done": False, "date": datetime.now().strftime("%Y-%m-%d")})
-                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
-                st.rerun()
-    for i, t in enumerate(todos[:10]):
-        cb = st.checkbox(t["task"], value=t["done"], key=f"dash_todo_{i}")
-        if cb != t["done"]:
-            todos[i]["done"] = cb
+
+    new_todo = st.text_input("添加待办事项", placeholder="例如：跟进德国客户OEM询价", key="new_todo_input")
+    if st.button("➕ 添加待办", use_container_width=True):
+        if new_todo.strip():
+            todos.append({"task": new_todo.strip(), "done": False, "date": datetime.now().strftime("%Y-%m-%d")})
             todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+            st.rerun()
+
+    if todos:
+        for i, t in enumerate(todos[:10]):
+            cb = st.checkbox(t["task"], value=t.get("done", False), key=f"dash_todo_{i}")
+            if cb != t.get("done", False):
+                todos[i]["done"] = cb
+                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+    else:
+        st.info("暂无待办事项，添加一个吧！")
 
     st.markdown("---")
 

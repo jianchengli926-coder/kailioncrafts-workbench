@@ -3447,10 +3447,10 @@ elif page == "📦 锴利自研AI工具库":
 # ============ 独立站SEO中心（合并三个SEO功能） ============
 elif page == "📊 独立站SEO中心" and "seo_sub" not in st.session_state:
     st.title("📊 独立站SEO中心")
-    st.caption("SEO表格工具 · 独立站上品SEO · 博客SEO · 一体化管理")
+    st.caption("SEO表格工具 · 独立站上品SEO · 图片SEO命名 · 博客SEO · 一体化管理")
 
-    # 三个大按钮
-    s1, s2, s3 = st.columns(3)
+    # 四个大按钮
+    s1, s2 = st.columns(2)
     with s1:
         st.markdown("""
         <div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:12px 12px 0 0;padding:24px;text-align:center;">
@@ -3473,7 +3473,19 @@ elif page == "📊 独立站SEO中心" and "seo_sub" not in st.session_state:
         if st.button("进入上品SEO", key="goto_seo_listing", use_container_width=True):
             st.session_state["seo_sub"] = "listing"
             st.rerun()
+    s3, s4 = st.columns(2)
     with s3:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);border-radius:12px 12px 0 0;padding:24px;text-align:center;">
+        <div style="font-size:36px;">🖼️</div>
+        <div style="font-weight:700;margin-top:8px;">图片SEO命名</div>
+        <div style="font-size:12px;color:#9d174d;margin-top:4px;">SKU+白底图→SEO文件名/ALT</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("进入图片SEO命名", key="goto_image_seo", use_container_width=True):
+            st.session_state["seo_sub"] = "image"
+            st.rerun()
+    with s4:
         st.markdown("""
         <div style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-radius:12px 12px 0 0;padding:24px;text-align:center;">
         <div style="font-size:36px;">💡</div>
@@ -3484,6 +3496,79 @@ elif page == "📊 独立站SEO中心" and "seo_sub" not in st.session_state:
         if st.button("进入博客SEO", key="goto_seo_blog", use_container_width=True):
             st.session_state["seo_sub"] = "blog"
             st.rerun()
+
+elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "image":
+    if st.button("← 返回SEO中心", key="back_seo_center_image"):
+        del st.session_state["seo_sub"]
+        st.rerun()
+    st.title("🖼️ 图片SEO命名工具")
+    st.caption("上传产品白底图 + 输入SKU → AI生成SEO文件名/ALT文本/图片标题")
+
+    # 连接的知识库
+    with st.expander("📚 本工具连接的知识库"):
+        st.markdown("""
+        - ✅ **产品规格参数库** — 材质/工艺/规格信息
+        - ✅ **SKU数据目录** — 四大品类200条SKU
+        - ✅ **术语库** — 标准英文术语
+        - ✅ **营销文案库** — 产品卖点描述
+        - ✅ **公司简介** — 品牌背景
+        """)
+
+    # 第一步：上传产品图
+    st.markdown("### 📷 第一步：上传产品图片")
+    uploaded_img = st.file_uploader("上传产品白底图/主图", type=['jpg', 'jpeg', 'png', 'webp'], key="image_seo_upload")
+    if uploaded_img:
+        st.image(uploaded_img, width=200, caption="上传的产品图")
+
+    # 第二步：输入SKU和信息
+    st.markdown("### 🏷️ 第二步：输入产品信息")
+    col1, col2 = st.columns(2)
+    with col1:
+        sku_input = st.text_input("产品SKU", placeholder="KL-KN-HM-003")
+        category_input = st.selectbox("产品品类", ["", "Kitchen Knives", "Professional Scissors", "Outdoor Knives", "Kitchen Accessories"])
+    with col2:
+        material_input = st.text_input("主要材质", placeholder="例如：German 1.4116 Stainless")
+        angle_input = st.selectbox("拍摄角度", ["", "Front View", "Back View", "Side View", "Top View", "Detail Close-up", "In Use / Lifestyle", "Packaging / Box"])
+
+    # 第三步：生成SEO命名
+    st.markdown("### 🎯 第三步：生成SEO命名")
+    if st.button("⚡ 生成图片SEO命名", type="primary", use_container_width=True):
+        if not sku_input:
+            st.warning("请先输入产品SKU")
+        else:
+            with st.spinner("AI正在生成SEO命名..."):
+                kb_info = kb.get_product_specs()[:500] if hasattr(kb, 'get_product_specs') else "暂无知识库资料"
+                prompt = f"""# KaiLionCrafts 图片SEO命名任务
+
+## 产品信息
+- SKU: {sku_input}
+- 品类: {category_input}
+- 材质: {material_input}
+- 拍摄角度: {angle_input}
+
+## 品牌背景
+- 品牌: KaiLionCrafts
+- 公司: Yangjiang KaiLionCrafts Hardware Co., Ltd.
+- 定位: B2B OEM/ODM 高端刀剪厨具出口
+- 目标客户: 全球批发商、Amazon卖家、品牌商
+
+## 知识库参考
+{kb_info}
+
+## 任务要求
+请为这张产品图生成以下SEO信息（全英文，B2B专业风格）：
+
+1. **SEO文件名**：格式为 SKU-angle-description.webp，例如 KL-KN-HM-003-front-view-chef-knife-german-steel.webp
+2. **Alt Text**：125字符以内，含关键词，描述图片内容
+3. **Image Title**：简洁专业的图片标题
+4. **Caption**：图片说明（可选）
+5. **焦点关键词**：这张图应该优化的1-2个关键词
+
+直接输出结果，用表格格式。"""
+                result = ai.chat(prompt)
+            st.markdown("---")
+            st.subheader("🎯 SEO命名结果")
+            st.markdown(result)
 
 elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "listing":
     # 返回SEO中心按钮

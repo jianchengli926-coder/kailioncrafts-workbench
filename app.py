@@ -5027,41 +5027,41 @@ elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "b
     
     with tab1:
         st.caption("用法：随时记录博客灵感/选题，然后点「生成文章」跳到右侧生成页")
-    with st.expander("➕ 添加选题灵感", expanded=False):
-        with st.form("new_idea"):
-            title = st.text_input("选题标题")
-            direction = st.selectbox("博客大方向", BLOG_DIRECTIONS)
-            cat = st.selectbox("产品品类", CATEGORIES)
-            kw = st.text_input("目标关键词（英文）")
-            note = st.text_area("灵感/大纲/要点")
-            if st.form_submit_button("保存选题"):
-                ideas.append({
-                    "title":title,"direction":direction,"category":cat,
-                    "keyword":kw,"note":note,"done":False,
-                    "date":datetime.now().strftime("%Y-%m-%d")
-                })
-                ideas_file.write_text(_json.dumps(ideas, ensure_ascii=False, indent=2), encoding="utf-8")
-                st.success("已保存")
-                st.rerun()
-    
-    if ideas:
-        for i, idea in enumerate(ideas):
-            with st.container():
-                st.markdown(f"**{idea['title']}**")
-            st.caption(f"方向：{idea.get('direction','')} | 品类：{idea.get('category','')} | 关键词：{idea.get('keyword','')} | {idea.get('date','')}")
-            if idea.get("note"):
-                st.write(idea["note"])
-            c1, c2 = st.columns(2)
-            if c1.button("✍️ 用这个选题生成", key=f"gen_{i}"):
-                st.session_state['_gen_idea'] = idea
-                st.rerun()
-            if c2.button("🗑 删除", key=f"del_{i}"):
-                ideas.pop(i)
-                ideas_file.write_text(_json.dumps(ideas, ensure_ascii=False, indent=2), encoding="utf-8")
-                st.rerun()
-            st.markdown("---")
-    else:
-        st.info("还没有选题，随时记录你的博客灵感")
+        with st.expander("➕ 添加选题灵感", expanded=False):
+            with st.form("new_idea"):
+                title = st.text_input("选题标题")
+                direction = st.selectbox("博客大方向", BLOG_DIRECTIONS)
+                cat = st.selectbox("产品品类", CATEGORIES)
+                kw = st.text_input("目标关键词（英文）")
+                note = st.text_area("灵感/大纲/要点")
+                if st.form_submit_button("保存选题"):
+                    ideas.append({
+                        "title":title,"direction":direction,"category":cat,
+                        "keyword":kw,"note":note,"done":False,
+                        "date":datetime.now().strftime("%Y-%m-%d")
+                    })
+                    ideas_file.write_text(_json.dumps(ideas, ensure_ascii=False, indent=2), encoding="utf-8")
+                    st.success("已保存")
+                    st.rerun()
+
+        if ideas:
+            for i, idea in enumerate(ideas):
+                with st.container():
+                    st.markdown(f"**{idea['title']}**")
+                st.caption(f"方向：{idea.get('direction','')} | 品类：{idea.get('category','')} | 关键词：{idea.get('keyword','')} | {idea.get('date','')}")
+                if idea.get("note"):
+                    st.write(idea["note"])
+                c1, c2 = st.columns(2)
+                if c1.button("✍️ 用这个选题生成", key=f"gen_{i}"):
+                    st.session_state['_gen_idea'] = idea
+                    st.rerun()
+                if c2.button("🗑 删除", key=f"del_{i}"):
+                    ideas.pop(i)
+                    ideas_file.write_text(_json.dumps(ideas, ensure_ascii=False, indent=2), encoding="utf-8")
+                    st.rerun()
+                st.markdown("---")
+        else:
+            st.info("还没有选题，随时记录你的博客灵感")
     
     with tab2:
         st.markdown("##### 输入选题 → AI读取知识库 → 生成SEO博客文章")

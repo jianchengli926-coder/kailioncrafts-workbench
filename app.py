@@ -1354,7 +1354,7 @@ elif page == "📦 产品推荐":
             st.dataframe(df[display_cols], use_container_width=True)
 
 # ============ 产品库页面（增强版：统一产品数据库 + 智能推荐） ============
-elif page == "🏭 产品库":
+elif page == "📦 产品库":
     # 子导航：产品库浏览 / 智能产品推荐
     sub_nav = st.radio(
         "产品库工作台",

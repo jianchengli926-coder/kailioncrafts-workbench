@@ -677,23 +677,64 @@ elif page == "📥 独立站管理":
 
     # WooCommerce后台
     st.markdown("---")
-    st.markdown("##### 🛒 WooCommerce订单")
-    if st.button("🔄 拉取最新订单", key="wc_pull"):
-        with st.spinner("正在从WooCommerce拉取..."):
-            try:
-                import requests
-                r = requests.get("https://kailioncrafts.com/wp-json/wc/v3/orders",
-                    auth=("ck_081563431476ddb5de3b7622b5103c36ae5dfa5e", "cs_14f604031a3c0afef77660ccd18d121670bffe84"),
-                    params={"per_page": 10}, timeout=15)
-                if r.status_code == 200:
-                    orders = r.json()
-                    st.success(f"拉取到 {len(orders)} 个订单")
-                    for o in orders:
-                        st.write(f"#{o.get('id')} | {o.get('status')} | {o.get('total')} {o.get('currency')} | {o.get('billing',{}).get('first_name','')}")
-                else:
-                    st.error(f"API错误: {r.status_code}")
-            except Exception as e:
-                st.error(f"连接失败：{e}")
+    st.markdown("##### 🛒 WooCommerce订单与评论")
+
+    wc_tab1, wc_tab2 = st.tabs(["📦 订单列表", "💬 产品评论"])
+
+    with wc_tab1:
+        if st.button("🔄 拉取最新订单", key="wc_pull"):
+            with st.spinner("正在从WooCommerce拉取..."):
+                try:
+                    import requests
+                    r = requests.get("https://kailioncrafts.com/wp-json/wc/v3/orders",
+                        auth=("ck_081563431476ddb5de3b7622b5103c36ae5dfa5e", "cs_14f604031a3c0afef77660ccd18d121670bffe84"),
+                        params={"per_page": 20}, timeout=15)
+                    if r.status_code == 200:
+                        orders = r.json()
+                        st.session_state["_wc_orders"] = orders
+                        st.success(f"拉取到 {len(orders)} 个订单")
+                    else:
+                        st.error(f"API错误: {r.status_code}")
+                except Exception as e:
+                    st.error(f"连接失败：{e}")
+
+        if "_wc_orders" in st.session_state:
+            orders = st.session_state["_wc_orders"]
+            if orders:
+                import pandas as pd
+                df = pd.DataFrame([{
+                    "订单号": f"#{o.get('id')}",
+                    "状态": o.get('status'),
+                    "金额": f"${o.get('total')}",
+                    "客户": o.get('billing',{}).get('first_name','') + " " + o.get('billing',{}).get('last_name',''),
+                    "邮箱": o.get('billing',{}).get('email',''),
+                    "国家": o.get('billing',{}).get('country',''),
+                    "日期": o.get('date_created','')[:10],
+                } for o in orders])
+                st.dataframe(df, use_container_width=True, hide_index=True)
+
+    with wc_tab2:
+        if st.button("🔄 拉取最新评论", key="wc_reviews"):
+            with st.spinner("正在拉取产品评论..."):
+                try:
+                    import requests
+                    r = requests.get("https://kailioncrafts.com/wp-json/wc/v3/products/reviews",
+                        auth=("ck_081563431476ddb5de3b7622b5103c36ae5dfa5e", "cs_14f604031a3c0afef77660ccd18d121670bffe84"),
+                        params={"per_page": 20}, timeout=15)
+                    if r.status_code == 200:
+                        reviews = r.json()
+                        st.session_state["_wc_reviews"] = reviews
+                        st.success(f"拉取到 {len(reviews)} 条评论")
+                    else:
+                        st.error(f"API错误: {r.status_code}")
+                except Exception as e:
+                    st.error(f"连接失败：{e}")
+
+        if "_wc_reviews" in st.session_state:
+            reviews = st.session_state["_wc_reviews"]
+            for rev in reviews[:15]:
+                with st.expander(f"⭐ {rev.get('rating','')} | {rev.get('reviewer','')} | {rev.get('date_created','')[:10]}"):
+                    st.write(rev.get('review',''))
 
 # ============ 页面2：晨间简报 ============
 elif page == "🌅 晨间简报":

@@ -8170,20 +8170,115 @@ elif page == "⚙️ 设置中心":
                 st.download_button("📥 导出CSV", csv, f"ai_usage_{now.strftime('%Y%m%d_%H%M')}.csv", "text/csv", use_container_width=True)
 
     elif sc_current == "👥 访问日志":
-        st.subheader("访问日志")
-        try:
-            import json, os
-            auth_file = "data/auth_log.json"
-            if os.path.exists(auth_file):
-                with open(auth_file, encoding='utf-8') as f:
-                    logs = json.load(f)
-                st.metric("总登录次数", len(logs))
-                for log in logs[-20:]:
-                    st.write(f"- {log.get('time', '')} | IP: {log.get('ip', '')} | {log.get('event', '')}")
-            else:
-                st.info("暂无登录记录")
-        except Exception as e:
-            st.error(f"加载失败：{e}")
+        st.subheader("👥 访问监控中心")
+        st.caption("访问日志 · IP黑名单 · 操作审计")
+
+        import json
+        from datetime import datetime
+
+        # ===== 文件路径 =====
+        AUTH_LOG = Path("data/auth_log.json")
+        BLACKLIST = Path("data/blacklist.json")
+        OP_LOG = Path("data/operation_log.json")
+
+        def _load_json(path, default):
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                return default
+
+        def _save_json(path, data):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        # ===== 读取数据 =====
+        auth_logs = _load_json(AUTH_LOG, [])
+        blacklist = _load_json(BLACKLIST, [])
+        op_logs = _load_json(OP_LOG, [])
+
+        # ===== 顶部KPI =====
+        today = datetime.now().strftime("%Y-%m-%d")
+        today_visits = sum(1 for l in auth_logs if l.get("time", "").startswith(today))
+        k1, k2, k3 = st.columns(3)
+        k1.metric("总访问次数", len(auth_logs))
+        k2.metric("今日访问", today_visits)
+        k3.metric("黑名单IP数", len(blacklist), delta="⚠️ 已拦截")
+
+        st.markdown("---")
+
+        # ===== 1. 访问日志 =====
+        st.markdown("**📋 访问日志**（最新在前，前10条展开，其余折叠）")
+        if not auth_logs:
+            st.info("暂无访问记录")
+        else:
+            reversed_logs = list(reversed(auth_logs))
+            # 前10条直接展示
+            show_count = min(10, len(reversed_logs))
+            for i, log in enumerate(reversed_logs[:show_count]):
+                ip = log.get("ip", "unknown")
+                is_blacklisted = ip in [b.get("ip") for b in blacklist]
+                cols = st.columns([3, 1, 1, 1])
+                cols[0].write(f"🕐 {log.get('time', '')}")
+                cols[1].write(f"🌐 IP: {ip}")
+                cols[2].write(f"📝 {log.get('action', log.get('event', 'login'))}")
+                if is_blacklisted:
+                    cols[3].write("🔴 已拉黑")
+                else:
+                    if cols[3].button(f"🚫 拉黑", key=f"blk_{i}_{ip}"):
+                        blacklist.append({"ip": ip, "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "reason": "手动拉黑"})
+                        _save_json(BLACKLIST, blacklist)
+                        st.success(f"已拉黑 IP: {ip}")
+                        st.rerun()
+            # 剩余折叠
+            if len(reversed_logs) > 10:
+                with st.expander(f"📂 查看更早的记录（{len(reversed_logs) - 10}条）"):
+                    for i, log in enumerate(reversed_logs[10:]):
+                        st.write(f"🕐 {log.get('time', '')} | 🌐 IP: {log.get('ip', 'unknown')} | 📝 {log.get('action', log.get('event', 'login'))}")
+
+        st.markdown("---")
+
+        # ===== 2. 黑名单管理 =====
+        st.markdown("**🚫 IP黑名单管理**")
+        if not blacklist:
+            st.info("暂无拉黑的IP")
+        else:
+            st.warning(f"⚠️ 当前有 {len(blacklist)} 个IP在黑名单中")
+            for i, b in enumerate(blacklist):
+                cols = st.columns([2, 2, 2, 1])
+                cols[0].write(f"🌐 {b.get('ip', '')}")
+                cols[1].write(f"🕐 {b.get('time', '')}")
+                cols[2].write(f"📝 {b.get('reason', '')}")
+                if cols[3].button("✅ 移除", key=f"unblk_{i}"):
+                    blacklist.pop(i)
+                    _save_json(BLACKLIST, blacklist)
+                    st.success(f"已移除 IP: {b.get('ip', '')}")
+                    st.rerun()
+
+            # 添加自定义IP
+            with st.expander("➕ 手动添加黑名单IP"):
+                bl_ip = st.text_input("要拉黑的IP地址", placeholder="如：192.168.1.100")
+                bl_reason = st.text_input("拉黑原因", placeholder="如：恶意访问")
+                if st.button("🚫 添加到黑名单"):
+                    if bl_ip:
+                        if not any(b.get("ip") == bl_ip for b in blacklist):
+                            blacklist.append({"ip": bl_ip, "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "reason": bl_reason})
+                            _save_json(BLACKLIST, blacklist)
+                            st.success(f"已拉黑 IP: {bl_ip}")
+                            st.rerun()
+                        else:
+                            st.warning("该IP已在黑名单中")
+
+        st.markdown("---")
+
+        # ===== 3. 使用日志（操作审计） =====
+        st.markdown("**📝 使用日志（操作审计）**")
+        st.caption("记录工作台内的重要操作：添加/修改/删除等")
+        if not op_logs:
+            st.info("暂无操作日志（后续版本会自动记录所有重要操作）")
+        else:
+            reversed_ops = list(reversed(op_logs[-50:]))
+            op_df = pd.DataFrame(reversed_ops)
+            st.dataframe(op_df, use_container_width=True, hide_index=True)
 
 # ============ AI调用Trace（旧） ============
 elif page == "📜 AI调用Trace":

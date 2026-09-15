@@ -666,41 +666,89 @@ if page == "🏠 仪表盘":
             st.caption("暂无待办")
 
     with right:
-        st.markdown("##### 📈 近7天趋势")
-        try:
-            import json as _j, os
-            from datetime import datetime as _dt, timedelta as _td
-            inbox_file = "data/inbox/inquiries.json"
-            if os.path.exists(inbox_file):
-                inqs = _j.load(open(inbox_file, encoding="utf-8"))
-            else:
-                inqs = []
-            dates = [(datetime.now() - _td(days=i)).strftime("%m-%d") for i in range(6, -1, -1)]
-            inq_counts = [0] * 7
-            for q in inqs:
-                d = q.get("date", "")
-                for i, ds in enumerate(dates):
-                    if ds in d:
-                        inq_counts[i] += 1
-            # 用plotly做更好看的图表
-            import plotly.express as px
-            trend_df = pd.DataFrame({"日期": dates, "询盘数": inq_counts})
-            fig = px.bar(trend_df, x="日期", y="询盘数",
-                        color="询盘数",
-                        color_continuous_scale=["#e0e7ff", "#D4AF37"],
-                        text="询盘数",
-                        height=220)
+        # ===== 客户来源分析 =====
+        st.markdown("##### 📊 客户来源分析")
+
+        # 数据文件
+        source_file = Path("data/customer_sources.json")
+        source_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # 默认渠道配置（名称 + 颜色）
+        DEFAULT_SOURCES = {
+            "Google搜索": {"count": 8, "color": "#4285F4"},
+            "Facebook": {"count": 5, "color": "#1877F2"},
+            "TikTok": {"count": 4, "color": "#000000"},
+            "LinkedIn": {"count": 6, "color": "#0A66C2"},
+            "Instagram": {"count": 3, "color": "#E4405F"},
+            "展会": {"count": 2, "color": "#D4AF37"},
+            "客户转介绍": {"count": 1, "color": "#34A853"},
+            "其他": {"count": 1, "color": "#9E9E9E"},
+        }
+
+        # 加载或初始化数据
+        if source_file.exists():
+            try:
+                sources = _json.loads(source_file.read_text(encoding="utf-8"))
+            except Exception:
+                sources = DEFAULT_SOURCES.copy()
+        else:
+            sources = DEFAULT_SOURCES.copy()
+            source_file.write_text(_json.dumps(sources, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        # 右上角编辑入口
+        with st.expander("✏️ 编辑客户来源数据", expanded=False):
+            st.caption("修改各渠道客户数量，保存后图表自动更新")
+            new_sources = {}
+            cols = st.columns(2)
+            for i, (name, info) in enumerate(sources.items()):
+                with cols[i % 2]:
+                    new_count = st.number_input(f"{name}", min_value=0, value=info.get("count", 0), key=f"src_{name}")
+                    new_sources[name] = {"count": new_count, "color": info.get("color", "#9E9E9E")}
+            if st.button("💾 保存数据", use_container_width=True, type="primary"):
+                source_file.write_text(_json.dumps(new_sources, ensure_ascii=False, indent=2), encoding="utf-8")
+                st.success("已保存！")
+                st.rerun()
+
+        # 计算总数
+        total = sum(v["count"] for v in sources.values())
+
+        # 左侧甜甜圈图 + 右侧渠道列表
+        left_chart, right_list = st.columns([1.2, 1])
+
+        with left_chart:
+            import plotly.graph_objects as go
+            fig = go.Figure(data=[go.Pie(
+                labels=list(sources.keys()),
+                values=[v["count"] for v in sources.values()],
+                hole=0.6,
+                marker_colors=[v["color"] for v in sources.values()],
+                textinfo="none",
+            )])
+            fig.add_annotation(
+                text=f"<b>{total}</b><br>客户总数",
+                x=0.5, y=0.5,
+                font_size=16,
+                showarrow=False,
+            )
             fig.update_layout(
                 margin=dict(l=10, r=10, t=10, b=10),
+                height=220,
                 showlegend=False,
-                plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
-                coloraxis_showscale=False,
             )
-            fig.update_traces(textposition="outside", textfont_size=11)
             st.plotly_chart(fig, use_container_width=True)
-        except Exception as e:
-            st.caption("暂无数据")
+
+        with right_list:
+            for name, info in sources.items():
+                pct = f"{info['count']/total*100:.0f}%" if total > 0 else "0%"
+                st.markdown(f"""
+                <div style="display:flex;align-items:center;margin:6px 0;">
+                    <div style="width:12px;height:12px;border-radius:50%;background:{info['color']};margin-right:8px;"></div>
+                    <div style="flex:1;font-size:13px;">{name}</div>
+                    <div style="font-size:13px;font-weight:600;">{info['count']}</div>
+                    <div style="font-size:12px;color:#888;margin-left:8px;width:35px;text-align:right;">{pct}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
     st.markdown("---")
 

@@ -673,13 +673,16 @@ if page == "🏠 仪表盘":
         source_file = Path("data/customer_sources.json")
         source_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # 默认渠道配置（名称 + 颜色）
+        # 默认渠道配置（名称 + 颜色，11个渠道每个不同色）
         DEFAULT_SOURCES = {
             "Google搜索": {"count": 8, "color": "#4285F4"},
             "Facebook": {"count": 5, "color": "#1877F2"},
-            "TikTok": {"count": 4, "color": "#000000"},
+            "TikTok": {"count": 4, "color": "#333333"},
             "LinkedIn": {"count": 6, "color": "#0A66C2"},
             "Instagram": {"count": 3, "color": "#E4405F"},
+            "YouTube": {"count": 2, "color": "#FF0000"},
+            "X (Twitter)": {"count": 2, "color": "#1DA1F2"},
+            "Pinterest": {"count": 1, "color": "#E60023"},
             "展会": {"count": 2, "color": "#D4AF37"},
             "客户转介绍": {"count": 1, "color": "#34A853"},
             "其他": {"count": 1, "color": "#9E9E9E"},
@@ -689,6 +692,10 @@ if page == "🏠 仪表盘":
         if source_file.exists():
             try:
                 sources = _json.loads(source_file.read_text(encoding="utf-8"))
+                # 确保新渠道有默认值
+                for k, v in DEFAULT_SOURCES.items():
+                    if k not in sources:
+                        sources[k] = v
             except Exception:
                 sources = DEFAULT_SOURCES.copy()
         else:
@@ -700,7 +707,8 @@ if page == "🏠 仪表盘":
             st.caption("修改各渠道客户数量，保存后图表自动更新")
             new_sources = {}
             cols = st.columns(2)
-            for i, (name, info) in enumerate(sources.items()):
+            source_items = list(sources.items())
+            for i, (name, info) in enumerate(source_items):
                 with cols[i % 2]:
                     new_count = st.number_input(f"{name}", min_value=0, value=info.get("count", 0), key=f"src_{name}")
                     new_sources[name] = {"count": new_count, "color": info.get("color", "#9E9E9E")}
@@ -711,44 +719,40 @@ if page == "🏠 仪表盘":
 
         # 计算总数
         total = sum(v["count"] for v in sources.values())
+        st.caption(f"客户总数：{total}")
 
-        # 左侧甜甜圈图 + 右侧渠道列表
-        left_chart, right_list = st.columns([1.2, 1])
+        # 横向条形图（11个渠道用条形图更清晰）
+        import plotly.graph_objects as go
 
-        with left_chart:
-            import plotly.graph_objects as go
-            fig = go.Figure(data=[go.Pie(
-                labels=list(sources.keys()),
-                values=[v["count"] for v in sources.values()],
-                hole=0.6,
-                marker_colors=[v["color"] for v in sources.values()],
-                textinfo="none",
-            )])
-            fig.add_annotation(
-                text=f"<b>{total}</b><br>客户总数",
-                x=0.5, y=0.5,
-                font_size=16,
-                showarrow=False,
-            )
-            fig.update_layout(
-                margin=dict(l=10, r=10, t=10, b=10),
-                height=220,
-                showlegend=False,
-                paper_bgcolor="rgba(0,0,0,0)",
-            )
-            st.plotly_chart(fig, use_container_width=True)
+        # 按数量降序排列
+        sorted_sources = sorted(sources.items(), key=lambda x: x[1]["count"], reverse=True)
+        names = [k for k, v in sorted_sources]
+        counts = [v["count"] for k, v in sorted_sources]
+        colors = [v["color"] for k, v in sorted_sources]
+        pcts = [f"{v['count']/total*100:.0f}%" if total > 0 else "0%" for k, v in sorted_sources]
 
-        with right_list:
-            for name, info in sources.items():
-                pct = f"{info['count']/total*100:.0f}%" if total > 0 else "0%"
-                st.markdown(f"""
-                <div style="display:flex;align-items:center;margin:6px 0;">
-                    <div style="width:12px;height:12px;border-radius:50%;background:{info['color']};margin-right:8px;"></div>
-                    <div style="flex:1;font-size:13px;">{name}</div>
-                    <div style="font-size:13px;font-weight:600;">{info['count']}</div>
-                    <div style="font-size:12px;color:#888;margin-left:8px;width:35px;text-align:right;">{pct}</div>
-                </div>
-                """, unsafe_allow_html=True)
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            y=names,
+            x=counts,
+            orientation="h",
+            marker_color=colors,
+            text=counts,
+            textposition="outside",
+            hovertemplate="%{y}: %{x} 个客户<br>占比: %{customdata}<extra></extra>",
+            customdata=pcts,
+        ))
+        fig.update_layout(
+            margin=dict(l=10, r=40, t=10, b=10),
+            height=320,
+            showlegend=False,
+            xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+            yaxis=dict(autorange="reversed", tickfont_size=12),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            bargap=0.3,
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
 

@@ -1320,7 +1320,10 @@ elif page == "👥 客户中心":
 
             st.markdown("---")
             st.markdown("**第二步：输入客户网站 → 生成个性化开发信**")
-            cust_url = st.text_input("客户网站地址", placeholder="https://example.com")
+            cu1, cu2 = st.columns(2)
+            cust_url = cu1.text_input("客户网站地址", placeholder="https://example.com")
+            cust_country = cu2.text_input("客户国家/地区（用于出当地语言版本）",
+                                          placeholder="如：西班牙/德国/阿联酋/巴西", key="pc_country")
             cust_extra = st.text_input("补充客户信息（网址打不开时手动填，可选）",
                                        placeholder="公司名/主营/地区...", key="pc_extra")
             if st.button("🚀 生成个性化开发信", type="primary", use_container_width=True):
@@ -1350,12 +1353,15 @@ elif page == "👥 客户中心":
 
 # 客户信息
 - 客户网站：{cust_url}
+- 客户国家/地区：{cust_country or '未填（默认仅英文）'}
 - 补充：{cust_extra or '无'}
 
 # 任务
 1. 客户背调：基于客户网站/名称推断对方公司名、主营、产品线、目标市场、规模。若网址无法访问或信息不足，请明确说明并按合理默认生成。
 2. 匹配依据：逐条说明匹配了哪个行业/哪条产品线/哪个地区，对应我方哪个案例或优势。
 3. 生成英文个性化开发信：标题突出对方业务关键词（不要出现我方产品型号）；正文四段——①开篇点对方业务/痛点 ②用真实案例做信任背书（只说事实数据）③对应痛点讲我方优势与好处 ④具体行动号召（如"本周15分钟通话"）。语气按对方规模调整。
+4. 双语版本：根据客户国家/地区，在英文之外再出一段当地语言开发信（西语/法语/德语/葡语/阿语/俄语等；若为英语国家或未填国家，则注明"英语市场，仅英文即可"）。
+5. WhatsApp开场话术：英文一条 + 当地语言一条，每条30-50字，口语化、轻量、无附件感，适合首次WhatsApp触达。
 
 严格按下面格式输出：
 【客户背调摘要】
@@ -1364,15 +1370,38 @@ elif page == "👥 客户中心":
 【匹配依据】
 ✅ ...
 
-【个性化开发信】
+【英文开发信】
 Subject: ...
 Dear ...
 （正文）
 Best regards, {ep_now.get('en_name')}
+
+【当地语言开发信】
+（若仅英文市场则写"英语市场，无需当地语言版本"）
+
+【WhatsApp话术】
+EN: ...
+当地语言: ...
 """
                             result = ai.chat(prompt)
+                            st.session_state["pc_last"] = {
+                                "url": cust_url, "country": cust_country,
+                                "extra": cust_extra, "result": result,
+                            }
                             st.markdown("---")
                             st.markdown(result)
+                            # 一键存档为客户
+                            if st.button("💾 存档为客户（自动进客户管理，阶段=已发开发信）",
+                                         use_container_width=True, type="primary"):
+                                _name = (cust_extra or cust_url or "未命名客户").split("\n")[0][:40]
+                                cm.add_customer({
+                                    "name": _name, "country": cust_country or "未填",
+                                    "website": cust_url, "status": "已发开发信",
+                                    "source": "AI开发信",
+                                    "analysis": result[:800],
+                                    "notes": f"网址:{cust_url}｜{cust_extra or ''}",
+                                })
+                                st.success(f"✅ 已存档客户「{_name}」，请到客户中心→客户管理查看")
                         except Exception as e:
                             st.error(f"AI错误：{e}")
 

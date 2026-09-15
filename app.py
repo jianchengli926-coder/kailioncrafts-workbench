@@ -329,6 +329,32 @@ if page == "📊 仪表盘":
     except Exception:
         pass
 
+    # 今日经营提醒
+    try:
+        import finance_db as _fdb
+        from datetime import date as _date, timedelta as _td
+        _remind = []
+        for r in _fdb.list_receivables():
+            if r["账龄天数"] > 30:
+                _remind.append(f"🔴 客户 {r['客户']} 应收 ${r['未收']:,.0f} 已 {r['账龄天数']} 天")
+        today = _date.today(); nxt = today + _td(days=7)
+        for o in _fdb.list_sales_orders():
+            dd = o.get("delivery_date") or ""
+            if dd and o["status"] not in ("完成",):
+                try:
+                    y, m, d = map(int, dd.split("-"))
+                    dlv = _date(y, m, d)
+                    if today <= dlv <= nxt:
+                        _remind.append(f"🟡 订单 {o['order_no']} ({o['customer']}) 预计 {dd} 交货")
+                except Exception:
+                    pass
+        if _remind:
+            st.markdown("##### 🔔 今日提醒")
+            for line in _remind[:8]:
+                st.write(line)
+    except Exception:
+        pass
+
     st.markdown("---")
 
     # 快捷功能（8个大按钮）

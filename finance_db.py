@@ -63,6 +63,10 @@ def init_db():
         notes TEXT
     );
     """)
+    # 轻量迁移：sales_orders 补 trade_extra（JSON：装货港/目的港/Consignee/HS/箱规等）
+    existing = {r["name"] for r in c.execute("PRAGMA table_info(sales_orders)").fetchall()}
+    if "trade_extra" not in existing:
+        c.execute("ALTER TABLE sales_orders ADD COLUMN trade_extra TEXT")
     c.commit()
     c.close()
 
@@ -89,7 +93,12 @@ def add_sales_order(**kw):
          kw.get("order_date") or datetime.now().strftime("%Y-%m-%d"),
          kw.get("delivery_date"), kw.get("logistics_fee", 0),
          kw.get("other_fee", 0), kw.get("notes")))
-    c.commit(); c.close()
+    c.commit();
+    if kw.get("trade_extra"):
+        c.execute("UPDATE sales_orders SET trade_extra=? WHERE order_no=?",
+                  (kw["trade_extra"], order_no))
+        c.commit()
+    c.close()
     return order_no
 
 

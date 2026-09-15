@@ -6564,16 +6564,31 @@ elif page == "🧾 订单台账":
                 c10, c11 = st.columns(2)
                 logistics_fee = c10.number_input("物流费", min_value=0.0, step=10.0)
                 other_fee = c11.number_input("其他费用", min_value=0.0, step=10.0)
+                with st.expander("🚢 贸易条款与箱规（出PI/合同/装箱单用，可不填）", expanded=False):
+                    t1, t2, t3 = st.columns(3)
+                    load_port = t1.text_input("装货港", value="Yantian, Shenzhen")
+                    dest_port = t2.text_input("目的港", placeholder="如：Los Angeles / Hamburg")
+                    consignee = t3.text_input("收货人/Consignee", placeholder="默认同客户公司")
+                    t4, t5, t6 = st.columns(3)
+                    hs_code = t4.text_input("HS Code")
+                    pcs_per_ctn = t5.number_input("每箱件数(Pcs/CTN)", min_value=0, step=1)
+                    gw_per_ctn = t6.number_input("每箱毛重(kg)", min_value=0.0, step=0.5)
                 notes = st.text_input("备注")
                 if st.form_submit_button("💾 保存订单", type="primary", use_container_width=True):
                     if not customer or total_amount <= 0:
                         st.warning("客户公司和订单金额必填")
                     else:
+                        trade_extra = _json.dumps({
+                            "load_port": load_port, "dest_port": dest_port,
+                            "consignee": consignee, "hs_code": hs_code,
+                            "pcs_per_ctn": pcs_per_ctn, "gw_per_ctn": gw_per_ctn,
+                        }, ensure_ascii=False)
                         no = fdb.add_sales_order(owner=owner, customer=customer, country=country,
                                                  product_summary=product_summary, qty=qty,
                                                  total_amount=total_amount, currency=currency,
                                                  status=status, delivery_date=delivery_date,
-                                                 logistics_fee=logistics_fee, other_fee=other_fee, notes=notes)
+                                                 logistics_fee=logistics_fee, other_fee=other_fee,
+                                                 notes=notes, trade_extra=trade_extra)
                         st.success(f"✅ 已保存订单 {no}")
                         st.rerun()
         orders = fdb.list_sales_orders()
@@ -6804,6 +6819,87 @@ Thank you for your business!
 """
             st.text(pi_text)
             st.download_button("⬇️ 下载PI(.txt)", pi_text, f"PI_{so['order_no']}.txt", "text/plain", use_container_width=True)
+
+            # ===== 一份数据自动出：合同 / 装箱单 / 商业发票 =====
+            _te = {}
+            if so.get("trade_extra"):
+                try:
+                    _te = _json.loads(so["trade_extra"])
+                except Exception:
+                    _te = {}
+            _consignee = _te.get("consignee") or buyer
+            _pcs_ctn = int(_te.get("pcs_per_ctn") or 0)
+            _gw_ctn = float(_te.get("gw_per_ctn") or 0)
+            _ctns = (int(qty_in) // _pcs_ctn) + (1 if _pcs_ctn and int(qty_in) % _pcs_ctn else 0) if _pcs_ctn else 0
+            _gw_total = round(_ctns * _gw_ctn, 2)
+
+            # 销售合同
+            sc_text = f"""SALES CONTRACT
+{'='*46}
+Contract No: {so['order_no']}
+Date: {today_str}
+
+The Seller: {comp['company']}
+            {comp['address']}
+The Buyer:  {buyer}
+
+This Contract is made by and between the Seller and the Buyer,
+whereby the Seller agrees to sell and the Buyer agrees to buy the under-mentioned goods:
+
+{'Item':<20}{'Qty':>8}{'Unit Price':>14}{'Amount':>14}
+{'-'*56}
+{so['product_summary']:<20}{qty_in:>8}{unit_price:>12,.2f}{total:>14,.2f}
+{'-'*56}
+{'TOTAL':<42}{total:>14,.2f}  {cur}
+
+Price Term:  {incoterm}
+Payment:     {pay_terms}
+Shipment:    {_te.get('load_port','-')} -> {_te.get('dest_port','-')}
+Delivery:    {so.get('delivery_date') or 'To be confirmed'}
+HS Code:     {_te.get('hs_code','-')}
+
+Confirmed by:
+Seller: ____________________   Buyer: ____________________
+"""
+            # 装箱单
+            pl_text = f"""PACKING LIST
+{'='*46}
+Invoice No: {so['order_no']}
+Date: {today_str}
+
+Shipper:   {comp['company']}
+Consignee: {_consignee}
+
+{'Item':<22}{'Qty':>8}{'CTNS':>8}{'N.W.(kg)':>10}{'G.W.(kg)':>10}
+{'-'*58}
+{so['product_summary']:<22}{qty_in:>8}{_ctns:>8}{'-':>10}{_gw_total:>10,.2f}
+{'-'*58}
+TOTAL: {qty_in} PCS / {_ctns} CTNS / {_gw_total} KGS (G.W.)
+"""
+            # 商业发票
+            ci_text = f"""COMMERCIAL INVOICE
+{'='*46}
+Invoice No: {so['order_no']}
+Date: {today_str}
+
+{seller_block}
+Buyer:  {buyer}
+Consignee: {_consignee}
+
+{'Item':<20}{'Qty':>8}{'Unit Price':>14}{'Amount':>14}
+{'-'*56}
+{so['product_summary']:<20}{qty_in:>8}{unit_price:>12,.2f}{total:>14,.2f}
+{'-'*56}
+{'TOTAL':<42}{total:>14,.2f}  {cur}
+
+Country of Origin: China
+Price Term: {incoterm}
+{bank_block}
+"""
+            dc1, dc2, dc3 = st.columns(3)
+            dc1.download_button("📄 销售合同(.txt)", sc_text, f"SC_{so['order_no']}.txt", "text/plain")
+            dc2.download_button("📦 装箱单(.txt)", pl_text, f"PL_{so['order_no']}.txt", "text/plain")
+            dc3.download_button("🧾 商业发票CI(.txt)", ci_text, f"CI_{so['order_no']}.txt", "text/plain")
     
 # ============ 页面：博客SEO工作台 ============
 elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "blog":

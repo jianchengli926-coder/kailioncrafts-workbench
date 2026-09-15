@@ -1470,29 +1470,222 @@ Best regards, {ep_now.get('en_name')}
                         st.error(f"AI错误：{e}")
 
     elif cc_current == "📊 客户管理":
-        cc_m1, cc_m2 = st.tabs(["📈 销售漏斗", "👥 客户列表"])
+        st.caption("借鉴GlobalDesk思路：数据总览 · 客户列表 · 看板开发进度 · 待办提醒 · 新增客户")
+        cc_m1, cc_m2, cc_m3, cc_m4, cc_m5 = st.tabs(
+            ["📊 数据总览", "👥 客户列表", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
+
+        CUSTOMER_SOURCES = ["Google搜索", "Google Maps", "LinkedIn", "Alibaba", "展会", "客户转介绍", "抖音/社媒", "其他"]
+        CUSTOMER_TYPES = ["进口商", "批发商", "零售商", "品牌商", "代理商", "制造商", "其他"]
+        _grade_color = {"A": "#28a745", "B": "#fd7e14", "C": "#6c757d"}
+
+        # ---------- Tab1 数据总览 ----------
         with cc_m1:
-            st.subheader("销售漏斗")
             try:
-                customers = cm.list_customers()
-                total = len(customers)
-                deal = sum(1 for c in customers if c.get("status") == "已成交")
-                c1, c2, c3 = st.columns(3)
-                c1.metric("总客户", total)
-                c2.metric("成交", deal)
-                c3.metric("转化率", f"{deal/total*100:.0f}%" if total else "0%")
+                _st = cm.get_statistics()
+                _today_fu = cm.get_follow_up_today()
+                _overdue = cm.get_overdue_follow_up()
+                _pdata = cm.get_pipeline_data()
+                _total = _st["total"]
+                _a_count = _st["by_grade"].get("A", 0)
+                _quoted = _pdata.get("quoted", {}).get("count", 0)
+                _closed = _pdata.get("closed", {}).get("count", 0)
+                m1, m2, m3, m4, m5, m6 = st.columns(6)
+                m1.metric("客户总数", _total)
+                m2.metric("今日待跟进", len(_today_fu))
+                m3.metric("超期未跟进", len(_overdue))
+                m4.metric("A级重点", _a_count)
+                m5.metric("报价中", _quoted)
+                m6.metric("已成交", _closed)
+
+                st.markdown("**销售漏斗（按阶段）**")
+                _maxc = max([v["count"] for v in _pdata.values()] + [1])
+                for key, v in _pdata.items():
+                    w = int(v["count"] / _maxc * 100)
+                    st.markdown(
+                        f'<div style="display:flex;align-items:center;margin:3px 0;">'
+                        f'<div style="width:64px;font-size:12px;">{v["name"]}</div>'
+                        f'<div style="flex:1;background:#f0f0f0;border-radius:6px;height:20px;">'
+                        f'<div style="width:{w}%;background:{v["color"]};height:20px;border-radius:6px;color:#fff;'
+                        f'font-size:11px;line-height:20px;padding-left:6px;">{v["count"]}</div></div></div>',
+                        unsafe_allow_html=True)
+
+                cL, cR = st.columns(2)
+                with cL:
+                    st.markdown("**客户等级分布**")
+                    for g in ["A", "B", "C"]:
+                        n = _st["by_grade"].get(g, 0)
+                        st.markdown(
+                            f'<div style="display:flex;align-items:center;margin:2px 0;">'
+                            f'<span style="width:24px;color:{_grade_color[g]};font-weight:700;">{g}</span>'
+                            f'<div style="flex:1;background:#f0f0f0;border-radius:4px;height:14px;">'
+                            f'<div style="width:{int(n/_total*100) if _total else 0}%;background:{_grade_color[g]};height:14px;border-radius:4px;"></div></div>'
+                            f'<span style="width:30px;text-align:right;font-size:12px;">{n}</span></div>',
+                            unsafe_allow_html=True)
+                with cR:
+                    st.markdown("**今日 / 超期待跟进**")
+                    st.info(f"今日待跟进 {len(_today_fu)} 个客户，请到「⏰ 待办提醒」处理")
+                    if _overdue:
+                        st.warning(f"⚠️ {len(_overdue)} 个客户已超期未跟进，建议优先处理")
             except Exception as e:
                 st.error(f"加载失败：{e}")
+
+        # ---------- Tab2 客户列表（表格+筛选+详情+跟进记录）----------
         with cc_m2:
-            st.subheader("客户列表")
             try:
                 customers = cm.list_customers()
-                for c in customers[:20]:
-                    with st.expander(f"{c.get('company_name', '未知')} | {c.get('country', '')}"):
-                        st.write(f"产品：{c.get('products', '')}")
-                        st.write(f"等级：{c.get('grade', 'C')}")
+                cF1, cF2, cF3 = st.columns([3, 1, 1])
+                with cF1:
+                    kw = st.text_input("搜索（公司/国家/产品）", key="cl_kw")
+                with cF2:
+                    g_f = st.selectbox("等级", ["全部", "A", "B", "C"], key="cl_g")
+                with cF3:
+                    stage_f = st.selectbox("阶段", ["全部"] + [s["name"] for s in PIPELINE_STAGES], key="cl_s")
+
+                def _stage_name(c):
+                    return next((s["name"] for s in PIPELINE_STAGES if s["key"] == c.get("pipeline_stage", "lead")),
+                                c.get("status", ""))
+                rows = []
+                for c in customers:
+                    if kw and kw.lower() not in (c.get("company_name", "") + c.get("country", "") + c.get("products", "")).lower():
+                        continue
+                    if g_f != "全部" and c.get("grade", "C") != g_f:
+                        continue
+                    if stage_f != "全部" and _stage_name(c) != stage_f:
+                        continue
+                    rows.append({
+                        "公司": c.get("company_name", ""), "国家": c.get("country", ""),
+                        "来源": c.get("source", ""), "等级": c.get("grade", "C"),
+                        "阶段": _stage_name(c), "评分": c.get("score", 0),
+                        "下次跟进": c.get("next_follow_up", ""),
+                    })
+                if rows:
+                    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                else:
+                    st.info("无匹配客户")
+
+                st.markdown("---")
+                st.markdown("**📇 客户详情与跟进记录**")
+                sel = st.selectbox("选择客户", [c["id"] for c in customers],
+                                  format_func=lambda i: next((c.get("company_name", "") for c in customers if c["id"] == i), i),
+                                  key="cl_sel")
+                cust = cm.get_customer(sel)
+                if cust:
+                    dc1, dc2, dc3 = st.columns(3)
+                    dc1.write(f"**公司**：{cust.get('company_name','')}\n**国家**：{cust.get('country','')}")
+                    dc2.write(f"**等级**：{cust.get('grade','C')}　**阶段**：{_stage_name(cust)}\n**官网**：{cust.get('website','')}")
+                    dc3.write(f"**来源**：{cust.get('source','')}　**类型**：{cust.get('customer_type','')}\n**下次跟进**：{cust.get('next_follow_up','未定')}")
+                    if cust.get("notes"):
+                        st.caption(f"备注：{cust['notes']}")
+                    acts = cust.get("activities", [])
+                    if acts:
+                        st.markdown("**跟进时间线**")
+                        for a in reversed(acts[-8:]):
+                            st.markdown(f"- `{(a.get('created_at','') or '')[:16]}` 【{a.get('type','')}】{a.get('description','')}")
+                    with st.form("add_act_form"):
+                        st.markdown("**＋ 记一条跟进**")
+                        af1, af2, af3 = st.columns([1, 2, 1])
+                        with af1:
+                            atype = st.selectbox("渠道", ["邮件", "WhatsApp", "电话", "面谈", "样品", "报价", "其他"])
+                        with af2:
+                            adesc = st.text_input("跟进内容/客户反馈", placeholder="如:客户嫌贵5%,要求再降3%")
+                        with af3:
+                            adays = st.number_input("几天后再跟进", 0, 90, 3)
+                        if st.form_submit_button("💾 保存跟进并设下次提醒", use_container_width=True):
+                            cm.add_activity(sel, atype, adesc)
+                            cm.set_next_follow_up(sel, int(adays))
+                            st.success("✅ 已记录跟进并更新下次跟进时间")
+                            st.rerun()
             except Exception as e:
                 st.error(f"加载失败：{e}")
+
+        # ---------- Tab3 客户看板（开发进度，按阶段分列）----------
+        with cc_m3:
+            st.subheader("🗂️ 客户开发进度看板")
+            st.caption("按销售阶段分列；点卡片下方按钮可把客户推进到下一阶段")
+            pdata = cm.get_pipeline_data()
+            cols = st.columns(len(PIPELINE_STAGES))
+            for i, stage in enumerate(PIPELINE_STAGES):
+                with cols[i]:
+                    v = pdata.get(stage["key"], {})
+                    st.markdown(
+                        f'<div style="border-top:4px solid {stage["color"]};padding:6px;background:#fafafa;border-radius:6px;">'
+                        f'<b>{stage["name"]}</b> <span style="float:right;color:{stage["color"]};">{v.get("count",0)}</span></div>',
+                        unsafe_allow_html=True)
+                    for c in v.get("customers", []):
+                        g = c.get("grade", "C")
+                        st.markdown(
+                            f'<div style="background:#fff;border:1px solid #eee;border-left:4px solid {_grade_color.get(g,"#999")};'
+                            f'padding:7px;border-radius:4px;margin:5px 0;font-size:12px;">'
+                            f'<b>{c.get("company_name","")}</b><br/>'
+                            f'<span style="color:#888">{c.get("country","")} · {c.get("source","")}</span><br/>'
+                            f'<span style="color:#fd7e14">下次跟进:{c.get("next_follow_up","未定")}</span></div>',
+                            unsafe_allow_html=True)
+                        if stage["key"] != "closed":
+                            next_stage = PIPELINE_STAGES[i + 1]["key"] if i + 1 < len(PIPELINE_STAGES) else stage["key"]
+                            if st.button(f"→ {next_stage}", key=f"mv_{c['id']}_{stage['key']}", use_container_width=True):
+                                cm.move_stage(c["id"], next_stage)
+                                st.rerun()
+
+        # ---------- Tab4 待办提醒 ----------
+        with cc_m4:
+            st.subheader("⏰ 待办提醒")
+            st.caption("今日该跟谁、谁已超期，一目了然")
+            today_fu = cm.get_follow_up_today()
+            overdue = cm.get_overdue_follow_up()
+            st.markdown(f"**📌 今日待跟进（{len(today_fu)}）**")
+            if today_fu:
+                for c in today_fu:
+                    st.markdown(f"- **{c.get('company_name','')}**（{c.get('country','')} · {c.get('grade','C')}级）— 计划今日跟进")
+            else:
+                st.success("今日暂无待跟进客户")
+            st.markdown("---")
+            st.markdown(f"**🚨 已超期未跟进（{len(overdue)}）**")
+            if overdue:
+                for c in overdue:
+                    st.warning(f"**{c.get('company_name','')}**（{c.get('country','')}）— 计划跟进日 {c.get('next_follow_up','')} 已过")
+            else:
+                st.success("无超期客户")
+            with st.expander("📋 智能提醒规则（说明）"):
+                st.markdown("""
+- 报价后 3 天未复：建议发一次报价跟进邮件
+- 样品寄出后 7 天：询问客户收到与试用反馈
+- 30 天无互动：发激活/新品邮件重新触达
+- A 级客户 7 天未跟进：优先处理，防止丢单
+""")
+
+        # ---------- Tab5 新增客户 ----------
+        with cc_m5:
+            st.subheader("➕ 新增客户档案")
+            with st.form("new_cust_form"):
+                n1, n2 = st.columns(2)
+                with n1:
+                    nc_name = st.text_input("公司名称 *")
+                    nc_country = st.text_input("国家 *")
+                    nc_city = st.text_input("城市（可选）")
+                    nc_web = st.text_input("官网（可选）")
+                with n2:
+                    nc_source = st.selectbox("客户来源", CUSTOMER_SOURCES)
+                    nc_type = st.selectbox("客户类型", CUSTOMER_TYPES)
+                    nc_grade = st.selectbox("等级", ["A", "B", "C"])
+                    nc_products = st.text_input("产品需求（可选）")
+                nc_stage = st.selectbox("初始阶段", [s["name"] for s in PIPELINE_STAGES])
+                nc_fu = st.number_input("几天后首次跟进提醒（0=不提醒）", 0, 60, 0)
+                if st.form_submit_button("✅ 保存客户", type="primary", use_container_width=True):
+                    if not nc_name or not nc_country:
+                        st.warning("请填写公司名称和国家")
+                    else:
+                        stage_key = next((s["key"] for s in PIPELINE_STAGES if s["name"] == nc_stage), "lead")
+                        cm.add_customer({
+                            "company_name": nc_name, "country": nc_country, "city": nc_city,
+                            "website": nc_web, "source": nc_source, "customer_type": nc_type,
+                            "grade": nc_grade, "products": nc_products, "pipeline_stage": stage_key,
+                            "score": 0,
+                        })
+                        if int(nc_fu) > 0:
+                            new_id = cm.list_customers()[0]["id"] if cm.list_customers() else None
+                            if new_id:
+                                cm.set_next_follow_up(new_id, int(nc_fu))
+                        st.success(f"✅ 已添加客户：{nc_name}")
 
 # ============ 页面3：客户分析（旧） ============
 elif page == "🎯 客户分析":

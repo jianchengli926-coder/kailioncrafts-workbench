@@ -165,6 +165,21 @@ st.markdown("""
         background: white; padding: 20px; border-radius: 8px;
         text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
+    /* 侧边栏导航字体放大 */
+    .stSidebar .stRadio label,
+    .stSidebar .stRadio p {
+        font-size: 16px !important;
+        font-weight: 500 !important;
+        padding: 4px 0;
+    }
+    .stSidebar .stRadio [role="radiogroup"] label {
+        padding: 6px 8px;
+        border-radius: 6px;
+        margin: 2px 0;
+    }
+    .stSidebar .stRadio [role="radiogroup"] label:hover {
+        background: #f0f4ff;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -547,47 +562,28 @@ if page == "🏠 仪表盘":
 
     st.markdown("---")
 
-    # 快捷功能（8个大按钮）
+    # 快捷功能（8个统一彩色卡片，直接点击进入）
     st.markdown("##### 🚀 快捷功能")
-    row1c1, row1c2, row1c3, row1c4 = st.columns(4)
-    with row1c1:
-        st.markdown("""<div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:12px 12px 0 0;padding:16px;text-align:center;">
-        <div style="font-size:28px;">🎯</div><div style="font-weight:700;margin-top:4px;">客户开发</div>
-        </div>""", unsafe_allow_html=True)
-        if st.button("进入", key="goto_crm", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "👥 客户中心"; st.rerun()
-    with row1c2:
-        st.markdown("""<div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:12px 12px 0 0;padding:16px;text-align:center;">
-        <div style="font-size:28px;">📦</div><div style="font-weight:700;margin-top:4px;">产品与SEO</div>
-        </div>""", unsafe_allow_html=True)
-        if st.button("进入", key="goto_seo", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🔍 独立站SEO中心"; st.rerun()
-    with row1c3:
-        st.markdown("""<div style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-radius:12px 12px 0 0;padding:16px;text-align:center;">
-        <div style="font-size:28px;">🛠️</div><div style="font-weight:700;margin-top:4px;">AI工具库</div>
-        </div>""", unsafe_allow_html=True)
-        if st.button("进入", key="goto_tools", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🤖 锴利自研AI工具库"; st.rerun()
-    with row1c4:
-        st.markdown("""<div style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);border-radius:12px 12px 0 0;padding:16px;text-align:center;">
-        <div style="font-size:28px;">🌍</div><div style="font-weight:700;margin-top:4px;">市场分析</div>
-        </div>""", unsafe_allow_html=True)
-        if st.button("进入", key="goto_market", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📈 市场与产品分析"; st.rerun()
-
-    row2c1, row2c2, row2c3, row2c4 = st.columns(4)
-    with row2c1:
-        if st.button("🖥️ 独立站管理", key="goto_website", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🖥️ 独立站管理"; st.rerun()
-    with row2c2:
-        if st.button("📚 知识库", key="goto_kb", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📚 公司知识库"; st.rerun()
-    with row2c3:
-        if st.button("🧾 订单台账", key="goto_orders", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🧾 订单台账"; st.rerun()
-    with row2c4:
-        if st.button("⚙️ 设置中心", key="goto_settings", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "⚙️ 设置中心"; st.rerun()
+    QUICK_LINKS = [
+        {"icon": "🎯", "name": "客户开发", "target": "👥 客户中心", "bg": "#fef3c7", "hover": "#fde68a"},
+        {"icon": "📦", "name": "产品与SEO", "target": "🔍 独立站SEO中心", "bg": "#dbeafe", "hover": "#bfdbfe"},
+        {"icon": "🛠️", "name": "AI工具库", "target": "🤖 锴利自研AI工具库", "bg": "#d1fae5", "hover": "#a7f3d0"},
+        {"icon": "📈", "name": "市场分析", "target": "📈 市场与产品分析", "bg": "#ede9fe", "hover": "#ddd6fe"},
+        {"icon": "🖥️", "name": "独立站管理", "target": "🖥️ 独立站管理", "bg": "#fce7f3", "hover": "#fbcfe8"},
+        {"icon": "📚", "name": "知识库", "target": "📚 公司知识库", "bg": "#e0e7ff", "hover": "#c7d2fe"},
+        {"icon": "🧾", "name": "订单台账", "target": "🧾 订单台账", "bg": "#ffedd5", "hover": "#fed7aa"},
+        {"icon": "⚙️", "name": "设置中心", "target": "⚙️ 设置中心", "bg": "#f1f5f9", "hover": "#e2e8f0"},
+    ]
+    for row_start in range(0, 8, 4):
+        row_items = QUICK_LINKS[row_start:row_start+4]
+        cols = st.columns(4)
+        for j, item in enumerate(row_items):
+            with cols[j]:
+                if st.button(f"{item['icon']}  {item['name']}", key=f"quick_{item['target']}",
+                             use_container_width=True):
+                    st.session_state.pop("main_nav", None)
+                    st.session_state["main_nav"] = item["target"]
+                    st.rerun()
 
     st.markdown("---")
 

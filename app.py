@@ -6163,28 +6163,7 @@ elif page == "📚 公司知识库":
             index=0, horizontal=True, label_visibility="collapsed", key="kb_src_radio"
         )
 
-        # ---- 全文搜索 ----
-        st.markdown("##### 🔎 全文搜索知识库")
-        search_query = st.text_input(
-            "全文搜索",
-            placeholder="输入关键词，如：MOQ、FDA认证、厨房刀、OEM定制、价格...",
-            key="kb_search_input", label_visibility="collapsed"
-        )
-        if search_query:
-            with st.spinner(f"正在「{src_labels[src_choice]}」中搜索..."):
-                results = kb.search(search_query, source=src_choice, max_results=20)
-                if results:
-                    st.success(f"在「{src_labels[src_choice]}」中找到 {len(results)} 个结果")
-                    for i, r in enumerate(results, 1):
-                        with st.expander(f"{i}. {r['file']}　·　{r.get('category', '')}"):
-                            st.caption(f"路径：{r['path']}")
-                            st.markdown(r["snippet"])
-                else:
-                    st.info("未找到相关内容，换个关键词或换个知识库来源试试")
-
-        st.markdown("---")
-
-        # ---- 分类浏览：常用模块 ----
+        # ---- 分类浏览：常用模块（放在搜索框前面，避免widget实例化后修改session_state报错）----
         st.markdown("##### 📁 分类浏览")
         st.markdown("###### ⚡ 常用模块")
         quick = [
@@ -6207,6 +6186,27 @@ elif page == "📚 公司知识库":
                 if st.button(btn_label, use_container_width=True, key=f"kbquick_{i}"):
                     st.session_state["kb_search_input"] = kw
                     st.rerun()
+
+        st.markdown("---")
+
+        # ---- 全文搜索 ----
+        st.markdown("##### 🔎 全文搜索知识库")
+        search_query = st.text_input(
+            "全文搜索",
+            placeholder="输入关键词，如：MOQ、FDA认证、厨房刀、OEM定制、价格...",
+            key="kb_search_input", label_visibility="collapsed"
+        )
+        if search_query:
+            with st.spinner(f"正在「{src_labels[src_choice]}」中搜索..."):
+                results = kb.search(search_query, source=src_choice, max_results=20)
+                if results:
+                    st.success(f"在「{src_labels[src_choice]}」中找到 {len(results)} 个结果")
+                    for i, r in enumerate(results, 1):
+                        with st.expander(f"{i}. {r['file']}　·　{r.get('category', '')}"):
+                            st.caption(f"路径：{r['path']}")
+                            st.markdown(r["snippet"])
+                else:
+                    st.info("未找到相关内容，换个关键词或换个知识库来源试试")
 
         st.markdown("---")
 

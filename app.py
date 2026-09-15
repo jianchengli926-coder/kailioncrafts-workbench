@@ -157,7 +157,7 @@ with st.sidebar:
 
     # AI工具库二级菜单
     tool_options = {
-        "📦 锴利自研AI工具库": None,  # 进入工具库主页
+        "🤖 锴利自研AI工具库": None,  # 进入工具库主页
         "  └ SKU命名工具": "sku_naming",
         "  └ 产品线稿工具": "line_art",
         "  └ 全品类视觉矫正": "visual_correction",
@@ -169,16 +169,16 @@ with st.sidebar:
 
     nav_options = [
         # 总览
-        "📊 仪表盘",
+        "🏠 仪表盘",
         # 业务部
-        "📦 锴利自研AI工具库",
-        "🌍 市场与产品分析",
+        "🤖 锴利自研AI工具库",
+        "📈 市场与产品分析",
         "👥 客户中心",
-        "📥 独立站管理", "📊 订单台账",
-        "🌍 海外社媒矩阵",
+        "🖥️ 独立站管理", "🧾 订单台账",
+        "📣 海外社媒矩阵",
         # 产品部
-        "📦 产品库",
-        "📊 独立站SEO中心",
+        "🔪 产品库",
+        "🔍 独立站SEO中心",
         # 市场部 -> 已并入公司知识库
         # 知识部
         "📚 公司知识库",
@@ -195,13 +195,13 @@ with st.sidebar:
     )
 
     # 切换导航时清除SEO子页面状态
-    if page != "📊 独立站SEO中心":
+    if page != "🔍 独立站SEO中心":
         st.session_state.pop("seo_sub", None)
 
     # 如果选择AI工具库，展开二级工具选择
-    if page == "📦 锴利自研AI工具库":
-        tool_options_with_prompt = ["📦 工具库首页"] + list(tool_options.keys())[1:]
-        prev_tool_select = st.session_state.get("_prev_tool_select", "📦 工具库首页")
+    if page == "🤖 锴利自研AI工具库":
+        tool_options_with_prompt = ["🤖 工具库首页"] + list(tool_options.keys())[1:]
+        prev_tool_select = st.session_state.get("_prev_tool_select", "🤖 工具库首页")
         tool_choice = st.selectbox(
             "🔧 选择AI工具",
             tool_options_with_prompt,
@@ -226,9 +226,17 @@ with st.sidebar:
     # ============ AI 连接状态 ============
     try:
         if ai.is_configured():
-            st.success(f"🤖 AI 引擎已就绪：{ai.get_provider_name()} · 模型 {getattr(ai,'model','?')}", icon="✅")
+            st.markdown(
+                f'<div style="background:#e6f4ea;border-left:3px solid #34a853;padding:5px 10px;'
+                f'border-radius:6px;font-size:12px;color:#1e7e34;line-height:1.4;">'
+                f'✅ AI 引擎已就绪：{ai.get_provider_name()} · 模型 {getattr(ai,"model","?")}</div>',
+                unsafe_allow_html=True)
         else:
-            st.warning("🤖 AI 引擎未配置 —— 所有 AI 功能将无法出结果，请先到「⚙️ 设置中心 → 模型配置」填写 API Key", icon="⚠️")
+            st.markdown(
+                '<div style="background:#fff3cd;border-left:3px solid #f0ad4e;padding:5px 10px;'
+                'border-radius:6px;font-size:12px;color:#8a6d3b;line-height:1.4;">'
+                '⚠️ AI 引擎未配置 —— AI 功能暂不可用，请到「⚙️ 设置中心 → 模型配置」填写 API Key</div>',
+                unsafe_allow_html=True)
     except Exception:
         pass
     if st.button("🔌 测试 AI 连接", use_container_width=True):
@@ -421,7 +429,7 @@ def _city_status(city, country, tzname):
     return now, is_work, is_weekend, holiday
 
 
-if page == "📊 仪表盘":
+if page == "🏠 仪表盘":
     # 欢迎头部
     st.markdown("""
     <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%);border-radius:16px;padding:32px;margin-bottom:24px;">
@@ -500,30 +508,30 @@ if page == "📊 仪表盘":
         <div style="font-size:28px;">📦</div><div style="font-weight:700;margin-top:4px;">产品与SEO</div>
         </div>""", unsafe_allow_html=True)
         if st.button("进入", key="goto_seo", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📊 独立站SEO中心"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🔍 独立站SEO中心"; st.rerun()
     with row1c3:
         st.markdown("""<div style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-radius:12px 12px 0 0;padding:16px;text-align:center;">
         <div style="font-size:28px;">🛠️</div><div style="font-weight:700;margin-top:4px;">AI工具库</div>
         </div>""", unsafe_allow_html=True)
         if st.button("进入", key="goto_tools", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📦 锴利自研AI工具库"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🤖 锴利自研AI工具库"; st.rerun()
     with row1c4:
         st.markdown("""<div style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);border-radius:12px 12px 0 0;padding:16px;text-align:center;">
         <div style="font-size:28px;">🌍</div><div style="font-weight:700;margin-top:4px;">市场分析</div>
         </div>""", unsafe_allow_html=True)
         if st.button("进入", key="goto_market", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🌍 市场与产品分析"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📈 市场与产品分析"; st.rerun()
 
     row2c1, row2c2, row2c3, row2c4 = st.columns(4)
     with row2c1:
-        if st.button("📥 独立站管理", key="goto_website", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📥 独立站管理"; st.rerun()
+        if st.button("🖥️ 独立站管理", key="goto_website", use_container_width=True):
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🖥️ 独立站管理"; st.rerun()
     with row2c2:
         if st.button("📚 知识库", key="goto_kb", use_container_width=True):
             st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📚 公司知识库"; st.rerun()
     with row2c3:
-        if st.button("📊 订单台账", key="goto_orders", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📊 订单台账"; st.rerun()
+        if st.button("🧾 订单台账", key="goto_orders", use_container_width=True):
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "🧾 订单台账"; st.rerun()
     with row2c4:
         if st.button("⚙️ 设置中心", key="goto_settings", use_container_width=True):
             st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "⚙️ 设置中心"; st.rerun()
@@ -629,7 +637,7 @@ if page == "📊 仪表盘":
             """, unsafe_allow_html=True)
 
 # ============ 独立站管理 ============
-elif page == "📥 独立站管理":
+elif page == "🖥️ 独立站管理":
     import json as _json
     from datetime import datetime as _dt
 
@@ -2143,7 +2151,7 @@ elif page == "📦 产品推荐":
             st.dataframe(df[display_cols], use_container_width=True)
 
 # ============ 产品库页面（增强版：统一产品数据库 + 智能推荐） ============
-elif page == "📦 产品库":
+elif page == "🔪 产品库":
     # 子导航：产品库浏览 / 智能产品推荐
     sub_nav = st.radio(
         "产品库工作台",
@@ -2408,7 +2416,7 @@ elif page == "📦 产品库":
                     st.rerun()
 
 # ============ 锴利自研AI工具库页面 ============
-elif page == "📦 锴利自研AI工具库":
+elif page == "🤖 锴利自研AI工具库":
     st.title("🛠️ 锴利自研AI工具库")
     st.caption("KaiLionCrafts自主研发的产品工具集 · Streamlit原生组件 · 本地运行 · 连接公司知识库")
 
@@ -2570,11 +2578,11 @@ elif page == "📦 锴利自研AI工具库":
                 """, unsafe_allow_html=True)
     
                 # 5个Tab
-                tab1, tab2, tab3, tab4, tab5 = st.tabs(["📦 产品库命名", "✏️ 自定义生成", "⚡ 批量重命名", "🧱 材质代码表", "📊 SEO关键词库"])
+                tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔪 产品库命名", "✏️ 自定义生成", "⚡ 批量重命名", "🧱 材质代码表", "📊 SEO关键词库"])
     
                 # ========== Tab1: 产品库命名 ==========
                 with tab1:
-                    st.markdown("### 📦 产品库命名")
+                    st.markdown("### 🔪 产品库命名")
                     st.caption("从产品库选择产品，自动生成SKU编号和图片文件名列表")
     
                     # 品类统计
@@ -4230,8 +4238,8 @@ elif page == "📦 锴利自研AI工具库":
             """)
 
 # ============ 独立站SEO中心（合并三个SEO功能） ============
-elif page == "📊 独立站SEO中心" and "seo_sub" not in st.session_state:
-    st.title("📊 独立站SEO中心")
+elif page == "🔍 独立站SEO中心" and "seo_sub" not in st.session_state:
+    st.title("🔍 独立站SEO中心")
     st.caption("SEO表格工具 · 独立站上品SEO · 图片SEO命名 · 博客SEO · 一体化管理")
 
     # 四个大按钮
@@ -4282,7 +4290,7 @@ elif page == "📊 独立站SEO中心" and "seo_sub" not in st.session_state:
             st.session_state["seo_sub"] = "blog"
             st.rerun()
 
-elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "image":
+elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "image":
     if st.button("← 返回SEO中心", key="back_seo_center_image"):
         del st.session_state["seo_sub"]
         st.rerun()
@@ -4355,7 +4363,7 @@ elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "i
             st.subheader("🎯 SEO命名结果")
             st.markdown(result)
 
-elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "listing":
+elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "listing":
     # 返回SEO中心按钮
     if st.button("← 返回SEO中心", key="back_seo_center_1"):
         del st.session_state["seo_sub"]
@@ -4585,7 +4593,7 @@ elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "l
     """)
     
 # ============ SEO表格工具页面 ============
-elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "table":
+elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "table":
     if st.button("← 返回SEO中心", key="back_seo_center_2"):
         del st.session_state["seo_sub"]
         st.rerun()
@@ -4937,7 +4945,7 @@ elif page == "👥 客户管理":
         st.success(f"已导出到 {export_path}")
 
 # ============ 市场与产品分析 ============
-elif page == "🌍 市场与产品分析":
+elif page == "📈 市场与产品分析":
     st.markdown("""
     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
     <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · MARKET & PRODUCT</div>
@@ -6151,7 +6159,7 @@ elif page == "📋 今日待办":
     todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
     
 # ============ 页面：订单台账 ============
-elif page == "🌍 海外社媒矩阵":
+elif page == "📣 海外社媒矩阵":
     import social_db as sdb
     sdb.init_db()
     st.markdown("""
@@ -6324,7 +6332,7 @@ elif page == "🌍 海外社媒矩阵":
                 if st.button("🗑 删除此内容", key=f"del_{c['id']}"):
                     sdb.delete_content(c["id"]); st.rerun()
 
-elif page == "📊 订单台账":
+elif page == "🧾 订单台账":
     import finance_db as fdb
     fdb.init_db()
     st.markdown("""
@@ -6564,7 +6572,7 @@ Thank you for your business!
             st.download_button("⬇️ 下载PI(.txt)", pi_text, f"PI_{so['order_no']}.txt", "text/plain", use_container_width=True)
     
 # ============ 页面：博客SEO工作台 ============
-elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "blog":
+elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "blog":
     if st.button("← 返回SEO中心", key="back_seo_center_3"):
         del st.session_state["seo_sub"]
         st.rerun()

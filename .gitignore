@@ -10,3 +10,4 @@ __pycache__/
 *.db
 data/workbench.db
 data/company_profile.json
+_backup/

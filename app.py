@@ -623,21 +623,24 @@ if page == "🏠 仪表盘":
 
     st.markdown("---")
 
-    # 快捷功能（8个统一彩色卡片，直接点击进入）
+    # 快捷功能（10个统一彩色卡片，和左边导航一一对应，直接点击进入）
     st.markdown("##### 🚀 快捷功能")
     QUICK_LINKS = [
-        {"icon": "🎯", "name": "客户开发", "target": "👥 客户中心", "bg": "#fef3c7", "hover": "#fde68a"},
-        {"icon": "📦", "name": "产品与SEO", "target": "🔍 独立站SEO中心", "bg": "#dbeafe", "hover": "#bfdbfe"},
-        {"icon": "🛠️", "name": "AI工具库", "target": "🤖 锴利自研AI工具库", "bg": "#d1fae5", "hover": "#a7f3d0"},
-        {"icon": "📈", "name": "市场分析", "target": "📈 市场与产品分析", "bg": "#ede9fe", "hover": "#ddd6fe"},
+        {"icon": "🤖", "name": "AI工具库", "target": "🤖 锴利自研AI工具库", "bg": "#d1fae5", "hover": "#a7f3d0"},
+        {"icon": "📈", "name": "市场与产品分析", "target": "📈 市场与产品分析", "bg": "#ede9fe", "hover": "#ddd6fe"},
+        {"icon": "👥", "name": "客户中心", "target": "👥 客户中心", "bg": "#fef3c7", "hover": "#fde68a"},
         {"icon": "🖥️", "name": "独立站管理", "target": "🖥️ 独立站管理", "bg": "#fce7f3", "hover": "#fbcfe8"},
-        {"icon": "📚", "name": "知识库", "target": "📚 公司知识库", "bg": "#e0e7ff", "hover": "#c7d2fe"},
         {"icon": "🧾", "name": "订单台账", "target": "🧾 订单台账", "bg": "#ffedd5", "hover": "#fed7aa"},
+        {"icon": "🌍", "name": "海外社媒矩阵", "target": "🌍 海外社媒矩阵", "bg": "#e0f2fe", "hover": "#bae6fd"},
+        {"icon": "📦", "name": "产品库", "target": "📦 产品库", "bg": "#fef9c3", "hover": "#fde047"},
+        {"icon": "🔍", "name": "独立站SEO", "target": "🔍 独立站SEO中心", "bg": "#dbeafe", "hover": "#bfdbfe"},
+        {"icon": "📚", "name": "公司知识库", "target": "📚 公司知识库", "bg": "#e0e7ff", "hover": "#c7d2fe"},
         {"icon": "⚙️", "name": "设置中心", "target": "⚙️ 设置中心", "bg": "#f1f5f9", "hover": "#e2e8f0"},
     ]
-    for row_start in range(0, 8, 4):
-        row_items = QUICK_LINKS[row_start:row_start+4]
-        cols = st.columns(4)
+    # 5列2行，刚好10个
+    for row_start in range(0, 10, 5):
+        row_items = QUICK_LINKS[row_start:row_start+5]
+        cols = st.columns(5)
         for j, item in enumerate(row_items):
             with cols[j]:
                 if st.button(f"{item['icon']}  {item['name']}", key=f"quick_{item['target']}",

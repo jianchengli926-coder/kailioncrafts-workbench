@@ -4532,24 +4532,86 @@ elif page == "📚 知识库":
     st.markdown("---")
 
     if kb_current == "🔍 搜索浏览":
-        search_query = st.text_input("🔍 全文搜索", placeholder="输入关键词：MOQ、FDA、OEM、厨房刀...")
+        # ---- 知识库来源（选搜哪个库）----
+        sources_map = kb.get_kb_sources()
+        src_keys = ["all"] + list(sources_map.keys())
+        src_labels = {k: ("🌐 全部知识库" if k == "all" else sources_map[k]["name"]) for k in src_keys}
+        st.markdown("##### 知识库来源")
+        src_choice = st.radio(
+            "知识库来源", src_keys, format_func=lambda k: src_labels[k],
+            index=0, horizontal=True, label_visibility="collapsed", key="kb_src_radio"
+        )
+
+        # ---- 全文搜索 ----
+        st.markdown("##### 🔎 全文搜索知识库")
+        search_query = st.text_input(
+            "全文搜索",
+            placeholder="输入关键词，如：MOQ、FDA认证、厨房刀、OEM定制、价格...",
+            key="kb_search_input", label_visibility="collapsed"
+        )
         if search_query:
-            with st.spinner("搜索中..."):
-                results = kb.search(search_query, max_results=20)
+            with st.spinner(f"正在「{src_labels[src_choice]}」中搜索..."):
+                results = kb.search(search_query, source=src_choice, max_results=20)
                 if results:
-                    st.success(f"找到 {len(results)} 个结果")
+                    st.success(f"在「{src_labels[src_choice]}」中找到 {len(results)} 个结果")
                     for i, r in enumerate(results, 1):
-                        with st.expander(f"{i}. {r['file']}"):
+                        with st.expander(f"{i}. {r['file']}　·　{r.get('category', '')}"):
+                            st.caption(f"路径：{r['path']}")
                             st.markdown(r["snippet"])
                 else:
-                    st.info("未找到相关内容")
+                    st.info("未找到相关内容，换个关键词或换个知识库来源试试")
+
+        st.markdown("---")
+
+        # ---- 分类浏览：常用模块 ----
+        st.markdown("##### 📁 分类浏览")
+        st.markdown("###### ⚡ 常用模块")
+        quick = [
+            ("🏢 公司简介", "公司简介"),
+            ("🏭 工厂供应链", "工厂 供应链 实力"),
+            ("💡 客户痛点", "客户痛点 为什么选择"),
+            ("❓ FAQ问答", "FAQ 常见问答"),
+            ("📖 产品术语", "术语 标准"),
+            ("📐 产品规格", "产品规格 参数"),
+            ("✉️ 邮件模板", "邮件模板 开发信"),
+            ("📦 SKU数据", "SKU 产品目录"),
+            ("🤝 谈客户技巧", "谈客户技巧"),
+            ("💰 谈判报价", "谈判 报价"),
+            ("📨 邮件开发", "邮件开发 外贸"),
+            ("📣 营销攻略", "营销 文案"),
+        ]
+        qcols = st.columns(4)
+        for i, (btn_label, kw) in enumerate(quick):
+            with qcols[i % 4]:
+                if st.button(btn_label, use_container_width=True, key=f"kbquick_{i}"):
+                    st.session_state["kb_search_input"] = kw
+                    st.rerun()
+
+        st.markdown("---")
+
+        # ---- 按目录浏览（标准化知识库）----
+        st.markdown("##### 📂 按目录浏览（标准化知识库 AI优化版）")
+        cats = kb.list_categories("standard")
+        if cats:
+            sel_cat = st.selectbox(
+                "选择分类",
+                options=cats,
+                format_func=lambda c: f"{c['name']}（{c['file_count']} 个文件）",
+                key="kb_cat_sel"
+            )
+            files = kb.list_files(sel_cat["path"])
+            st.caption(f"共 {len(files)} 个文档")
+            ffilter = st.text_input("在当前分类中筛选文件", placeholder="输入文件名关键词...", key="kb_file_filter")
+            if ffilter:
+                files = [f for f in files if ffilter.lower() in f["name"].lower()]
+            for f in files:
+                with st.expander(f"📄 {f['name']}　（{f['size_kb']} KB）"):
+                    st.caption(f["path"])
+                    if st.button("📖 阅读全文", key=f"read_{f['path']}"):
+                        content = kb.read_file_by_path(f["path"], max_chars=8000)
+                        st.markdown(content)
         else:
-            st.markdown("#### ⚡ 常用模块")
-            qc = st.columns(4)
-            modules = [("🏢 公司简介", "company"), ("🏭 工厂供应链", "factory"), ("❓ FAQ", "faq"), ("📐 产品规格", "specs")]
-            for i, (name, key) in enumerate(modules):
-                with qc[i]:
-                    st.button(name, use_container_width=True, key=f"kbq_{key}")
+            st.info("未发现分类目录")
 
     elif kb_current == "📊 管理统计":
         try:

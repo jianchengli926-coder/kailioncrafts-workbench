@@ -859,24 +859,44 @@ elif page == "👥 客户中心":
                 with col1:
                     ca_company = st.text_input("公司名称 *")
                     ca_country = st.text_input("国家 *")
+                    ca_website = st.text_input("官网（可选）")
                 with col2:
                     ca_products = st.text_area("主营产品 *", height=80)
+                    ca_extra = st.text_input("补充信息（规模/采购量，可选）")
                 ca_submit = st.form_submit_button("🔍 AI分析", use_container_width=True, type="primary")
             if ca_submit and ca_company and ca_country and ca_products:
                 with st.spinner("AI分析中..."):
                     try:
-                        result = ai.chat(f"分析这个客户：{ca_company}, {ca_country}, 产品：{ca_products}。我们是阳江刀剪工厂KaiLionCrafts，主营厨房刀/剪刀/户外刀/厨房用品。给出匹配度评分、等级、切入策略。")
+                        prompt = CUSTOMER_ANALYSIS_PROMPT.format(
+                            company_name=ca_company, website=ca_website or "未提供",
+                            country=ca_country, products=ca_products,
+                            size=ca_extra or "未知", additional_info="无",
+                            company_profile=kb.get_company_brief(),
+                            product_categories=", ".join(COMPANY["categories"]),
+                        )
+                        result = ai.chat(prompt)
                         st.markdown(result)
                     except Exception as e:
                         st.error(f"AI错误：{e}")
         with cc_t2:
             st.subheader("客户深度背调")
-            bg_company = st.text_input("客户公司名 *")
-            bg_submit = st.button("🔍 开始背调", use_container_width=True, type="primary")
+            with st.form("bg_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    bg_company = st.text_input("客户公司名 *")
+                    bg_country = st.text_input("国家（可选）")
+                with col2:
+                    bg_products = st.text_input("对方主营产品（可选）")
+                bg_submit = st.form_submit_button("🔍 开始背调", use_container_width=True, type="primary")
             if bg_submit and bg_company:
                 with st.spinner("背调中..."):
                     try:
-                        result = ai.chat(f"对{bg_company}做B2B客户背调：公司规模、主营、采购潜力、切入策略。用中文详细回答。")
+                        prompt = DUE_DILIGENCE_PROMPT.format(
+                            company_name=bg_company, website="未提供",
+                            country=bg_country or "未知", products=bg_products or "未知",
+                            company_profile=kb.get_company_brief(),
+                        )
+                        result = ai.chat(prompt)
                         st.markdown(result)
                     except Exception as e:
                         st.error(f"AI错误：{e}")
@@ -892,32 +912,62 @@ elif page == "👥 客户中心":
                     ce_country = st.text_input("国家 *")
                 with col2:
                     ce_product = st.selectbox("推荐产品", ["厨房刀具", "专业剪刀", "户外刀具", "厨房用品"])
+                ce_analysis = st.text_area("客户分析结论（可选，贴上去信更准）", height=60,
+                                           placeholder="可粘贴上面客户分析的结果")
                 ce_submit = st.form_submit_button("✉️ 生成", use_container_width=True, type="primary")
             if ce_submit and ce_company and ce_country:
                 with st.spinner("生成中..."):
                     try:
-                        result = ai.chat(f"写一封英文B2B开发信给{ce_company}({ce_country})，推荐{ce_product}。我们是阳江KaiLionCrafts源头工厂，OEM/ODM/Private Label。150词左右，专业但不生硬。")
+                        prompt = COLD_EMAIL_PROMPT.format(
+                            company_name=ce_company, country=ce_country,
+                            products=ce_product, customer_analysis=ce_analysis or "暂无分析，基于主营产品判断",
+                            company_profile=kb.get_company_brief(),
+                            pain_points=kb.get_pain_points(), terminology=kb.get_terminology(),
+                        )
+                        result = ai.chat(prompt)
                         st.markdown(result)
                     except Exception as e:
                         st.error(f"AI错误：{e}")
         with cc_d2:
             st.subheader("多轮跟进")
-            fol_num = st.selectbox("第几轮", [1, 2, 3, 4])
-            if st.button("🔄 生成跟进", use_container_width=True):
+            with st.form("fol_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    fol_company = st.text_input("客户公司 *")
+                    fol_num = st.selectbox("第几轮", [1, 2, 3, 4])
+                with col2:
+                    fol_reply = st.selectbox("客户状态", ["未回复", "已读未回", "有回复但在比价", "明确拒绝过"])
+                fol_submit = st.form_submit_button("🔄 生成跟进", use_container_width=True, type="primary")
+            if fol_submit and fol_company:
                 with st.spinner("生成中..."):
                     try:
-                        result = ai.chat(f"写第{fol_num}轮英文跟进邮件，简短有价值，100词左右。")
+                        prompt = FOLLOW_UP_PROMPT.format(
+                            company_name=fol_company, follow_up_number=fol_num,
+                            first_email_date="约一周前", previous_subject="（首封开发信）",
+                            products="刀剪全品类", country="未知", reply_status=fol_reply,
+                            company_profile=kb.get_company_brief(),
+                        )
+                        result = ai.chat(prompt)
                         st.markdown(result)
                     except Exception as e:
                         st.error(f"AI错误：{e}")
 
     elif cc_current == "💬 客户问答":
         st.subheader("客户问题智能回复")
-        q = st.text_area("客户问题 *", height=100)
-        if st.button("🤖 AI回复", use_container_width=True, type="primary") and q:
+        with st.form("qa_form"):
+            q = st.text_area("客户问题 *", height=100)
+            qa_company = st.text_input("客户公司（可选）")
+            qa_submit = st.form_submit_button("🤖 AI回复", use_container_width=True, type="primary")
+        if qa_submit and q:
             with st.spinner("生成中..."):
                 try:
-                    result = ai.chat(f"用英文专业回答这个客户问题：{q}。我们是KaiLionCrafts阳江刀剪B2B工厂。")
+                    prompt = FAQ_PROMPT.format(
+                        question=q, company_name=qa_company or "客户", country="未知",
+                        conversation_history="（无）", faq_content=kb.get_faq(),
+                        product_specs=kb.get_product_specs()[:1500],
+                        terminology=kb.get_terminology(),
+                    )
+                    result = ai.chat(prompt)
                     st.markdown(result)
                 except Exception as e:
                     st.error(f"AI错误：{e}")

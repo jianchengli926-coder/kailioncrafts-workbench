@@ -4739,7 +4739,7 @@ elif page == "📚 知识库":
     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
     <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · KNOWLEDGE BASE</div>
     <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">公司知识库</h2>
-    <div style="color:rgba(255,243,224,.6);font-size:13px;">搜索 · 管理 · 版本 · 添加 · 知识库化器</div>
+    <div style="color:rgba(255,243,224,.6);font-size:13px;">搜索 · 管理 · 版本 · 添加（含对话转知识）</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -4747,14 +4747,13 @@ elif page == "📚 知识库":
         "🔍 搜索浏览": "全文搜索 · 分类浏览",
         "📊 管理统计": "知识库数量 · 文件统计",
         "📋 版本管理": "版本号 · 日期 · 回退",
-        "➕ 添加知识": "登记新知识库",
-        "🤖 知识库化器": "对话记录 → 知识库",
+        "➕ 添加知识": "新建文档 / 上传 / 对话转知识",
     }
     if "kb_sub" not in st.session_state:
         st.session_state["kb_sub"] = "🔍 搜索浏览"
     kb_current = st.session_state["kb_sub"]
 
-    kb_cols = st.columns(5)
+    kb_cols = st.columns(4)
     for i, (name, desc) in enumerate(kb_sections.items()):
         with kb_cols[i]:
             is_active = st.session_state["kb_sub"] == name
@@ -4954,15 +4953,15 @@ elif page == "📚 知识库":
             else:
                 st.warning("请填写标题+内容，或上传一个文档文件")
 
-    elif kb_current == "🤖 知识库化器":
-        st.markdown("##### 🤖 对话记录 → 知识库")
-        st.caption("粘贴一段工作对话/问答，AI 提炼成结构化知识后存入选定分类")
-        conv = st.text_area("粘贴对话/笔记原文", height=200)
-        if st.button("✨ AI提炼并保存", type="primary", use_container_width=True):
+        st.markdown("---")
+        st.markdown("##### 🤖 对话记录 → 知识")
+        st.caption("把一段工作对话/问答贴进来，AI 自动提炼成结构化知识后存入选定分类")
+        conv = st.text_area("粘贴对话/笔记原文", height=160, key="kb_conv")
+        if st.button("✨ AI 提炼成知识", type="primary", use_container_width=True):
             if not conv.strip():
                 st.warning("请先粘贴内容")
             else:
-                with st.spinner("AI提炼中..."):
+                with st.spinner("AI 提炼中..."):
                     try:
                         extracted = ai.chat(
                             f"把下面这段对话/笔记提炼成一篇结构化的Markdown知识库文档：给一个标题、分小标题、保留关键事实和数据，去掉口语和寒暄。直接输出Markdown正文。\n\n原文：\n{conv}"
@@ -4974,9 +4973,6 @@ elif page == "📚 知识库":
                         st.error(f"AI错误：{e}")
         if st.session_state.get("kb_distilled"):
             import re as _re
-            kb_root = Path(__file__).parent.parent
-            cat_dirs = sorted([d.name for d in kb_root.iterdir()
-                               if d.is_dir() and d.name[:2].isdigit() and not d.name.startswith('99')])
             d_cat = st.selectbox("保存到分类", cat_dirs, key="distill_cat")
             d_title = st.text_input("文档标题", value="提炼知识文档", key="distill_title")
             if st.button("💾 保存提炼结果", use_container_width=True):

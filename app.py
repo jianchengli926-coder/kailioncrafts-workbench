@@ -8035,44 +8035,137 @@ elif page == "⚙️ 设置中心":
             """)
 
     elif sc_current == "📊 AI调用统计":
-        st.subheader("AI调用统计")
-        try:
-            import json, os
-            traces = []
-            # 真实记录在 data/trace/trace_YYYYMM.json（ai_client._save_trace 按月写）
-            trace_dir = Path("data/trace")
-            if trace_dir.exists():
-                for tf in sorted(trace_dir.glob("trace_*.json")):
-                    try:
-                        traces.extend(json.loads(tf.read_text(encoding="utf-8")))
-                    except Exception:
-                        pass
-            # 兼容旧路径
-            old_trace = Path("data/ai_trace.json")
-            if old_trace.exists():
+        st.subheader("📊 AI用量监控中心")
+        st.caption("中转站式用量统计 · Token消耗 · 模型分布 · 调用记录")
+
+        # ===== 读取trace数据 =====
+        import json
+        traces = []
+        trace_dir = Path("data/trace")
+        if trace_dir.exists():
+            for tf in sorted(trace_dir.glob("trace_*.json")):
                 try:
-                    traces.extend(json.loads(old_trace.read_text(encoding="utf-8")))
+                    traces.extend(json.loads(tf.read_text(encoding="utf-8")))
                 except Exception:
                     pass
-            if traces:
-                st.metric("总调用次数", len(traces))
-                total_tokens = sum(t.get('total_tokens', 0) for t in traces if isinstance(t.get('total_tokens'), (int, float)))
-                st.metric("总Token消耗", total_tokens)
-                ok = sum(1 for t in traces if t.get('status') == 'success')
-                st.metric("成功 / 失败", f"{ok} / {len(traces)-ok}")
-                by_model = {}
-                for t in traces:
-                    by_model[t.get('model', '未知')] = by_model.get(t.get('model', '未知'), 0) + 1
-                st.markdown("**按模型分布**")
-                st.dataframe([{"模型": m, "次数": c} for m, c in sorted(by_model.items(), key=lambda x: -x[1])],
-                             use_container_width=True, hide_index=True)
-                st.markdown("**最近 20 次**")
-                for t in traces[-20:][::-1]:
-                    st.write(f"- {t.get('time', '')} | {t.get('task','')} | {t.get('model', '')} | {t.get('total_tokens', '?')} tok")
+        old_trace = Path("data/ai_trace.json")
+        if old_trace.exists():
+            try:
+                traces.extend(json.loads(old_trace.read_text(encoding="utf-8")))
+            except Exception:
+                pass
+
+        if not traces:
+            st.info("暂无调用记录（调用任意 AI 功能后这里会自动统计）")
+            st.markdown("""
+            <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;padding:40px;text-align:center;margin:20px 0;">
+            <div style="font-size:48px;margin-bottom:16px;">📊</div>
+            <div style="color:#64748b;font-size:16px;">AI用量监控中心</div>
+            <div style="color:#94a3b8;font-size:13px;margin-top:8px;">调用任意AI功能后，这里会自动统计：<br>
+            总请求数 / 总Token / 总消费 / 模型分布 / 调用趋势 / 详细记录</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            # ===== 时间范围筛选 =====
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            time_range = st.selectbox("时间范围", ["全部", "近24小时", "近7天", "近30天"], key="usage_range")
+            if time_range == "近24小时":
+                cutoff = now - timedelta(hours=24)
+            elif time_range == "近7天":
+                cutoff = now - timedelta(days=7)
+            elif time_range == "近30天":
+                cutoff = now - timedelta(days=30)
             else:
-                st.info("暂无调用记录（调用任意 AI 功能后这里会自动统计）")
-        except Exception as e:
-            st.error(f"加载失败：{e}")
+                cutoff = datetime(2000, 1, 1)
+
+            filtered = []
+            for t in traces:
+                try:
+                    t_time = datetime.strptime(t.get("time", ""), "%Y-%m-%d %H:%M:%S")
+                    if t_time >= cutoff:
+                        filtered.append(t)
+                except Exception:
+                    pass
+
+            if not filtered:
+                st.info("该时间范围内暂无记录")
+            else:
+                # ===== KPI卡片 =====
+                total_req = len(filtered)
+                total_tokens = sum(t.get("total_tokens", 0) for t in filtered if isinstance(t.get("total_tokens"), (int, float)))
+                total_prompt = sum(t.get("prompt_tokens", 0) for t in filtered if isinstance(t.get("prompt_tokens"), (int, float)))
+                total_completion = sum(t.get("completion_tokens", 0) for t in filtered if isinstance(t.get("completion_tokens"), (int, float)))
+                avg_elapsed = sum(t.get("elapsed_seconds", 0) for t in filtered) / total_req if total_req > 0 else 0
+                # 估算消费（豆包模型：输入0.0008元/千token，输出0.002元/千token）
+                est_cost = (total_prompt / 1000 * 0.0008 + total_completion / 1000 * 0.002)
+
+                k1, k2, k3, k4 = st.columns(4)
+                k1.metric("总请求数", f"{total_req:,}", delta=f"成功 {sum(1 for t in filtered if t.get('status')=='success')}")
+                k2.metric("总Token", f"{total_tokens/10000:.1f}K", delta=f"输入 {total_prompt/10000:.1f}K / 输出 {total_completion/10000:.1f}K")
+                k3.metric("估算消费", f"¥{est_cost:.4f}", delta="豆包seed-2定价")
+                k4.metric("平均耗时", f"{avg_elapsed:.1f}s", delta="单次调用")
+
+                st.markdown("---")
+
+                # ===== 模型分布 + 任务分布 =====
+                c1, c2 = st.columns(2)
+
+                with c1:
+                    st.markdown("**📊 模型分布**")
+                    by_model = {}
+                    for t in filtered:
+                        m = t.get("model", "未知")
+                        by_model[m] = by_model.get(m, 0) + 1
+                    model_df = pd.DataFrame([{"模型": m, "请求数": c} for m, c in sorted(by_model.items(), key=lambda x: -x[1])])
+                    st.dataframe(model_df, use_container_width=True, hide_index=True)
+
+                with c2:
+                    st.markdown("**📋 任务分布**")
+                    by_task = {}
+                    for t in filtered:
+                        task = t.get("task", "未命名任务")
+                        by_task[task] = by_task.get(task, 0) + 1
+                    task_df = pd.DataFrame([{"任务": t, "请求数": c} for t, c in sorted(by_task.items(), key=lambda x: -x[1])])
+                    st.dataframe(task_df, use_container_width=True, hide_index=True)
+
+                st.markdown("---")
+
+                # ===== 每日趋势 =====
+                st.markdown("**📈 每日调用趋势**")
+                by_day = {}
+                for t in filtered:
+                    try:
+                        day = t.get("time", "")[:10]
+                        by_day[day] = by_day.get(day, 0) + 1
+                    except Exception:
+                        pass
+                if by_day:
+                    trend_df = pd.DataFrame([{"日期": d, "调用次数": c} for d, c in sorted(by_day.items())])
+                    st.line_chart(trend_df.set_index("日期"), use_container_width=True)
+
+                st.markdown("---")
+
+                # ===== 详细调用记录 =====
+                st.markdown("**📝 详细调用记录**（最近50条）")
+                recent = filtered[-50:][::-1]
+                rows = []
+                for t in recent:
+                    rows.append({
+                        "时间": t.get("time", ""),
+                        "任务": t.get("task", ""),
+                        "模型": t.get("model", ""),
+                        "状态": "✅" if t.get("status") == "success" else "❌",
+                        "耗时(s)": t.get("elapsed_seconds", ""),
+                        "输入Token": t.get("prompt_tokens", ""),
+                        "输出Token": t.get("completion_tokens", ""),
+                        "总Token": t.get("total_tokens", ""),
+                    })
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+                # 导出CSV
+                csv = pd.DataFrame(rows).to_csv(index=False).encode("utf-8-sig")
+                st.download_button("📥 导出CSV", csv, f"ai_usage_{now.strftime('%Y%m%d_%H%M')}.csv", "text/csv", use_container_width=True)
 
     elif sc_current == "👥 访问日志":
         st.subheader("访问日志")

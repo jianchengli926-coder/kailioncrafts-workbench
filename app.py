@@ -4898,13 +4898,75 @@ elif page == "📚 知识库":
         st.info("版本管理功能开发中")
 
     elif kb_current == "➕ 添加知识":
-        kb_name = st.text_input("知识库名称")
-        kb_desc = st.text_area("描述")
-        if st.button("登记", use_container_width=True):
-            st.success(f"已记录：{kb_name}")
+        st.markdown("##### 📝 添加新文档到知识库")
+        st.caption("填写内容或上传文档，保存后立即进入对应分类，全文搜索即可搜到")
+        # 列出标准化知识库下的分类目录
+        kb_root = Path(__file__).parent.parent
+        cat_dirs = sorted([d.name for d in kb_root.iterdir()
+                           if d.is_dir() and d.name[:2].isdigit() and not d.name.startswith('99')])
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            add_cat = st.selectbox("保存到分类", cat_dirs, key="add_cat")
+        with col2:
+            add_title = st.text_input("文档标题", placeholder="例如：美国厨房刀进口关税要点")
+        add_body = st.text_area("文档内容（Markdown）", height=180, placeholder="粘贴/撰写知识正文...")
+        add_file = st.file_uploader("或直接上传文档", type=['md', 'txt', 'csv'], key="add_kb_file")
+
+        if st.button("💾 保存到知识库", type="primary", use_container_width=True):
+            import re as _re
+            safe_name = _re.sub(r'[\\/:\*\?"<>\|]+', "_", (add_title or "未命名文档")).strip()
+            target_dir = kb_root / add_cat
+            target_dir.mkdir(parents=True, exist_ok=True)
+            saved = False
+            if add_file is not None:
+                dest = target_dir / add_file.name
+                dest.write_bytes(add_file.getbuffer())
+                saved_path = str(dest)
+                saved = True
+            elif safe_name and (add_body or add_title):
+                dest = target_dir / f"{safe_name}.md"
+                content = f"# {add_title}\n\n> 添加人：{st.session_state.get('current_member','leo')}　添加时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n{add_body}\n"
+                dest.write_text(content, encoding="utf-8")
+                saved_path = str(dest)
+                saved = True
+            if saved:
+                st.success(f"✅ 已保存到：{saved_path}")
+                st.caption("在「🔍 搜索浏览」里即可搜到（如未立即出现，刷新一次页面）")
+            else:
+                st.warning("请填写标题+内容，或上传一个文档文件")
 
     elif kb_current == "🤖 知识库化器":
-        st.info("对话记录自动整理成知识库功能开发中")
+        st.markdown("##### 🤖 对话记录 → 知识库")
+        st.caption("粘贴一段工作对话/问答，AI 提炼成结构化知识后存入选定分类")
+        conv = st.text_area("粘贴对话/笔记原文", height=200)
+        if st.button("✨ AI提炼并保存", type="primary", use_container_width=True):
+            if not conv.strip():
+                st.warning("请先粘贴内容")
+            else:
+                with st.spinner("AI提炼中..."):
+                    try:
+                        extracted = ai.chat(
+                            f"把下面这段对话/笔记提炼成一篇结构化的Markdown知识库文档：给一个标题、分小标题、保留关键事实和数据，去掉口语和寒暄。直接输出Markdown正文。\n\n原文：\n{conv}"
+                        )
+                        st.session_state["kb_distilled"] = extracted
+                        st.success("✅ 已提炼，确认后保存：")
+                        st.markdown(extracted[:1500] + ("..." if len(extracted) > 1500 else ""))
+                    except Exception as e:
+                        st.error(f"AI错误：{e}")
+        if st.session_state.get("kb_distilled"):
+            import re as _re
+            kb_root = Path(__file__).parent.parent
+            cat_dirs = sorted([d.name for d in kb_root.iterdir()
+                               if d.is_dir() and d.name[:2].isdigit() and not d.name.startswith('99')])
+            d_cat = st.selectbox("保存到分类", cat_dirs, key="distill_cat")
+            d_title = st.text_input("文档标题", value="提炼知识文档", key="distill_title")
+            if st.button("💾 保存提炼结果", use_container_width=True):
+                safe_name = _re.sub(r'[\\/:\*\?"<>\|]+', "_", d_title).strip()
+                dest = kb_root / d_cat / f"{safe_name}.md"
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(st.session_state["kb_distilled"], encoding="utf-8")
+                st.success(f"✅ 已保存：{dest}")
+                st.session_state.pop("kb_distilled", None)
 
 elif page == "👥 团队工作空间":
     st.title("👥 团队工作空间")

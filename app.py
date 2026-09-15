@@ -80,6 +80,28 @@ def show_kb_connections(feature_name, kb_list, output_folder=None):
             st.markdown(f"**📂 生成内容保存到：** `data/kb_output/{output_folder}/`（当前 {file_count} 个文件）")
 
 
+def save_to_kb_button(content, output_folder, title="生成结果", fmt="md"):
+    """
+    通用功能：在生成结果下方显示"保存到知识库"按钮
+    content: 要保存的文本内容
+    output_folder: 知识库文件夹名
+    title: 文件名前缀
+    fmt: 文件格式 md/html/txt
+    """
+    kb_dir = Path(f"data/kb_output/{output_folder}")
+    kb_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{timestamp}_{title}.{fmt}"
+    filepath = kb_dir / filename
+
+    if st.button(f"💾 保存到知识库", key=f"save_kb_{output_folder}_{timestamp}"):
+        try:
+            filepath.write_text(content, encoding="utf-8")
+            st.success(f"✅ 已保存到：`data/kb_output/{output_folder}/{filename}`")
+        except Exception as e:
+            st.error(f"保存失败：{e}")
+
+
 # ============ 通用：我的语气档案（蒸馏作者风格） ============
 VOICE_FILE = Path("data/voice_profile.json")
 def _load_voice():
@@ -1825,6 +1847,7 @@ EN: ...
                         )
                         result = ai.chat(prompt)
                         st.markdown(result)
+                        save_to_kb_button(result, "客户管理", "客户问答回复")
                     except Exception as e:
                         st.error(f"AI错误：{e}")
         with cc_q2:
@@ -5504,6 +5527,7 @@ elif page == "📈 市场与产品分析":
                     prompt = MARKET_ANALYSIS_PROMPT.format(target_market=target_market, product_category=product_category, company_profile=kb.get_company_brief())
                     result = ai.chat(prompt)
                     st.markdown(result)
+                    save_to_kb_button(result, "市场分析", f"入市分析_{target_market}")
 
         with m2:
             st.markdown("##### 🌊 蓝海选品分析")
@@ -5542,6 +5566,7 @@ elif page == "📈 市场与产品分析":
 务实、具体，不要堆术语。"""
                     result = ai.chat(prompt)
                     st.markdown(result)
+                    save_to_kb_button(result, "市场分析", f"蓝海选品_{bs_cat}")
 
         with m3:
             st.markdown("##### 💬 VOC 客户之声分析")
@@ -5653,6 +5678,7 @@ elif page == "📈 市场与产品分析":
 中文，B2B刀剪视角。"""
                         result = ai.chat(prompt)
                     st.markdown(result)
+                    save_to_kb_button(result, "产品分析", f"Listing诊断_{asin}")
                 else:
                     st.warning("请先输入ASIN或SKU")
         with p2:
@@ -5685,6 +5711,7 @@ elif page == "📈 市场与产品分析":
 遵循可售事实，不编造型号参数。"""
                     result = ai.chat(prompt)
                 st.markdown(result)
+                save_to_kb_button(result, "产品分析", f"文案生成_{p_name[:20]}")
         with p3:
             st.markdown("##### 竞品对比")
             col1, col2 = st.columns(2)

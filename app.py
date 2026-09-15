@@ -7204,13 +7204,186 @@ elif page == "⚙️ 设置中心":
     st.markdown("---")
 
     if sc_current == "🤖 模型配置":
-        st.subheader("模型配置")
-        try:
-            cfg = get_current_config()
-            st.write(f"当前模型：{cfg.get('model', '未设置')}")
-            st.write(f"API Base：{cfg.get('base_url', '未设置')}")
-        except Exception as e:
-            st.error(f"加载配置失败：{e}")
+        # 统计信息
+        stats = get_provider_stats()
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("供应商总数", stats['total'])
+        with col2:
+            st.metric("在线API", stats['online'])
+        with col3:
+            st.metric("本地模型", stats['local'])
+        with col4:
+            active = get_active_provider()
+            st.metric("当前使用", active['name'] if active else "未设置")
+
+        st.markdown("---")
+
+        # 本地Ollama状态
+        st.subheader("💻 本地模型状态")
+        ollama_models = detect_ollama_models()
+        if ollama_models:
+            st.success(f"✅ Ollama服务运行中，检测到 {len(ollama_models)} 个本地模型")
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                for m in ollama_models:
+                    st.caption(f"  • {m}")
+            with col2:
+                if st.button("🔄 刷新模型列表", use_container_width=True):
+                    refresh_ollama_models()
+                    st.success("已刷新本地模型列表")
+                    st.rerun()
+        else:
+            st.warning("⚠️ 未检测到Ollama服务，请先启动Ollama")
+            st.code("ollama serve", language="bash")
+
+        st.markdown("---")
+
+        # 供应商列表
+        st.subheader("📋 API供应商列表")
+        providers_data = load_providers()
+        providers = providers_data['providers']
+        active_id = providers_data.get('active_provider')
+
+        for p in providers:
+            is_active = p['id'] == active_id
+            card_bg = "#e8f5e9" if is_active else "#ffffff"
+            border_color = "#4caf50" if is_active else "#e0e0e0"
+
+            with st.container():
+                st.markdown(f"""
+                <div style="background:{card_bg}; padding:16px; border-radius:8px;
+                            border-left:4px solid {border_color}; margin-bottom:12px;">
+                    <strong>{'✅ ' if is_active else ''}{p['name']}</strong>
+                    <span style="float:right; color:#666; font-size:12px;">
+                        {p['type']} | {len(p['models'])}个模型
+                    </span>
+                    <br>
+                    <small style="color:#888;">{p['base_url']}</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+            col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+
+            with col1:
+                if p['models']:
+                    selected_model = st.selectbox(
+                        "选择模型",
+                        p['models'],
+                        key=f"sc_model_{p['id']}",
+                        index=0,
+                        label_visibility="collapsed"
+                    )
+                else:
+                    selected_model = st.text_input("模型名称", key=f"sc_model_{p['id']}")
+
+            with col2:
+                if not is_active:
+                    if st.button("✅ 切换到此供应商", key=f"sc_switch_{p['id']}", use_container_width=True):
+                        provider = set_active_provider(p['id'])
+                        if provider:
+                            save_config(
+                                provider=p['id'],
+                                api_key=provider['api_key'],
+                                base_url=provider['base_url'],
+                                model=selected_model
+                            )
+                            st.success(f"已切换到：{p['name']} / {selected_model}")
+                            st.rerun()
+                else:
+                    st.success("当前使用中")
+
+            with col3:
+                if st.button("🔗 测试连接", key=f"sc_test_{p['id']}", use_container_width=True):
+                    result = test_provider(p['id'])
+                    if result['success']:
+                        st.success(f"✅ {result['message']}")
+                    else:
+                        st.error(f"❌ {result['message']}")
+
+            with col4:
+                if p['id'] not in ['ollama_local', 'doubao_default']:
+                    if two_step_delete("🗑️", f"sc_del_{p['id']}", "删除此AI模型配置，不可恢复") == "yes":
+                        delete_provider(p['id'])
+                        st.success("已删除")
+                        st.rerun()
+
+            with st.expander("✏️ 编辑配置", expanded=False):
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    edit_name = st.text_input("供应商名称", value=p['name'], key=f"sc_edit_name_{p['id']}")
+                    edit_url = st.text_input("API地址", value=p['base_url'], key=f"sc_edit_url_{p['id']}")
+                with col_b:
+                    edit_key = st.text_input("API Key", value=p['api_key'], type="password", key=f"sc_edit_key_{p['id']}")
+                    edit_models = st.text_area(
+                        "模型列表（每行一个）",
+                        value='\n'.join(p['models']),
+                        key=f"sc_edit_models_{p['id']}",
+                        height=100
+                    )
+
+                if st.button("💾 保存修改", key=f"sc_save_edit_{p['id']}"):
+                    models_list = [m.strip() for m in edit_models.split('\n') if m.strip()]
+                    update_provider(
+                        p['id'],
+                        name=edit_name,
+                        base_url=edit_url,
+                        api_key=edit_key,
+                        models=models_list
+                    )
+                    st.success("已保存修改")
+                    st.rerun()
+
+            st.markdown("---")
+
+        # 添加新供应商
+        st.subheader("➕ 添加新API中转站")
+        st.info("💡 支持所有OpenAI兼容接口的中转站（如 CC Switch、SiliconFlow、API2D、OpenRouter 等），填入API地址和密钥即可")
+
+        with st.form("sc_add_provider_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                new_name = st.text_input("供应商名称 *", placeholder="例如：我的中转站、SiliconFlow、OpenRouter等")
+                new_url = st.text_input("API地址 *", placeholder="https://api.example.com/v1")
+            with col2:
+                new_key = st.text_input("API Key *", type="password", placeholder="sk-...")
+            new_models = st.text_area("模型列表（可选，每行一个，留空自动检测）", height=80)
+            submitted = st.form_submit_button("✅ 添加供应商", use_container_width=True)
+        if submitted and new_name and new_url and new_key:
+            models_list = [m.strip() for m in new_models.split('\n') if m.strip()] if new_models else None
+            provider = add_provider(new_name, new_url, new_key, models_list)
+            if provider['models']:
+                st.success(f"✅ 添加成功！自动检测到 {len(provider['models'])} 个模型")
+            else:
+                st.success("✅ 添加成功！请手动添加模型名称")
+            st.rerun()
+
+        st.markdown("---")
+
+        with st.expander("📖 使用说明"):
+            st.markdown("""
+            ### 如何使用中转站？
+
+            1. **添加中转站**：在上方填入中转站名称、API地址、API Key
+            2. **自动检测模型**：添加时会自动获取模型列表（如果中转站支持）
+            3. **一键切换**：点击"切换到此供应商"，所有AI功能立即使用新模型
+            4. **测试连接**：点击"测试连接"验证API是否可用
+
+            ### 本地模型 vs 在线API
+
+            | 特性 | 本地Ollama | 在线API中转站 |
+            |------|-----------|-------------|
+            | 费用 | 免费 | 按调用量付费 |
+            | 网络 | 不需要联网 | 需要联网 |
+            | 数据安全 | 100%本地 | 数据传到服务商 |
+            | 模型效果 | 取决于电脑性能 | 通常更好 |
+            | 速度 | 取决于电脑 | 通常更快 |
+
+            ### 支持的中转站格式
+            - API地址格式：`https://xxx.com/v1`
+            - 接口：`/chat/completions`、`/models`
+            - 认证：Bearer Token
+            """)
 
     elif sc_current == "📊 AI调用统计":
         st.subheader("AI调用统计")

@@ -19,6 +19,7 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime, timedelta
 import io
+import os
 import json as _json
 
 from config import (
@@ -690,7 +691,7 @@ elif page == "📥 独立站管理":
                 try:
                     import requests
                     r = requests.get("https://kailioncrafts.com/wp-json/wc/v3/orders",
-                        auth=("ck_081563431476ddb5de3b7622b5103c36ae5dfa5e", "cs_14f604031a3c0afef77660ccd18d121670bffe84"),
+                        auth=(os.getenv("WC_CONSUMER_KEY", ""), os.getenv("WC_CONSUMER_SECRET", "")),
                         params={"per_page": 20}, timeout=15)
                     if r.status_code == 200:
                         orders = r.json()
@@ -722,7 +723,7 @@ elif page == "📥 独立站管理":
                 try:
                     import requests
                     r = requests.get("https://kailioncrafts.com/wp-json/wc/v3/products/reviews",
-                        auth=("ck_081563431476ddb5de3b7622b5103c36ae5dfa5e", "cs_14f604031a3c0afef77660ccd18d121670bffe84"),
+                        auth=(os.getenv("WC_CONSUMER_KEY", ""), os.getenv("WC_CONSUMER_SECRET", "")),
                         params={"per_page": 20}, timeout=15)
                     if r.status_code == 200:
                         reviews = r.json()
@@ -4125,7 +4126,7 @@ elif page == "📈 销售管道":
             with col3:
                 if st.button("👁️ 详情", key=f"view_{c['id']}", use_container_width=True):
                     st.session_state["view_customer"] = c["id"]
-                    st.switch_page("👥 客户管理")
+                    st.toast(f"已选中：{c.get('company_name','')}（请到「👥 客户中心 → 客户管理」查看完整档案）")
                 else:
                     st.info("暂无客户")
 
@@ -5120,8 +5121,8 @@ elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "b
         # 先读取知识库
         kb_context = ""
         try:
-            blog_dir = Path("知识库/17_博客文章与内容营销知识库")
-            for f in blog_dir.glob("*.md"):
+            blog_dir = KB_DIR / "17_博客文章与内容营销知识库"
+            for f in sorted(blog_dir.glob("*.md")):
                 kb_context += f"\n\n=== {f.name} ===\n" + f.read_text(encoding="utf-8")[:3000]
         except Exception as e:
             kb_context = f"(知识库读取: {e})"
@@ -5525,29 +5526,28 @@ elif page == "⚙️ 设置":
     with tab2:
         st.subheader("关于工作台")
     st.markdown(f"""
-    **KaiLionCrafts AI客户开发工作台**
-    
-    - 版本：v2.0
+    **KaiLionCrafts 企业级AI工作台**
+
+    - 版本：v2.5
     - 公司：{COMPANY['name_cn']}
     - 品牌：{COMPANY['brand']}（{COMPANY['brand_cn']}）
     - 定位：{COMPANY['positioning']}
     - 创始人：{COMPANY['founder']}
-    
-    **功能模块：13个**
-    仪表盘 | 晨间简报 | 客户分析 | 客户背调 | 开发信生成
-    跟进序列 | 客户问答 | 产品推荐 | 销售管道 | 客户管理
-    市场分析 | 竞品资源库 | 知识库
-    
+
+    **功能导航（12个）：**
+    仪表盘 | 自研AI工具库 | 市场与产品分析 | 客户中心 | 独立站管理
+    订单台账 | 产品库 | 独立站SEO中心 | 竞品与资源库 | 知识库 | 飞书协同 | 设置中心
+
     **数据资产：**
-    - 知识库文档：78个
-    - 产品SKU：200+
-    - 竞品网站：78个
-    - 潜在客户：28个（预置）
-    
+    - 标准化知识库：18大分类 / 1200+ 文档
+    - 产品SKU：127 个已上架
+    - 竞品/资源站：78 个
+    - 团队：Leo / Jason / Owen / Julia 四人工作区
+
     **技术栈：**
-    - Streamlit + Python
-    - 豆包/OpenAI兼容API
-    - 本地JSON存储（数据安全）
+    - Streamlit + Python（本地运行）
+    - 豆包/OpenAI兼容API · 可切本地Ollama
+    - 本地JSON存储（数据不出本机）
     """)
     
     st.markdown("---")

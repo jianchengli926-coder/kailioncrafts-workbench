@@ -5190,9 +5190,11 @@ elif page == "📈 市场与产品分析":
                 st.rerun()
 
     mp_current = st.session_state["mp_sub"]
-    st.markdown(f"### {mp_current}")
-    st.caption(mp_sections[mp_current])
-    st.markdown("---")
+    # 市场分析tab下面没有写subheader，需要这里显示；其他tab下面已有subheader，跳过避免重复
+    if mp_current == "📊 市场分析":
+        st.markdown(f"### {mp_current}")
+        st.caption(mp_sections[mp_current])
+        st.markdown("---")
 
     if mp_current == "📊 市场分析":
         m1, m2, m3, m4 = st.tabs(["🗺️ 入市分析", "🌊 蓝海选品", "💬 VOC客户之声", "🔑 关键词挖掘"])

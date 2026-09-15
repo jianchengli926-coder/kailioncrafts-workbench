@@ -5734,17 +5734,39 @@ elif page == "⚙️ 设置中心":
         st.subheader("AI调用统计")
         try:
             import json, os
-            trace_file = "data/ai_trace.json"
-            if os.path.exists(trace_file):
-                with open(trace_file, encoding='utf-8') as f:
-                    traces = json.load(f)
+            traces = []
+            # 真实记录在 data/trace/trace_YYYYMM.json（ai_client._save_trace 按月写）
+            trace_dir = Path("data/trace")
+            if trace_dir.exists():
+                for tf in sorted(trace_dir.glob("trace_*.json")):
+                    try:
+                        traces.extend(json.loads(tf.read_text(encoding="utf-8")))
+                    except Exception:
+                        pass
+            # 兼容旧路径
+            old_trace = Path("data/ai_trace.json")
+            if old_trace.exists():
+                try:
+                    traces.extend(json.loads(old_trace.read_text(encoding="utf-8")))
+                except Exception:
+                    pass
+            if traces:
                 st.metric("总调用次数", len(traces))
-                total_tokens = sum(t.get('tokens', 0) for t in traces)
+                total_tokens = sum(t.get('total_tokens', 0) for t in traces if isinstance(t.get('total_tokens'), (int, float)))
                 st.metric("总Token消耗", total_tokens)
-                for t in traces[-20:]:
-                    st.write(f"- {t.get('time', '')} | {t.get('model', '')} | {t.get('tokens', 0)} tokens")
+                ok = sum(1 for t in traces if t.get('status') == 'success')
+                st.metric("成功 / 失败", f"{ok} / {len(traces)-ok}")
+                by_model = {}
+                for t in traces:
+                    by_model[t.get('model', '未知')] = by_model.get(t.get('model', '未知'), 0) + 1
+                st.markdown("**按模型分布**")
+                st.dataframe([{"模型": m, "次数": c} for m, c in sorted(by_model.items(), key=lambda x: -x[1])],
+                             use_container_width=True, hide_index=True)
+                st.markdown("**最近 20 次**")
+                for t in traces[-20:][::-1]:
+                    st.write(f"- {t.get('time', '')} | {t.get('task','')} | {t.get('model', '')} | {t.get('total_tokens', '?')} tok")
             else:
-                st.info("暂无调用记录")
+                st.info("暂无调用记录（调用任意 AI 功能后这里会自动统计）")
         except Exception as e:
             st.error(f"加载失败：{e}")
 

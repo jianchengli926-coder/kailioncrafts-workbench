@@ -5555,6 +5555,56 @@ elif page == "📈 市场与产品分析":
                     result = ai.chat(prompt)
                 st.markdown(result)
 
+        st.markdown("---")
+        st.markdown("##### 💬 竞品评价痛点挖掘（1-3星评论分析）")
+        st.caption("抓取竞品1-3星差评，提炼痛点 → 反推我们的产品改进方向")
+        with st.form("pain_point_form"):
+            pp1, pp2 = st.columns(2)
+            with pp1:
+                pp_asin = st.text_input("竞品ASIN/产品名 *", key="pp_asin", placeholder="如：B08XYZ123 或 Henckels Chef Knife")
+            with pp2:
+                pp_product = st.text_input("我们的对应产品", key="pp_product", placeholder="如：8寸德国不锈钢厨师刀")
+            pp_reviews = st.text_area("粘贴竞品1-3星评论（可选，有就贴，没有AI会基于常识推理）",
+                                      height=100, key="pp_reviews",
+                                      placeholder="如：Sharp but rusts easily / Handle broke after 2 months / Not worth the price...")
+            pp_submit = st.form_submit_button("🔍 挖掘竞品痛点", type="primary", use_container_width=True)
+
+        if pp_submit and pp_asin:
+            with st.spinner("AI分析竞品痛点..."):
+                try:
+                    prompt = f"""你是B2B产品竞品分析专家（借鉴blue-ocean-research方法论）。
+竞品：{pp_asin}
+我方对应产品：{pp_product}
+竞品评论原文：{pp_reviews or '（未提供，基于该品类常见差评模式推理）'}
+
+请分析：
+
+## 竞品痛点挖掘（1-3星差评分析）
+
+### 高频痛点TOP5
+| # | 痛点 | 出现频率 | 严重程度 | 影响 |
+|---|------|---------|---------|------|
+| 1 | ... | 高/中/低 | 🔴高/🟡中/🟢低 | 什么后果 |
+
+### 痛点根因分析
+每个痛点背后的根本原因是什么？（是材料问题？工艺问题？设计问题？还是预期不符？）
+
+### 我们的改进机会
+针对每个痛点，我们的产品可以怎么做得更好？
+- 哪些痛点我们已经解决了？（差异化卖点）
+- 哪些痛点我们也有？（需要改进）
+- 哪些痛点可以成为我们的"主打卖点"？（在开发信/Listing里强调）
+
+### 反推产品改进建议
+3条具体的产品改进方向，按优先级排序。
+
+中文输出，控制在500字内。
+"""
+                    result = ai.chat(prompt)
+                    st.markdown(result)
+                except Exception as e:
+                    st.error(f"AI错误：{e}")
+
     elif mp_current == "📈 广告分析":
         st.subheader("📈 广告分析")
         st.caption("上传Amazon广告报告 → AI分析产品角色 + 否定词建议")

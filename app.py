@@ -182,7 +182,7 @@ with st.sidebar:
         # 市场部 -> 已并入公司知识库
         # 知识部
         "📚 公司知识库",
-        "📱 飞书协同",
+        # 飞书协同已并入公司知识库
         # 管理
         "⚙️ 设置中心",
     ]
@@ -4877,12 +4877,13 @@ elif page == "📚 公司知识库":
         "📊 管理统计": "统计 · 体积 · 最近更新",
         "➕ 添加知识": "新建文档 / 上传 / 对话转知识",
         "🌐 竞品与资源库": "同行独立站 · 建站模仿",
+        "📱 飞书协同": "云盘 · 消息 · 文档同步",
     }
     if "kb_sub" not in st.session_state:
         st.session_state["kb_sub"] = "🔍 搜索浏览"
     kb_current = st.session_state["kb_sub"]
 
-    kb_cols = st.columns(4)
+    kb_cols = st.columns(5)
     for i, (name, desc) in enumerate(kb_sections.items()):
         with kb_cols[i]:
             is_active = st.session_state["kb_sub"] == name
@@ -5208,6 +5209,81 @@ elif page == "📚 公司知识库":
             """)
         else:
             st.warning("竞品数据文件未找到，请确保 data/competitor_sites.csv 存在")
+
+    elif kb_current == "📱 飞书协同":
+        st.caption("飞书云盘 · 消息通知 · 文档同步")
+        try:
+            import feishu_client as _fs
+        except Exception as _e:
+            _fs = None
+            st.warning(f"feishu_client 加载失败：{_e}")
+        st.caption("飞书应用 App ID：cli_aa2c7e3b30b8dbd88（以下操作实时调用飞书开放平台 API）")
+        f_t1, f_t2, f_t3 = st.tabs(["🔌 连接测试", "📁 云盘文件", "🔔 发消息 / 建文档"])
+        with f_t1:
+            if st.button("🧪 测试飞书连接", type="primary", use_container_width=True):
+                if _fs:
+                    with st.spinner("正在连接飞书..."):
+                        try:
+                            res = _fs.test_connection()
+                            for k, v in res.items():
+                                st.write(f"**{k}**：{v}")
+                        except Exception as e:
+                            st.error(f"连接失败：{e}（检查网络 / App权限 / folder token）")
+                else:
+                    st.error("feishu_client 不可用")
+        with f_t2:
+            if st.button("📂 拉取云盘文件列表", use_container_width=True):
+                if _fs:
+                    with st.spinner("拉取中..."):
+                        try:
+                            data = _fs.list_drive_files()
+                            files = data.get("data", {}).get("files", [])
+                            if data.get("code") != 0:
+                                st.warning(f"飞书返回：{data.get('msg')}")
+                            elif not files:
+                                st.info("云盘根目录暂无文件（或机器人无权访问）")
+                            else:
+                                st.success(f"共 {len(files)} 个文件/文件夹")
+                                st.dataframe([{"名称": f.get("name"), "类型": f.get("type"),
+                                               "token": f.get("token")} for f in files],
+                                             use_container_width=True, hide_index=True)
+                        except Exception as e:
+                            st.error(f"拉取失败：{e}")
+                else:
+                    st.error("feishu_client 不可用")
+        with f_t3:
+            st.markdown("##### 发送群消息")
+            chat_id = st.text_input("群聊 chat_id", placeholder="oc_xxxxxx（需机器人已在群里）")
+            msg_text = st.text_area("消息内容", placeholder="工作台告警 / 新询盘提醒...")
+            if st.button("📤 发送", use_container_width=True):
+                if not chat_id or not msg_text:
+                    st.warning("请填 chat_id 和消息内容")
+                elif _fs:
+                    try:
+                        r = _fs.send_text_message(chat_id, msg_text)
+                        if r.get("code") == 0:
+                            st.success("✅ 已发送")
+                        else:
+                            st.warning(f"飞书返回：{r.get('msg')}")
+                    except Exception as e:
+                        st.error(f"发送失败：{e}")
+            st.markdown("---")
+            st.markdown("##### 在飞书云盘新建文档")
+            doc_title = st.text_input("文档标题", placeholder="例如：本周询盘周报")
+            doc_body = st.text_area("文档正文", height=100)
+            if st.button("📄 创建飞书文档", use_container_width=True):
+                if not doc_title:
+                    st.warning("请填文档标题")
+                elif _fs:
+                    try:
+                        r = _fs.create_doc(doc_title, doc_body)
+                        if r.get("code") == 0:
+                            st.success(f"✅ 已创建：{doc_title}")
+                            st.json(r.get("data", {}))
+                        else:
+                            st.warning(f"飞书返回：{r.get('msg')}（可能缺 docx 权限 / folder token）")
+                    except Exception as e:
+                        st.error(f"创建失败：{e}")
 
 elif page == "👥 团队工作空间":
     st.title("👥 团队工作空间")
@@ -6177,120 +6253,6 @@ Slug: ...
                     st.write(f"- {ref}")
 
 # ============ 飞书协同 ============
-elif page == "📱 飞书协同":
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
-    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · FEISHU</div>
-    <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">飞书协同</h2>
-    <div style="color:rgba(255,243,224,.6);font-size:13px;">飞书云盘 · 消息通知 · 文档同步</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    fs1, fs2, fs3 = st.columns(3)
-    with fs1:
-        st.markdown("""
-        <div style="background:#f8f9fa;border-radius:12px;padding:20px;">
-        <div style="font-size:32px;">📁</div>
-        <div style="font-weight:600;margin:8px 0;">飞书云盘</div>
-        <div style="font-size:12px;color:#888;">文档同步 · 知识库备份</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with fs2:
-        st.markdown("""
-        <div style="background:#f8f9fa;border-radius:12px;padding:20px;">
-        <div style="font-size:32px;">🔔</div>
-        <div style="font-weight:600;margin:8px 0;">消息通知</div>
-        <div style="font-size:12px;color:#888;">新询盘 · 订单 · 提醒</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with fs3:
-        st.markdown("""
-        <div style="background:#f8f9fa;border-radius:12px;padding:20px;">
-        <div style="font-size:32px;">📄</div>
-        <div style="font-weight:600;margin:8px 0;">文档同步</div>
-        <div style="font-size:12px;color:#888;">报告 · 资料 · 备份</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.caption(f"飞书应用 App ID：cli_aa2c7e3b30b8dbd8（以下操作实时调用飞书开放平台 API）")
-
-    try:
-        import feishu_client as _fs
-    except Exception as _e:
-        _fs = None
-        st.warning(f"feishu_client 加载失败：{_e}")
-
-    f_t1, f_t2, f_t3 = st.tabs(["🔌 连接测试", "📁 云盘文件", "🔔 发消息 / 建文档"])
-
-    with f_t1:
-        if st.button("🧪 测试飞书连接", type="primary", use_container_width=True):
-            if _fs:
-                with st.spinner("正在连接飞书..."):
-                    try:
-                        res = _fs.test_connection()
-                        for k, v in res.items():
-                            st.write(f"**{k}**：{v}")
-                    except Exception as e:
-                        st.error(f"连接失败：{e}（检查网络 / App权限 / folder token）")
-            else:
-                st.error("feishu_client 不可用")
-
-    with f_t2:
-        if st.button("📂 拉取云盘文件列表", use_container_width=True):
-            if _fs:
-                with st.spinner("拉取中..."):
-                    try:
-                        data = _fs.list_drive_files()
-                        files = data.get("data", {}).get("files", [])
-                        if data.get("code") != 0:
-                            st.warning(f"飞书返回：{data.get('msg')}")
-                        elif not files:
-                            st.info("云盘根目录暂无文件（或机器人无权访问）")
-                        else:
-                            st.success(f"共 {len(files)} 个文件/文件夹")
-                            st.dataframe([{"名称": f.get("name"), "类型": f.get("type"),
-                                           "token": f.get("token")} for f in files],
-                                         use_container_width=True, hide_index=True)
-                    except Exception as e:
-                        st.error(f"拉取失败：{e}")
-            else:
-                st.error("feishu_client 不可用")
-
-    with f_t3:
-        st.markdown("##### 发送群消息")
-        chat_id = st.text_input("群聊 chat_id", placeholder="oc_xxxxxx（需机器人已在群里）")
-        msg_text = st.text_area("消息内容", placeholder="工作台告警 / 新询盘提醒...")
-        if st.button("📤 发送", use_container_width=True):
-            if not chat_id or not msg_text:
-                st.warning("请填 chat_id 和消息内容")
-            elif _fs:
-                try:
-                    r = _fs.send_text_message(chat_id, msg_text)
-                    if r.get("code") == 0:
-                        st.success("✅ 已发送")
-                    else:
-                        st.warning(f"飞书返回：{r.get('msg')}")
-                except Exception as e:
-                    st.error(f"发送失败：{e}")
-        st.markdown("---")
-        st.markdown("##### 在飞书云盘新建文档")
-        doc_title = st.text_input("文档标题", placeholder="例如：本周询盘周报")
-        doc_body = st.text_area("文档正文", height=100)
-        if st.button("📄 创建飞书文档", use_container_width=True):
-            if not doc_title:
-                st.warning("请填文档标题")
-            elif _fs:
-                try:
-                    r = _fs.create_doc(doc_title, doc_body)
-                    if r.get("code") == 0:
-                        st.success(f"✅ 已创建：{doc_title}")
-                        st.json(r.get("data", {}))
-                    else:
-                        st.warning(f"飞书返回：{r.get('msg')}（可能缺 docx 权限 / folder token）")
-                except Exception as e:
-                    st.error(f"创建失败：{e}")
-
 # ============ 设置中心 ============
 elif page == "⚙️ 设置中心":
     st.markdown("""

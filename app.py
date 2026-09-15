@@ -2542,8 +2542,6 @@ elif page == "📦 产品库":
                         if st.button(f"查看SEO资料", key=f"detail_{product['sku']}", use_container_width=True):
                             st.session_state['selected_product'] = product['sku']
 
-                st.markdown("---")
-
             if len(filtered) > 60:
                 st.info(f"还有 {len(filtered)-60} 个产品，请使用SKU或关键词精确搜索")
 
@@ -4610,14 +4608,14 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "l
     col1, col2 = st.columns(2)
     with col1:
         sku = st.text_input("产品SKU", placeholder="例如：KL-KN-HC-001")
-    category = st.selectbox("产品品类", ["厨房刀具 Kitchen Knives", "户外刀具 Outdoor Knives", "专业剪刀 Professional Scissors", "厨房用品 Kitchen Accessories"])
-    product_type = st.text_input("产品子类型", placeholder="例如：chef knife / hunting knife / kitchen shears")
-    main_material = st.text_input("主要材质", placeholder="例如：Damascus Steel / High Carbon Stainless Steel")
+        category = st.selectbox("产品品类", ["厨房刀具 Kitchen Knives", "户外刀具 Outdoor Knives", "专业剪刀 Professional Scissors", "厨房用品 Kitchen Accessories"])
+        product_type = st.text_input("产品子类型", placeholder="例如：chef knife / hunting knife / kitchen shears")
+        main_material = st.text_input("主要材质", placeholder="例如：Damascus Steel / High Carbon Stainless Steel")
     with col2:
         handle_material = st.text_input("手柄材质", placeholder="例如：Ebony Wood / G10 / Pakkawood")
-    surface_finish = st.text_input("表面工艺", placeholder="例如：Polished / Mirror Finish / Hammered")
-    moq = st.text_input("MOQ起订量", placeholder="例如：100 pieces")
-    blade_length = st.text_input("尺寸/长度", placeholder="例如：8 inch / 20cm")
+        surface_finish = st.text_input("表面工艺", placeholder="例如：Polished / Mirror Finish / Hammered")
+        moq = st.text_input("MOQ起订量", placeholder="例如：100 pieces")
+        blade_length = st.text_input("尺寸/长度", placeholder="例如：8 inch / 20cm")
     
     # 产品图片上传
     st.markdown("### 🖼️ 第二步：上传产品图片（用于以图搜图）")
@@ -5164,8 +5162,8 @@ elif page == "👥 客户管理":
     st.markdown("---")
     if st.button("📥 导出客户数据CSV"):
         export_path = "customers_export.csv"
-    if cm.export_csv(export_path):
-        st.success(f"已导出到 {export_path}")
+        if cm.export_csv(export_path):
+            st.success(f"已导出到 {export_path}")
 
 # ============ 市场与产品分析 ============
 elif page == "📈 市场与产品分析":
@@ -6052,98 +6050,96 @@ elif page == "👥 团队工作空间":
     
     with tab1:
         emails_dir = workspace_base / "generated_emails"
-    emails_dir.mkdir(parents=True, exist_ok=True)
-    email_files = sorted(emails_dir.glob("*.md"), reverse=True)
-    
-    st.caption(f"共 {len(email_files)} 封开发信")
-    if email_files:
-        for ef in email_files[:20]:
-            with st.expander(f"📧 {ef.stem}"):
-                content = ef.read_text(encoding='utf-8')
-            st.markdown(content)
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("📤 推送到公司知识库", key=f"push_email_{ef.name}"):
-                    # 复制到总知识库
-                    target_dir = KB_DIR / "06_营销与客户开发" / "开发信存档"
-                    target_dir.mkdir(parents=True, exist_ok=True)
-                    target_file = target_dir / f"{member['name']}_{ef.name}"
-                    target_file.write_text(content, encoding='utf-8')
-                    st.success(f"已推送到公司知识库：{target_file.name}")
-            with col_b:
-                if st.button("🗑️ 删除", key=f"del_email_{ef.name}"):
-                    ef.unlink()
-                    st.rerun()
-                else:
-                    st.info("还没有生成的开发信，去「开发信生成」页面创建第一封吧！")
-    
+        emails_dir.mkdir(parents=True, exist_ok=True)
+        email_files = sorted(emails_dir.glob("*.md"), reverse=True)
+
+        st.caption(f"共 {len(email_files)} 封开发信")
+        if email_files:
+            for ef in email_files[:20]:
+                with st.expander(f"📧 {ef.stem}"):
+                    content = ef.read_text(encoding='utf-8')
+                    st.markdown(content)
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        if st.button("📤 推送到公司知识库", key=f"push_email_{ef.name}"):
+                            target_dir = KB_DIR / "06_营销与客户开发" / "开发信存档"
+                            target_dir.mkdir(parents=True, exist_ok=True)
+                            target_file = target_dir / f"{member['name']}_{ef.name}"
+                            target_file.write_text(content, encoding='utf-8')
+                            st.success(f"已推送到公司知识库：{target_file.name}")
+                    with col_b:
+                        if st.button("🗑️ 删除", key=f"del_email_{ef.name}"):
+                            ef.unlink()
+                            st.rerun()
+        else:
+            st.info("还没有生成的开发信，去「开发信生成」页面创建第一封吧！")
+
     with tab2:
         notes_dir = workspace_base / "customer_notes"
-    notes_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 新建笔记
-    with st.expander("✏️ 新建客户笔记"):
-        note_title = st.text_input("笔记标题", key="new_note_title")
-    note_content = st.text_area("笔记内容", height=150, key="new_note_content")
-    if st.button("💾 保存笔记", key="save_note"):
-        if note_title:
-            note_file = notes_dir / f"{note_title}_{datetime.now().strftime('%Y%m%d_%H%M')}.md"
-            note_file.write_text(f"# {note_title}\n\n{note_content}\n\n---\n*创建者：{member['name']}*", encoding='utf-8')
-            st.success("笔记已保存！")
-            st.rerun()
-    
-    note_files = sorted(notes_dir.glob("*.md"), reverse=True)
-    st.caption(f"共 {len(note_files)} 条笔记")
-    for nf in note_files[:20]:
-        with st.expander(f"📝 {nf.stem}"):
-            st.markdown(nf.read_text(encoding='utf-8'))
-    
+        notes_dir.mkdir(parents=True, exist_ok=True)
+
+        with st.expander("✏️ 新建客户笔记"):
+            note_title = st.text_input("笔记标题", key="new_note_title")
+            note_content = st.text_area("笔记内容", height=150, key="new_note_content")
+            if st.button("💾 保存笔记", key="save_note"):
+                if note_title:
+                    note_file = notes_dir / f"{note_title}_{datetime.now().strftime('%Y%m%d_%H%M')}.md"
+                    note_file.write_text(f"# {note_title}\n\n{note_content}\n\n---\n*创建者：{member['name']}*", encoding='utf-8')
+                    st.success("笔记已保存！")
+                    st.rerun()
+
+        note_files = sorted(notes_dir.glob("*.md"), reverse=True)
+        st.caption(f"共 {len(note_files)} 条笔记")
+        for nf in note_files[:20]:
+            with st.expander(f"📝 {nf.stem}"):
+                st.markdown(nf.read_text(encoding='utf-8'))
+
     with tab3:
         reports_dir = workspace_base / "reports"
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    report_files = sorted(reports_dir.glob("*.md"), reverse=True)
-    
-    st.caption(f"共 {len(report_files)} 份背调报告")
-    if report_files:
-        for rf in report_files[:20]:
-            with st.expander(f"📊 {rf.stem}"):
-                st.markdown(rf.read_text(encoding='utf-8'))
-    else:
-        st.info("还没有背调报告，去「客户背调」页面做第一份吧！")
-    
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        report_files = sorted(reports_dir.glob("*.md"), reverse=True)
+
+        st.caption(f"共 {len(report_files)} 份背调报告")
+        if report_files:
+            for rf in report_files[:20]:
+                with st.expander(f"📊 {rf.stem}"):
+                    st.markdown(rf.read_text(encoding='utf-8'))
+        else:
+            st.info("还没有背调报告，去「客户背调」页面做第一份吧！")
+
     with tab4:
         st.markdown("### 📤 工作空间内容整合到公司知识库")
-    st.info("""
-    **工作原理**：
-    1. 每位成员在自己的工作空间生成开发信、笔记、报告
-    2. 点击"推送到公司知识库"后，内容会复制到总知识库对应分类
-    3. 所有成员共享总知识库，搜索时能找到所有人的优质内容
-    4. 总知识库是公司资产，个人工作空间是个人草稿
-    
-    **推送规则**：
-    - 开发信 → `06_营销与客户开发/开发信存档/`
-    - 客户笔记 → `06_营销与客户开发/客户笔记/`
-    - 背调报告 → `06_营销与客户开发/背调报告/`
-    """)
-    
+        st.info("""
+        **工作原理**：
+        1. 每位成员在自己的工作空间生成开发信、笔记、报告
+        2. 点击"推送到公司知识库"后，内容会复制到总知识库对应分类
+        3. 所有成员共享总知识库，搜索时能找到所有人的优质内容
+        4. 总知识库是公司资产，个人工作空间是个人草稿
+
+        **推送规则**：
+        - 开发信 → `06_营销与客户开发/开发信存档/`
+        - 客户笔记 → `06_营销与客户开发/客户笔记/`
+        - 背调报告 → `06_营销与客户开发/背调报告/`
+        """)
+
     # 统计各成员工作空间内容
     st.markdown("---")
     st.subheader("📊 团队工作空间统计")
     for mk, m in TEAM_MEMBERS.items():
         wd = Path(__file__).parent / "data" / m['workspace_dir']
-    email_count = len(list((wd / "generated_emails").glob("*.md"))) if (wd / "generated_emails").exists() else 0
-    note_count = len(list((wd / "customer_notes").glob("*.md"))) if (wd / "customer_notes").exists() else 0
-    report_count = len(list((wd / "reports").glob("*.md"))) if (wd / "reports").exists() else 0
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f"**{m['name']}** ({m['category']})")
-    with col2:
-        st.metric("开发信", email_count)
-    with col3:
-        st.metric("笔记", note_count)
-    with col4:
-        st.metric("报告", report_count)
+        email_count = len(list((wd / "generated_emails").glob("*.md"))) if (wd / "generated_emails").exists() else 0
+        note_count = len(list((wd / "customer_notes").glob("*.md"))) if (wd / "customer_notes").exists() else 0
+        report_count = len(list((wd / "reports").glob("*.md"))) if (wd / "reports").exists() else 0
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.markdown(f"**{m['name']}** ({m['category']})")
+        with col2:
+            st.metric("开发信", email_count)
+        with col3:
+            st.metric("笔记", note_count)
+        with col4:
+            st.metric("报告", report_count)
     
     st.markdown("---")
     st.caption(f"当前工作空间路径：{workspace_base}")
@@ -6164,7 +6160,7 @@ elif page == "🤖 模型管理":
         st.metric("本地模型", stats['local'])
     with col4:
         active = get_active_provider()
-    st.metric("当前使用", active['name'] if active else "未设置")
+        st.metric("当前使用", active['name'] if active else "未设置")
     
     st.markdown("---")
     

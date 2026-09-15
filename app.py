@@ -6748,7 +6748,7 @@ elif page == "🧾 订单台账":
     </div>
     """, unsafe_allow_html=True)
 
-    oa, ob, oc, od, oe = st.tabs(["🧾 销售订单", "🏭 采购/工厂", "💰 收付款流水", "📊 经营看板", "📄 报价单/PI"])
+    oa, ob, oc, od, oe, of = st.tabs(["🧾 销售订单", "🏭 采购/工厂", "💰 收付款流水", "📊 经营看板", "📄 报价单/PI", "💰 定价测算"])
 
     # ---- 销售订单 ----
     with oa:
@@ -7156,7 +7156,77 @@ Price Term: {incoterm}
             st.download_button("🖨️ 打印版（HTML，打开后 Ctrl+P 存 PDF）",
                                _full_html, f"Docs_{so['order_no']}.html", "text/html",
                                use_container_width=True, type="primary")
-    
+
+    with of:
+        st.subheader("💰 定价敏感度测算")
+        st.caption("借鉴Pricing Analyst方法论：±20%价格变动对利润的影响，帮你找到最优定价点")
+        with st.form("pricing_form"):
+            c1, c2 = st.columns(2)
+            with c1:
+                prd_name = st.text_input("产品名称 *", placeholder="如：8寸厨师刀")
+                unit_cost = st.number_input("单位成本（人民币元）*", min_value=0.0, step=1.0, value=35.0)
+                sell_price = st.number_input("当前售价（美元/个）*", min_value=0.0, step=0.1, value=5.5)
+            with c2:
+                est_qty = st.number_input("预计月销量（个）", min_value=0, step=100, value=1000)
+                exchange_rate = st.number_input("美元汇率", min_value=0.0, step=0.01, value=7.2)
+                other_cost = st.number_input("其他费用占比（%，平台/物流/退款等）", min_value=0.0, max_value=100.0, step=1.0, value=15.0)
+            pr_submit = st.form_submit_button("📊 计算定价敏感度", type="primary", use_container_width=True)
+
+        if pr_submit and prd_name and unit_cost > 0 and sell_price > 0:
+            # 计算不同价格下的利润
+            results = []
+            for pct in [-20, -10, -5, 0, 5, 10, 20]:
+                price = sell_price * (1 + pct / 100)
+                # 成本换算成美元
+                cost_usd = unit_cost / exchange_rate
+                other_cost_usd = price * other_cost / 100
+                profit_per_unit = price - cost_usd - other_cost_usd
+                total_profit = profit_per_unit * est_qty
+                results.append({
+                    "价格变动": f"{pct:+d}%" if pct != 0 else "基准价",
+                    "单价(USD)": round(price, 2),
+                    "单位成本(USD)": round(cost_usd, 2),
+                    "其他费用(USD)": round(other_cost_usd, 2),
+                    "单位利润(USD)": round(profit_per_unit, 2),
+                    "月总利润(USD)": round(total_profit, 0),
+                })
+            st.markdown("### 定价敏感度分析表")
+            st.dataframe(results, use_container_width=True, hide_index=True)
+
+            # 最优价格建议
+            best = max(results, key=lambda x: x["月总利润(USD)"])
+            st.markdown("---")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("当前月利润", f"${results[3]['月总利润(USD)']:,.0f}")
+            c2.metric("最优价格点", f"${best['单价(USD)']}")
+            c3.metric("最优月利润", f"${best['月总利润(USD)']:,.0f}")
+
+            # AI定价建议
+            st.markdown("---")
+            st.markdown("### AI定价建议")
+            with st.spinner("AI分析定价策略中..."):
+                try:
+                    prompt = f"""你是B2B外贸定价分析师（借鉴Pricing Agent方法论）。
+产品：{prd_name}
+单位成本：{unit_cost}元人民币 = {unit_cost/exchange_rate:.2f}美元
+当前售价：{sell_price}美元/个
+预计月销量：{est_qty}个
+汇率：1美元={exchange_rate}人民币
+其他费用占比：{other_cost}%
+
+不同价格下的利润：
+{results}
+
+请输出（中文，300字内）：
+1. 当前定价是否合理？偏高还是偏低？
+2. 提价/降价的利弊（提价影响销量？降价抢市场？）
+3. 建议的最优价格区间
+4. 如果客户压价，最低能接受的价格是多少？（保住多少利润率？）
+"""
+                    st.markdown(ai.chat(prompt))
+                except Exception as e:
+                    st.error(f"AI错误：{e}")
+
 # ============ 页面：博客SEO工作台 ============
 elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "blog":
     if st.button("← 返回SEO中心", key="back_seo_center_3"):

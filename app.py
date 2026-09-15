@@ -4298,6 +4298,7 @@ elif page == "🤖 锴利自研AI工具库":
                         final_prompt = f"Create a realistic commercial product photograph.\nScene: {result.get('scene','')}\nAction: {result.get('action','')}\nInteraction: {result.get('interaction','')}\nKeywords: {', '.join(kw)}\nComposition: {result.get('composition','rule of thirds')}\nLighting: {result.get('lighting','natural light')}\nMood: {result.get('mood','premium lifestyle')}\nStyle: {style_tags}\nProduct: keep uploaded product 100% identical.\n{ratio_flag}"
                         st.markdown("**最终Prompt：**")
                         st.code(final_prompt, language='text', height=250)
+                        save_to_kb_button(final_prompt, "场景反推", f"场景反推_{datetime.now().strftime('%Y%m%d_%H%M')}")
                         # 复制按钮
                         copy_btn_key = "sr_copy_" + str(global_idx) if 'global_idx' in dir() else "sr_copy_main"
                         if st.button("📋 复制当前Prompt", key=copy_btn_key, use_container_width=True, type="primary"):

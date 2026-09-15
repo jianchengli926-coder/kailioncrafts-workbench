@@ -5595,7 +5595,7 @@ elif page == "📊 订单台账":
     </div>
     """, unsafe_allow_html=True)
 
-    oa, ob, oc, od = st.tabs(["🧾 销售订单", "🏭 采购/工厂", "💰 收付款流水", "📊 经营看板"])
+    oa, ob, oc, od, oe = st.tabs(["🧾 销售订单", "🏭 采购/工厂", "💰 收付款流水", "📊 经营看板", "📄 报价单/PI"])
 
     # ---- 销售订单 ----
     with oa:
@@ -5755,6 +5755,49 @@ elif page == "📊 订单台账":
         pay_df = pd.DataFrame(fdb.list_payments())
         exp3.download_button("导出收付款CSV", pay_df.to_csv(index=False).encode("utf-8-sig"),
                             "payments.csv", "text/csv", use_container_width=True)
+
+    # ---- 报价单/PI ----
+    with oe:
+        sales = fdb.list_sales_orders()
+        if not sales:
+            st.info("先在「销售订单」建一笔，再来生成报价单/PI")
+        else:
+            pick_no = st.selectbox("选择销售订单", [o["order_no"] for o in sales])
+            so = next((o for o in sales if o["order_no"] == pick_no), sales[0])
+            i1, i2, i3 = st.columns(3)
+            buyer = i1.text_input("客户抬头", so.get("customer", ""))
+            incoterm = i2.selectbox("贸易条款", ["FOB", "CIF", "EXW", "CFR", "DDP"])
+            pay_terms = i3.selectbox("付款条款", ["30% deposit + 70% before shipment", "T/T 100% in advance",
+                                                  "30% deposit + 70% against B/L copy", "L/C at sight"])
+            d1, d2, d3 = st.columns(3)
+            unit_price = d1.number_input("单价", min_value=0.0, value=float(so["total_amount"]/so["qty"]) if so["qty"] else float(so["total_amount"]))
+            qty_in = d2.number_input("数量", min_value=0, value=int(so["qty"] or 0))
+            cur = d3.selectbox("币种", ["USD", "EUR", "GBP", "CNY"], key="pi_curr")
+            today_str = datetime.now().strftime("%b %d, %Y")
+            total = unit_price * qty_in
+            pi_text = f"""PROFORMA INVOICE
+{'='*46}
+Invoice No: {so['order_no']}
+Date: {today_str}
+
+Seller: KAILIONCRAFTS
+        Yangjiang, Guangdong, China
+Buyer:  {buyer}
+
+{'Item':<20}{'Qty':>8}{'Unit Price':>14}{'Amount':>14}
+{'-'*56}
+{so['product_summary']:<20}{qty_in:>8}{unit_price:>12,.2f}{total:>14,.2f}
+{'-'*56}
+{'TOTAL':<42}{total:>14,.2f}  {cur}
+
+Price Term: {incoterm}
+Payment: {pay_terms}
+Delivery:   {so.get('delivery_date') or 'To be confirmed'}
+
+Thank you for your business!
+"""
+            st.text(pi_text)
+            st.download_button("⬇️ 下载PI(.txt)", pi_text, f"PI_{so['order_no']}.txt", "text/plain", use_container_width=True)
     
 # ============ 页面：博客SEO工作台 ============
 elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "blog":

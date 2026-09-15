@@ -62,6 +62,24 @@ def two_step_delete(btn_label, key, danger="此操作不可恢复"):
     return False
 
 
+def show_kb_connections(feature_name, kb_list, output_folder=None):
+    """
+    通用功能：显示本功能连接的知识库
+    feature_name: 功能名称
+    kb_list: 知识库列表 [(名称, 描述), ...]
+    output_folder: 生成内容保存的文件夹（可选）
+    """
+    with st.expander(f"🔗 {feature_name} · 连接的知识库", expanded=False):
+        st.markdown("**自动读取以下知识库内容：**")
+        for name, desc in kb_list:
+            st.markdown(f"- 📘 **{name}** — {desc}")
+        if output_folder:
+            out_path = Path(f"data/kb_output/{output_folder}")
+            out_path.mkdir(parents=True, exist_ok=True)
+            file_count = len(list(out_path.glob("*")))
+            st.markdown(f"**📂 生成内容保存到：** `data/kb_output/{output_folder}/`（当前 {file_count} 个文件）")
+
+
 # ============ 通用：我的语气档案（蒸馏作者风格） ============
 VOICE_FILE = Path("data/voice_profile.json")
 def _load_voice():
@@ -1273,6 +1291,13 @@ elif page == "👥 客户中心":
                     except Exception as e:
                         st.error(f"AI错误：{e}")
 
+        show_kb_connections("客户分析", [
+            ("公司简介与创始人", "KaiLionCrafts介绍、阳江产业带、创始人背景"),
+            ("产品知识库", "四大品类SKU、产品参数、卖点"),
+            ("客户痛点库", "Why Global Buyers Choose KaiLionCrafts"),
+            ("展会知识库", "行业展会、市场活动"),
+        ], output_folder="客户开发")
+
     elif cc_current == "✉️ 客户开发":
         cc_p1, cc_d1, cc_d2, cc_seq, cc_g1, cc_find = st.tabs(
             ["🎯 个性化开发信(网址+案例)", "✉️ 新开发信", "🔄 多轮跟进", "📋 邮件序列设计", "🎯 业绩目标", "🔍 找客户关键词"])
@@ -1721,6 +1746,14 @@ EN: ...
                         except Exception as e:
                             st.error(f"AI错误：{e}")
 
+        show_kb_connections("客户开发", [
+            ("外贸邮件回复与表达库", "开发信模板、跟进话术、邮件表达"),
+            ("客户痛点库", "Why Global Buyers Choose KaiLionCrafts"),
+            ("产品知识库", "四大品类SKU、产品参数、卖点"),
+            ("FAQ客户问答库", "客户常见问题、标准回复"),
+            ("市场策略", "市场主攻策略、目标市场"),
+        ], output_folder="客户开发")
+
     elif cc_current == "💬 客户问答":
         cc_q1, cc_q2 = st.tabs(["💬 智能回复", "🗣️ 沟通话术与文化禁忌"])
         with cc_q1:
@@ -1765,6 +1798,13 @@ EN: ...
                         st.markdown(ai.chat(prompt))
                     except Exception as e:
                         st.error(f"AI错误：{e}")
+
+        show_kb_connections("客户问答", [
+            ("FAQ客户问答库", "客户常见问题、标准回复"),
+            ("客服问答与翻译知识库", "客户问答、翻译参考"),
+            ("产品知识库", "四大品类SKU、产品参数、卖点"),
+            ("外贸邮件回复与表达库", "邮件回复模板"),
+        ], output_folder="客户管理")
 
     elif cc_current == "📊 客户管理":
         st.caption("借鉴GlobalDesk思路：数据总览 · 客户列表 · 看板开发进度 · 待办提醒 · 新增客户")
@@ -2795,6 +2835,13 @@ elif page == "📦 产品库":
                 if st.button("关闭详情", key=f"close_{product['sku']}"):
                     del st.session_state['selected_product']
                     st.rerun()
+
+    show_kb_connections("产品库", [
+        ("产品知识库", "四大品类SKU、产品规格参数库、术语库"),
+        ("SKU产品与SEO知识库", "200条SKU数据、SEO关键词"),
+        ("产品图片与SEO知识库", "127个产品图片、卖点提炼"),
+        ("公司简介与创始人", "KaiLionCrafts介绍、品牌故事"),
+    ], output_folder="产品分析")
 
 # ============ 锴利自研AI工具库页面 ============
 elif page == "🤖 锴利自研AI工具库":
@@ -5347,6 +5394,12 @@ elif page == "👥 客户管理":
         if cm.export_csv(export_path):
             st.success(f"已导出到 {export_path}")
 
+    show_kb_connections("客户管理（CRM）", [
+        ("客户痛点库", "Why Global Buyers Choose KaiLionCrafts"),
+        ("市场策略", "市场主攻策略、目标市场分级"),
+        ("产品知识库", "四大品类SKU、产品参数"),
+    ], output_folder="客户管理")
+
 # ============ 市场与产品分析 ============
 elif page == "📈 市场与产品分析":
     st.markdown("""
@@ -5516,6 +5569,13 @@ elif page == "📈 市场与产品分析":
                     except Exception as e:
                         st.error(f"预览失败：{e}（文件较大，可直接双击路径用浏览器打开）")
 
+        show_kb_connections("市场分析", [
+            ("市场策略", "市场主攻策略、目标市场分析"),
+            ("阳江刀剪产业带", "产业带知识、供应链优势"),
+            ("行业知识与培训", "五金刀剪行业知识、趋势"),
+            ("外贸学习与客户开发技巧", "市场分析方法、客户洞察"),
+        ], output_folder="市场分析")
+
     elif mp_current == "📦 产品分析":
         st.subheader("📦 产品分析")
         p1, p2, p3 = st.tabs(["📋 Listing诊断", "✍️ 文案生成", "🔍 竞品对比"])
@@ -5649,6 +5709,13 @@ elif page == "📈 市场与产品分析":
                 except Exception as e:
                     st.error(f"AI错误：{e}")
 
+        show_kb_connections("产品分析", [
+            ("产品知识库", "四大品类SKU、产品规格参数库、术语库"),
+            ("SKU产品与SEO知识库", "SKU数据、SEO关键词"),
+            ("产品图片与SEO知识库", "产品图片、卖点提炼"),
+            ("客户痛点库", "客户痛点、竞品差评分析"),
+        ], output_folder="产品分析")
+
     elif mp_current == "📈 广告分析":
         st.subheader("📈 广告分析")
         st.caption("上传Amazon广告报告 → AI分析产品角色 + 否定词建议")
@@ -5732,6 +5799,12 @@ ACOS: {ad_acos}%
                 except Exception as e:
                     st.error(f"解析失败：{e}")
 
+        show_kb_connections("广告分析", [
+            ("产品知识库", "四大品类SKU、产品参数、卖点"),
+            ("市场策略", "目标市场、竞品分析"),
+            ("独立站与SEO", "关键词研究、广告优化"),
+        ], output_folder="广告分析")
+
     elif mp_current == "🎨 视觉内容":
         st.subheader("🎨 视觉内容")
         st.caption("对标 amazon-listing-image-workflow / kailioncrafts-image-seo / amazon-aplus-image-workflow")
@@ -5788,6 +5861,12 @@ ACOS: {ad_acos}%
 中文输出。"""
                     result = ai.chat(prompt)
                 st.markdown(result)
+
+    show_kb_connections("视觉内容", [
+        ("产品知识库", "四大品类SKU、产品卖点、规格参数"),
+        ("产品图片与SEO知识库", "产品图片参考、视觉风格"),
+        ("独立站与SEO", "图片SEO、ALT标签、A+页面规范"),
+    ], output_folder="视觉内容")
 
 # ============ 公司知识库（含竞品与资源库） ============
 elif page == "📚 公司知识库":

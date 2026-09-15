@@ -4368,25 +4368,24 @@ elif page == "🌍 市场与产品分析":
         p1, p2, p3 = st.tabs(["📋 Listing诊断", "✍️ 文案生成", "🔍 竞品对比"])
         with p1:
             st.markdown("##### Listing健康度诊断")
+            st.caption("对标 amazon-listing-health-diagnostic：基线→生命周期/资产保护→关键词与竞品→评论内容属性→问题与修改边界")
             asin = st.text_input("输入ASIN或产品SKU", placeholder="B0XXXXXX 或 KL-KN-HM-003")
             if st.button("🔍 AI诊断", use_container_width=True, type="primary"):
                 if asin:
                     with st.spinner("AI正在诊断Listing..."):
-                        prompt = f"""# Amazon Listing 诊断任务
-
-请基于以下产品信息，诊断这个Listing的健康度，给出1-100分评分和改进建议：
+                        prompt = f"""# Amazon Listing 健康诊断（对标 amazon-listing-health-diagnostic）
 
 产品标识: {asin}
+公司背景: {kb.get_company_brief()[:500]}
 
-请从以下维度分析：
-1. 标题质量（关键词覆盖、长度、可读性）
-2. 五点描述（卖点突出、关键词、长度）
-3. 产品描述（SEO友好度、信息完整度）
-4. 图片建议（主图、副图数量）
-5. 定价建议
-6. 竞品差异
-
-输出格式：总分 + 各维度得分 + 具体改进建议（中文，B2B视角）。"""
+请按固定流程输出中文诊断报告（缺实际数据就标'需核'，不要编造）：
+1. 建立当前基线：标题/五点/描述/图片/A+/评分评论数现状概览
+2. 生命周期与资产保护：判断是新品/成长期/成熟期/衰退期；哪些关键词/排名是必须保护、不能改坏的资产
+3. 关键词与竞品：核心词覆盖是否到位、和头部竞品的关键词差距
+4. 评论/内容/属性：买家顾虑（FAQ）、属性是否完整、图片是否达标
+5. 问题清单与修改边界：按严重度列出问题，标注哪些"现在能改"、哪些"要谨慎/不能动"
+6. 总分（1-100）+ 各维度得分 + 优先级排序的改进建议
+中文，B2B刀剪视角。"""
                         result = ai.chat(prompt)
                     st.markdown(result)
                 else:
@@ -4403,24 +4402,22 @@ elif page == "🌍 市场与产品分析":
                 p_style = st.selectbox("文案风格", ["B2B批发专业风", "Amazon零售风", "独立站品牌风"])
             if st.button("✍️ 生成Listing文案", use_container_width=True, type="primary"):
                 with st.spinner("AI正在生成..."):
-                    prompt = f"""# 产品Listing文案生成
-
-请根据以下信息生成完整的Amazon Listing文案：
+                    prompt = f"""# 产品Listing文案生成（对标 amazon-listing-optimizer）
 
 产品名称: {p_name}
 品类: {p_cat}
 卖点: {p_features}
 目标市场: {p_target}
 风格: {p_style}
-
 公司背景: {kb.get_company_brief()[:500]}
 
-请输出：
-1. SEO标题（含核心关键词）
-2. 五点描述（5条bullet points）
-3. 产品描述（200词）
-4. 焦点关键词建议（5个）
-全部英文，B2B专业风格。"""
+请输出（英文，B2B专业风，可直接上架）：
+1. SEO标题：≤200字符，前80字符放核心词，含品牌词，无促销词
+2. 五点描述：5条，每条小标题大写+卖点，融入1-2个关键词，突出HRC/材质/适用场景
+3. 产品描述：200词，讲清楚工厂背书+使用场景+售后
+4. 焦点关键词：5个（含1个B2B批发词）
+5. 后台Search Terms：200字节以内，无重复词
+遵循可售事实，不编造型号参数。"""
                     result = ai.chat(prompt)
                 st.markdown(result)
         with p3:
@@ -4455,37 +4452,82 @@ elif page == "🌍 市场与产品分析":
         a1, a2 = st.tabs(["🎯 广告策略", "🔧 广告调优"])
         with a1:
             st.markdown("##### 广告产品角色判断")
+            st.caption("对标 amazon-ad-strategy-commander：增长/验证/控费/保护/退出 五种打法")
             col1, col2 = st.columns(2)
             with col1:
                 ad_sku = st.text_input("产品SKU", key="ad_sku")
                 ad_spend = st.number_input("日均广告花费($)", min_value=0, value=50)
+                ad_orders = st.number_input("日均广告订单", min_value=0, value=3)
             with col2:
                 ad_sales = st.number_input("日均广告销售额($)", min_value=0, value=200)
-                ad_acos = st.number_input("ACOS(%)", min_value=0, max_value=100, value=35)
+                ad_acos = st.number_input("ACOS(%)", min_value=0, max_value=200, value=35)
             if st.button("🎯 AI判断产品角色", use_container_width=True, type="primary"):
                 with st.spinner("分析中..."):
-                    prompt = f"""# Amazon广告产品角色分析
+                    prompt = f"""# Amazon广告产品角色与打法（对标 ad-strategy-commander）
 
 产品SKU: {ad_sku}
 日均花费: ${ad_spend}
-日均销售: ${ad_sales}
+日均订单: {ad_orders}
+日均广告销售: ${ad_sales}
 ACOS: {ad_acos}%
 
-请判断这个产品在广告结构中的角色：
-1. 防御型（高ACOS，保护品牌词）
-2. 进攻型（低ACOS，抢竞品词）
-3. 收割型（精准转化，利润款）
-4. 测款型（高花费低转化，测试中）
+请判断这个产品当前在广告结构中的角色（5选1或组合）：
+- 增长型：转化好，应加预算抢量
+- 验证型：新品测款，数据不足继续观察
+- 控费型：ACOS偏高，需缩词/降出价
+- 保护型：守品牌词/自有ASIN，防止竞品占位
+- 退出型：长期无转化，建议停投
 
-给出判断 + 优化建议。中文输出。"""
+输出：角色判断 + 当前ACoS健康度 + 具体打法（加/减预算、抢哪些词、否定哪些词）+ 下一步3条动作。中文。"""
                     result = ai.chat(prompt)
                 st.markdown(result)
         with a2:
-            st.markdown("##### 搜索词报告分析")
-            st.info("上传Amazon搜索词报告CSV后，AI自动分析：高转化词加价 + 无效词否定")
-            uploaded_ad = st.file_uploader("上传搜索词报告", type=['csv'], key="ad_report")
+            st.markdown("##### 搜索词报告分析（CSV）")
+            st.caption("上传 Amazon 搜索词报告，自动统计：高转化词建议加价、零转化词建议否定")
+            uploaded_ad = st.file_uploader("上传搜索词报告CSV", type=['csv'], key="ad_report")
             if uploaded_ad:
-                st.success("文件已上传，AI分析功能开发中（当前版本仅支持手动输入）")
+                try:
+                    df = pd.read_csv(uploaded_ad)
+                    st.caption(f"已读取 {len(df)} 行，列：{', '.join(df.columns[:12])}")
+                    cols = {c.lower(): c for c in df.columns}
+                    def pick(*names):
+                        for n in names:
+                            for low, orig in cols.items():
+                                if n in low:
+                                    return orig
+                        return None
+                    kw_col = pick("customer search term", "search term", "搜索词", "keyword")
+                    clk_col = pick("clicks", "点击")
+                    ord_col = pick("orders", "orders placed", "订单", "conversions")
+                    cost_col = pick("cost", "spend", "花费", "广告花费")
+                    sales_col = pick("sales", "7 day total sales", "销售额")
+                    if kw_col:
+                        agg = {kw_col: "count"}
+                        if clk_col: agg[clk_col] = "sum"
+                        if ord_col: agg[ord_col] = "sum"
+                        if cost_col: agg[cost_col] = "sum"
+                        if sales_col: agg[sales_col] = "sum"
+                        g = df.groupby(kw_col).agg(agg).reset_index()
+                        if ord_col:
+                            g = g.sort_values(ord_col, ascending=False)
+                        st.success(f"共 {len(g)} 个独立搜索词")
+                        st.markdown("##### ✅ 高转化词（建议加价/转精准）")
+                        if ord_col:
+                            top = g[g[ord_col] > 0].head(15)
+                            st.dataframe(top, use_container_width=True)
+                        st.markdown("##### ❌ 零转化高花费词（建议否定）")
+                        if ord_col and cost_col:
+                            neg = g[(g[ord_col] == 0) & (g[cost_col] > 0)].sort_values(cost_col, ascending=False).head(15)
+                            st.dataframe(neg, use_container_width=True)
+                            if len(neg) > 0:
+                                st.code("请把以下词加入否定精确/词组：\n" + "\n".join(neg[kw_col].astype(str).tolist()))
+                        else:
+                            st.info("该报告缺少订单/花费列，无法判断，仅展示原始数据")
+                            st.dataframe(g.head(20), use_container_width=True)
+                    else:
+                        st.warning("未识别到搜索词列，请确认是亚马逊搜索词报告")
+                except Exception as e:
+                    st.error(f"解析失败：{e}")
 
     elif mp_current == "🎨 视觉内容":
         st.subheader("🎨 视觉内容")

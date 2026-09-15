@@ -6532,7 +6532,7 @@ elif page == "🌍 海外社媒矩阵":
     </div>
     """, unsafe_allow_html=True)
 
-    t1, t2, t3 = st.tabs(["📊 驾驶舱", "👥 账号矩阵", "🎬 内容台账"])
+    t1, t2, t3, t4 = st.tabs(["📊 驾驶舱", "👥 账号矩阵", "🎬 内容台账", "📅 LinkedIn内容日历"])
 
     with t1:
         s, by_cat = sdb.dashboard()
@@ -6736,6 +6736,70 @@ elif page == "🌍 海外社媒矩阵":
                 st.caption(f"互动率 {rate}% · 点击率 {cr}% · 询盘转化率 {ir}% · 更新 {c.get('updated_at','')}")
                 if two_step_delete("🗑 删除此内容", f"del_{c['id']}", "删除这条社媒内容记录，不可恢复") == "yes":
                     sdb.delete_content(c["id"]); st.rerun()
+
+    with t4:
+        st.subheader("📅 LinkedIn B2B内容日历")
+        st.caption("借鉴linkedin-content-creator方法论：每周3篇（公司动态/行业洞察/客户案例），不是随便发")
+        with st.form("linkedin_calendar_form"):
+            c1, c2 = st.columns(2)
+            with c1:
+                lc_product = st.selectbox("本周主推产品", ["厨房刀具", "专业剪刀", "户外刀具", "厨房用品"], key="lc_product")
+                lc_audience = st.selectbox("目标受众", ["进口商/分销商", "品牌商/私有标签", "Amazon卖家", "批发商"], key="lc_audience")
+            with c2:
+                lc_market = st.text_input("目标市场", value="美国/欧洲", key="lc_market")
+                lc_week = st.date_input("本周起始日期", key="lc_week")
+            lc_submit = st.form_submit_button("📅 生成本周LinkedIn内容日历", type="primary", use_container_width=True)
+
+        if lc_submit:
+            with st.spinner("AI生成本周内容日历..."):
+                try:
+                    prompt = f"""你是B2B LinkedIn内容策略专家（借鉴linkedin-content-creator方法论）。
+我方：{kb.get_company_brief()}
+本周主推产品：{lc_product}
+目标受众：{lc_audience}
+目标市场：{lc_market}
+本周起始日期：{lc_week}
+
+请设计本周LinkedIn内容日历（3篇/周，周二/周四/周六各一篇）：
+
+## 内容类型分配
+- 第1篇（周二）：🏭 公司动态 / 工厂实力展示
+- 第2篇（周四）：📊 行业洞察 / 专业知识分享
+- 第3篇（周六）：🤝 客户案例 / 社会证明
+
+## 每篇内容格式
+### 第1篇（周二 · 公司动态）
+- 标题：...
+- 正文要点（3-5条，英文）：...
+- CTA：...
+- 建议发布时间：...
+- Hashtags：#xxx #xxx
+
+### 第2篇（周四 · 行业洞察）
+- 标题：...
+- 正文要点：...
+- CTA：...
+- 建议发布时间：...
+- Hashtags：...
+
+### 第3篇（周六 · 客户案例）
+- 标题：...
+- 正文要点：...
+- CTA：...
+- 建议发布时间：...
+- Hashtags：...
+
+## 关键规则
+- LinkedIn B2B不要C端娱乐内容，要专业、有价值
+- 每篇不超过150字（LinkedIn最佳长度）
+- CTA必须具体（不是"联系我们"，而是"DM me for a quote / Comment 'YES' to get the catalog"）
+- 结合{lc_product}和{lc_audience}的痛点
+- 语气：专业但不生硬，像一个行业老兵在分享经验
+"""
+                    result = ai.chat(prompt)
+                    st.markdown(result)
+                except Exception as e:
+                    st.error(f"AI错误：{e}")
 
 elif page == "🧾 订单台账":
     import finance_db as fdb

@@ -4231,18 +4231,114 @@ elif page == "🌍 市场与产品分析":
     st.markdown("---")
 
     if mp_current == "📊 市场分析":
-        st.subheader("目标市场入市分析")
-        st.caption("入市作战地图：认证、关税、关键词、竞争格局、行动路线")
-        col1, col2 = st.columns(2)
-        with col1:
-            target_market = st.selectbox("目标市场", ["美国 (USA)", "德国 (Germany)", "英国 (UK)", "日本 (Japan)", "澳大利亚 (Australia)", "加拿大 (Canada)", "其他"])
-        with col2:
-            product_category = st.selectbox("产品品类", COMPANY["categories"])
-        if st.button("🔬 AI生成入市分析", use_container_width=True, type="primary"):
-            with st.spinner("AI分析中..."):
-                prompt = MARKET_ANALYSIS_PROMPT.format(target_market=target_market, product_category=product_category, company_profile=kb.get_company_brief())
-                result = ai.chat(prompt)
-                st.markdown(result)
+        st.subheader("📊 市场分析")
+        st.caption("蓝海选品 · VOC客户之声 · 关键词挖掘 · 目标市场入市分析")
+        m1, m2, m3, m4 = st.tabs(["🗺️ 入市分析", "🌊 蓝海选品", "💬 VOC客户之声", "🔑 关键词挖掘"])
+
+        with m1:
+            st.markdown("##### 目标市场入市分析")
+            st.caption("入市作战地图：认证、关税、关键词、竞争格局、行动路线")
+            col1, col2 = st.columns(2)
+            with col1:
+                target_market = st.selectbox("目标市场", ["美国 (USA)", "德国 (Germany)", "英国 (UK)", "日本 (Japan)", "澳大利亚 (Australia)", "加拿大 (Canada)", "其他"])
+            with col2:
+                product_category = st.selectbox("产品品类", COMPANY["categories"], key="mp_entry_cat")
+            if st.button("🔬 AI生成入市分析", use_container_width=True, type="primary"):
+                with st.spinner("AI分析中..."):
+                    prompt = MARKET_ANALYSIS_PROMPT.format(target_market=target_market, product_category=product_category, company_profile=kb.get_company_brief())
+                    result = ai.chat(prompt)
+                    st.markdown(result)
+
+        with m2:
+            st.markdown("##### 🌊 蓝海选品分析")
+            st.caption("选一个品类+目标市场，AI评估市场规模、竞争度、价格带与进入机会")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                bs_cat = st.selectbox("产品品类", COMPANY["categories"], key="bs_cat")
+            with col2:
+                bs_market = st.selectbox("目标市场", ["美国", "欧洲", "日本", "东南亚", "中东", "拉美"], key="bs_market")
+            with col3:
+                bs_price = st.selectbox("目标价格带", ["<$5", "$5-20", "$20-50", "$50-100", ">$100"], key="bs_price")
+            bs_extra = st.text_input("补充想法（可选）", placeholder="例如：带包装/可激光刻字/套装", key="bs_extra")
+            if st.button("🌊 AI蓝海选品分析", use_container_width=True, type="primary"):
+                with st.spinner("AI分析蓝海机会..."):
+                    prompt = f"""# 刀剪五金品类 · 蓝海选品分析任务
+
+你是阳江刀剪产业带资深B2B选品顾问。请针对以下机会点做蓝海评估：
+
+- 品类：{bs_cat}
+- 目标市场：{bs_market}
+- 目标价格带：{bs_price}
+- 补充：{bs_extra or '无'}
+
+公司背景：{kb.get_company_brief()[:600]}
+
+请输出（中文，结构化）：
+1. 【市场规模与趋势】该品类在目标市场的大致容量、增长方向
+2. 【竞争格局】头部是谁、是否红海、差异化空档在哪
+3. 【价格带分析】{bs_price} 这个价格带利润与竞争如何
+4. 【客户痛点】买家/终端最不满意现有产品的3个点（VOC视角）
+5. 【3个具体选品建议】每个建议给：产品形态+卖点+定价区间+为什么是蓝海
+6. 【风险与建议】认证/供应链/库存风险
+要务实，不要堆术语。"""
+                    result = ai.chat(prompt)
+                    st.markdown(result)
+
+        with m3:
+            st.markdown("##### 💬 VOC 客户之声分析")
+            st.caption("输入产品或竞品，AI提炼客户评价里的好评/差评关键词与改进方向")
+            col1, col2 = st.columns(2)
+            with col1:
+                voc_product = st.text_input("产品/品类", placeholder="例如：8寸主厨刀 / 厨房剪刀", key="voc_product")
+            with col2:
+                voc_source = st.selectbox("评价来源（可选）", ["亚马逊", "独立站评论", "速卖通", "综合"], key="voc_source")
+            voc_review = st.text_area("粘贴客户评价/差评原文（可选）", placeholder="粘贴几条真实评价，AI会更准；留空则让AI基于行业经验分析", height=90, key="voc_review")
+            if st.button("💬 AI分析VOC", use_container_width=True, type="primary"):
+                with st.spinner("AI提炼客户之声..."):
+                    review_txt = voc_review.strip() if voc_review else "（未提供原文，请基于该品类行业普遍评价经验分析）"
+                    prompt = f"""# 刀剪产品 · VOC（客户之声）分析任务
+
+产品：{voc_product}
+评价来源：{voc_source}
+真实评价原文：
+{review_txt}
+
+请输出（中文，结构化）：
+1. 【高频好评关键词】TOP10，按出现频率排序
+2. 【高频差评/吐槽关键词】TOP10，按严重程度排序
+3. 【核心痛点归纳】3-5条，说明客户最不满什么
+4. 【改进机会】我们的产品可以怎么差异化解决
+5. 【对Listing/开发信的建议】这些痛点怎么用进卖点话术
+务实、具体，别泛泛而谈。"""
+                    result = ai.chat(prompt)
+                    st.markdown(result)
+
+        with m4:
+            st.markdown("##### 🔑 关键词挖掘")
+            st.caption("输入产品/品类，AI输出核心词、长尾词、SEO与广告词分组")
+            col1, col2 = st.columns(2)
+            with col1:
+                kw_product = st.text_input("产品/品类", placeholder="例如：bamboo cutting board", key="kw_product")
+            with col2:
+                kw_lang = st.selectbox("输出语言", ["英文", "中文", "中英"], key="kw_lang")
+            if st.button("🔑 AI挖掘关键词", use_container_width=True, type="primary"):
+                with st.spinner("AI挖掘关键词..."):
+                    prompt = f"""# 刀剪产品 · SEO关键词挖掘任务
+
+产品/品类：{kw_product}
+输出语言：{kw_lang}
+
+公司：{kb.get_company_brief()[:400]}
+
+请输出：
+1. 【核心大词】5个（搜索量大、竞争高）
+2. 【长尾精准词】15个（购买意图强、B2B批发向，含 wholesale/OEM/custom/private label）
+3. 【问题/场景词】10个（客户会搜的问题型词，如 "how to..."）
+4. 【负面/排除词】建议广告否定的词
+5. 每个词标注：月搜索量级（高/中/低）+ 商业意图（高/中）
+表格化输出。"""
+                    result = ai.chat(prompt)
+                    st.markdown(result)
 
     elif mp_current == "📦 产品分析":
         st.subheader("📦 产品分析")

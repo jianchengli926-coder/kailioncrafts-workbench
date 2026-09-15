@@ -673,19 +673,19 @@ if page == "🏠 仪表盘":
         source_file = Path("data/customer_sources.json")
         source_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # 默认渠道配置（名称 + 颜色，11个渠道每个不同色）
+        # 默认渠道配置（名称 + 颜色，11个渠道每个不同色系）
         DEFAULT_SOURCES = {
-            "Google搜索": {"count": 8, "color": "#4285F4"},
-            "Facebook": {"count": 5, "color": "#1877F2"},
-            "TikTok": {"count": 4, "color": "#333333"},
-            "LinkedIn": {"count": 6, "color": "#0A66C2"},
-            "Instagram": {"count": 3, "color": "#E4405F"},
-            "YouTube": {"count": 2, "color": "#FF0000"},
-            "X (Twitter)": {"count": 2, "color": "#1DA1F2"},
-            "Pinterest": {"count": 1, "color": "#E60023"},
+            "Google搜索": {"count": 8, "color": "#3B82F6"},
+            "Facebook": {"count": 5, "color": "#8B5CF6"},
+            "TikTok": {"count": 4, "color": "#374151"},
+            "LinkedIn": {"count": 6, "color": "#10B981"},
+            "Instagram": {"count": 3, "color": "#EC4899"},
+            "YouTube": {"count": 2, "color": "#EF4444"},
+            "X (Twitter)": {"count": 2, "color": "#F97316"},
+            "Pinterest": {"count": 1, "color": "#92400E"},
             "展会": {"count": 2, "color": "#D4AF37"},
-            "客户转介绍": {"count": 1, "color": "#34A853"},
-            "其他": {"count": 1, "color": "#9E9E9E"},
+            "客户转介绍": {"count": 1, "color": "#06B6D4"},
+            "其他": {"count": 1, "color": "#9CA3AF"},
         }
 
         # 加载或初始化数据

@@ -12,7 +12,7 @@ CATEGORIES = {
     "Professional Scissors": "Owen Li",
     "Kitchen Accessories": "Julia Zhong",
 }
-PLATFORMS = ["TikTok", "Instagram", "YouTube", "Facebook", "X", "LinkedIn", "Pinterest"]
+PLATFORMS = ["Facebook", "Instagram", "YouTube", "TikTok", "X", "LinkedIn", "Pinterest", "WhatsApp"]
 CONTENT_TYPES = ["Video", "Shorts", "Reels", "Image", "Graphic Post"]
 STATUS = ["策划", "拍摄", "剪辑", "待发布", "已发布", "下架"]
 

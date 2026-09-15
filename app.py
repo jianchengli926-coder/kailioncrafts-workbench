@@ -6213,10 +6213,19 @@ elif page == "🌍 海外社媒矩阵":
             </div>""", unsafe_allow_html=True)
 
     with t2:
+        # 三级下钻：品类 -> 平台账号 -> 内容记录
+        for _k, _d in [("sm_level", "cats"), ("sm_cat", None), ("sm_acc_id", None)]:
+            if _k not in st.session_state:
+                st.session_state[_k] = _d
+        accounts = sdb.list_accounts()
+
+        # 新增账号表单（各层级通用）
         with st.expander("➕ 新增账号", expanded=False):
             with st.form("new_social_account"):
+                _cat_default = st.session_state["sm_cat"] or list(sdb.CATEGORIES.keys())[0]
                 x1, x2, x3 = st.columns(3)
-                cat = x1.selectbox("品类", list(sdb.CATEGORIES.keys()))
+                cat = x1.selectbox("品类", list(sdb.CATEGORIES.keys()),
+                                   index=list(sdb.CATEGORIES.keys()).index(_cat_default))
                 owner = x2.text_input("负责人", sdb.CATEGORIES[cat])
                 platform = x3.selectbox("平台", sdb.PLATFORMS)
                 y1, y2 = st.columns(2)
@@ -6232,38 +6241,72 @@ elif page == "🌍 海外社媒矩阵":
                                         account_name=acct_name, account_url=acct_url,
                                         email=email, status=status)
                         st.success("已保存"); st.rerun()
-        accounts = sdb.list_accounts()
-        if accounts:
-            # 筛选
-            g1, g2, g3, g4 = st.columns(4)
-            fg = g1.selectbox("品类", ["全部"] + list(sdb.CATEGORIES.keys()), key="ag_fcat")
-            fp = g2.selectbox("平台", ["全部"] + sdb.PLATFORMS, key="ag_fplat")
-            fo = g3.selectbox("负责人", ["全部"] + list(sdb.CATEGORIES.values()), key="ag_fown")
-            fs = g4.selectbox("状态", ["全部", "Active", "Inactive", "Pending", "Suspended"], key="ag_fst")
-            def _keep(a):
-                return (fg == "全部" or a["category"] == fg) and (fp == "全部" or a["platform"] == fp) \
-                    and (fo == "全部" or a["owner"] == fo) and (fs == "全部" or a["status"] == fs)
-            accs = [a for a in accounts if _keep(a)]
-            st.caption(f"共 {len(accs)} 个账号")
-            cols = ["category", "owner", "platform", "account_name", "account_url", "email", "status"]
-            st.dataframe(pd.DataFrame([{k: a.get(k) for k in cols} for a in accs]),
-                         use_container_width=True, hide_index=True)
-            with st.expander("🔍 查看账号详情"):
-                sel = st.selectbox("选账号", [f"{a['platform']} · {a['account_name']}" for a in accs])
-                acc = next(a for a in accs if f"{a['platform']} · {a['account_name']}" == sel)
+
+        # ===== 第一层：4大品类 =====
+        if st.session_state["sm_level"] == "cats":
+            st.markdown("##### 选择品类（4大产品线）")
+            cc = st.columns(4)
+            for i, (cat, owner) in enumerate(sdb.CATEGORIES.items()):
+                with cc[i]:
+                    n_acc = sum(1 for a in accounts if a.get("category") == cat)
+                    st.markdown(f"""<div style="background:#1f2733;border:1px solid #2c3e50;border-radius:10px;padding:14px;margin-bottom:8px;">
+                    <b style="color:#FFF3E0;font-size:15px;">{cat}</b><br>
+                    <span style="color:#aaa;font-size:12px;">负责人 {owner}</span><br>
+                    <span style="color:#D4AF37;font-size:12px;">已绑账号 {n_acc}/8</span></div>""", unsafe_allow_html=True)
+                    if st.button(f"进入 {cat} →", key=f"catbtn_{cat}", use_container_width=True):
+                        st.session_state["sm_cat"] = cat
+                        st.session_state["sm_level"] = "accounts"
+                        st.rerun()
+
+        # ===== 第二层：品类下 8 平台账号 =====
+        elif st.session_state["sm_level"] == "accounts":
+            cat = st.session_state["sm_cat"]
+            if st.button("← 返回品类", key="back_cats"):
+                st.session_state["sm_level"] = "cats"; st.rerun()
+            st.markdown(f"##### {cat} · 负责人 {sdb.CATEGORIES.get(cat,'')}")
+            st.caption("每个平台一张账号卡片；已绑账号显示状态，未绑显示「待配置」。点「打开」看该账号内容。")
+            cat_accs = [a for a in accounts if a.get("category") == cat]
+            grid = st.columns(4)
+            for pi, plat in enumerate(sdb.PLATFORMS):
+                plat_accs = [a for a in cat_accs if a.get("platform") == plat]
+                with grid[pi % 4]:
+                    if plat_accs:
+                        for a in plat_accs:
+                            badge = "🟢" if a.get("status") == "Active" else "⚪"
+                            st.markdown(f"""<div style="background:#1f2733;border-left:4px solid #D4AF37;border-radius:6px;padding:8px;margin:4px 0;font-size:12px;">
+                            {badge} <b>{plat}</b><br><span style="color:#ccc;">{a.get('account_name','')}</span></div>""", unsafe_allow_html=True)
+                            if st.button(f"📂 打开", key=f"open_{a['id']}", use_container_width=True):
+                                st.session_state["sm_acc_id"] = a["id"]
+                                st.session_state["sm_level"] = "contents"
+                                st.rerun()
+                    else:
+                        st.markdown(f"""<div style="background:#171d26;border:1px dashed #333;border-radius:6px;padding:8px;margin:4px 0;font-size:12px;color:#888;">
+                        ⚪ <b>{plat}</b><br>待配置</div>""", unsafe_allow_html=True)
+
+        # ===== 第三层：账号的内容记录 =====
+        else:
+            if st.button("← 返回账号", key="back_accounts"):
+                st.session_state["sm_level"] = "accounts"; st.rerun()
+            acc = next((a for a in accounts if a["id"] == st.session_state["sm_acc_id"]), None)
+            if acc:
+                st.markdown(f"##### {acc.get('platform','')} · {acc.get('account_name','')}")
                 its = sdb.contents_of_account(acc["id"])
                 vv = sum(i.get("views", 0) for i in its)
-                st.markdown(f"**{acc['platform']} · {acc['account_name']}**　品类 {acc['category']}　负责人 {acc['owner']}　状态 {acc['status']}")
-                st.caption(f"内容 {len(its)} 条 · 总播放 {vv:,}")
+                st.caption(f"品类 {acc.get('category','')} · 内容 {len(its)} 条 · 总播放 {vv:,}")
                 if acc.get("account_url"):
-                    st.markdown(f"[🌐 打开账号]({acc['account_url']})")
+                    st.markdown(f"[🌐 打开账号主页]({acc['account_url']})")
                 if its:
-                    st.dataframe(pd.DataFrame(its)[["content_no", "title", "status", "views", "likes"]],
-                                 use_container_width=True, hide_index=True)
-                if st.button("🗑 删除此账号"):
-                    sdb.delete_account(acc["id"]); st.rerun()
-        else:
-            st.info("还没有账号，点上方新增第一个")
+                    for it in its:
+                        with st.expander(f"🎬 {it.get('title','(无标题)')} · {it.get('status','')} · 播放{it.get('views',0):,}"):
+                            st.write(f"发布日期: {it.get('publish_date','') or '未填'}")
+                            if it.get("publish_url"):
+                                st.markdown(f"[👉 发布链接]({it['publish_url']})")
+                            st.write(f"点赞 {it.get('likes',0)} · 收藏 {it.get('saves',0)} · 评论 {it.get('comments',0)} · 询盘 {it.get('inquiries',0)}")
+                            if it.get("shoot_script"):
+                                st.caption("拍摄剪辑脚本：")
+                                st.write(it["shoot_script"])
+                else:
+                    st.info("该账号还没有内容记录，到「🎬 内容台账」新增第一条")
 
     with t3:
         with st.expander("➕ 新增内容", expanded=False):

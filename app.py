@@ -178,10 +178,9 @@ with st.sidebar:
         # 产品部
         "📦 产品库",
         "📊 独立站SEO中心",
-        # 市场部
-        "🔎 竞品与资源库",
+        # 市场部 -> 已并入公司知识库
         # 知识部
-        "📚 知识库",
+        "📚 公司知识库",
         "📱 飞书协同",
         # 管理
         "⚙️ 设置中心",
@@ -352,7 +351,7 @@ if page == "📊 仪表盘":
             st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📥 独立站管理"; st.rerun()
     with row2c2:
         if st.button("📚 知识库", key="goto_kb", use_container_width=True):
-            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📚 知识库"; st.rerun()
+            st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📚 公司知识库"; st.rerun()
     with row2c3:
         if st.button("📊 订单台账", key="goto_orders", use_container_width=True):
             st.session_state.pop("main_nav", None); st.session_state["main_nav"] = "📊 订单台账"; st.rerun()
@@ -4655,86 +4654,8 @@ ACOS: {ad_acos}%
                     result = ai.chat(prompt)
                 st.markdown(result)
 
-# ============ 页面12：竞品与资源库 ============
-elif page == "🔎 竞品与资源库":
-    st.title("🔍 竞品与行业资源库")
-    st.caption("78个五金刀剪行业独立站，按用途分类，助力建站模仿和客户开发")
-
-    # 加载竞品数据
-    competitor_csv = Path(__file__).parent / "data" / "competitor_sites.csv"
-    if competitor_csv.exists():
-        df = pd.read_csv(competitor_csv, encoding='utf-8-sig')
-
-        # 统计概览
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("总网站数", len(df))
-        with col2:
-            st.metric("分类数", df['分类'].nunique())
-        with col3:
-            high_priority = len(df[df['优先级'].str.contains('高', na=False)])
-            st.metric("高优先级", high_priority)
-        with col4:
-            potential_customers = len(df[df['分类'].str.contains('潜在客户', na=False)])
-            st.metric("潜在客户站", potential_customers)
-
-        st.markdown("---")
-
-        # 分类筛选
-        categories = ["全部"] + sorted(df['分类'].unique().tolist())
-        selected_cat = st.selectbox("按分类筛选", categories)
-
-        filtered_df = df if selected_cat == "全部" else df[df['分类'] == selected_cat]
-
-        # 展示网站列表
-        for _, row in filtered_df.iterrows():
-            with st.expander(f"🌐 {row['域名']}  |  {row['分类']}  |  优先级：{row['优先级']}"):
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.markdown(f"**网址：** [{row['网址']}]({row['网址']})")
-                    st.markdown(f"**用途：** {row['用途']}")
-                with col2:
-                    if "潜在客户" in str(row['分类']):
-                        if st.button("🎯 加入客户分析", key=f"comp_{row['域名']}"):
-                            st.session_state['potential_customer'] = row['域名']
-                    if st.button("📋 复制域名", key=f"copy_{row['域名']}"):
-                        st.toast(f"已复制: {row['域名']}")
-
-        st.markdown("---")
-
-        # 导出功能
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button(
-            "📥 导出完整CSV",
-            df.to_csv(index=False).encode('utf-8-sig'),
-            file_name="五金刀剪行业独立站资源库.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-        with col2:
-            st.info("💡 建议：优先研究「阳江本地工厂」和「同行竞品」的建站风格，「零售平台」可作为潜在B2B客户开发")
-
-        # 建站参考提示
-        st.markdown("---")
-        st.subheader("🏗️ 建站模仿建议")
-        st.markdown("""
-        **推荐重点研究的网站（按用途）：**
-
-        - **建站结构参考**：rtkitchenknife.com、yjchefknife.com、insight-kitchenknife.com
-          - 这些站有完整的产品分类、详情页、About Us、Contact结构
-        - **产品页设计**：wusthof.com、messermeister.com、henckels.com
-          - 国际大牌的产品展示方式、卖点描述、图片风格
-        - **SEO博客参考**：insight-kitchenknife.com、saafiknife.com、biliknife.com
-          - top-10-manufacturers类文章是获取流量的利器
-        - **价格参考**：costco.com、target.com、williams-sonoma.com
-          - 了解终端零售价，反推批发价空间
-        """)
-    else:
-        st.warning("竞品数据文件未找到，请确保 data/competitor_sites.csv 存在")
-
-# ============ 知识库 ============
-elif page == "📚 知识库":
+# ============ 公司知识库（含竞品与资源库） ============
+elif page == "📚 公司知识库":
     st.markdown("""
     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
     <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · KNOWLEDGE BASE</div>
@@ -4748,12 +4669,13 @@ elif page == "📚 知识库":
         "📊 管理统计": "知识库数量 · 文件统计",
         "📋 版本管理": "版本号 · 日期 · 回退",
         "➕ 添加知识": "新建文档 / 上传 / 对话转知识",
+        "🌐 竞品与资源库": "同行独立站 · 建站模仿",
     }
     if "kb_sub" not in st.session_state:
         st.session_state["kb_sub"] = "🔍 搜索浏览"
     kb_current = st.session_state["kb_sub"]
 
-    kb_cols = st.columns(4)
+    kb_cols = st.columns(5)
     for i, (name, desc) in enumerate(kb_sections.items()):
         with kb_cols[i]:
             is_active = st.session_state["kb_sub"] == name
@@ -4982,6 +4904,68 @@ elif page == "📚 知识库":
                 dest.write_text(st.session_state["kb_distilled"], encoding="utf-8")
                 st.success(f"✅ 已保存：{dest}")
                 st.session_state.pop("kb_distilled", None)
+
+    elif kb_current == "🌐 竞品与资源库":
+        st.subheader("🌐 竞品与行业资源库")
+        st.caption("78个五金刀剪行业独立站，按用途分类，助力建站模仿和客户开发")
+
+        competitor_csv = Path(__file__).parent / "data" / "competitor_sites.csv"
+        if competitor_csv.exists():
+            df = pd.read_csv(competitor_csv, encoding='utf-8-sig')
+
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("总网站数", len(df))
+            with col2:
+                st.metric("分类数", df['分类'].nunique())
+            with col3:
+                high_priority = len(df[df['优先级'].str.contains('高', na=False)])
+                st.metric("高优先级", high_priority)
+            with col4:
+                potential_customers = len(df[df['分类'].str.contains('潜在客户', na=False)])
+                st.metric("潜在客户站", potential_customers)
+
+            st.markdown("---")
+            categories = ["全部"] + sorted(df['分类'].unique().tolist())
+            selected_cat = st.selectbox("按分类筛选", categories, key="comp_cat_filter")
+            filtered_df = df if selected_cat == "全部" else df[df['分类'] == selected_cat]
+
+            for _, row in filtered_df.iterrows():
+                with st.expander(f"🌐 {row['域名']}  |  {row['分类']}  |  优先级：{row['优先级']}"):
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
+                        st.markdown(f"**网址：** [{row['网址']}]({row['网址']})")
+                        st.markdown(f"**用途：** {row['用途']}")
+                    with c2:
+                        if "潜在客户" in str(row['分类']):
+                            if st.button("🎯 加入客户分析", key=f"comp_{row['域名']}"):
+                                st.session_state['potential_customer'] = row['域名']
+                        if st.button("📋 复制域名", key=f"copy_{row['域名']}"):
+                            st.toast(f"已复制: {row['域名']}")
+
+            st.markdown("---")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.download_button(
+                    "📥 导出完整CSV",
+                    df.to_csv(index=False).encode('utf-8-sig'),
+                    file_name="五金刀剪行业独立站资源库.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+            with c2:
+                st.info("💡 建议：优先研究「阳江本地工厂」和「同行竞品」的建站风格，「零售平台」可作为潜在B2B客户开发")
+
+            st.markdown("---")
+            st.markdown("**🏗️ 建站模仿建议**")
+            st.markdown("""
+            - **建站结构参考**：rtkitchenknife.com、yjchefknife.com、insight-kitchenknife.com（完整分类/详情/About/Contact）
+            - **产品页设计**：wusthof.com、messermeister.com、henckels.com（国际大牌展示与卖点）
+            - **SEO博客参考**：insight-kitchenknife.com、saafiknife.com、biliknife.com（top-10 类引流文）
+            - **价格参考**：costco.com、target.com、williams-sonoma.com（终端零售价反推批发空间）
+            """)
+        else:
+            st.warning("竞品数据文件未找到，请确保 data/competitor_sites.csv 存在")
 
 elif page == "👥 团队工作空间":
     st.title("👥 团队工作空间")
@@ -6032,7 +6016,7 @@ elif page == "⚙️ 设置":
 
     **功能导航（12个）：**
     仪表盘 | 自研AI工具库 | 市场与产品分析 | 客户中心 | 独立站管理
-    订单台账 | 产品库 | 独立站SEO中心 | 竞品与资源库 | 知识库 | 飞书协同 | 设置中心
+    订单台账 | 产品库 | 独立站SEO中心 | 公司知识库(含竞品与资源库) | 飞书协同 | 设置中心
 
     **数据资产：**
     - 标准化知识库：18大分类 / 1200+ 文档

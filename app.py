@@ -4596,6 +4596,29 @@ elif page == "🔍 独立站SEO中心" and "seo_sub" not in st.session_state:
         if st.button("进入博客SEO", key="goto_seo_blog", use_container_width=True):
             st.session_state["seo_sub"] = "blog"
             st.rerun()
+    s5, s6 = st.columns(2)
+    with s5:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);border-radius:12px 12px 0 0;padding:24px;text-align:center;">
+        <div style="font-size:36px;">🗺️</div>
+        <div style="font-weight:700;margin-top:8px;">SEO策略规划</div>
+        <div style="font-size:12px;color:#5b21b6;margin-top:4px;">内容集群 · 技术检查 · 评分卡</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("进入SEO策略", key="goto_seo_strategy", use_container_width=True):
+            st.session_state["seo_sub"] = "strategy"
+            st.rerun()
+    with s6:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#ffedd5,#fed7aa);border-radius:12px 12px 0 0;padding:24px;text-align:center;">
+        <div style="font-size:36px;">📊</div>
+        <div style="font-weight:700;margin-top:8px;">产品SEO评分卡</div>
+        <div style="font-size:12px;color:#9a3412;margin-top:4px;">市场×竞争×利润×合规</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("进入产品评分卡", key="goto_seo_scorecard", use_container_width=True):
+            st.session_state["seo_sub"] = "scorecard"
+            st.rerun()
 
 elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "image":
     if st.button("← 返回SEO中心", key="back_seo_center_image"):
@@ -7256,6 +7279,186 @@ Slug: ...
                 st.write("引用知识库：")
                 for ref in t.get("knowledge_refs", []):
                     st.write(f"- {ref}")
+
+# ============ SEO策略规划（内容集群+技术SEO检查） ============
+elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "strategy":
+    if st.button("← 返回SEO中心", key="back_seo_strategy"):
+        del st.session_state["seo_sub"]
+        st.rerun()
+    st.title("🗺️ SEO策略规划")
+    st.caption("内容集群规划 · 技术SEO检查清单 · 借鉴SEO Specialist方法论")
+
+    st.markdown("### 📚 内容集群规划器")
+    st.caption("不是单页优化，而是主题集群——一个核心产品页（支柱页）+多个长尾文章页互相内链，形成主题权威")
+    with st.form("cluster_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            cluster_topic = st.text_input("核心主题（如：chef knife wholesale）", key="cluster_topic")
+            cluster_audience = st.selectbox("目标受众", ["进口商/分销商", "品牌商/私有标签", "Amazon卖家", "批发商", "全部"], key="cluster_audience")
+        with col2:
+            cluster_market = st.text_input("目标市场", value="美国", key="cluster_market")
+            cluster_products = st.text_input("相关产品", value="厨房刀/厨师刀/剪刀", key="cluster_products")
+        cluster_submit = st.form_submit_button("🗺️ 规划内容集群", type="primary", use_container_width=True)
+    if cluster_submit and cluster_topic:
+        with st.spinner("AI规划内容集群中..."):
+            try:
+                prompt = f"""你是B2B独立站SEO内容集群规划专家。
+我方：{kb.get_company_brief()}
+核心主题：{cluster_topic}
+目标受众：{cluster_audience}
+目标市场：{cluster_market}
+相关产品：{cluster_products}
+
+请设计一个完整的内容集群（Topic Cluster）：
+
+## 支柱页（Pillar Page）
+- 核心主题页：{cluster_topic}
+- 支柱页应该覆盖什么内容？（2000+词，10-15个内链到集群文章）
+
+## 集群文章（Cluster Articles）
+设计8-12篇长尾文章，每篇包含：
+| # | 文章标题 | 目标关键词（英文） | 搜索意图 | 与支柱页的内链锚文本 |
+
+搜索意图分类：信息型（how to guide）/ 对比型（vs comparison）/ 购买型（wholesale/bulk/buy）
+
+## 内链策略
+- 每篇集群文章必须链接回支柱页（锚文本=核心关键词）
+- 支柱页链接到所有集群文章
+- 集群文章之间互相链接（相关主题）
+
+## 优先级排序
+按"搜索量×商业价值×竞争度"排序，先做哪3篇？
+
+输出格式：markdown表格 + 优先级说明，控制在800字内。
+"""
+                result = ai.chat(prompt)
+                st.markdown(result)
+            except Exception as e:
+                st.error(f"AI错误：{e}")
+
+    st.markdown("---")
+    st.markdown("### ✅ 技术SEO检查清单")
+    st.caption("基于SEO Specialist方法论，逐项检查你的独立站技术SEO健康度")
+    tech_items = [
+        ("站点可爬取", "robots.txt是否正确？是否屏蔽了重要页面？"),
+        ("XML站点地图", "sitemap.xml是否提交给Google Search Console？是否包含所有产品页？"),
+        ("页面速度", "Core Web Vitals：LCP<2.5s / FID<100ms / CLS<0.1？"),
+        ("移动端适配", "Google Mobile-Friendly Test是否通过？"),
+        ("HTTPS", "全站是否HTTPS？混合内容是否清理？"),
+        ("结构化数据", "Product/Organization/BreadcrumbList Schema是否部署？"),
+        ("标题标签", "每个页面Title是否唯一？50-60字符？含主关键词？"),
+        ("Meta描述", "每个页面Description是否唯一？150-160字符？含CTA？"),
+        ("H标签层级", "H1只有一个？H2/H3层级清晰？"),
+        ("图片ALT", "所有产品图ALT是否含关键词？文件名是否SEO友好？"),
+        ("内链结构", "产品页之间是否有相关推荐？支柱页是否链接到所有集群文章？"),
+        ("外链建设", "是否有高质量外链？行业目录/展会/合作伙伴？"),
+        ("Google Analytics", "GA4是否部署？事件跟踪是否配置？"),
+        ("Search Console", "是否提交？是否监控索引状态/手动处罚？"),
+        ("hreflang", "多语言版本是否有hreflang标签？"),
+        ("Canonical标签", "重复内容是否有canonical指向？"),
+    ]
+    for i, (name, desc) in enumerate(tech_items):
+        col1, col2 = st.columns([1, 4])
+        done = col2.checkbox(f"**{name}**", key=f"tech_{i}")
+        col1.write("✅" if done else "⬜")
+        if not done:
+            st.caption(f"   → {desc}")
+
+    st.markdown("---")
+    st.markdown("### 📊 技术SEO健康度评分")
+    done_count = sum(1 for i in range(len(tech_items)) if st.session_state.get(f"tech_{i}", False))
+    total = len(tech_items)
+    score = int(done_count / total * 100)
+    st.metric("技术SEO健康度", f"{score}分", f"{done_count}/{total} 项已完成")
+    if score >= 80:
+        st.success("🟢 优秀！技术SEO基础扎实")
+    elif score >= 50:
+        st.warning("🟡 及格，还有优化空间")
+    else:
+        st.error("🔴 需要立即修复！")
+
+# ============ 产品SEO评分卡 ============
+elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "scorecard":
+    if st.button("← 返回SEO中心", key="back_seo_scorecard"):
+        del st.session_state["seo_sub"]
+        st.rerun()
+    st.title("📊 产品SEO评分卡")
+    st.caption("市场规模 × 竞争度 × 利润率 × 合规度 × 季节性 — 综合评分决定优先上品")
+
+    with st.form("scorecard_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            sc_product = st.text_input("产品名称 *", placeholder="如：8寸主厨刀 Chef Knife")
+            sc_market_size = st.selectbox("月搜索量（Google Keywords）", ["<1000", "1000-5000", "5000-20000", "20000-100000", ">100000"], index=1)
+            sc_competition = st.selectbox("首页平均评论数（竞争度）", ["<100", "100-500", "500-2000", ">2000"], index=1)
+        with col2:
+            sc_price = st.selectbox("售价区间", ["<$10", "$10-25", "$25-50", "$50-100", ">$100"], index=2)
+            sc_margin = st.selectbox("预估毛利率", ["<10%", "10-20%", "20-35%", ">35%"], index=2)
+        sc_cert = st.selectbox("目标市场认证要求", ["无特殊要求", "FDA/LFGB", "CE", "BSCI验厂", "多项认证"], index=1)
+        sc_seasonal = st.selectbox("季节性", ["全年稳定", "有一定季节性", "强季节性"], index=0)
+        sc_submit = st.form_submit_button("📊 计算评分", type="primary", use_container_width=True)
+
+    if sc_submit and sc_product:
+        # 评分计算
+        size_map = {"<1000": 1, "1000-5000": 3, "5000-20000": 5, "20000-100000": 7, ">100000": 10}
+        comp_map = {"<100": 10, "100-500": 7, "500-2000": 4, ">2000": 2}
+        price_map = {"<$10": 2, "$10-25": 5, "$25-50": 8, "$50-100": 9, ">$100": 7}
+        margin_map = {"<10%": 1, "10-20%": 4, "20-35%": 8, ">35%": 10}
+        cert_map = {"无特殊要求": 10, "FDA/LFGB": 7, "CE": 7, "BSCI验厂": 5, "多项认证": 3}
+        seasonal_map = {"全年稳定": 10, "有一定季节性": 6, "强季节性": 3}
+
+        s_size = size_map[sc_market_size]
+        s_comp = comp_map[sc_competition]
+        s_price = price_map[sc_price]
+        s_margin = margin_map[sc_margin]
+        s_cert = cert_map[sc_cert]
+        s_seasonal = seasonal_map[sc_seasonal]
+        total_score = s_size + s_comp + s_price + s_margin + s_cert + s_seasonal
+
+        st.markdown(f"### {sc_product} — SEO评分卡")
+        score_data = {
+            "维度": ["市场规模", "竞争度（分越高越容易）", "价格区间", "毛利率", "合规门槛（分越高越易）", "季节性"],
+            "评分": [s_size, s_comp, s_price, s_margin, s_cert, s_seasonal],
+            "满分": [10, 10, 10, 10, 10, 10],
+            "说明": [sc_market_size, sc_competition, sc_price, sc_margin, sc_cert, sc_seasonal],
+        }
+        st.dataframe(score_data, use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("总分", f"{total_score}/60")
+        if total_score >= 48:
+            col2.success("🟢 优先上品")
+            col3.write("市场好、竞争低、利润高，立即做SEO")
+        elif total_score >= 36:
+            col2.warning("🟡 值得做")
+            col3.write("有机会，需要1-2个月优化")
+        else:
+            col2.error("🔴 暂缓")
+            col3.write("市场小或竞争大或利润低，先做其他产品")
+
+        st.markdown("---")
+        st.markdown("### AI优化建议")
+        with st.spinner("AI分析中..."):
+            try:
+                prompt = f"""你是B2B独立站SEO产品选品专家。
+产品：{sc_product}
+市场规模：{sc_market_size}
+竞争度：{sc_competition}
+价格区间：{sc_price}
+毛利率：{sc_margin}
+认证要求：{sc_cert}
+季节性：{sc_seasonal}
+综合评分：{total_score}/60
+
+请输出（中文，300字内）：
+1. 这个产品做SEO独立站的优劣势
+2. 建议的SEO策略（主攻什么关键词、怎么差异化）
+3. 3条具体行动建议
+"""
+                st.markdown(ai.chat(prompt))
+            except Exception as e:
+                st.error(f"AI错误：{e}")
 
 # ============ 飞书协同 ============
 # ============ 设置中心 ============

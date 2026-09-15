@@ -63,6 +63,18 @@ def two_step_delete(btn_label, key, danger="此操作不可恢复"):
     return False
 
 
+# ============ 通用：我的语气档案（蒸馏作者风格） ============
+VOICE_FILE = Path("data/voice_profile.json")
+def _load_voice():
+    try:
+        return _json.loads(VOICE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {"samples": [], "style_notes": ""}
+def _save_voice(v):
+    VOICE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    VOICE_FILE.write_text(_json.dumps(v, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 # ============ 页面配置 ============
 st.set_page_config(
     page_title="KaiLionCrafts · 企业级AI工作台",
@@ -1366,6 +1378,40 @@ Best regards, {ep_now.get('en_name')}
 
         with cc_d1:
             st.subheader("开发信生成")
+            # ===== 我的语气档案（蒸馏作者风格） =====
+            with st.expander("🎙️ 我的语气档案（把你过去真发过的开发信喂进来，AI以后按你的语气写）", expanded=False):
+                _v = _load_voice()
+                st.caption(f"已收集样本 {len(_v.get('samples', []))} 条"
+                           + (" · 风格已蒸馏 ✅" if _v.get("style_notes") else " · 还没蒸馏"))
+                with st.form("voice_sample"):
+                    vs_type = st.selectbox("样本类型", ["开发信", "WhatsApp/即时回复", "报价邮件", "其他"])
+                    vs_text = st.text_area("粘贴你过去写过的原文（英文最好，可中英混合）", height=120)
+                    if st.form_submit_button("保存样本", use_container_width=True):
+                        if vs_text.strip():
+                            _v.setdefault("samples", []).append(
+                                {"type": vs_type, "content": vs_text.strip(),
+                                 "date": datetime.now().strftime("%Y-%m-%d")})
+                            _save_voice(_v); st.success("已保存样本"); st.rerun()
+                        else:
+                            st.warning("请先粘贴内容")
+                if _v.get("samples"):
+                    if st.button("✨ 蒸馏我的语气风格", type="primary", use_container_width=True):
+                        _sample_txt = "\n\n---\n\n".join(
+                            [f"[{s.get('type','')}] {s.get('content','')}" for s in _v["samples"][-20:]])
+                        _dp = ("你是文案风格分析师。以下是我过去真实发过的外贸开发信/客户沟通原文。"
+                               "请蒸馏出我的写作风格，输出：1)整体语气(正式/亲切/直接/委婉) 2)句式特点 "
+                               "3)高频用词与口头禅 4)段落结构习惯 5)要避免的写法。中文回答，300字内，要具体可模仿。"
+                               f"\n\n我的原文：\n{_sample_txt}")
+                        with st.spinner("正在蒸馏你的语气..."):
+                            try:
+                                _v["style_notes"] = ai.chat(_dp)
+                                _v["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                                _save_voice(_v); st.success("✅ 风格已蒸馏，以后开发信会自动套用"); st.rerun()
+                            except Exception as e:
+                                st.error(f"AI错误：{e}")
+                if _v.get("style_notes"):
+                    st.markdown("**📌 当前语气档案：**")
+                    st.info(_v["style_notes"])
             with st.form("ce_form"):
                 col1, col2 = st.columns(2)
                 with col1:
@@ -1385,6 +1431,9 @@ Best regards, {ep_now.get('en_name')}
                             company_profile=kb.get_company_brief(),
                             pain_points=kb.get_pain_points(), terminology=kb.get_terminology(),
                         )
+                        _vn = _load_voice().get("style_notes")
+                        if _vn:
+                            prompt += f"\n\n【我方作者语气档案，必须严格模仿此语气、句式与用词】\n{_vn}"
                         result = ai.chat(prompt)
                         st.markdown(result)
                     except Exception as e:

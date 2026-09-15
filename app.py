@@ -4656,14 +4656,14 @@ ACOS: {ad_acos}%
                 st.markdown(result)
 
 # ============ 页面12：竞品与资源库 ============
-elif page == "🔍 竞品与资源库":
+elif page == "🔎 竞品与资源库":
     st.title("🔍 竞品与行业资源库")
     st.caption("78个五金刀剪行业独立站，按用途分类，助力建站模仿和客户开发")
 
     # 加载竞品数据
     competitor_csv = Path(__file__).parent / "data" / "competitor_sites.csv"
     if competitor_csv.exists():
-        df = pd.read_csv(competitor_csv)
+        df = pd.read_csv(competitor_csv, encoding='utf-8-sig')
 
         # 统计概览
         col1, col2, col3, col4 = st.columns(4)

@@ -7094,6 +7094,72 @@ elif page == "🧾 订单台账":
                 comp_file.write_text(_json.dumps(comp, ensure_ascii=False, indent=2), encoding="utf-8")
                 st.success("已保存")
 
+        # ===== 阶梯MOQ报价生成器 =====
+        with st.expander("📋 阶梯MOQ报价生成器（按数量分级报价）", expanded=False):
+            st.caption("输入产品成本和目标利润率，自动生成3-4档阶梯报价（1000/5000/10000/50000把）")
+            with st.form("tiered_quote_form"):
+                tq1, tq2 = st.columns(2)
+                with tq1:
+                    tq_product = st.text_input("产品名称 *", placeholder="如：8寸德国不锈钢厨师刀")
+                    tq_cost = st.number_input("单位成本（人民币元）*", min_value=0.0, step=1.0, value=35.0)
+                with tq2:
+                    tq_target_margin = st.number_input("目标毛利率（%）", min_value=5, max_value=80, value=30)
+                    tq_exchange = st.number_input("汇率（USD/CNY）", min_value=0.0, step=0.01, value=7.2)
+                tq_submit = st.form_submit_button("📊 生成阶梯报价", type="primary", use_container_width=True)
+
+            if tq_submit and tq_product and tq_cost > 0:
+                # 阶梯数量
+                tiers = [
+                    ("1,000把", 1000, 1.0),      # 小单：原价
+                    ("5,000把", 5000, 0.92),     # 中量：8%折扣
+                    ("10,000把", 10000, 0.85),   # 大量：15%折扣
+                    ("50,000把+", 50000, 0.78),  # 超大单：22%折扣
+                ]
+                rows = []
+                for name, qty, discount in tiers:
+                    cost_usd = tq_cost / tq_exchange
+                    target_price = cost_usd / (1 - tq_target_margin / 100)
+                    final_price = target_price * discount
+                    rows.append({
+                        "数量档": name,
+                        "单价(USD)": round(final_price, 2),
+                        "单位成本(USD)": round(cost_usd, 2),
+                        "毛利率(%)": round((final_price - cost_usd) / final_price * 100, 1),
+                        "总金额(USD)": round(final_price * qty, 0),
+                    })
+                st.markdown("**阶梯报价表**")
+                st.dataframe(rows, use_container_width=True, hide_index=True)
+
+                # 生成英文报价单文本
+                quote_lines = [
+                    f"QUOTATION",
+                    f"{'='*50}",
+                    f"Product: {tq_product}",
+                    f"Date: {datetime.now().strftime('%b %d, %Y')}",
+                    f"",
+                    f"{'Quantity':<15}{'Unit Price (USD)':>18}{'Total Amount (USD)':>20}",
+                    f"{'-'*53}",
+                ]
+                for r in rows:
+                    quote_lines.append(f"{r['数量档']:<15}${r['单价(USD)']:>16,.2f}${r['总金额(USD)']:>18,.0f}")
+                quote_lines.extend([
+                    f"{'-'*53}",
+                    f"",
+                    f"Terms:",
+                    f"- MOQ: 1,000 pcs",
+                    f"- Payment: 30% deposit + 70% before shipment",
+                    f"- Delivery: 30-35 days after deposit",
+                    f"- Port: Yantian, Shenzhen",
+                    f"- Validity: 30 days",
+                    f"- OEM/ODM available",
+                    f"",
+                    f"Thank you for your inquiry!",
+                ])
+                quote_text = "\n".join(quote_lines)
+                st.code(quote_text, language="text")
+                st.download_button("📥 下载报价单(.txt)", quote_text, f"Quote_{tq_product.replace(' ','_')}.txt", "text/plain")
+
+
         sales = fdb.list_sales_orders()
         if not sales:
             st.info("先在「销售订单」建一笔，再来生成报价单/PI")

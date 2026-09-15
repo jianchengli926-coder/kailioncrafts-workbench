@@ -1762,6 +1762,36 @@ EN: ...
                         f'font-size:11px;line-height:20px;padding-left:6px;">{v["count"]}</div></div></div>',
                         unsafe_allow_html=True)
 
+                # ===== 漏斗转化率分析（借鉴sales-pipeline-analyst） =====
+                st.markdown("**📊 漏斗转化率分析（哪一步流失最多？）**")
+                stages_list = list(_pdata.values())
+                conv_rows = []
+                for i, v in enumerate(stages_list):
+                    if i == 0:
+                        conv_rows.append({"阶段": v["name"], "客户数": v["count"], "本阶段转化率": "—", "累计转化率": "100%"})
+                    else:
+                        prev = stages_list[i-1]["count"]
+                        cur = v["count"]
+                        rate = f"{int(cur/prev*100)}%" if prev > 0 else "—"
+                        cum = f"{int(cur/stages_list[0]['count']*100)}%" if stages_list[0]["count"] > 0 else "—"
+                        conv_rows.append({"阶段": v["name"], "客户数": cur, "本阶段转化率": rate, "累计转化率": cum})
+                st.dataframe(conv_rows, use_container_width=True, hide_index=True)
+
+                # 找出流失最多的阶段
+                if len(stages_list) >= 2:
+                    worst_loss = None
+                    worst_loss_rate = 1.0
+                    for i in range(1, len(stages_list)):
+                        prev = stages_list[i-1]["count"]
+                        cur = stages_list[i]["count"]
+                        if prev > 0:
+                            loss_rate = 1 - cur / prev
+                            if loss_rate < worst_loss_rate:
+                                worst_loss_rate = loss_rate
+                                worst_loss = stages_list[i-1]["name"]
+                    if worst_loss and worst_loss_rate > 0.3:
+                        st.warning(f"⚠️ 最大流失点：{worst_loss} → 下一阶段，流失率 {int((1-worst_loss_rate)*100)}%。建议：分析这步为什么客户流失最多，针对性优化话术/产品/价格。")
+
                 cL, cR = st.columns(2)
                 with cL:
                     st.markdown("**客户等级分布**")

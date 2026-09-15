@@ -920,7 +920,160 @@ elif page == "👥 客户中心":
                         st.error(f"AI错误：{e}")
 
     elif cc_current == "✉️ 客户开发":
-        cc_d1, cc_d2 = st.tabs(["✉️ 新开发信", "🔄 多轮跟进"])
+        cc_p1, cc_d1, cc_d2 = st.tabs(["🎯 个性化开发信(网址+案例)", "✉️ 新开发信", "🔄 多轮跟进"])
+
+        # ===== 个性化开发信（personalized-email skill）=====
+        EP_FILE = Path(__file__).parent / "data" / "enterprise_profile.json"
+        _ep_default = {
+            "cn_name": "阳江市锴利国际贸易有限公司", "en_name": "Yangjiang KaiLionCrafts Hardware Co., Ltd.",
+            "founded": "2010", "staff": "50人", "factory_area": "2000平方米",
+            "main_biz": "专业厨房刀/剪刀/户外刀/厨房用品 OEM/ODM/Private Label",
+            "advantages": "源头工厂直供 / 支持小批量定制 / 交期稳定30天内",
+            "export_regions": "欧美、中东、东南亚、南美", "cert": "ISO9001、BSCI",
+            "intro": "KaiLionCrafts 位于中国刀剪之都阳江，专注高端刀剪厨具B2B出口十余年。",
+            "cases": [
+                {"行业": "欧美厨具品牌", "地区": "美国", "做什么": "为其代工厨师刀套装",
+                 "解决问题": "原供应商品质不稳，我们统一材质与公差", "结果": "连续返单3年"},
+            ],
+        }
+
+        def _load_ep():
+            try:
+                if EP_FILE.exists():
+                    import json as _j
+                    d = _j.loads(EP_FILE.read_text(encoding="utf-8"))
+                    for k, v in _ep_default.items():
+                        d.setdefault(k, v)
+                    return d
+            except Exception:
+                pass
+            return dict(_ep_default)
+
+        with cc_p1:
+            st.subheader("🎯 个性化开发信（一对一 · 网址+案例背书）")
+            st.caption("填一次企业信息与案例库 → 输入客户网址 → AI 输出：客户背调摘要 + 匹配依据 + 个性化开发信")
+            ep = _load_ep()
+
+            with st.expander("⚙️ 第一步：企业信息与工程案例库（只需维护一次，自动保存）", expanded=False):
+                cA, cB = st.columns(2)
+                with cA:
+                    e_cn = st.text_input("企业中文名称", ep["cn_name"], key="ep_cn")
+                    e_en = st.text_input("企业英文名称", ep["en_name"], key="ep_en")
+                    e_founded = st.text_input("成立年份", ep["founded"], key="ep_founded")
+                    e_staff = st.text_input("员工人数", ep["staff"], key="ep_staff")
+                    e_area = st.text_input("工厂面积", ep["factory_area"], key="ep_area")
+                with cB:
+                    e_biz = st.text_input("主营产品/服务", ep["main_biz"], key="ep_biz")
+                    e_adv = st.text_input("核心优势（最多3条，顿号分隔）", ep["advantages"], key="ep_adv")
+                    e_region = st.text_input("出口经验地区", ep["export_regions"], key="ep_region")
+                    e_cert = st.text_input("资质认证", ep["cert"], key="ep_cert")
+                    e_intro = st.text_area("英文介绍（200字内，可选）", ep["intro"], key="ep_intro", height=60)
+
+                st.markdown("**工程案例库（AI 按 同行业>同产品线>同地区 自动匹配）**")
+                cases = ep.get("cases", [])
+                case_rows = []
+                for i, cs in enumerate(cases):
+                    st.markdown(f"案例 {i+1}")
+                    cc1, cc2 = st.columns(2)
+                    with cc1:
+                        case_rows.append({
+                            "行业": st.text_input("客户行业", cs.get("行业", ""), key=f"cs_ind_{i}"),
+                            "地区": st.text_input("客户地区", cs.get("地区", ""), key=f"cs_reg_{i}"),
+                        })
+                    with cc2:
+                        case_rows.append({
+                            "做什么": st.text_input("用我们的产品做什么", cs.get("做什么", ""), key=f"cs_use_{i}"),
+                            "解决/结果": st.text_input("解决问题 / 客户反馈", cs.get("解决问题", "") + "；" + cs.get("结果", ""), key=f"cs_res_{i}"),
+                        })
+                if st.button("➕ 新增一个案例", key="ep_add_case"):
+                    cases.append({"行业": "", "地区": "", "做什么": "", "解决问题": "", "结果": ""})
+                    cases_save = {
+                        "cn_name": e_cn, "en_name": e_en, "founded": e_founded, "staff": e_staff,
+                        "factory_area": e_area, "main_biz": e_biz, "advantages": e_adv,
+                        "export_regions": e_region, "cert": e_cert, "intro": e_intro, "cases": cases,
+                    }
+                    import json as _j
+                    EP_FILE.write_text(_j.dumps(cases_save, ensure_ascii=False, indent=2), encoding="utf-8")
+                    st.rerun()
+
+                if st.button("💾 保存企业信息与案例", type="primary", key="ep_save", use_container_width=True):
+                    saved_cases = []
+                    for i, cs in enumerate(cases):
+                        saved_cases.append({
+                            "行业": st.session_state.get(f"cs_ind_{i}", ""),
+                            "地区": st.session_state.get(f"cs_reg_{i}", ""),
+                            "做什么": st.session_state.get(f"cs_use_{i}", ""),
+                            "解决问题": st.session_state.get(f"cs_res_{i}", ""),
+                            "结果": "",
+                        })
+                    out = {
+                        "cn_name": e_cn, "en_name": e_en, "founded": e_founded, "staff": e_staff,
+                        "factory_area": e_area, "main_biz": e_biz, "advantages": e_adv,
+                        "export_regions": e_region, "cert": e_cert, "intro": e_intro,
+                        "cases": saved_cases,
+                    }
+                    import json as _j
+                    EP_FILE.write_text(_j.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+                    st.success("✅ 企业信息与案例库已保存")
+
+            st.markdown("---")
+            st.markdown("**第二步：输入客户网站 → 生成个性化开发信**")
+            cust_url = st.text_input("客户网站地址", placeholder="https://example.com")
+            cust_extra = st.text_input("补充客户信息（网址打不开时手动填，可选）",
+                                       placeholder="公司名/主营/地区...", key="pc_extra")
+            if st.button("🚀 生成个性化开发信", type="primary", use_container_width=True):
+                if not (cust_url or cust_extra):
+                    st.warning("请填写客户网址，或手动补充客户信息")
+                else:
+                    with st.spinner("AI 背调 + 匹配案例 + 生成开发信..."):
+                        try:
+                            ep_now = _load_ep()
+                            case_txt = "\n".join(
+                                [f"案例{i+1}（行业:{c.get('行业','')} 地区:{c.get('地区','')}）："
+                                 f"{c.get('做什么','')}；我们解决了：{c.get('解决问题','')}；结果：{c.get('结果','')}"
+                                 for i, c in enumerate(ep_now.get("cases", []))]
+                            ) or "（暂无案例）"
+                            prompt = f"""你是B2B外贸开发信专家。请按以下流程为客户生成一对一个性化开发信。
+
+# 我们的企业信息
+- 名称：{ep_now.get('cn_name')} / {ep_now.get('en_name')}
+- 成立：{ep_now.get('founded')}年｜员工：{ep_now.get('staff')}｜工厂：{ep_now.get('factory_area')}
+- 主营：{ep_now.get('main_biz')}
+- 核心优势：{ep_now.get('advantages')}
+- 出口地区：{ep_now.get('export_regions')}
+- 资质：{ep_now.get('cert')}
+
+# 我们的工程案例库（请按 同行业>同产品线>同地区 自动匹配最相关的）
+{case_txt}
+
+# 客户信息
+- 客户网站：{cust_url}
+- 补充：{cust_extra or '无'}
+
+# 任务
+1. 客户背调：基于客户网站/名称推断对方公司名、主营、产品线、目标市场、规模。若网址无法访问或信息不足，请明确说明并按合理默认生成。
+2. 匹配依据：逐条说明匹配了哪个行业/哪条产品线/哪个地区，对应我方哪个案例或优势。
+3. 生成英文个性化开发信：标题突出对方业务关键词（不要出现我方产品型号）；正文四段——①开篇点对方业务/痛点 ②用真实案例做信任背书（只说事实数据）③对应痛点讲我方优势与好处 ④具体行动号召（如"本周15分钟通话"）。语气按对方规模调整。
+
+严格按下面格式输出：
+【客户背调摘要】
+公司/主营/目标市场/主要产品
+
+【匹配依据】
+✅ ...
+
+【个性化开发信】
+Subject: ...
+Dear ...
+（正文）
+Best regards, {ep_now.get('en_name')}
+"""
+                            result = ai.chat(prompt)
+                            st.markdown("---")
+                            st.markdown(result)
+                        except Exception as e:
+                            st.error(f"AI错误：{e}")
+
         with cc_d1:
             st.subheader("开发信生成")
             with st.form("ce_form"):

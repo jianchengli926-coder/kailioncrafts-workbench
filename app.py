@@ -498,6 +498,26 @@ if page == "🏠 仪表盘":
     except Exception:
         pass
 
+    # 📅 今日待跟进客户（打开工作台第一眼就知道今天先找谁）
+    try:
+        _today_fu = cm.get_follow_up_today()
+        _overdue_fu = cm.get_overdue_follow_up()
+        if _today_fu or _overdue_fu:
+            st.markdown("##### 📅 今日待跟进")
+            for c in _overdue_fu:
+                st.markdown(f"🔴 **{c.get('company_name','')}**（{c.get('country','')}）"
+                            f"— 计划跟进日 {c.get('next_follow_up','')} 已逾期"
+                            f"　状态:{c.get('status','')}")
+            for c in _today_fu:
+                st.markdown(f"🟡 **{c.get('company_name','')}**（{c.get('country','')}）"
+                            f"— 今天该跟进　状态:{c.get('status','')}")
+            if _overdue_fu:
+                st.caption(f"共 {len(_overdue_fu)} 个逾期 · {len(_today_fu)} 个今日")
+        else:
+            st.success("✅ 今天没有到期的客户跟进")
+    except Exception:
+        pass
+
     # 今日经营提醒
     try:
         import finance_db as _fdb

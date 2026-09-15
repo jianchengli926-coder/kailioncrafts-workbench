@@ -8198,7 +8198,7 @@ elif page == "⚙️ 设置中心":
 
         # ===== 顶部KPI =====
         today = datetime.now().strftime("%Y-%m-%d")
-        today_visits = sum(1 for l in auth_logs if l.get("time", "").startswith(today))
+        today_visits = sum(1 for log in auth_logs if log.get("time", "").startswith(today))
         k1, k2, k3 = st.columns(3)
         k1.metric("总访问次数", len(auth_logs))
         k2.metric("今日访问", today_visits)
@@ -8243,22 +8243,23 @@ elif page == "⚙️ 设置中心":
             st.info("暂无拉黑的IP")
         else:
             st.warning(f"⚠️ 当前有 {len(blacklist)} 个IP在黑名单中")
-            for i, b in enumerate(blacklist):
+            for idx, entry in enumerate(blacklist):
                 cols = st.columns([2, 2, 2, 1])
-                cols[0].write(f"🌐 {b.get('ip', '')}")
-                cols[1].write(f"🕐 {b.get('time', '')}")
-                cols[2].write(f"📝 {b.get('reason', '')}")
-                if cols[3].button("✅ 移除", key=f"unblk_{i}"):
-                    blacklist.pop(i)
+                cols[0].write(f"🌐 {entry.get('ip', '')}")
+                cols[1].write(f"🕐 {entry.get('time', '')}")
+                cols[2].write(f"📝 {entry.get('reason', '')}")
+                if cols[3].button("✅ 移除", key=f"unblk_{idx}"):
+                    removed_ip = entry.get('ip', '')
+                    blacklist.pop(idx)
                     _save_json(BLACKLIST, blacklist)
-                    st.success(f"已移除 IP: {b.get('ip', '')}")
+                    st.success(f"已移除 IP: {removed_ip}")
                     st.rerun()
 
             # 添加自定义IP
             with st.expander("➕ 手动添加黑名单IP"):
-                bl_ip = st.text_input("要拉黑的IP地址", placeholder="如：192.168.1.100")
-                bl_reason = st.text_input("拉黑原因", placeholder="如：恶意访问")
-                if st.button("🚫 添加到黑名单"):
+                bl_ip = st.text_input("要拉黑的IP地址", placeholder="如：192.168.1.100", key="manual_bl_ip")
+                bl_reason = st.text_input("拉黑原因", placeholder="如：恶意访问", key="manual_bl_reason")
+                if st.button("🚫 添加到黑名单", key="manual_bl_add"):
                     if bl_ip:
                         if not any(b.get("ip") == bl_ip for b in blacklist):
                             blacklist.append({"ip": bl_ip, "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "reason": bl_reason})

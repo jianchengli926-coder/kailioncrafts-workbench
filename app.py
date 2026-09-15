@@ -4554,22 +4554,63 @@ elif page == "📚 知识库":
     elif kb_current == "📊 管理统计":
         try:
             import os
+
+            def _fmt_size(n):
+                if n >= 1024 ** 3:
+                    return f"{n / 1024**3:.2f} GB"
+                if n >= 1024 ** 2:
+                    return f"{n / 1024**2:.1f} MB"
+                if n >= 1024:
+                    return f"{n / 1024:.0f} KB"
+                return f"{n} B"
+
             sources = kb.get_kb_sources()
             total_files = 0
+            total_bytes = 0
+            rows = []
             for s, info in sources.items():
                 p = info.get("path")
+                p_str = str(p) if p else ""
                 if p and os.path.exists(p):
-                    count = sum([len(files) for _, _, files in os.walk(p)])
+                    count = 0
+                    bytes_sum = 0
+                    for root, _, files in os.walk(p):
+                        count += len(files)
+                        for fn in files:
+                            try:
+                                bytes_sum += os.path.getsize(os.path.join(root, fn))
+                            except OSError:
+                                pass
                 else:
                     count = 0
+                    bytes_sum = 0
                 total_files += count
+                total_bytes += bytes_sum
+                rows.append({
+                    "名称": info.get("name", s),
+                    "文件数": count,
+                    "体积": _fmt_size(bytes_sum),
+                    "路径": p_str if os.path.exists(p_str) else "⚠️ 路径不存在",
+                })
+
+            # 汇总条
+            c1, c2 = st.columns(2)
+            c1.metric("知识库总数", f"{len(rows)} 个源")
+            c2.metric("合计体积", _fmt_size(total_bytes))
+            st.caption(f"合计文件：{total_files} 个")
+
+            st.markdown("---")
+            st.markdown("##### 📚 各知识库详情（名称 / 文件数 / 体积 / 路径）")
+            for r in rows:
+                ok = not r["路径"].startswith("⚠️")
+                border = "#28a745" if ok else "#dc3545"
                 st.markdown(f"""
-                <div style="background:#f8f9fa;border-radius:8px;padding:12px;margin-bottom:8px;border-left:4px solid #D4AF37;">
-                <strong>{info.get('name', s)}</strong><span style="float:right;color:#D4AF37;font-weight:700;">{count} 个文件</span><br>
-                <small style="color:#888;">{info.get('description', '')}</small>
+                <div style="background:#f8f9fa;border-radius:8px;padding:12px;margin-bottom:8px;border-left:4px solid {border};">
+                <strong>{r['名称']}</strong>
+                <span style="float:right;color:#D4AF37;font-weight:700;">{r['文件数']} 文件 · {r['体积']}</span><br>
                 </div>
                 """, unsafe_allow_html=True)
-            st.markdown(f"### 总计：{total_files} 个文件")
+                st.code(r["路径"], language=None)
         except Exception as e:
             st.error(f"加载失败：{e}")
 

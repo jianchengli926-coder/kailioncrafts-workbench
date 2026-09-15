@@ -5758,6 +5758,26 @@ elif page == "📊 订单台账":
 
     # ---- 报价单/PI ----
     with oe:
+        # 公司抬头/银行信息（一次填写，持久化）
+        comp_file = Path("data/company_profile.json")
+        if comp_file.exists():
+            comp = _json.loads(comp_file.read_text(encoding="utf-8"))
+        else:
+            comp = {"company": "KAILIONCRAFTS", "address": "Yangjiang, Guangdong, China",
+                    "contact": "", "bank": "", "swift": ""}
+        with st.expander("🏢 公司/银行抬头（一次填写，自动保存）"):
+            c1, c2 = st.columns(2)
+            comp["company"] = c1.text_input("公司名", comp["company"])
+            comp["address"] = c2.text_input("地址", comp["address"])
+            comp["contact"] = st.text_input("联系人/邮箱", comp["contact"])
+            c3, c4 = st.columns(2)
+            comp["bank"] = c3.text_input("银行账号信息", comp["bank"])
+            comp["swift"] = c4.text_input("SWIFT/银行", comp["swift"])
+            if st.button("保存抬头"):
+                comp_file.parent.mkdir(parents=True, exist_ok=True)
+                comp_file.write_text(_json.dumps(comp, ensure_ascii=False, indent=2), encoding="utf-8")
+                st.success("已保存")
+
         sales = fdb.list_sales_orders()
         if not sales:
             st.info("先在「销售订单」建一笔，再来生成报价单/PI")
@@ -5775,13 +5795,16 @@ elif page == "📊 订单台账":
             cur = d3.selectbox("币种", ["USD", "EUR", "GBP", "CNY"], key="pi_curr")
             today_str = datetime.now().strftime("%b %d, %Y")
             total = unit_price * qty_in
+            seller_block = f"""Seller: {comp['company']}
+        {comp['address']}
+        {comp['contact']}"""
+            bank_block = f"\nBank Info: {comp['bank']}\n            {comp['swift']}" if comp["bank"] or comp["swift"] else ""
             pi_text = f"""PROFORMA INVOICE
 {'='*46}
 Invoice No: {so['order_no']}
 Date: {today_str}
 
-Seller: KAILIONCRAFTS
-        Yangjiang, Guangdong, China
+{seller_block}
 Buyer:  {buyer}
 
 {'Item':<20}{'Qty':>8}{'Unit Price':>14}{'Amount':>14}
@@ -5793,6 +5816,7 @@ Buyer:  {buyer}
 Price Term: {incoterm}
 Payment: {pay_terms}
 Delivery:   {so.get('delivery_date') or 'To be confirmed'}
+{bank_block}
 
 Thank you for your business!
 """

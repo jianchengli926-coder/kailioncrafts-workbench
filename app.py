@@ -5571,48 +5571,137 @@ elif page == "📋 今日待办":
     
 # ============ 页面：订单台账 ============
 elif page == "📊 订单台账":
+    import finance_db as fdb
+    fdb.init_db()
     st.markdown("""
     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
-    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · ORDERS</div>
-    <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">订单台账</h2>
-    <div style="color:rgba(255,243,224,.6);font-size:13px;">已成交订单 · 金额 · 状态 · 毛利</div>
+    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · ORDER & FINANCE</div>
+    <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">订单与财务中心</h2>
+    <div style="color:rgba(255,243,224,.6);font-size:13px;">销售订单 · 采购工厂 · 收付款 · 利润看板</div>
     </div>
     """, unsafe_allow_html=True)
-    
-    orders_file = Path("data/orders/orders.json")
-    orders_file.parent.mkdir(parents=True, exist_ok=True)
-    if orders_file.exists():
-        orders = _json.loads(orders_file.read_text(encoding="utf-8"))
-    else:
-        orders = []
-    
-    with st.expander("➕ 录入新订单", expanded=False):
-        with st.form("new_order"):
-            o1, o2, o3 = st.columns(3)
-            customer = o1.text_input("客户公司")
-            product = o2.text_input("产品")
-            sku = o3.text_input("SKU")
-            o4, o5, o6 = st.columns(3)
-            amount = o4.number_input("订单金额($)", min_value=0.0)
-            cost = o5.number_input("成本($)", min_value=0.0)
-            status = o6.selectbox("状态", ["待付款","生产中","已发货","已完成","已取消"])
-            if st.form_submit_button("保存订单"):
-                orders.append({"customer":customer,"product":product,"sku":sku,"amount":amount,"cost":cost,"status":status,"date":datetime.now().strftime("%Y-%m-%d")})
-                orders_file.write_text(_json.dumps(orders, ensure_ascii=False, indent=2), encoding="utf-8")
-                st.success("已保存")
-                st.rerun()
-    
-    if orders:
-        df = pd.DataFrame(orders)
-        total = df["amount"].sum()
-        profit = (df["amount"] - df["cost"]).sum()
-        c1, c2, c3 = st.columns(3)
-        c1.metric("总订单额", f"${total:,.0f}")
-        c2.metric("总毛利", f"${profit:,.0f}")
-        c3.metric("订单数", len(orders))
-        st.dataframe(df, use_container_width=True)
-    else:
-        st.info("还没有订单数据，点击上方录入第一笔")
+
+    oa, ob, oc, od = st.tabs(["🧾 销售订单", "🏭 采购/工厂", "💰 收付款流水", "📊 经营看板"])
+
+    # ---- 销售订单 ----
+    with oa:
+        with st.expander("➕ 新建销售订单", expanded=False):
+            with st.form("new_sales_order"):
+                c1, c2, c3 = st.columns(3)
+                owner = c1.selectbox("负责人", fdb.MEMBERS)
+                customer = c2.text_input("客户公司 *")
+                country = c3.text_input("国家")
+                product_summary = st.text_input("产品摘要", placeholder="如：厨师刀套装 500套")
+                c4, c5, c6 = st.columns(3)
+                qty = c4.number_input("数量", min_value=0, step=1)
+                total_amount = c5.number_input("订单金额 *", min_value=0.0, step=100.0)
+                currency = c6.selectbox("币种", ["USD", "EUR", "GBP", "CNY"])
+                c7, c8, c9 = st.columns(3)
+                status = c7.selectbox("状态", fdb.ORDER_STATUS)
+                delivery_date = c8.text_input("预计交期", placeholder="2026-10-01")
+                c10, c11 = st.columns(2)
+                logistics_fee = c10.number_input("物流费", min_value=0.0, step=10.0)
+                other_fee = c11.number_input("其他费用", min_value=0.0, step=10.0)
+                notes = st.text_input("备注")
+                if st.form_submit_button("💾 保存订单", type="primary", use_container_width=True):
+                    if not customer or total_amount <= 0:
+                        st.warning("客户公司和订单金额必填")
+                    else:
+                        no = fdb.add_sales_order(owner=owner, customer=customer, country=country,
+                                                 product_summary=product_summary, qty=qty,
+                                                 total_amount=total_amount, currency=currency,
+                                                 status=status, delivery_date=delivery_date,
+                                                 logistics_fee=logistics_fee, other_fee=other_fee, notes=notes)
+                        st.success(f"✅ 已保存订单 {no}")
+                        st.rerun()
+        orders = fdb.list_sales_orders()
+        if orders:
+            st.dataframe(pd.DataFrame(orders)[["order_no","owner","customer","product_summary","total_amount","currency","status","order_date","delivery_date"]],
+                         use_container_width=True, hide_index=True)
+            # 快捷改状态
+            with st.expander("🔄 快速更新订单状态"):
+                upd_no = st.selectbox("选择订单", [o["order_no"] for o in orders])
+                upd_st = st.selectbox("新状态", fdb.ORDER_STATUS, key="upd_st")
+                if st.button("更新状态"):
+                    fdb.update_sales_status(upd_no, upd_st); st.success("已更新"); st.rerun()
+        else:
+            st.info("还没有订单，点上方新建第一笔")
+
+    # ---- 采购/工厂 ----
+    with ob:
+        sales_nos = [o["order_no"] for o in fdb.list_sales_orders()]
+        if not sales_nos:
+            st.info("请先在「销售订单」建一笔订单，再为它安排采购")
+        else:
+            with st.form("new_po"):
+                p1, p2 = st.columns(2)
+                so_no = p1.selectbox("关联销售订单", sales_nos)
+                factory = p2.text_input("工厂名 *")
+                p3, p4, p5 = st.columns(3)
+                cost_amount = p3.number_input("采购成本 *", min_value=0.0, step=100.0)
+                po_curr = p4.selectbox("币种", ["USD","CNY","EUR"], key="po_curr")
+                pay_status = p5.selectbox("付款进度", ["未付","部分付款","已付清"])
+                notes = st.text_input("备注")
+                if st.form_submit_button("💾 保存采购", type="primary", use_container_width=True):
+                    if not factory or cost_amount <= 0:
+                        st.warning("工厂名和采购成本必填")
+                    else:
+                        no = fdb.add_purchase_order(sales_order_no=so_no, factory=factory,
+                                                   cost_amount=cost_amount, currency=po_curr, pay_status=pay_status, notes=notes)
+                        st.success(f"✅ 已保存采购单 {no}")
+                        st.rerun()
+            pos = fdb.list_purchase_orders()
+            if pos:
+                st.dataframe(pd.DataFrame(pos)[["po_no","sales_order_no","factory","cost_amount","currency","pay_status","delivery_status","po_date"]],
+                             use_container_width=True, hide_index=True)
+
+    # ---- 收付款 ----
+    with oc:
+        sales_nos = [o["order_no"] for o in fdb.list_sales_orders()]
+        pos_nos = [p["po_no"] for p in fdb.list_purchase_orders()]
+        refs = sales_nos + pos_nos
+        if not refs:
+            st.info("先建订单或采购单，再来登记收付款")
+        else:
+            with st.form("new_pay"):
+                d1, d2, d3 = st.columns(3)
+                direction = d1.selectbox("方向", ["收客户", "付工厂"])
+                ref_no = d2.selectbox("关联订单/采购单", refs)
+                amount = d3.number_input("金额", min_value=0.0, step=100.0)
+                d4, d5, d6 = st.columns(3)
+                pcurr = d4.selectbox("币种", ["USD","CNY","EUR"], key="pay_curr")
+                rate = d5.number_input("汇率(折人民币)", min_value=0.0, value=1.0, step=0.1)
+                method = d6.selectbox("方式", ["T/T","西联","信用证","PayPal","其他"])
+                notes = st.text_input("备注，如：30%定金 / 70%尾款")
+                if st.form_submit_button("💾 登记", type="primary", use_container_width=True):
+                    if amount <= 0:
+                        st.warning("金额要大于0")
+                    else:
+                        fdb.add_payment(direction=direction, ref_order_no=ref_no, amount=amount,
+                                        currency=pcurr, exchange_rate=rate, method=method, notes=notes)
+                        st.success("✅ 已登记")
+                        st.rerun()
+            pays = fdb.list_payments()
+            if pays:
+                st.dataframe(pd.DataFrame(pays)[["pay_date","direction","ref_order_no","amount","currency","exchange_rate","method","notes"]],
+                             use_container_width=True, hide_index=True)
+
+    # ---- 经营看板 ----
+    with od:
+        s = fdb.dashboard_summary()
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("订单总数", s["orders"])
+        k2.metric("应收总额", f"${s['ar']:,.0f}")
+        k3.metric("应付总额", f"${s['ap']:,.0f}")
+        k4.metric("累计毛利", f"${s['gross']:,.0f}")
+        st.markdown("---")
+        b1, b2, b3 = st.columns(3)
+        b1.metric("本月销售额", f"${s['m_sales']:,.0f}")
+        b2.metric("本月采购", f"${s['m_po']:,.0f}")
+        b3.metric("本月毛利", f"${s['m_gross']:,.0f}")
+        st.caption("口径：USD 原币汇总；应收=销售总额-已收；应付=采购总额-已付；毛利=销售额-采购-物流-其他")
+        if s["ar"] > 0:
+            st.warning(f"⚠️ 当前应收 ${s['ar']:,.0f} 未收回，记得跟进尾款")
     
 # ============ 页面：博客SEO工作台 ============
 elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "blog":

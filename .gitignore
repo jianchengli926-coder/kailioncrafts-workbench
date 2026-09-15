@@ -5,3 +5,7 @@ data/competitor_sites.csv
 __pycache__/
 *.pyc
 .streamlit/secrets.toml
+
+# 订单与财务中心
+*.db
+data/workbench.db

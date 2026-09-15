@@ -19,6 +19,7 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime, timedelta
 import io
+import json as _json
 
 from config import (
     COMPANY, CUSTOMER_GRADES, EMAIL_CONFIG,
@@ -3803,10 +3804,10 @@ elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "l
     
     for item, desc in checklist:
         col1, col2 = st.columns([1, 4])
-    with col1:
-        st.checkbox("", key=f"check_{item}")
-    with col2:
-        st.markdown(f"**{item}** - {desc}")
+        with col1:
+            st.checkbox(f"完成-{item}", key=f"check_{item}", label_visibility="collapsed")
+        with col2:
+            st.markdown(f"**{item}** - {desc}")
     
     st.markdown("---")
     
@@ -4799,12 +4800,12 @@ elif page == "🤖 模型管理":
     
     for p in providers:
         is_active = p['id'] == active_id
-    card_bg = "#e8f5e9" if is_active else "#ffffff"
-    border_color = "#4caf50" if is_active else "#e0e0e0"
-    
-    with st.container():
-        st.markdown(f"""
-    <div style="background:{card_bg}; padding:16px; border-radius:8px; 
+        card_bg = "#e8f5e9" if is_active else "#ffffff"
+        border_color = "#4caf50" if is_active else "#e0e0e0"
+
+        with st.container():
+            st.markdown(f"""
+    <div style="background:{card_bg}; padding:16px; border-radius:8px;
                 border-left:4px solid {border_color}; margin-bottom:12px;">
         <strong>{'✅ ' if is_active else ''}{p['name']}</strong>
         <span style="float:right; color:#666; font-size:12px;">
@@ -4814,82 +4815,82 @@ elif page == "🤖 模型管理":
         <small style="color:#888;">{p['base_url']}</small>
     </div>
     """, unsafe_allow_html=True)
-    
-    col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-    
-    with col1:
-        # 模型选择
-        if p['models']:
-            selected_model = st.selectbox(
-                "选择模型",
-                p['models'],
-                key=f"model_{p['id']}",
-                index=0,
-                label_visibility="collapsed"
-            )
-        else:
-            selected_model = st.text_input("模型名称", key=f"model_{p['id']}")
-    
-    with col2:
-        if not is_active:
-            if st.button("✅ 切换到此供应商", key=f"switch_{p['id']}", use_container_width=True):
-                provider = set_active_provider(p['id'])
-                if provider:
-                    # 同步到.env配置
-                    save_config(
-                        provider=p['id'],
-                        api_key=provider['api_key'],
-                        base_url=provider['base_url'],
-                        model=selected_model
-                    )
-                    st.success(f"已切换到：{p['name']} / {selected_model}")
-                    st.rerun()
-        else:
-            st.success("当前使用中")
-    
-    with col3:
-        if st.button("🔗 测试连接", key=f"test_{p['id']}", use_container_width=True):
-            result = test_provider(p['id'])
-            if result['success']:
-                st.success(f"✅ {result['message']}")
+
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+
+        with col1:
+            # 模型选择
+            if p['models']:
+                selected_model = st.selectbox(
+                    "选择模型",
+                    p['models'],
+                    key=f"model_{p['id']}",
+                    index=0,
+                    label_visibility="collapsed"
+                )
             else:
-                st.error(f"❌ {result['message']}")
-    
-    with col4:
-        if p['id'] not in ['ollama_local', 'doubao_default']:
-            if st.button("🗑️", key=f"del_{p['id']}"):
-                delete_provider(p['id'])
-                st.success("已删除")
+                selected_model = st.text_input("模型名称", key=f"model_{p['id']}")
+
+        with col2:
+            if not is_active:
+                if st.button("✅ 切换到此供应商", key=f"switch_{p['id']}", use_container_width=True):
+                    provider = set_active_provider(p['id'])
+                    if provider:
+                        # 同步到.env配置
+                        save_config(
+                            provider=p['id'],
+                            api_key=provider['api_key'],
+                            base_url=provider['base_url'],
+                            model=selected_model
+                        )
+                        st.success(f"已切换到：{p['name']} / {selected_model}")
+                        st.rerun()
+            else:
+                st.success("当前使用中")
+
+        with col3:
+            if st.button("🔗 测试连接", key=f"test_{p['id']}", use_container_width=True):
+                result = test_provider(p['id'])
+                if result['success']:
+                    st.success(f"✅ {result['message']}")
+                else:
+                    st.error(f"❌ {result['message']}")
+
+        with col4:
+            if p['id'] not in ['ollama_local', 'doubao_default']:
+                if st.button("🗑️", key=f"del_{p['id']}", use_container_width=True):
+                    delete_provider(p['id'])
+                    st.success("已删除")
+                    st.rerun()
+
+        # 展开编辑
+        with st.expander("✏️ 编辑配置", expanded=False):
+            col_a, col_b = st.columns(2)
+            with col_a:
+                edit_name = st.text_input("供应商名称", value=p['name'], key=f"edit_name_{p['id']}")
+                edit_url = st.text_input("API地址", value=p['base_url'], key=f"edit_url_{p['id']}")
+            with col_b:
+                edit_key = st.text_input("API Key", value=p['api_key'], type="password", key=f"edit_key_{p['id']}")
+                edit_models = st.text_area(
+                    "模型列表（每行一个）",
+                    value='\n'.join(p['models']),
+                    key=f"edit_models_{p['id']}",
+                    height=100
+                )
+
+            if st.button("💾 保存修改", key=f"save_edit_{p['id']}"):
+                models_list = [m.strip() for m in edit_models.split('\n') if m.strip()]
+                update_provider(
+                    p['id'],
+                    name=edit_name,
+                    base_url=edit_url,
+                    api_key=edit_key,
+                    models=models_list
+                )
+                st.success("已保存修改")
                 st.rerun()
-    
-    # 展开编辑
-    with st.expander("✏️ 编辑配置", expanded=False):
-        col_a, col_b = st.columns(2)
-        with col_a:
-            edit_name = st.text_input("供应商名称", value=p['name'], key=f"edit_name_{p['id']}")
-            edit_url = st.text_input("API地址", value=p['base_url'], key=f"edit_url_{p['id']}")
-        with col_b:
-            edit_key = st.text_input("API Key", value=p['api_key'], type="password", key=f"edit_key_{p['id']}")
-            edit_models = st.text_area(
-                "模型列表（每行一个）",
-                value='\n'.join(p['models']),
-                key=f"edit_models_{p['id']}",
-                height=100
-            )
-    
-        if st.button("💾 保存修改", key=f"save_edit_{p['id']}"):
-            models_list = [m.strip() for m in edit_models.split('\n') if m.strip()]
-            update_provider(
-                p['id'],
-                name=edit_name,
-                base_url=edit_url,
-                api_key=edit_key,
-                models=models_list
-            )
-            st.success("已保存修改")
-            st.rerun()
-    
-    st.markdown("---")
+
+        st.markdown("---")
     
     # 添加新供应商
     st.subheader("➕ 添加新API中转站")
@@ -4906,12 +4907,12 @@ elif page == "🤖 模型管理":
         submitted = st.form_submit_button("✅ 添加供应商", use_container_width=True)
     if submitted and new_name and new_url and new_key:
         models_list = [m.strip() for m in new_models.split('\n') if m.strip()] if new_models else None
-    provider = add_provider(new_name, new_url, new_key, models_list)
-    if provider['models']:
-        st.success(f"✅ 添加成功！自动检测到 {len(provider['models'])} 个模型")
-    else:
-        st.success("✅ 添加成功！请手动添加模型名称")
-    st.rerun()
+        provider = add_provider(new_name, new_url, new_key, models_list)
+        if provider['models']:
+            st.success(f"✅ 添加成功！自动检测到 {len(provider['models'])} 个模型")
+        else:
+            st.success("✅ 添加成功！请手动添加模型名称")
+        st.rerun()
     
     st.markdown("---")
     

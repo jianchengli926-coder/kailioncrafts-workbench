@@ -1573,10 +1573,11 @@ Best regards, {ep_now.get('en_name')}
 
                 st.markdown("---")
                 st.markdown("**📇 客户详情与跟进记录**")
-                sel = st.selectbox("选择客户", [c["id"] for c in customers],
-                                  format_func=lambda i: next((c.get("company_name", "") for c in customers if c["id"] == i), i),
+                _cust_ids = [c["id"] for c in customers] or ["__empty__"]
+                sel = st.selectbox("选择客户", _cust_ids,
+                                  format_func=lambda i: "（暂无客户）" if i == "__empty__" else next((c.get("company_name", "") for c in customers if c["id"] == i), i),
                                   key="cl_sel")
-                cust = cm.get_customer(sel)
+                cust = cm.get_customer(sel) if sel != "__empty__" else None
                 if cust:
                     dc1, dc2, dc3 = st.columns(3)
                     dc1.write(f"**公司**：{cust.get('company_name','')}\n**国家**：{cust.get('country','')}")
@@ -1683,16 +1684,14 @@ Best regards, {ep_now.get('en_name')}
                         st.warning("请填写公司名称和国家")
                     else:
                         stage_key = next((s["key"] for s in PIPELINE_STAGES if s["name"] == nc_stage), "lead")
-                        cm.add_customer({
+                        _new_c = cm.add_customer({
                             "company_name": nc_name, "country": nc_country, "city": nc_city,
                             "website": nc_web, "source": nc_source, "customer_type": nc_type,
                             "grade": nc_grade, "products": nc_products, "pipeline_stage": stage_key,
                             "score": 0,
                         })
-                        if int(nc_fu) > 0:
-                            new_id = cm.list_customers()[0]["id"] if cm.list_customers() else None
-                            if new_id:
-                                cm.set_next_follow_up(new_id, int(nc_fu))
+                        if int(nc_fu) > 0 and _new_c:
+                            cm.set_next_follow_up(_new_c["id"], int(nc_fu))
                         st.success(f"✅ 已添加客户：{nc_name}")
 
 # ============ 页面3：客户分析（旧） ============

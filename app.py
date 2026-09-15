@@ -223,6 +223,19 @@ with st.sidebar:
 
     st.markdown("---")
 
+    # ============ AI 连接状态 ============
+    try:
+        if ai.is_configured():
+            st.success(f"🤖 AI 引擎已就绪：{ai.get_provider_name()} · 模型 {getattr(ai,'model','?')}", icon="✅")
+        else:
+            st.warning("🤖 AI 引擎未配置 —— 所有 AI 功能将无法出结果，请先到「⚙️ 设置中心 → 模型配置」填写 API Key", icon="⚠️")
+    except Exception:
+        pass
+    if st.button("🔌 测试 AI 连接", use_container_width=True):
+        with st.spinner("正在测试连接..."):
+            ok, msg = ai.test_connection()
+            (st.success if ok else st.error)(msg)
+
     # ============ 第三区块：团队工作空间 ============
     st.markdown("##### 👥 团队工作空间")
     team_options = {key: f"{m['name']} · {m['category']}" for key, m in TEAM_MEMBERS.items()}

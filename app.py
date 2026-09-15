@@ -1780,17 +1780,17 @@ EN: ...
                 # 找出流失最多的阶段
                 if len(stages_list) >= 2:
                     worst_loss = None
-                    worst_loss_rate = 1.0
+                    worst_loss_rate = 0.0
                     for i in range(1, len(stages_list)):
                         prev = stages_list[i-1]["count"]
                         cur = stages_list[i]["count"]
                         if prev > 0:
                             loss_rate = 1 - cur / prev
-                            if loss_rate < worst_loss_rate:
+                            if loss_rate > worst_loss_rate:
                                 worst_loss_rate = loss_rate
                                 worst_loss = stages_list[i-1]["name"]
                     if worst_loss and worst_loss_rate > 0.3:
-                        st.warning(f"⚠️ 最大流失点：{worst_loss} → 下一阶段，流失率 {int((1-worst_loss_rate)*100)}%。建议：分析这步为什么客户流失最多，针对性优化话术/产品/价格。")
+                        st.warning(f"⚠️ 最大流失点：{worst_loss} → 下一阶段，流失率 {int(worst_loss_rate*100)}%。建议：分析这步为什么客户流失最多，针对性优化话术/产品/价格。")
 
                 cL, cR = st.columns(2)
                 with cL:

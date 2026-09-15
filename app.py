@@ -293,6 +293,134 @@ with st.sidebar:
         st.warning("⚠️ 演示模式")
 
 # ============ 页面1：企业工作台首页 ============
+# ============ 客户中心扩展：外贸市场情报（世界时钟/节日/展会/业绩）============
+from zoneinfo import ZoneInfo as _ZoneInfo
+
+# 主要贸易城市实时时钟（按区域分组），tz 为 IANA 时区
+WORLD_CLOCK_GROUPS = {
+    "本地": [
+        ("北京", "中国", "Asia/Shanghai"),
+    ],
+    "东南亚": [
+        ("新加坡", "新加坡", "Asia/Singapore"),
+        ("吉隆坡", "马来西亚", "Asia/Kuala_Lumpur"),
+        ("曼谷", "泰国", "Asia/Bangkok"),
+        ("雅加达", "印尼", "Asia/Jakarta"),
+        ("马尼拉", "菲律宾", "Asia/Manila"),
+    ],
+    "中东": [
+        ("迪拜", "阿联酋", "Asia/Dubai"),
+        ("利雅得", "沙特", "Asia/Riyadh"),
+        ("多哈", "卡塔尔", "Asia/Qatar"),
+        ("科威特城", "科威特", "Asia/Kuwait"),
+        ("伊斯坦布尔", "土耳其", "Europe/Istanbul"),
+    ],
+    "欧洲": [
+        ("法兰克福", "德国", "Europe/Berlin"),
+        ("伦敦", "英国", "Europe/London"),
+        ("巴黎", "法国", "Europe/Paris"),
+        ("马德里", "西班牙", "Europe/Madrid"),
+    ],
+    "北美": [
+        ("纽约", "美国", "America/New_York"),
+        ("洛杉矶", "美国", "America/Los_Angeles"),
+        ("多伦多", "加拿大", "America/Toronto"),
+    ],
+    "非洲": [
+        ("开罗", "埃及", "Africa/Cairo"),
+        ("拉各斯", "尼日利亚", "Africa/Lagos"),
+        ("约翰内斯堡", "南非", "Africa/Johannesburg"),
+        ("内罗毕", "肯尼亚", "Africa/Nairobi"),
+    ],
+}
+
+# 国家 -> IANA 时区（供"按客户国家判断联系时间"用）
+COUNTRY_TZ = {
+    "中国": "Asia/Shanghai", "新加坡": "Asia/Singapore", "马来西亚": "Asia/Kuala_Lumpur",
+    "泰国": "Asia/Bangkok", "印尼": "Asia/Jakarta", "印度尼西亚": "Asia/Jakarta",
+    "菲律宾": "Asia/Manila", "阿联酋": "Asia/Dubai", "沙特": "Asia/Riyadh",
+    "沙特阿拉伯": "Asia/Riyadh", "卡塔尔": "Asia/Qatar", "科威特": "Asia/Kuwait",
+    "土耳其": "Europe/Istanbul", "德国": "Europe/Berlin", "英国": "Europe/London",
+    "法国": "Europe/Paris", "西班牙": "Europe/Madrid", "意大利": "Europe/Rome",
+    "美国": "America/New_York", "加拿大": "America/Toronto", "埃及": "Africa/Cairo",
+    "尼日利亚": "Africa/Lagos", "南非": "Africa/Johannesburg", "肯尼亚": "Africa/Nairobi",
+    "巴西": "America/Sao_Paulo", "墨西哥": "America/Mexico_City", "澳大利亚": "Australia/Sydney",
+    "日本": "Asia/Tokyo", "韩国": "Asia/Seoul", "印度": "Asia/Kolkata", "越南": "Asia/Ho_Chi_Minh",
+}
+
+# 2026年主要贸易国固定法定节日：国家 -> [(月, 日, 节日名)]
+HOLIDAYS_2026 = {
+    "中国": [(1, 1, "元旦"), (2, 17, "春节"), (2, 18, "春节"), (2, 19, "春节"),
+            (5, 1, "劳动节"), (10, 1, "国庆节")],
+    "美国": [(1, 1, "元旦"), (1, 19, "马丁·路德·金纪念日"), (5, 25, "阵亡将士纪念日"),
+            (7, 3, "独立日(观察日)"), (9, 7, "劳动节"), (11, 26, "感恩节"), (12, 25, "圣诞节")],
+    "英国": [(1, 1, "元旦"), (4, 3, "Good Friday"), (12, 25, "圣诞节"), (12, 26, "节礼日")],
+    "德国": [(1, 1, "元旦"), (4, 3, "Good Friday"), (5, 1, "劳动节"),
+            (10, 3, "德国统一日"), (12, 25, "圣诞节"), (12, 26, "圣诞节二日")],
+    "法国": [(1, 1, "元旦"), (5, 1, "劳动节"), (7, 14, "法国国庆"), (12, 25, "圣诞节")],
+    "阿联酋": [(1, 1, "元旦"), (12, 1, "联邦纪念日")],
+    "沙特": [(1, 1, "公历元旦")],
+    "卡塔尔": [(1, 1, "元旦"), (12, 18, "国庆日")],
+    "日本": [(1, 1, "元旦"), (1, 12, "成人日"), (2, 11, "建国纪念日"),
+            (4, 29, "昭和之日"), (5, 3, "宪法纪念日"), (11, 23, "勤劳感谢日")],
+}
+ISLAMIC_HOLIDAY_NOTE = ("⚠️ 阿联酋/沙特/卡塔尔/科威特等伊斯兰国家：开斋节(Eid al-Fitr)、宰牲节(Eid al-Adha)"
+                       "按伊斯兰历浮动，2026年约在4月下旬、5月底~6月初，期间客户基本不办公，"
+                       "发邮件前请核对当地公告。")
+
+# 五金刀剪/餐厨/消费品行业主要展会（框架数据，可在页面上补充）
+EXPOS_2026 = [
+    {"name": "广交会 Canton Fair", "country": "中国·广州", "month": "4月/10月",
+     "category": "综合外贸(五金/餐厨)", "fit": "★★★★★", "note": "全球买家最集中，老客户约见首选"},
+    {"name": "Ambiente 法兰克福国际消费品展", "country": "德国·法兰克福", "month": "2月",
+     "category": "餐厨/家居消费品", "fit": "★★★★★", "note": "欧美厨房用品采购主战场"},
+    {"name": "Chicago Housewares Show", "country": "美国·芝加哥", "month": "3月",
+     "category": "餐厨用品", "fit": "★★★★★", "note": "美国家居厨具最大展"},
+    {"name": "HKTDC 香港家庭用品展", "country": "中国·香港", "month": "4月",
+     "category": "家居/餐厨", "fit": "★★★★", "note": "东南亚及全球买家中转站"},
+    {"name": "National Hardware Show", "country": "美国·拉斯维加斯", "month": "4-5月",
+     "category": "五金工具", "fit": "★★★★", "note": "北美五金渠道商集中"},
+    {"name": "Gulfood / Arabian Hospitality", "country": "阿联酋·迪拜", "month": "2月",
+     "category": "酒店餐饮供应", "fit": "★★★★", "note": "中东餐厨/酒店采购渠道"},
+    {"name": "科隆国际五金展 Eisenwarenmesse", "country": "德国·科隆", "month": "3月(隔年)",
+     "category": "五金", "fit": "★★★★", "note": "2026年为举办年，B2B五金专业买家"},
+    {"name": "东京国际礼品展 Gift Show", "country": "日本·东京", "month": "2月/9月",
+     "category": "礼品/家居", "fit": "★★★", "note": "日本市场渠道"},
+]
+
+PERF_FILE = Path(__file__).parent / "data" / "perf_targets.json"
+
+
+def _perf_load():
+    try:
+        if PERF_FILE.exists():
+            return _json.loads(PERF_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def _perf_save(d):
+    PERF_FILE.write_text(_json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _city_status(city, country, tzname):
+    """返回 (当地datetime, 是否工作时间, 是否周末, 今日节日名或None)"""
+    now = datetime.now(_ZoneInfo(tzname))
+    wd = now.weekday()  # 周一0 ... 周日6
+    is_weekend = wd >= 5
+    hm = now.hour + now.minute / 60
+    is_work = (not is_weekend) and 9.0 <= hm < 18.0
+    holiday = None
+    for m, d, name in HOLIDAYS_2026.get(country, []):
+        if m == now.month and d == now.day:
+            holiday = name
+            break
+    if holiday:
+        is_work = False
+    return now, is_work, is_weekend, holiday
+
+
 if page == "📊 仪表盘":
     # 欢迎头部
     st.markdown("""
@@ -910,7 +1038,8 @@ elif page == "👥 客户中心":
     st.markdown("---")
 
     if cc_current == "🎯 客户分析":
-        cc_t1, cc_t2 = st.tabs(["📊 客户分析", "🔍 深度背调"])
+        cc_t1, cc_t2, cc_t3, cc_t4, cc_t5 = st.tabs(
+            ["📊 客户分析", "🔍 深度背调", "🌍 世界时钟与节日", "📰 外贸热点研判", "🎪 展会情报"])
         with cc_t1:
             st.subheader("潜在客户分析")
             with st.form("ca_form"):
@@ -960,8 +1089,86 @@ elif page == "👥 客户中心":
                     except Exception as e:
                         st.error(f"AI错误：{e}")
 
+        with cc_t3:
+            st.subheader("🌍 世界时钟与节日提醒")
+            st.caption("按客户当地时间判断此刻是否适合联系；节假日/周末自动标灰，避免在对方休息时打扰")
+            for region, cities in WORLD_CLOCK_GROUPS.items():
+                st.markdown(f"**📍 {region}**")
+                cols = st.columns(len(cities))
+                for i, (city, country, tzname) in enumerate(cities):
+                    with cols[i]:
+                        now, is_work, is_weekend, holiday = _city_status(city, country, tzname)
+                        t = now.strftime("%H:%M")
+                        d = now.strftime("%m/%d")
+                        wd = "一二三四五六日"[now.weekday()]
+                        if holiday:
+                            badge = f"🎉 {holiday}"
+                        elif is_weekend:
+                            badge = "🌴 周末"
+                        elif is_work:
+                            badge = "🟢 工作时间"
+                        else:
+                            badge = "⚪ 非工作时间"
+                        st.metric(label=f"{city} · {country}", value=t, delta=f"{d} 周{wd} · {badge}")
+            st.info(ISLAMIC_HOLIDAY_NOTE)
+            st.markdown("---")
+            st.markdown("**📌 现在适不适合联系某国客户？**")
+            cc_country_sel = st.selectbox("选择客户所在国家", list(COUNTRY_TZ.keys()), key="cc_tz_sel")
+            if st.button("🕐 判断最佳联系时间", key="cc_tz_btn", use_container_width=True):
+                tzname = COUNTRY_TZ[cc_country_sel]
+                now, is_work, is_weekend, holiday = _city_status(cc_country_sel, cc_country_sel, tzname)
+                with st.spinner("结合知识库分析联系节奏..."):
+                    try:
+                        prompt = f"""你是B2B外贸客户开发专家。客户所在国家：{cc_country_sel}。
+客户当地此刻时间：{now.strftime('%Y-%m-%d %H:%M')}（星期{now.weekday()+1}），是否工作时间：{is_work}，是否周末：{is_weekend}，今日是否节日：{holiday or '否'}。
+我方情况：{kb.get_company_brief()}
+请简短输出(中文)：1)现在此刻该不该发邮件/打电话，为什么；2)今天当地哪个时段发开发信/回复询盘打开率最高；3)该国商务沟通1-2条时间/节奏提醒(如周五祈祷、斋月等)。控制在200字内。"""
+                        st.markdown(ai.chat(prompt))
+                    except Exception as e:
+                        st.error(f"AI错误：{e}")
+
+        with cc_t4:
+            st.subheader("📰 外贸热点研判")
+            st.caption("选市场+主题，AI 结合我方知识库做采购影响研判（实时新闻源后续接入，当前为基于行业常识与知识库的研判框架）")
+            cc_mkt = st.selectbox("关注市场", ["中东", "欧美", "东南亚", "非洲", "南美"], key="cc_mkt")
+            cc_topic = st.selectbox("关注主题", ["汇率波动", "关税/贸易政策", "采购旺季/节日备货", "海运物流", "原材料价格", "竞争对手动向"], key="cc_topic")
+            if st.button("📡 生成研判", key="cc_news_btn", type="primary", use_container_width=True):
+                with st.spinner("AI研判中..."):
+                    try:
+                        prompt = f"""你是资深B2B外贸市场分析师，服务阳江刀剪厨具出口企业。
+我方：{kb.get_company_brief()}
+关注市场：{cc_mkt}；关注主题：{cc_topic}。
+请输出(中文，分点)：1)该市场近期在此主题上的典型动向及其对我方客户采购的影响；2)对客户报价/开发信/跟进节奏的具体建议；3)1-2条需要持续盯的信号。300字内。涉及具体最新数据请标注"需实时核实"。"""
+                        st.markdown(ai.chat(prompt))
+                    except Exception as e:
+                        st.error(f"AI错误：{e}")
+
+        with cc_t5:
+            st.subheader("🎪 展会情报")
+            st.caption("五金刀剪/餐厨行业主要展会台账；选客户国家，AI 推荐该重点约见哪个展")
+            expos_df = pd.DataFrame(EXPOS_2026)
+            expos_df.columns = ["展会", "国家/城市", "月份", "品类", "相关度", "备注"]
+            st.dataframe(expos_df, use_container_width=True, hide_index=True)
+            st.markdown("---")
+            cc_expo_country = st.selectbox("客户所在国家/地区",
+                ["美国", "德国", "英国", "阿联酋", "沙特", "日本", "澳大利亚", "俄罗斯/独联体", "东南亚", "南美"], key="cc_expo_country")
+            cc_expo_note = st.text_input("客户主营（可选）", placeholder="如:连锁厨具零售商/批发商", key="cc_expo_note")
+            if st.button("🎯 AI推荐参展/观展价值", key="cc_expo_btn", use_container_width=True):
+                with st.spinner("AI分析中..."):
+                    try:
+                        expos_txt = "\n".join([f"- {e['name']}（{e['country']}，{e['month']}，相关度{e['fit']}）：{e['note']}" for e in EXPOS_2026])
+                        prompt = f"""你是外贸展会营销顾问。我方：{kb.get_company_brief()}
+客户所在：{cc_expo_country}；客户主营：{cc_expo_note or '未知'}。
+可用展会清单：
+{expos_txt}
+请输出(中文)：1)针对这个客户所在市场，最值得约见/重点布局的1-2个展会及理由；2)展前给该客户发什么邀约话术方向；3)若不参展，线上如何借这个展会做营销由头。200字内。"""
+                        st.markdown(ai.chat(prompt))
+                    except Exception as e:
+                        st.error(f"AI错误：{e}")
+
     elif cc_current == "✉️ 客户开发":
-        cc_p1, cc_d1, cc_d2 = st.tabs(["🎯 个性化开发信(网址+案例)", "✉️ 新开发信", "🔄 多轮跟进"])
+        cc_p1, cc_d1, cc_d2, cc_g1 = st.tabs(
+            ["🎯 个性化开发信(网址+案例)", "✉️ 新开发信", "🔄 多轮跟进", "🎯 业绩目标"])
 
         # ===== 个性化开发信（personalized-email skill）=====
         EP_FILE = Path(__file__).parent / "data" / "enterprise_profile.json"
@@ -1178,25 +1385,89 @@ Best regards, {ep_now.get('en_name')}
                     except Exception as e:
                         st.error(f"AI错误：{e}")
 
+        with cc_g1:
+            st.subheader("🎯 业绩目标")
+            st.caption("设定本月开发与成交目标，自动读取客户中心CRM实际进度算达成率")
+            _ym = datetime.now().strftime("%Y-%m")
+            _targets = _perf_load()
+            _cur = _targets.get(_ym, {})
+            cg1, cg2, cg3, cg4 = st.columns(4)
+            with cg1:
+                t_dev = st.number_input("本月目标开发信(封)", min_value=0, value=int(_cur.get("dev", 20)), step=5, key="pt_dev")
+            with cg2:
+                t_lead = st.number_input("本月目标意向客户(个)", min_value=0, value=int(_cur.get("leads", 8)), step=1, key="pt_leads")
+            with cg3:
+                t_deal = st.number_input("本月目标成交(单)", min_value=0, value=int(_cur.get("deals", 2)), step=1, key="pt_deals")
+            with cg4:
+                t_amt = st.number_input("本月目标成交额(USD)", min_value=0, value=int(_cur.get("amount", 50000)), step=5000, key="pt_amt")
+            if st.button("💾 保存本月目标", key="pt_save", use_container_width=True):
+                _targets[_ym] = {"dev": t_dev, "leads": t_lead, "deals": t_deal, "amount": t_amt}
+                _perf_save(_targets)
+                st.success(f"✅ 已保存 {_ym} 业绩目标")
+            st.markdown("---")
+            st.markdown(f"**📈 {_ym} 实际进度（来自客户中心CRM）**")
+            try:
+                _st = cm.get_statistics()
+                _dealed = _st.get("by_status", {}).get("已成交", 0)
+                _total = _st.get("total", 0)
+
+                def _bar(actual, target, unit=""):
+                    if target <= 0:
+                        st.write(f"实际 {actual}{unit} ｜ 目标未设")
+                        return
+                    st.progress(min(1.0, actual / target),
+                                text=f"实际 {actual}{unit} / 目标 {target}{unit}（{actual/target*100:.0f}%）")
+
+                _bar(_total, t_lead, "个客户")
+                _bar(_dealed, t_deal, "单")
+                st.caption("说明：开发信发送量、成交额暂未埋点，先以CRM建档客户数/成交单数为进度口径；后续可接 finance_db 订单财务自动取成交额。")
+            except Exception as e:
+                st.error(f"读取CRM进度失败：{e}")
+
     elif cc_current == "💬 客户问答":
-        st.subheader("客户问题智能回复")
-        with st.form("qa_form"):
-            q = st.text_area("客户问题 *", height=100)
-            qa_company = st.text_input("客户公司（可选）")
-            qa_submit = st.form_submit_button("🤖 AI回复", use_container_width=True, type="primary")
-        if qa_submit and q:
-            with st.spinner("生成中..."):
-                try:
-                    prompt = FAQ_PROMPT.format(
-                        question=q, company_name=qa_company or "客户", country="未知",
-                        conversation_history="（无）", faq_content=kb.get_faq(),
-                        product_specs=kb.get_product_specs()[:1500],
-                        terminology=kb.get_terminology(),
-                    )
-                    result = ai.chat(prompt)
-                    st.markdown(result)
-                except Exception as e:
-                    st.error(f"AI错误：{e}")
+        cc_q1, cc_q2 = st.tabs(["💬 智能回复", "🗣️ 沟通话术与文化禁忌"])
+        with cc_q1:
+            st.subheader("客户问题智能回复")
+            with st.form("qa_form"):
+                q = st.text_area("客户问题 *", height=100)
+                qa_company = st.text_input("客户公司（可选）")
+                qa_submit = st.form_submit_button("🤖 AI回复", use_container_width=True, type="primary")
+            if qa_submit and q:
+                with st.spinner("生成中..."):
+                    try:
+                        prompt = FAQ_PROMPT.format(
+                            question=q, company_name=qa_company or "客户", country="未知",
+                            conversation_history="（无）", faq_content=kb.get_faq(),
+                            product_specs=kb.get_product_specs()[:1500],
+                            terminology=kb.get_terminology(),
+                        )
+                        result = ai.chat(prompt)
+                        st.markdown(result)
+                    except Exception as e:
+                        st.error(f"AI错误：{e}")
+        with cc_q2:
+            st.subheader("🗣️ 沟通话术与文化禁忌")
+            st.caption("选客户国家+沟通场景，AI 结合知识库谈判/邮件技巧，输出文化禁忌与可直接套用的话术模板")
+            cc_q_country = st.selectbox("客户所在国家",
+                ["美国", "德国", "英国", "阿联酋", "沙特", "印度", "日本", "澳大利亚", "俄罗斯", "巴西"], key="cq_country")
+            cc_q_scene = st.selectbox("沟通场景",
+                ["首次开发/破冰", "报价后客户嫌贵", "客户比价/压价", "催下单/催定金", "交期延误解释", "售后/投诉处理", "节日问候维护关系"], key="cq_scene")
+            cc_q_extra = st.text_input("客户情况补充（可选）", placeholder="如:首次询价/已合作3年/正在跟竞品谈...", key="cq_extra")
+            if st.button("🗣️ 生成沟通建议与话术", key="cq_btn", type="primary", use_container_width=True):
+                with st.spinner("AI生成中..."):
+                    try:
+                        prompt = f"""你是资深B2B外贸沟通教练，服务阳江刀剪厨具出口企业。
+我方：{kb.get_company_brief()}
+知识库谈判要点：{kb.get_negotiation_tips()[:1200] if callable(getattr(kb,'get_negotiation_tips',None)) else ''}
+知识库邮件技巧：{kb.get_email_tips()[:1200] if callable(getattr(kb,'get_email_tips',None)) else ''}
+客户国家：{cc_q_country}；沟通场景：{cc_q_scene}；客户情况：{cc_q_extra or '未知'}。
+请输出(中文)：
+【文化与商务禁忌】3条以内，该国客户在邮件/谈判中最该注意的雷区；
+【沟通策略】2-3句，这个场景下该怎么把握节奏与措辞；
+【话术模板】给一段可直接发给客户的英文邮件/WhatsApp草稿（语气贴合该国商务风格），关键句可替换处用[方括号]标注。"""
+                        st.markdown(ai.chat(prompt))
+                    except Exception as e:
+                        st.error(f"AI错误：{e}")
 
     elif cc_current == "📊 客户管理":
         cc_m1, cc_m2 = st.tabs(["📈 销售漏斗", "👥 客户列表"])

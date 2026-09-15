@@ -430,14 +430,20 @@ if page == "📊 仪表盘":
     perf_cols = st.columns(len(members))
     for i, (mkey, mcol) in enumerate(zip(members, perf_cols)):
         m = TEAM_MEMBERS[mkey]
+        # 真实数据：统计该成员工作区已产出文件数
+        try:
+            ws = Path(m.get("workspace_dir", ""))
+            prod_count = len(list(ws.rglob("*"))) if str(ws) and ws.exists() else 0
+        except Exception:
+            prod_count = 0
         with mcol:
             st.markdown(f"""
             <div style="background:#f8f9fa;border-radius:12px;padding:16px;text-align:center;">
                 <div style="font-size:28px;">{'🔪' if mkey=='leo' else '🍳' if mkey=='jason' else '✂️' if mkey=='owen' else '🍖'}</div>
                 <div style="font-weight:700;margin:6px 0;">{m['name']}</div>
                 <div style="font-size:12px;color:#888;">{m['category']}</div>
-                <div style="margin-top:10px;font-size:24px;font-weight:700;color:#D4AF37;">--</div>
-                <div style="font-size:11px;color:#999;">客户数</div>
+                <div style="margin-top:10px;font-size:24px;font-weight:700;color:#D4AF37;">{prod_count}</div>
+                <div style="font-size:11px;color:#999;">已产出文件</div>
             </div>
             """, unsafe_allow_html=True)
 

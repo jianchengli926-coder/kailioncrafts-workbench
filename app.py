@@ -175,6 +175,7 @@ with st.sidebar:
         "🌍 市场与产品分析",
         "👥 客户中心",
         "📥 独立站管理", "📊 订单台账",
+        "🌍 海外社媒矩阵",
         # 产品部
         "📦 产品库",
         "📊 独立站SEO中心",
@@ -5610,6 +5611,138 @@ elif page == "📋 今日待办":
     todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
     
 # ============ 页面：订单台账 ============
+elif page == "🌍 海外社媒矩阵":
+    import social_db as sdb
+    sdb.init_db()
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
+    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · SOCIAL MATRIX</div>
+    <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">海外社媒矩阵</h2>
+    <div style="color:rgba(255,243,224,.6);font-size:13px;">品类 · 账号 · 内容 · 数据 · 引流独立站</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    t1, t2, t3 = st.tabs(["📊 驾驶舱", "👥 账号矩阵", "🎬 内容台账"])
+
+    with t1:
+        s, by_cat = sdb.dashboard()
+        a1, a2, a3, a4 = st.columns(4)
+        a1.metric("账号总数", s["accounts"], delta=f"活跃 {s['active']}")
+        a2.metric("本月发布", s["pub_month"], delta=f"共 {s['contents']} 条")
+        a3.metric("总播放", f"{s['views']:,}")
+        a4.metric("社媒询盘/订单", f"{s['inquiries']} / {s['orders']}")
+        st.markdown("##### 🏷️ 四大品类")
+        for cat, info in by_cat.items():
+            st.markdown(f"""
+            <div style="background:#1f2733;border-radius:10px;padding:12px 16px;margin-bottom:8px;">
+            <b style="color:#FFF3E0;">{cat}</b>　<span style="color:#aaa;font-size:13px;">负责人 {info['owner']}</span>
+            <br><span style="color:#D4AF37;font-size:13px;">账号 {info['accounts']} · 本月发布 {info['pub_month']} · 播放 {info['views']:,} · 询盘 {info['inquiries']} · 订单 {info['orders']}</span>
+            </div>""", unsafe_allow_html=True)
+
+    with t2:
+        with st.expander("➕ 新增账号", expanded=False):
+            with st.form("new_social_account"):
+                x1, x2, x3 = st.columns(3)
+                cat = x1.selectbox("品类", list(sdb.CATEGORIES.keys()))
+                owner = x2.text_input("负责人", sdb.CATEGORIES[cat])
+                platform = x3.selectbox("平台", sdb.PLATFORMS)
+                y1, y2 = st.columns(2)
+                acct_name = y1.text_input("账号名称 *")
+                acct_url = y2.text_input("账号主页链接")
+                email = st.text_input("联系邮箱")
+                status = st.selectbox("状态", ["Active", "Inactive", "Pending"])
+                if st.form_submit_button("保存", type="primary", use_container_width=True):
+                    if not acct_name:
+                        st.warning("账号名称必填")
+                    else:
+                        sdb.add_account(category=cat, owner=owner, platform=platform,
+                                        account_name=acct_name, account_url=acct_url,
+                                        email=email, status=status)
+                        st.success("已保存"); st.rerun()
+        accounts = sdb.list_accounts()
+        if accounts:
+            cols = ["category", "owner", "platform", "account_name", "account_url", "email", "status"]
+            st.dataframe(pd.DataFrame(accounts)[cols], use_container_width=True, hide_index=True)
+            with st.expander("🔗 打开账号"):
+                sel = st.selectbox("选账号", [f"{a['platform']} · {a['account_name']}" for a in accounts])
+                acc = next(a for a in accounts if f"{a['platform']} · {a['account_name']}" == sel)
+                if acc.get("account_url"):
+                    st.markdown(f"[🌐 打开 {acc['platform']} 账号]({acc['account_url']})")
+                else:
+                    st.info("该账号还没填主页链接")
+                if st.button("🗑 删除此账号"):
+                    sdb.delete_account(acc["id"]); st.rerun()
+        else:
+            st.info("还没有账号，点上方新增第一个")
+
+    with t3:
+        with st.expander("➕ 新增内容", expanded=False):
+            with st.form("new_content"):
+                z1, z2, z3 = st.columns(3)
+                cat = z1.selectbox("品类", list(sdb.CATEGORIES.keys()), key="cnt_cat")
+                owner = z2.text_input("负责人", sdb.CATEGORIES[cat], key="cnt_owner")
+                platform = z3.selectbox("平台", sdb.PLATFORMS, key="cnt_plat")
+                title = st.text_input("标题 *")
+                z4, z5, z6 = st.columns(3)
+                ctype = z4.selectbox("类型", sdb.CONTENT_TYPES)
+                pub_status = z5.selectbox("状态", sdb.STATUS)
+                pub_date = z6.text_input("发布日期", placeholder="2026-09-14")
+                cover = st.file_uploader("封面图（JPG/PNG/WEBP）", type=["jpg", "jpeg", "png", "webp"])
+                pub_url = st.text_input("发布链接（平台视频URL）")
+                landing = st.text_input("独立站落地页链接")
+                d1, d2, d3, d4 = st.columns(4)
+                views = d1.number_input("播放", min_value=0, step=100)
+                likes = d2.number_input("点赞", min_value=0)
+                comments = d3.number_input("评论", min_value=0)
+                saves = d4.number_input("收藏", min_value=0)
+                e1, e2, e3 = st.columns(3)
+                shares = e1.number_input("分享", min_value=0)
+                inq = e2.number_input("询盘", min_value=0)
+                ord_n = e3.number_input("订单", min_value=0)
+                shoot = st.text_area("📹 拍摄脚本（折叠长文本）", height=100)
+                notes = st.text_input("备注")
+                if st.form_submit_button("保存内容", type="primary", use_container_width=True):
+                    if not title:
+                        st.warning("标题必填")
+                    else:
+                        cover_path = None
+                        if cover is not None:
+                            sdb.COVER_DIR.mkdir(parents=True, exist_ok=True)
+                            cover_path = str(sdb.COVER_DIR / cover.name)
+                            with open(cover_path, "wb") as f:
+                                f.write(cover.getbuffer())
+                        no = sdb.add_content(category=cat, owner=owner, platform=platform,
+                                             title=title, content_type=ctype, status=pub_status,
+                                             publish_date=pub_date or None, cover_path=cover_path,
+                                             publish_url=pub_url, landing_url=landing,
+                                             views=views, likes=likes, comments=comments,
+                                             saves=saves, shares=shares, inquiries=inq, orders=ord_n,
+                                             shoot_script=shoot, notes=notes)
+                        st.success(f"✅ 已保存 {no}"); st.rerun()
+
+        f1, f2, f3, f4 = st.columns(4)
+        fcat = f1.selectbox("品类筛选", ["全部"] + list(sdb.CATEGORIES.keys()), key="flt_cat")
+        fplat = f2.selectbox("平台筛选", ["全部"] + sdb.PLATFORMS, key="flt_plat")
+        fown = f3.selectbox("负责人筛选", ["全部"] + list(sdb.CATEGORIES.values()), key="flt_own")
+        fst = f4.selectbox("状态筛选", ["全部"] + sdb.STATUS, key="flt_st")
+        items = sdb.list_contents(fcat, fplat, fown, fst)
+        st.caption(f"共 {len(items)} 条")
+        for c in items:
+            rate = sdb.interaction_rate(c)
+            with st.expander(f"🖼️ {c['content_no']} · {c['title']}  [{c['platform']}/{c['status']}]  播放{c['views']} 互动率{rate}%"):
+                cols_show = ["content_no", "category", "owner", "platform", "content_type",
+                             "publish_date", "views", "likes", "comments", "saves", "shares",
+                             "inquiries", "orders"]
+                st.dataframe(pd.DataFrame([{k: c.get(k) for k in cols_show}]),
+                             use_container_width=True, hide_index=True)
+                if c.get("cover_path") and Path(c["cover_path"]).exists():
+                    st.image(c["cover_path"], width=240)
+                if c.get("publish_url"):
+                    st.markdown(f"[▶ 打开发布链接]({c['publish_url']})")
+                if c.get("landing_url"):
+                    st.markdown(f"[🔗 独立站落地页]({c['landing_url']})")
+                st.markdown("**📹 拍摄脚本**"); st.write(c.get("shoot_script") or "—")
+
 elif page == "📊 订单台账":
     import finance_db as fdb
     fdb.init_db()

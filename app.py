@@ -5638,6 +5638,16 @@ elif page == "📊 订单台账":
                 upd_st = st.selectbox("新状态", fdb.ORDER_STATUS, key="upd_st")
                 if st.button("更新状态"):
                     fdb.update_sales_status(upd_no, upd_st); st.success("已更新"); st.rerun()
+
+            with st.expander("🔍 客户历史查询（谁还欠钱/下过几单）"):
+                cu_rows = fdb.list_customers()
+                st.dataframe(pd.DataFrame(cu_rows), use_container_width=True, hide_index=True)
+                picks = [r["客户"] for r in cu_rows]
+                if picks:
+                    sel_cu = st.selectbox("选客户看明细", picks)
+                    cu_orders = [o for o in orders if (o["customer"] or "(未填)") == sel_cu]
+                    st.dataframe(pd.DataFrame(cu_orders)[["order_no","product_summary","total_amount","currency","status","order_date"]],
+                                 use_container_width=True, hide_index=True)
         else:
             st.info("还没有订单，点上方新建第一笔")
 
@@ -5650,7 +5660,14 @@ elif page == "📊 订单台账":
             with st.form("new_po"):
                 p1, p2 = st.columns(2)
                 so_no = p1.selectbox("关联销售订单", sales_nos)
-                factory = p2.text_input("工厂名 *")
+                existing_factories = fdb.list_factories()
+                factory_opts = existing_factories + ["➕ 新工厂..."]
+                f_sel = p2.selectbox("工厂名", factory_opts)
+                if f_sel == "➕ 新工厂...":
+                    factory = p2.text_input("新工厂名", key="new_factory")
+                else:
+                    factory = f_sel
+                    p2.caption(f"将使用：{f_sel}")
                 p3, p4, p5 = st.columns(3)
                 cost_amount = p3.number_input("采购成本 *", min_value=0.0, step=100.0)
                 po_curr = p4.selectbox("币种", ["USD","CNY","EUR"], key="po_curr")

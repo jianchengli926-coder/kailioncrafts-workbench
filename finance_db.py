@@ -143,6 +143,40 @@ def list_payments():
     return [dict(r) for r in rows]
 
 
+def list_customers():
+    """按客户汇总：客户名->订单数/订单总额/已收/未收。"""
+    orders = list_sales_orders()
+    pays = list_payments()
+    received_by = {}
+    for p in pays:
+        if p["direction"] == "收客户":
+            received_by[p["ref_order_no"]] = received_by.get(p["ref_order_no"], 0) + p["amount"]
+    agg = {}
+    for o in orders:
+        cu = o["customer"] or "(未填)"
+        d = agg.setdefault(cu, {"orders": 0, "total": 0, "received": 0, "last_date": ""})
+        d["orders"] += 1
+        d["total"] += o["total_amount"]
+        d["received"] += received_by.get(o["order_no"], 0)
+        if (o["order_date"] or "") > d["last_date"]:
+            d["last_date"] = o["order_date"]
+    rows = [{"客户": k, "订单数": v["orders"], "订单总额": round(v["total"], 0),
+             "已收": round(v["received"], 0), "未收": round(v["total"] - v["received"], 0),
+             "最近订单": v["last_date"]} for k, v in agg.items()]
+    rows.sort(key=lambda r: r["未收"], reverse=True)
+    return rows
+
+
+def list_factories():
+    """已用过的工厂名列表（去重）。"""
+    pos = list_purchase_orders()
+    seen = []
+    for p in pos:
+        if p["factory"] and p["factory"] not in seen:
+            seen.append(p["factory"])
+    return seen
+
+
 # ---------- 汇总 ----------
 def dashboard_summary():
     """返回 应收/应付/本月销售额/本月毛利(原币USD口径汇总)。"""

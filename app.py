@@ -175,9 +175,9 @@ with st.sidebar:
         "📈 市场与产品分析",
         "👥 客户中心",
         "🖥️ 独立站管理", "🧾 订单台账",
-        "📣 海外社媒矩阵",
+        "🌍 海外社媒矩阵",
         # 产品部
-        "🔪 产品库",
+        "📦 产品库",
         "🔍 独立站SEO中心",
         # 市场部 -> 已并入公司知识库
         # 知识部
@@ -2151,7 +2151,7 @@ elif page == "📦 产品推荐":
             st.dataframe(df[display_cols], use_container_width=True)
 
 # ============ 产品库页面（增强版：统一产品数据库 + 智能推荐） ============
-elif page == "🔪 产品库":
+elif page == "📦 产品库":
     # 子导航：产品库浏览 / 智能产品推荐
     sub_nav = st.radio(
         "产品库工作台",
@@ -6159,7 +6159,7 @@ elif page == "📋 今日待办":
     todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
     
 # ============ 页面：订单台账 ============
-elif page == "📣 海外社媒矩阵":
+elif page == "🌍 海外社媒矩阵":
     import social_db as sdb
     sdb.init_db()
     st.markdown("""

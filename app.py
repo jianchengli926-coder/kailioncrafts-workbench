@@ -1590,6 +1590,32 @@ Best regards, {ep_now.get('en_name')}
                         st.markdown("**跟进时间线**")
                         for a in reversed(acts[-8:]):
                             st.markdown(f"- `{(a.get('created_at','') or '')[:16]}` 【{a.get('type','')}】{a.get('description','')}")
+                    # ---- P0: 关联订单与收款（客户名模糊匹配 finance_db）----
+                    try:
+                        import finance_db as _fdb
+                        _cn = (cust.get("company_name", "") or "").strip()
+                        _orders = [o for o in _fdb.list_sales_orders()
+                                   if _cn and (_cn in (o.get("customer") or "") or (o.get("customer") or "") in _cn)]
+                        _pay_no = {o["order_no"] for o in _orders}
+                        _received = sum(p["amount"] for p in _fdb.list_payments()
+                                       if p.get("direction") == "收客户" and p.get("ref_order_no") in _pay_no)
+                        _owed = sum(o["total_amount"] for o in _orders) - _received
+                        st.markdown("---")
+                        st.markdown("**📦 关联订单与收款**")
+                        r1, r2, r3 = st.columns(3)
+                        r1.metric("订单数", len(_orders))
+                        r2.metric("已收款", f"${_received:,.0f}")
+                        r3.metric("应收余额", f"${_owed:,.0f}")
+                        if _orders:
+                            st.dataframe(pd.DataFrame([{
+                                "订单号": o["order_no"], "产品": o["product_summary"],
+                                "金额": f"${o['total_amount']:,.0f}", "状态": o["status"],
+                                "下单日": o["order_date"], "交期": o["delivery_date"],
+                            } for o in _orders]), use_container_width=True, hide_index=True)
+                        else:
+                            st.caption("该客户暂无订单记录（在「🧾 订单台账」录入后会自动按客户名关联）")
+                    except Exception as _e:
+                        st.caption(f"订单关联暂不可用：{_e}")
                     with st.form("add_act_form"):
                         st.markdown("**＋ 记一条跟进**")
                         af1, af2, af3 = st.columns([1, 2, 1])

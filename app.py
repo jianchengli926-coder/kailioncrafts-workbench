@@ -4231,8 +4231,6 @@ elif page == "🌍 市场与产品分析":
     st.markdown("---")
 
     if mp_current == "📊 市场分析":
-        st.subheader("📊 市场分析")
-        st.caption("蓝海选品 · VOC客户之声 · 关键词挖掘 · 目标市场入市分析")
         m1, m2, m3, m4 = st.tabs(["🗺️ 入市分析", "🌊 蓝海选品", "💬 VOC客户之声", "🔑 关键词挖掘"])
 
         with m1:
@@ -4251,7 +4249,7 @@ elif page == "🌍 市场与产品分析":
 
         with m2:
             st.markdown("##### 🌊 蓝海选品分析")
-            st.caption("选一个品类+目标市场，AI评估市场规模、竞争度、价格带与进入机会")
+            st.caption("工作流参照 amazon-blue-ocean-research：关键词池 → 竞品分层 → 1-3星VOC根因 → 价格带 → 5个方案评分")
             col1, col2, col3 = st.columns(3)
             with col1:
                 bs_cat = st.selectbox("产品品类", COMPANY["categories"], key="bs_cat")
@@ -4262,31 +4260,34 @@ elif page == "🌍 市场与产品分析":
             bs_extra = st.text_input("补充想法（可选）", placeholder="例如：带包装/可激光刻字/套装", key="bs_extra")
             if st.button("🌊 AI蓝海选品分析", use_container_width=True, type="primary"):
                 with st.spinner("AI分析蓝海机会..."):
-                    prompt = f"""# 刀剪五金品类 · 蓝海选品分析任务
+                    prompt = f"""# 刀剪五金品类 · 蓝海选品调研（对标 amazon-blue-ocean-research 工作流）
 
-你是阳江刀剪产业带资深B2B选品顾问。请针对以下机会点做蓝海评估：
+你是阳江刀剪产业带资深B2B选品顾问。按以下结构输出决策级中文报告（不要编造成交数据；缺数据就标'需SellerSprite核'）：
 
 - 品类：{bs_cat}
 - 目标市场：{bs_market}
 - 目标价格带：{bs_price}
 - 补充：{bs_extra or '无'}
-
 公司背景：{kb.get_company_brief()[:600]}
 
-请输出（中文，结构化）：
-1. 【市场规模与趋势】该品类在目标市场的大致容量、增长方向
-2. 【竞争格局】头部是谁、是否红海、差异化空档在哪
-3. 【价格带分析】{bs_price} 这个价格带利润与竞争如何
-4. 【客户痛点】买家/终端最不满意现有产品的3个点（VOC视角）
-5. 【3个具体选品建议】每个建议给：产品形态+卖点+定价区间+为什么是蓝海
-6. 【风险与建议】认证/供应链/库存风险
-要务实，不要堆术语。"""
+请严格按这10步输出：
+1. 产品定义（一句话：形态/用途/使用方式/排除相邻品/目标买家）
+2. 关键词池：核心词/特征词/场景词分组，给出该品类典型词及'为什么相关'
+3. 竞品分层：8-12个代表性竞品，按结构+价格分层（不是按排名），每个至少2个具体事实
+4. VOC（1-3星差评根因）：列出5条根因，每条给'根因+严重度+受影响产品+改进要求'
+5. 价格带分布：相关样本价格带、样本数、代表结构，突出推荐价格带
+6. 非亚马逊渠道验证：沃尔玛/独立站等至少4个渠道的价格与结构观察
+7. 社媒消费者摘要：3-5个'夸'的主题、3-5个'骂'的主题
+8. 【5个蓝海产品方案 A-E】每个给：一句话定义/目标买家/形态材质/解决的问题/目标价/主要风险/竞品参照
+9. 方案评分与排序（需求度/竞争度/供应链可行性/利润），选出前3
+10. 风险与下一步验证清单
+务实、具体，不要堆术语。"""
                     result = ai.chat(prompt)
                     st.markdown(result)
 
         with m3:
             st.markdown("##### 💬 VOC 客户之声分析")
-            st.caption("输入产品或竞品，AI提炼客户评价里的好评/差评关键词与改进方向")
+            st.caption("工作流参照 amazon-voc-consumer-insights：购买理由/优势/劣势/使用场景/疑虑/未满足痛点")
             col1, col2 = st.columns(2)
             with col1:
                 voc_product = st.text_input("产品/品类", placeholder="例如：8寸主厨刀 / 厨房剪刀", key="voc_product")
@@ -4296,26 +4297,28 @@ elif page == "🌍 市场与产品分析":
             if st.button("💬 AI分析VOC", use_container_width=True, type="primary"):
                 with st.spinner("AI提炼客户之声..."):
                     review_txt = voc_review.strip() if voc_review else "（未提供原文，请基于该品类行业普遍评价经验分析）"
-                    prompt = f"""# 刀剪产品 · VOC（客户之声）分析任务
+                    prompt = f"""# 刀剪产品 · VOC客户之声（对标 amazon-voc-consumer-insights）
 
 产品：{voc_product}
 评价来源：{voc_source}
 真实评价原文：
 {review_txt}
 
-请输出（中文，结构化）：
-1. 【高频好评关键词】TOP10，按出现频率排序
-2. 【高频差评/吐槽关键词】TOP10，按严重程度排序
-3. 【核心痛点归纳】3-5条，说明客户最不满什么
-4. 【改进机会】我们的产品可以怎么差异化解决
-5. 【对Listing/开发信的建议】这些痛点怎么用进卖点话术
-务实、具体，别泛泛而谈。"""
+请按固定章节输出（中文）：
+1. 购买理由（为什么下单，TOP理由）
+2. 产品优势（好评高频点）
+3. 产品劣势（差评/退货根因，按严重度排序）
+4. 典型使用场景（买家怎么用）
+5. 消费者疑虑（下单前顾虑）
+6. 未满足痛点（现有产品没解决、可差异化机会）
+7. 对Listing卖点与开发信的话术建议
+每条结论要有依据，别泛泛而谈。"""
                     result = ai.chat(prompt)
                     st.markdown(result)
 
         with m4:
             st.markdown("##### 🔑 关键词挖掘")
-            st.caption("输入产品/品类，AI输出核心词、长尾词、SEO与广告词分组")
+            st.caption("工作流参照 amazon-keyword-library：采集→清洗去重→多维分类→详情页埋词→广告结构→否定词")
             col1, col2 = st.columns(2)
             with col1:
                 kw_product = st.text_input("产品/品类", placeholder="例如：bamboo cutting board", key="kw_product")
@@ -4323,22 +4326,42 @@ elif page == "🌍 市场与产品分析":
                 kw_lang = st.selectbox("输出语言", ["英文", "中文", "中英"], key="kw_lang")
             if st.button("🔑 AI挖掘关键词", use_container_width=True, type="primary"):
                 with st.spinner("AI挖掘关键词..."):
-                    prompt = f"""# 刀剪产品 · SEO关键词挖掘任务
+                    prompt = f"""# 刀剪产品 · 关键词资产库（对标 amazon-keyword-library）
 
 产品/品类：{kw_product}
 输出语言：{kw_lang}
-
 公司：{kb.get_company_brief()[:400]}
 
-请输出：
-1. 【核心大词】5个（搜索量大、竞争高）
-2. 【长尾精准词】15个（购买意图强、B2B批发向，含 wholesale/OEM/custom/private label）
-3. 【问题/场景词】10个（客户会搜的问题型词，如 "how to..."）
-4. 【负面/排除词】建议广告否定的词
-5. 每个词标注：月搜索量级（高/中/低）+ 商业意图（高/中）
+请按关键词资产库结构输出：
+1. 核心大词（5个，标注搜索量高/中/低、商业意图高/中）
+2. 长尾精准词（15个，含 wholesale/OEM/custom/private label/B2B向）
+3. 场景/问题词（10个，如 how to / best for）
+4. 【详情页埋词映射】哪些词放标题、哪些放五点、哪些放描述/后台
+5. 【广告结构建议】SP广泛/词组/精准分别投哪些词
+6. 【否定词库】建议否定的无效词
 表格化输出。"""
                     result = ai.chat(prompt)
                     st.markdown(result)
+
+        # ---- 真实案例展示 ----
+        with st.expander("📂 真实案例参考（点开看本功能实际产出的报告）"):
+            EXAMPLE_DIR = Path("/Volumes/Kingston 1TB NV1 40Gbps/独立站SEO项目/Codex-工作流Skill")
+            case_files = {
+                "🌊 蓝海选品案例（Block Knife Set 美国站蓝海调研报告）": EXAMPLE_DIR / "Block-Knife-Set-美国站蓝海调研-嵌入图片版.html",
+                "💬 VOC案例（ASIN B0G8H85L4T 客户之声报告）": EXAMPLE_DIR / "B0G8H85L4T-voc-report.html",
+                "📦 Listing文案案例（Kitchen Knives Set）": EXAMPLE_DIR / "kitchen-knives-set-standalone-share(1).html",
+            }
+            for label, fpath in case_files.items():
+                st.markdown(f"**{label}**")
+                st.code(str(fpath), language=None)
+                if not fpath.exists():
+                    st.warning("文件不存在")
+                elif st.button(f"🔍 在工作台内预览", key=f"case_{hash(label) & 0xffff}"):
+                    try:
+                        html = fpath.read_text(encoding="utf-8", errors="ignore")
+                        components.html(html, height=720, scrolling=True)
+                    except Exception as e:
+                        st.error(f"预览失败：{e}（文件较大，可直接双击路径用浏览器打开）")
 
     elif mp_current == "📦 产品分析":
         st.subheader("📦 产品分析")

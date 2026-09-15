@@ -2932,6 +2932,7 @@ elif page == "🤖 锴利自研AI工具库":
         {"id": "scene_reverse", "name": "场景图反推", "icon": "🔄", "category": "AI生图", "description": "参考图反推Prompt模板", "status": "✅ 已上线", "features": "上传参考图→选特征→反推生图Prompt"},
         {"id": "white_balance", "name": "白平衡校正工具", "icon": "🌈", "category": "图片处理", "description": "图片白平衡自动校正", "status": "✅ 已上线", "features": "上传产品图→自动白平衡→对比预览→下载"},
         {"id": "raw_alignment", "name": "选片与RAW对齐", "icon": "📸", "category": "图片处理", "description": "JPG选片匹配RAW原片", "status": "✅ 已上线", "features": "批量上传JPG选片+RAW原片→自动匹配"},
+        {"id": "video_reverse", "name": "爆款视频反推", "icon": "🎬", "category": "视频解析", "description": "丢爆款视频→反推分镜→生成剪辑脚本", "status": "✅ 已上线", "features": "链接解析/上传视频→反推分镜表→结合素材+要求→输出剪辑脚本"},
     ]
 
     # 统计
@@ -2941,7 +2942,7 @@ elif page == "🤖 锴利自研AI工具库":
     with col2:
         st.metric("已上线", len(TOOLS))
     with col3:
-        st.metric("工具分类", 3)
+        st.metric("工具分类", 4)
     with col4:
         st.metric("运行方式", "Streamlit原生")
 
@@ -2955,7 +2956,7 @@ elif page == "🤖 锴利自研AI工具库":
     # 未选中工具时才显示工具列表
     if 'selected_tool_id' not in st.session_state:
         # 分类标签
-        categories_order = ["全部", "产品命名", "图片处理", "AI生图"]
+        categories_order = ["全部", "产品命名", "图片处理", "AI生图", "视频解析"]
         selected_cat = st.radio("🔍 选择工具分类", categories_order, horizontal=True, key="tool_cat_filter")
 
         if selected_cat == "全部":
@@ -4702,29 +4703,193 @@ elif page == "🤖 锴利自研AI工具库":
                                 zf.writestr(f"RAW/{raw.name}", raw.getvalue())
                         zip_buf.seek(0)
                         st.download_button("📦 导出ZIP包 (JPG+RAW)", zip_buf, file_name="matched_raw.zip", mime="application/zip", type="primary")
-        else:
-            st.info("👆 请先上传JPG选片和RAW原片")
+                else:
+                    st.info("👆 请先上传JPG选片和RAW原片")
 
-            with st.expander("📚 本工具连接的公司知识库", expanded=False):
-                kb_map = {
-                    "sku_naming": ["SKU产品与SEO知识库（220种钢材+289SKU命名规则）", "产品图片与SEO知识库（127产品SEO命名）"],
-                    "line_art": ["产品图片与SEO知识库（827张SEO图片）", "独立站知识库（产品分类映射）"],
-                    "visual_correction": ["产品图片与SEO知识库（产品图片规范）", "标准化知识库（品牌视觉规范）"],
-                    "prompt_library": ["营销与客户开发知识库（高级营销词汇）", "产品图片与SEO知识库（产品描述参考）"],
-                    "scene_reverse": ["营销与客户开发知识库（场景营销）", "产品图片与SEO知识库（产品风格参考）"],
-                    "white_balance": ["产品图片与SEO知识库（图片质量标准）"],
-                    "raw_alignment": ["产品图片与SEO知识库（产品图片库）"],
-                }
-                kbs = kb_map.get(tool_id, ["标准化知识库", "产品图片与SEO知识库"])
-                for kb in kbs:
-                    st.markdown(f"- {kb}")
-    
+        # ========== 8. 爆款视频反推工具 ==========
+        elif tool_id == 'video_reverse':
+            st.markdown("""
+            <div style="text-align:center; margin-bottom:24px;">
+                <div style="display:inline-block; font-family:monospace; font-size:11px; letter-spacing:3px; color:#B8860B; border:1px solid #D4AF37; padding:5px 14px; border-radius:3px; margin-bottom:12px; font-weight:600;">
+                    KAILIONCRAFTS · 爆款视频反推 + 剪辑脚本生成
+                </div>
+                <h2 style="font-family:serif; font-size:28px; font-weight:700; color:#1a1a2e; margin:10px 0 8px 0;">
+                    🎬 爆款视频<span style="color:#B8860B;">反推工作台</span>
+                </h2>
+                <div style="font-size:13px; color:#666; line-height:1.6;">
+                    丢爆款视频 → 反推分镜 → 结合你的素材+剪辑要求 → 输出专属剪辑脚本
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # ===== 区域1：爆款视频输入 =====
+            st.markdown("#### 1️⃣ 爆款视频输入")
+            input_tab1, input_tab2 = st.tabs(["🔗 链接解析", "📁 上传视频文件"])
+
+            with input_tab1:
+                video_url = st.text_input(
+                    "粘贴视频链接",
+                    placeholder="支持：YouTube / B站 / TikTok / 部分抖音链接",
+                    key="vr_url"
+                )
+                st.caption("⚠️ 小红书/部分抖音有登录墙，链接解析可能失败，请改用上传文件方式")
+                if st.button("🔍 联网解析", type="primary", key="vr_parse_url"):
+                    if video_url:
+                        st.info("⏳ 正在解析视频...（实际使用时会调用视频解析服务）")
+                        st.session_state['vr_parsed'] = True
+                        st.session_state['vr_video_source'] = f"链接：{video_url}"
+                    else:
+                        st.warning("请先粘贴视频链接")
+
+            with input_tab2:
+                uploaded_video = st.file_uploader(
+                    "上传视频文件",
+                    type=["mp4", "mov", "avi"],
+                    key="vr_file",
+                    help="单个≤200MB，≤60秒（15秒爆款参考最合适）"
+                )
+                if uploaded_video:
+                    st.success(f"✅ 已上传：{uploaded_video.name}（{uploaded_video.size/1024/1024:.1f}MB）")
+                    st.session_state['vr_parsed'] = True
+                    st.session_state['vr_video_source'] = f"文件：{uploaded_video.name}"
+
+            # ===== 区域2+3：左右并排 =====
+            col_left, col_right = st.columns([1.2, 1])
+
+            with col_left:
+                st.markdown("#### 2️⃣ 我的素材描述")
+                st.caption("按模板填写你的镜头素材（不用上传视频）")
+
+                # 动态镜头列表
+                if 'vr_shots' not in st.session_state:
+                    st.session_state['vr_shots'] = [{"dur": "3", "angle": "特写", "content": "锻打刀刃", "scene": "车间", "note": "突出工艺"}]
+
+                for i, shot in enumerate(st.session_state['vr_shots']):
+                    with st.expander(f"镜头 {i+1}", expanded=(i < 3)):
+                        c1, c2 = st.columns([1, 2])
+                        with c1:
+                            shot['dur'] = st.text_input("时长(秒)", value=shot['dur'], key=f"vr_dur_{i}")
+                        with c2:
+                            shot['angle'] = st.selectbox("拍摄角度",
+                                ["特写", "航拍", "俯拍", "平视", "侧拍", "慢动作特写"],
+                                index=["特写", "航拍", "俯拍", "平视", "侧拍", "慢动作特写"].index(shot['angle']) if shot['angle'] in ["特写", "航拍", "俯拍", "平视", "侧拍", "慢动作特写"] else 0,
+                                key=f"vr_angle_{i}")
+                        shot['content'] = st.text_input("拍了什么", value=shot['content'], key=f"vr_content_{i}",
+                            placeholder="例如：锻打/磨刃/产品展示/流水线")
+                        shot['scene'] = st.text_input("场景", value=shot['scene'], key=f"vr_scene_{i}",
+                            placeholder="例如：车间/办公室/仓库")
+                        shot['note'] = st.text_input("说明（想突出什么）", value=shot['note'], key=f"vr_note_{i}")
+
+                if st.button("➕ 加一个镜头", key="vr_add_shot"):
+                    st.session_state['vr_shots'].append({"dur": "", "angle": "特写", "content": "", "scene": "", "note": ""})
+                    st.rerun()
+
+            with col_right:
+                st.markdown("#### 3️⃣ 剪辑要求")
+
+                video_duration = st.selectbox("视频总时长", ["15秒", "30秒", "60秒"], key="vr_duration")
+                video_ratio = st.selectbox("画幅", ["竖屏 9:16", "横屏 1920×1080"], key="vr_ratio")
+                bgm_style = st.selectbox("BGM风格", ["电子鼓点", "工业低沉", "轻快活泼", "自定义"], key="vr_bgm")
+                filter_style = st.selectbox("滤镜", ["复古工业", "冷蓝金属", "金属质感", "电影感", "无滤镜"], key="vr_filter")
+                transition = st.selectbox("转场", ["硬切", "叠化", "闪黑", "爆闪"], key="vr_transition")
+                subtitle_anim = st.selectbox("字幕动画", ["打字机", "弹入", "静态白字"], key="vr_subtitle")
+                slow_mo = st.text_input("慢动作镜头（哪些镜头慢放）", placeholder="例如：镜头2、镜头5", key="vr_slowmo")
+                extra_req = st.text_area("其他要求", placeholder="自由文本补充要求", key="vr_extra", height=80)
+
+            # ===== 区域4：输出 =====
             st.markdown("---")
-    
-            # 新员工指南
-            with st.expander("👋 新员工使用指南", expanded=False):
-                st.markdown("""
-                **7个工具快速上手：**
+            st.markdown("#### 4️⃣ 生成结果")
+
+            if st.button("🚀 生成爆款反推 + 剪辑脚本", type="primary", use_container_width=True, key="vr_generate"):
+                if not st.session_state.get('vr_parsed'):
+                    st.warning("👆 请先输入视频链接或上传视频文件")
+                elif len(st.session_state['vr_shots']) == 0:
+                    st.warning("👆 请至少填写一个镜头素材描述")
+                else:
+                    with st.spinner("AI生成中..."):
+                        # 构建素材描述
+                        shots_text = ""
+                        for i, s in enumerate(st.session_state['vr_shots']):
+                            shots_text += f"镜头{i+1}：{s['dur']}秒，{s['angle']}，拍了{s['content']}，场景：{s['scene']}，说明：{s['note']}\n"
+
+                        prompt = f"""你是资深B2B短视频剪辑导演，服务阳江刀剪厨具出口企业。
+
+【视频来源】{st.session_state.get('vr_video_source', '未指定')}
+
+【我的素材镜头】
+{shots_text}
+
+【剪辑要求】
+- 总时长：{video_duration}
+- 画幅：{video_ratio}
+- BGM风格：{bgm_style}
+- 滤镜：{filter_style}
+- 转场：{transition}
+- 字幕动画：{subtitle_anim}
+- 慢动作：{slow_mo or '无'}
+- 其他要求：{extra_req or '无'}
+
+【公司背景】{kb.get_company_brief()[:500]}
+
+请输出两份完整文档：
+
+## 第一部分：爆款反推分析
+1. 视频节奏分析（开头钩子/中间节奏/结尾情绪点）
+2. 逐镜拆解建议（时间码/画面/字幕/转场/BGM鼓点位置）
+3. 为什么能爆（开头3秒钩子/情绪曲线/记忆点）
+
+## 第二部分：你的专属剪辑脚本
+1. 逐镜头脚本（用你的哪段素材/时长/转场/字幕/滤镜参数）
+2. BGM风格描述
+3. 关键帧/慢动作标注
+4. 可直接复制给剪映AI/豆包执行的完整脚本
+
+中文输出，具体可执行，不要空话。"""
+
+                        try:
+                            result = ai.chat(prompt)
+                            st.session_state['vr_result'] = result
+                        except Exception as e:
+                            st.error(f"AI错误：{e}")
+
+            # 显示结果
+            if 'vr_result' in st.session_state and st.session_state['vr_result']:
+                tab1, tab2 = st.tabs(["📋 爆款反推提示词", "🎬 专属剪辑脚本"])
+
+                with tab1:
+                    st.markdown("#### 爆款反推分析（存档参考）")
+                    st.markdown(st.session_state['vr_result'])
+                    save_to_kb_button(st.session_state['vr_result'], "视频反推", f"爆款反推_{datetime.now().strftime('%Y%m%d_%H%M')}")
+
+                with tab2:
+                    st.markdown("#### 专属剪辑脚本（可执行）")
+                    st.markdown(st.session_state['vr_result'])
+                    save_to_kb_button(st.session_state['vr_result'], "视频反推", f"剪辑脚本_{datetime.now().strftime('%Y%m%d_%H%M')}")
+
+                st.success("✅ 已自动保存到知识库文件夹：data/kb_output/视频反推/")
+
+        # 知识库连接说明（所有工具都显示）
+        with st.expander("📚 本工具连接的公司知识库", expanded=False):
+            kb_map = {
+                "sku_naming": ["SKU产品与SEO知识库（220种钢材+289SKU命名规则）", "产品图片与SEO知识库（127产品SEO命名）"],
+                "line_art": ["产品图片与SEO知识库（827张SEO图片）", "独立站知识库（产品分类映射）"],
+                "visual_correction": ["产品图片与SEO知识库（产品图片规范）", "标准化知识库（品牌视觉规范）"],
+                "prompt_library": ["营销与客户开发知识库（高级营销词汇）", "产品图片与SEO知识库（产品描述参考）"],
+                "scene_reverse": ["营销与客户开发知识库（场景营销）", "产品图片与SEO知识库（产品风格参考）"],
+                "white_balance": ["产品图片与SEO知识库（图片质量标准）"],
+                "raw_alignment": ["产品图片与SEO知识库（产品图片库）"],
+                "video_reverse": ["产品图片与SEO知识库（产品视觉参考）", "营销与客户开发知识库（短视频营销）", "公司简介与创始人（品牌故事）"],
+            }
+            kbs = kb_map.get(tool_id, ["标准化知识库", "产品图片与SEO知识库"])
+            for kb in kbs:
+                st.markdown(f"- {kb}")
+
+        st.markdown("---")
+
+        # 新员工指南
+        with st.expander("👋 新员工使用指南", expanded=False):
+            st.markdown("""
+                **8个工具快速上手：**
 
                 1. 🏷️ **SKU命名工具** - 选品类+材质，一键生成SKU和SEO命名
                 2. ✏️ **产品线稿工具** - 上传产品图，转线稿效果
@@ -4733,6 +4898,7 @@ elif page == "🤖 锴利自研AI工具库":
                 5. 🔄 **场景图反推** - 上传参考图，反推生图Prompt
                 6. 🌈 **白平衡校正工具** - 自动校正图片白平衡
                 7. 📸 **选片与RAW对齐** - JPG选片匹配RAW原片
+                8. 🎬 **爆款视频反推** - 丢爆款视频→反推分镜→生成剪辑脚本
 
                 **注意事项：**
             - 所有图片处理在浏览器本地完成

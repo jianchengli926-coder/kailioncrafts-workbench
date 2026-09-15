@@ -315,6 +315,20 @@ if page == "📊 仪表盘":
         closed = stats["by_pipeline"].get("closed", 0)
         st.metric("已成交", closed, delta=f"转化率 {closed/stats['total']*100:.0f}%" if stats["total"] else "0%")
 
+    # 订单/财务概览
+    try:
+        import finance_db as fdb
+        fdb.init_db()
+        _s = fdb.dashboard_summary()
+        _live = len([o for o in fdb.list_sales_orders() if o["status"] not in ("完成",)])
+        f1, f2, f3, f4 = st.columns(4)
+        f1.metric("进行中订单", _live)
+        f2.metric("应收(未收)", f"${_s['ar']:,.0f}", delta="跟进尾款" if _s["ar"] > 0 else None)
+        f3.metric("应付(未付)", f"${_s['ap']:,.0f}", delta="待付工厂" if _s["ap"] > 0 else None)
+        f4.metric("本月毛利", f"${_s['m_gross']:,.0f}")
+    except Exception:
+        pass
+
     st.markdown("---")
 
     # 快捷功能（8个大按钮）

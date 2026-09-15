@@ -8114,19 +8114,21 @@ elif page == "⚙️ 设置中心":
                 with c1:
                     st.markdown("**📊 模型分布**")
                     by_model = {}
-                    for t in filtered:
-                        m = t.get("model", "未知")
+                    for trace in filtered:
+                        m = trace.get("model", "未知")
                         by_model[m] = by_model.get(m, 0) + 1
-                    model_df = pd.DataFrame([{"模型": m, "请求数": c} for m, c in sorted(by_model.items(), key=lambda x: -x[1])])
+                    model_rows = [{"模型": m, "请求数": cnt} for m, cnt in sorted(by_model.items(), key=lambda x: -x[1])]
+                    model_df = pd.DataFrame(model_rows)
                     st.dataframe(model_df, use_container_width=True, hide_index=True)
 
                 with c2:
                     st.markdown("**📋 任务分布**")
                     by_task = {}
-                    for t in filtered:
-                        task = t.get("task", "未命名任务")
+                    for trace in filtered:
+                        task = trace.get("task", "未命名任务")
                         by_task[task] = by_task.get(task, 0) + 1
-                    task_df = pd.DataFrame([{"任务": t, "请求数": c} for t, c in sorted(by_task.items(), key=lambda x: -x[1])])
+                    task_rows = [{"任务": task_name, "请求数": cnt} for task_name, cnt in sorted(by_task.items(), key=lambda x: -x[1])]
+                    task_df = pd.DataFrame(task_rows)
                     st.dataframe(task_df, use_container_width=True, hide_index=True)
 
                 st.markdown("---")
@@ -8150,16 +8152,16 @@ elif page == "⚙️ 设置中心":
                 st.markdown("**📝 详细调用记录**（最近50条）")
                 recent = filtered[-50:][::-1]
                 rows = []
-                for t in recent:
+                for trace in recent:
                     rows.append({
-                        "时间": t.get("time", ""),
-                        "任务": t.get("task", ""),
-                        "模型": t.get("model", ""),
-                        "状态": "✅" if t.get("status") == "success" else "❌",
-                        "耗时(s)": t.get("elapsed_seconds", ""),
-                        "输入Token": t.get("prompt_tokens", ""),
-                        "输出Token": t.get("completion_tokens", ""),
-                        "总Token": t.get("total_tokens", ""),
+                        "时间": trace.get("time", ""),
+                        "任务": trace.get("task", ""),
+                        "模型": trace.get("model", ""),
+                        "状态": "✅" if trace.get("status") == "success" else "❌",
+                        "耗时(s)": trace.get("elapsed_seconds", ""),
+                        "输入Token": trace.get("prompt_tokens", ""),
+                        "输出Token": trace.get("completion_tokens", ""),
+                        "总Token": trace.get("total_tokens", ""),
                     })
                 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 

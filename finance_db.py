@@ -177,6 +177,35 @@ def list_factories():
     return seen
 
 
+def list_receivables():
+    """按销售订单算应收余额与账龄（天数）。"""
+    from datetime import date
+    orders = list_sales_orders()
+    pays = list_payments()
+    received = {}
+    for p in pays:
+        if p["direction"] == "收客户":
+            received[p["ref_order_no"]] = received.get(p["ref_order_no"], 0) + p["amount"]
+    today = date.today()
+    rows = []
+    for o in orders:
+        bal = o["total_amount"] - received.get(o["order_no"], 0)
+        if bal > 0.5:
+            days = 0
+            if o["order_date"]:
+                try:
+                    y, m, d = map(int, o["order_date"].split("-"))
+                    days = (today - date(y, m, d)).days
+                except Exception:
+                    days = 0
+            rows.append({"订单号": o["order_no"], "客户": o["customer"],
+                         "订单额": round(o["total_amount"], 0), "已收": round(received.get(o["order_no"], 0), 0),
+                         "未收": round(bal, 0), "下单日": o["order_date"], "账龄天数": days,
+                         "状态": o["status"]})
+    rows.sort(key=lambda r: r["账龄天数"], reverse=True)
+    return rows
+
+
 # ---------- 汇总 ----------
 def dashboard_summary():
     """返回 应收/应付/本月销售额/本月毛利(原币USD口径汇总)。"""

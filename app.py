@@ -5733,6 +5733,28 @@ elif page == "📊 订单台账":
         st.caption("口径：USD 原币汇总；应收=销售总额-已收；应付=采购总额-已付；毛利=销售额-采购-物流-其他")
         if s["ar"] > 0:
             st.warning(f"⚠️ 当前应收 ${s['ar']:,.0f} 未收回，记得跟进尾款")
+
+        st.markdown("##### ⏰ 应收账龄（未收回尾款）")
+        ar_rows = fdb.list_receivables()
+        if ar_rows:
+            st.dataframe(pd.DataFrame(ar_rows), use_container_width=True, hide_index=True)
+            over = [r for r in ar_rows if r["账龄天数"] > 30]
+            if over:
+                st.error("🔴 账龄超30天未收：" + "、".join(f"{r['客户']}(${r['未收']:,.0f}/{r['账龄天数']}天)" for r in over))
+        else:
+            st.success("✅ 无未收应收款")
+
+        st.markdown("##### ⬇️ 导出")
+        exp1, exp2, exp3 = st.columns(3)
+        sales_df = pd.DataFrame(fdb.list_sales_orders())
+        exp1.download_button("导出销售订单CSV", sales_df.to_csv(index=False).encode("utf-8-sig"),
+                            "sales_orders.csv", "text/csv", use_container_width=True)
+        po_df = pd.DataFrame(fdb.list_purchase_orders())
+        exp2.download_button("导出采购CSV", po_df.to_csv(index=False).encode("utf-8-sig"),
+                            "purchase_orders.csv", "text/csv", use_container_width=True)
+        pay_df = pd.DataFrame(fdb.list_payments())
+        exp3.download_button("导出收付款CSV", pay_df.to_csv(index=False).encode("utf-8-sig"),
+                            "payments.csv", "text/csv", use_container_width=True)
     
 # ============ 页面：博客SEO工作台 ============
 elif page == "📊 独立站SEO中心" and st.session_state.get("seo_sub") == "blog":

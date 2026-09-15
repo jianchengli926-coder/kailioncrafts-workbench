@@ -4531,51 +4531,58 @@ ACOS: {ad_acos}%
 
     elif mp_current == "🎨 视觉内容":
         st.subheader("🎨 视觉内容")
-        v1, v2 = st.tabs(["🖼️ 主副图提示词", "📄 A+布局规划"])
+        st.caption("对标 amazon-listing-image-workflow / kailioncrafts-image-seo / amazon-aplus-image-workflow")
+        v1, v2 = st.tabs(["🖼️ 主副图整套方案", "📄 A+布局规划"])
         with v1:
-            st.markdown("##### AI生图提示词")
+            st.markdown("##### AI主副图整套方案")
+            st.caption("一次出6张图：白底主图/卖点信息图/场景图/尺寸图/包装图/生活方式图，每张给英文Prompt+负面词+SEO文件名ALT")
             col1, col2 = st.columns(2)
             with col1:
-                v_product = st.text_input("产品名称", placeholder="8寸主厨刀", key="v_product")
-                v_scene = st.selectbox("图片类型", ["主图（白底）", "场景图（厨房使用）", "细节图（刀刃特写）", "尺寸图", "包装图", "生活方式图"])
+                v_product = st.text_input("产品名称", placeholder="8寸主厨刀 German Steel Chef Knife", key="v_product")
+                v_cat = st.selectbox("品类", COMPANY["categories"], key="v_cat")
             with col2:
-                v_style = st.selectbox("风格", ["亚马逊高端风格", "独立站品牌风格", "极简白底", "生活方式"])
-                v_ratio = st.selectbox("图片比例", ["1:1 (1000x1000)", "3:4 (750x1000)", "16:9", "4:5"])
-            if st.button("🎨 生成图片提示词", use_container_width=True, type="primary"):
-                with st.spinner("生成中..."):
-                    prompt = f"""# AI生图提示词生成
+                v_style = st.selectbox("风格", ["亚马逊高端白底", "独立站品牌风", "极简白底", "生活方式"], key="v_style2")
+                v_ratio = st.selectbox("主图比例", ["1:1 (1000x1000)", "3:4 (750x1000)", "4:5"], key="v_ratio2")
+            if st.button("🎨 生成整套图片方案", use_container_width=True, type="primary"):
+                with st.spinner("生成整套图片方案..."):
+                    prompt = f"""# 亚马逊主副图整套方案（对标 listing-image-workflow + kailioncrafts-image-seo）
 
 产品: {v_product}
-图片类型: {v_scene}
+品类: {v_cat}
 风格: {v_style}
 比例: {v_ratio}
+公司: {kb.get_company_brief()[:300]}
 
-请输出Midjourney/DALL-E可用的英文提示词，包含：
-- 产品主体描述
-- 背景/场景
-- 光线/角度
-- 质量关键词（8k, professional, studio lighting）
-- 负面提示词"""
+请为该产品规划完整主副图套图（白底主图 + 5张副图），每张输出：
+1. 图片用途（主图/卖点信息图/使用场景/尺寸图/包装图/生活方式）
+2. 英文生图Prompt（MJ/DALL-E可用：主体+场景+光线+角度+质量词8k,studio lighting）
+3. 英文负面提示词（negative prompt）
+4. SEO文件名（小写连字符，含关键词，如 chef-knife-8inch-white-main.png）
+5. ALT Text（≤125字符，含核心词）
+主图必须纯白底、无文字水印；信息图可含简洁卖点文字。按表格或分节输出。"""
                     result = ai.chat(prompt)
                 st.markdown(result)
         with v2:
             st.markdown("##### A+ Content 布局规划")
-            a_product = st.text_input("产品名称", key="a_plus_product")
+            col1, col2 = st.columns(2)
+            with col1:
+                a_product = st.text_input("产品名称", key="a_plus_product")
+            with col2:
+                a_level = st.radio("A+类型", ["基础版 A+ (Basic)", "高级版 Premium A+"], horizontal=True, key="a_level")
             if st.button("📐 生成A+布局", use_container_width=True, type="primary"):
                 with st.spinner("生成中..."):
-                    prompt = f"""# Amazon A+ Content 布局规划
+                    prompt = f"""# Amazon A+ Content 布局规划（对标 amazon-aplus-image-workflow）
 
 产品: {a_product}
+类型: {a_level}
 公司: {kb.get_company_brief()[:300]}
 
-请规划一个5模块的A+ Content布局：
-1. 品牌横幅
-2. 产品核心卖点（3个icon）
-3. 产品对比表
-4. 使用场景
-5. 品牌故事
-
-每个模块描述内容和图片建议。中文输出。"""
+请按{('高级版 Premium A+，含轮播/视频/对比表模块' if 'Premium' in a_level else '基础版 A+，5个标准模块')}规划，每个模块给出：
+1. 模块名称与推荐图片尺寸（如 970x600 / 300x300 / 1464x600）
+2. 文案要点
+3. 该模块图片的英文生图Prompt
+模块顺序建议：品牌横幅 → 核心卖点(3 icon) → 产品对比表 → 使用场景 → 品牌故事/工厂背书
+中文输出。"""
                     result = ai.chat(prompt)
                 st.markdown(result)
 

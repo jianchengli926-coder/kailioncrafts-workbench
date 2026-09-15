@@ -161,18 +161,18 @@ class KnowledgeBase:
         keywords = [k.lower() for k in re.split(r'\s+', query.strip()) if k]
 
         # 确定搜索范围
-        sources_to_search = []
         if source == "all":
-            sources_to_search = [KB_SOURCES["standard"]["path"], KB_SOURCES["feishu"]["path"]]
+            # 全部知识库：遍历所有已挂载的源（重复文件靠 seen_files 去重）
+            sources_to_search = [(k, v["path"]) for k, v in KB_SOURCES.items()]
         elif source in KB_SOURCES:
-            sources_to_search = [KB_SOURCES[source]["path"]]
+            sources_to_search = [(source, KB_SOURCES[source]["path"])]
         else:
-            sources_to_search = [KB_SOURCES["standard"]["path"]]
+            sources_to_search = [("standard", KB_SOURCES["standard"]["path"])]
 
         results = []
         seen_files = set()
 
-        for kb_path in sources_to_search:
+        for src_key, kb_path in sources_to_search:
             if not kb_path.exists():
                 continue
             for ext in KB_SEARCH_CONFIG["supported_extensions"]:
@@ -219,7 +219,7 @@ class KnowledgeBase:
                             "category": category,
                             "snippet": snippet,
                             "score": score,
-                            "source": "standard" if kb_path == KB_SOURCES["standard"]["path"] else "feishu",
+                            "source": src_key,
                         })
                     except Exception:
                         continue

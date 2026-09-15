@@ -188,17 +188,17 @@ with st.sidebar:
     # ============ 注入CSS：缩小导航间距 ============
     st.markdown("""
     <style>
-    /* 缩小radio选项的上下间距 */
-    .stRadio > div {
+    /* 缩小radio选项的上下间距（只影响侧边栏） */
+    section[data-testid="stSidebar"] .stRadio > div {
         gap: 2px !important;
     }
-    .stRadio label {
+    section[data-testid="stSidebar"] .stRadio label {
         padding-top: 2px !important;
         padding-bottom: 2px !important;
         margin-bottom: 0px !important;
     }
-    /* 缩小功能导航标题的margin */
-    .stMarkdown h5 {
+    /* 缩小侧边栏功能导航标题的margin */
+    section[data-testid="stSidebar"] .stMarkdown h5 {
         margin-top: 8px !important;
         margin-bottom: 4px !important;
     }

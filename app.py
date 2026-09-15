@@ -5650,7 +5650,7 @@ elif page == "🌍 海外社媒矩阵":
                 acct_name = y1.text_input("账号名称 *")
                 acct_url = y2.text_input("账号主页链接")
                 email = st.text_input("联系邮箱")
-                status = st.selectbox("状态", ["Active", "Inactive", "Pending"])
+                status = st.selectbox("状态", ["Active", "Inactive", "Pending", "Suspended"])
                 if st.form_submit_button("保存", type="primary", use_container_width=True):
                     if not acct_name:
                         st.warning("账号名称必填")
@@ -5661,15 +5661,32 @@ elif page == "🌍 海外社媒矩阵":
                         st.success("已保存"); st.rerun()
         accounts = sdb.list_accounts()
         if accounts:
+            # 筛选
+            g1, g2, g3, g4 = st.columns(4)
+            fg = g1.selectbox("品类", ["全部"] + list(sdb.CATEGORIES.keys()), key="ag_fcat")
+            fp = g2.selectbox("平台", ["全部"] + sdb.PLATFORMS, key="ag_fplat")
+            fo = g3.selectbox("负责人", ["全部"] + list(sdb.CATEGORIES.values()), key="ag_fown")
+            fs = g4.selectbox("状态", ["全部", "Active", "Inactive", "Pending", "Suspended"], key="ag_fst")
+            def _keep(a):
+                return (fg == "全部" or a["category"] == fg) and (fp == "全部" or a["platform"] == fp) \
+                    and (fo == "全部" or a["owner"] == fo) and (fs == "全部" or a["status"] == fs)
+            accs = [a for a in accounts if _keep(a)]
+            st.caption(f"共 {len(accs)} 个账号")
             cols = ["category", "owner", "platform", "account_name", "account_url", "email", "status"]
-            st.dataframe(pd.DataFrame(accounts)[cols], use_container_width=True, hide_index=True)
-            with st.expander("🔗 打开账号"):
-                sel = st.selectbox("选账号", [f"{a['platform']} · {a['account_name']}" for a in accounts])
-                acc = next(a for a in accounts if f"{a['platform']} · {a['account_name']}" == sel)
+            st.dataframe(pd.DataFrame([{k: a.get(k) for k in cols} for a in accs]),
+                         use_container_width=True, hide_index=True)
+            with st.expander("🔍 查看账号详情"):
+                sel = st.selectbox("选账号", [f"{a['platform']} · {a['account_name']}" for a in accs])
+                acc = next(a for a in accs if f"{a['platform']} · {a['account_name']}" == sel)
+                its = sdb.contents_of_account(acc["id"])
+                vv = sum(i.get("views", 0) for i in its)
+                st.markdown(f"**{acc['platform']} · {acc['account_name']}**　品类 {acc['category']}　负责人 {acc['owner']}　状态 {acc['status']}")
+                st.caption(f"内容 {len(its)} 条 · 总播放 {vv:,}")
                 if acc.get("account_url"):
-                    st.markdown(f"[🌐 打开 {acc['platform']} 账号]({acc['account_url']})")
-                else:
-                    st.info("该账号还没填主页链接")
+                    st.markdown(f"[🌐 打开账号]({acc['account_url']})")
+                if its:
+                    st.dataframe(pd.DataFrame(its)[["content_no", "title", "status", "views", "likes"]],
+                                 use_container_width=True, hide_index=True)
                 if st.button("🗑 删除此账号"):
                     sdb.delete_account(acc["id"]); st.rerun()
         else:
@@ -5695,11 +5712,19 @@ elif page == "🌍 海外社媒矩阵":
                 likes = d2.number_input("点赞", min_value=0)
                 comments = d3.number_input("评论", min_value=0)
                 saves = d4.number_input("收藏", min_value=0)
-                e1, e2, e3 = st.columns(3)
+                e1, e2, e3, e4 = st.columns(4)
                 shares = e1.number_input("分享", min_value=0)
-                inq = e2.number_input("询盘", min_value=0)
-                ord_n = e3.number_input("订单", min_value=0)
+                link_clicks = e2.number_input("链接点击", min_value=0)
+                web_visits = e3.number_input("独立站访问", min_value=0)
+                followers_g = e4.number_input("涨粉", min_value=0)
+                e5, e6, e7 = st.columns(3)
+                inq = e5.number_input("询盘", min_value=0)
+                ord_n = e6.number_input("订单", min_value=0)
+                mult_links = e7.text_input("多平台链接", placeholder="平台,URL 每行一条")
                 shoot = st.text_area("📹 拍摄脚本（折叠长文本）", height=100)
+                editing = st.text_area("✂️ 剪辑脚本", height=80)
+                cap_in = st.text_area("📝 平台文案/Caption", height=60)
+                tags = st.text_input("#️⃣ Hashtags（空格分隔）")
                 notes = st.text_input("备注")
                 if st.form_submit_button("保存内容", type="primary", use_container_width=True):
                     if not title:
@@ -5717,7 +5742,10 @@ elif page == "🌍 海外社媒矩阵":
                                              publish_url=pub_url, landing_url=landing,
                                              views=views, likes=likes, comments=comments,
                                              saves=saves, shares=shares, inquiries=inq, orders=ord_n,
-                                             shoot_script=shoot, notes=notes)
+                                             link_clicks=link_clicks, website_visits=web_visits,
+                                             followers_gained=followers_g, multi_links=mult_links,
+                                             shoot_script=shoot, editing_script=editing,
+                                             caption=cap_in, hashtags=tags, notes=notes)
                         st.success(f"✅ 已保存 {no}"); st.rerun()
 
         f1, f2, f3, f4 = st.columns(4)
@@ -5729,9 +5757,11 @@ elif page == "🌍 海外社媒矩阵":
         st.caption(f"共 {len(items)} 条")
         for c in items:
             rate = sdb.interaction_rate(c)
-            with st.expander(f"🖼️ {c['content_no']} · {c['title']}  [{c['platform']}/{c['status']}]  播放{c['views']} 互动率{rate}%"):
+            cr = sdb.click_rate(c)
+            ir = sdb.inquiry_rate(c)
+            with st.expander(f"🖼️ {c['content_no']} · {c['title']}  [{c['platform']}/{c['status']}]  播放{c['views']} 互动{rate}% 点击{cr}%"):
                 cols_show = ["content_no", "category", "owner", "platform", "content_type",
-                             "publish_date", "views", "likes", "comments", "saves", "shares",
+                             "publish_date", "views", "link_clicks", "website_visits",
                              "inquiries", "orders"]
                 st.dataframe(pd.DataFrame([{k: c.get(k) for k in cols_show}]),
                              use_container_width=True, hide_index=True)
@@ -5739,9 +5769,20 @@ elif page == "🌍 海外社媒矩阵":
                     st.image(c["cover_path"], width=240)
                 if c.get("publish_url"):
                     st.markdown(f"[▶ 打开发布链接]({c['publish_url']})")
+                if c.get("multi_links"):
+                    st.caption("多平台链接（平台,URL）：" + c["multi_links"].replace("\n", " ｜ "))
                 if c.get("landing_url"):
                     st.markdown(f"[🔗 独立站落地页]({c['landing_url']})")
                 st.markdown("**📹 拍摄脚本**"); st.write(c.get("shoot_script") or "—")
+                if c.get("editing_script"):
+                    st.markdown("**✂️ 剪辑脚本**"); st.write(c["editing_script"])
+                if c.get("caption"):
+                    st.markdown("**📝 平台文案**"); st.write(c["caption"])
+                if c.get("hashtags"):
+                    st.caption("# " + c["hashtags"])
+                st.caption(f"互动率 {rate}% · 点击率 {cr}% · 询盘转化率 {ir}% · 更新 {c.get('updated_at','')}")
+                if st.button("🗑 删除此内容", key=f"del_{c['id']}"):
+                    sdb.delete_content(c["id"]); st.rerun()
 
 elif page == "📊 订单台账":
     import finance_db as fdb

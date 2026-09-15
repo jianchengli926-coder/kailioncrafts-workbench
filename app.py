@@ -6972,6 +6972,84 @@ elif page == "🧾 订单台账":
                             _save_fac(facs)
                             st.success(f"✅ 已保存工厂档案：{fn}")
                             st.rerun()
+
+            # ===== 供应商QCD评分卡 =====
+            with st.expander("⭐ 供应商QCD评分卡（质量/成本/交期）", expanded=False):
+                st.caption("借鉴supply-chain-strategist方法论：按QCD三维度评分，季度评估，ABC分级管理")
+                with st.form("qcd_form"):
+                    qcd1, qcd2 = st.columns(2)
+                    with qcd1:
+                        qcd_name = st.text_input("供应商/工厂名 *", key="qcd_name")
+                    with qcd2:
+                        qcd_product = st.text_input("供应产品", key="qcd_product", placeholder="如：厨师刀/剪刀冲压")
+                    qcd3, qcd4, qcd5 = st.columns(3)
+                    with qcd3:
+                        q_quality = st.slider("质量Quality（合格率/一致性）", 1, 10, 7, key="qcd_q")
+                        st.caption("1=经常退货 / 10=零缺陷")
+                    with qcd4:
+                        c_cost = st.slider("成本Cost（价格竞争力）", 1, 10, 7, key="qcd_c")
+                        st.caption("1=最贵 / 10=最低")
+                    with qcd5:
+                        d_delivery = st.slider("交期Delivery（准时率）", 1, 10, 7, key="qcd_d")
+                        st.caption("1=经常延期 / 10=100%准时")
+                    qcd6, qcd7 = st.columns(2)
+                    with qcd6:
+                        qcd_payment = st.selectbox("付款条件", ["款到发货", "30%定金+70%发货前", "月结30天", "月结60天"], key="qcd_pay")
+                    with qcd7:
+                        qcd_cert = st.text_input("现有认证", key="qcd_cert", placeholder="ISO9001/BSCI等")
+                    qcd_note = st.text_area("备注", key="qcd_note", placeholder="历史合作问题/优势...")
+                    qcd_submit = st.form_submit_button("📊 计算QCD评分", type="primary", use_container_width=True)
+
+                if qcd_submit and qcd_name:
+                    total = q_quality + c_cost + d_delivery
+                    max_score = 30
+                    pct = total / max_score * 100
+                    if pct >= 85:
+                        grade = "A（战略供应商）"
+                        advice = "优先合作，可给更大订单份额，长期合作"
+                    elif pct >= 70:
+                        grade = "B（合格供应商）"
+                        advice = "正常合作，保持监控，关注改进项"
+                    elif pct >= 55:
+                        grade = "C（备选供应商）"
+                        advice = "小单试合作，需要观察改进，不要给大订单"
+                    else:
+                        grade = "D（淘汰候选）"
+                        advice = "风险高，建议逐步淘汰，寻找替代"
+
+                    st.markdown("**QCD评分结果**")
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("质量", f"{q_quality}/10")
+                    c2.metric("成本", f"{c_cost}/10")
+                    c3.metric("交期", f"{d_delivery}/10")
+                    c4.metric("总分", f"{total}/30 ({pct:.0f}%)")
+                    st.markdown(f"**等级：{grade}**")
+                    st.info(f"建议：{advice}")
+
+                    # AI改进建议
+                    st.markdown("---")
+                    st.markdown("**💡 AI合作建议**")
+                    with st.spinner("AI分析中..."):
+                        try:
+                            prompt = f"""你是供应链管理专家（借鉴supply-chain-strategist方法论）。
+供应商：{qcd_name}
+供应产品：{qcd_product}
+质量评分：{q_quality}/10
+成本评分：{c_cost}/10
+交期评分：{d_delivery}/10
+付款条件：{qcd_payment}
+认证：{qcd_cert}
+备注：{qcd_note}
+
+请输出（中文，200字内）：
+1. 这个供应商的优势和风险
+2. 需要重点关注什么？
+3. 下一步合作建议（继续/改进/淘汰）
+"""
+                            st.markdown(ai.chat(prompt))
+                        except Exception as e:
+                            st.error(f"AI错误：{e}")
+
             with st.form("new_po"):
                 p1, p2 = st.columns(2)
                 so_no = p1.selectbox("关联销售订单", sales_nos)

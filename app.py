@@ -6426,14 +6426,48 @@ elif page == "🧾 订单台账":
 
     # ---- 采购/工厂 ----
     with ob:
+        FAC_FILE = Path("data/factories.json")
+        def _load_fac():
+            try:
+                return _json.loads(FAC_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                return []
+        def _save_fac(lst):
+            FAC_FILE.parent.mkdir(parents=True, exist_ok=True)
+            FAC_FILE.write_text(_json.dumps(lst, ensure_ascii=False, indent=2), encoding="utf-8")
+
         sales_nos = [o["order_no"] for o in fdb.list_sales_orders()]
         if not sales_nos:
             st.info("请先在「销售订单」建一笔订单，再为它安排采购")
         else:
+            with st.expander("🏭 工厂资料库（资质/产能/认证/合作备注，一次录入后采购单可直接选）", expanded=False):
+                facs = _load_fac()
+                if facs:
+                    st.dataframe(pd.DataFrame(facs), use_container_width=True, hide_index=True)
+                with st.form("new_factory"):
+                    ff1, ff2 = st.columns(2)
+                    fn = ff1.text_input("工厂名 *")
+                    fspecialty = ff2.text_input("主营产品（如:厨师刀/剪刀冲压）")
+                    ff3, ff4 = st.columns(2)
+                    fcap = ff3.text_input("产能/规模")
+                    fcert = ff4.text_input("认证（ISO/BSCI等）")
+                    fcontact = st.text_input("联系人/电话/微信")
+                    fnote = st.text_area("合作备注（历史/价格/质量/交期）")
+                    if st.form_submit_button("💾 保存工厂档案", type="primary", use_container_width=True):
+                        if not fn:
+                            st.warning("工厂名必填")
+                        else:
+                            facs = [f for f in facs if f.get("name") != fn]
+                            facs.append({"name": fn, "specialty": fspecialty, "capacity": fcap,
+                                         "cert": fcert, "contact": fcontact, "note": fnote})
+                            _save_fac(facs)
+                            st.success(f"✅ 已保存工厂档案：{fn}")
+                            st.rerun()
             with st.form("new_po"):
                 p1, p2 = st.columns(2)
                 so_no = p1.selectbox("关联销售订单", sales_nos)
-                existing_factories = fdb.list_factories()
+                _fac_names = [f.get("name") for f in _load_fac()]
+                existing_factories = list(dict.fromkeys(_fac_names + fdb.list_factories()))
                 factory_opts = existing_factories + ["➕ 新工厂..."]
                 f_sel = p2.selectbox("工厂名", factory_opts)
                 if f_sel == "➕ 新工厂...":

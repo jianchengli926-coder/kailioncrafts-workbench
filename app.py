@@ -43,6 +43,26 @@ from prompts import (
 )
 from customer_manager import cm, PIPELINE_STAGES
 
+
+# ============ 通用：两步删除（防误删） ============
+def two_step_delete(btn_label, key, danger="此操作不可恢复"):
+    """第一次点进入确认态；确认态下再点「确认删除」才返回 'yes'。"""
+    flag_key = f"_confirm_del_{key}"
+    if st.session_state.get(flag_key):
+        st.warning(f"⚠️ {danger}")
+        c1, c2 = st.columns(2)
+        if c1.button("✅ 确认删除", key=f"{key}_yes", type="primary"):
+            st.session_state.pop(flag_key, None)
+            return "yes"
+        if c2.button("取消", key=f"{key}_no"):
+            st.session_state.pop(flag_key, None)
+            st.rerun()
+        return "armed"
+    if st.button(btn_label, key=key):
+        st.session_state[flag_key] = True
+    return False
+
+
 # ============ 页面配置 ============
 st.set_page_config(
     page_title="KaiLionCrafts · 企业级AI工作台",
@@ -4956,7 +4976,7 @@ elif page == "👥 客户管理":
                 cm.update_customer(c["id"], {"status": new_status})
                 st.success("已更新！")
                 st.rerun()
-            if st.button("🗑️ 删除", key=f"del_{c['id']}"):
+            if two_step_delete("🗑️ 删除", f"del_{c['id']}", "删除该客户及其跟进记录，不可恢复") == "yes":
                 cm.delete_customer(c["id"])
                 st.rerun()
             else:
@@ -6056,7 +6076,7 @@ elif page == "🤖 模型管理":
 
         with col4:
             if p['id'] not in ['ollama_local', 'doubao_default']:
-                if st.button("🗑️", key=f"del_{p['id']}", use_container_width=True):
+                if two_step_delete("🗑️", f"del_{p['id']}", "删除此AI模型配置，不可恢复") == "yes":
                     delete_provider(p['id'])
                     st.success("已删除")
                     st.rerun()
@@ -6397,7 +6417,7 @@ elif page == "🌍 海外社媒矩阵":
                 if c.get("hashtags"):
                     st.caption("# " + c["hashtags"])
                 st.caption(f"互动率 {rate}% · 点击率 {cr}% · 询盘转化率 {ir}% · 更新 {c.get('updated_at','')}")
-                if st.button("🗑 删除此内容", key=f"del_{c['id']}"):
+                if two_step_delete("🗑 删除此内容", f"del_{c['id']}", "删除这条社媒内容记录，不可恢复") == "yes":
                     sdb.delete_content(c["id"]); st.rerun()
 
 elif page == "🧾 订单台账":

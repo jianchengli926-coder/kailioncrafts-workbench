@@ -6900,6 +6900,57 @@ Price Term: {incoterm}
             dc1.download_button("📄 销售合同(.txt)", sc_text, f"SC_{so['order_no']}.txt", "text/plain")
             dc2.download_button("📦 装箱单(.txt)", pl_text, f"PL_{so['order_no']}.txt", "text/plain")
             dc3.download_button("🧾 商业发票CI(.txt)", ci_text, f"CI_{so['order_no']}.txt", "text/plain")
+
+            # ===== 打印版：带公司抬头的HTML，打开后Ctrl+P另存PDF =====
+            _rows = (f"<tr><td>{so['product_summary']}</td><td>{qty_in}</td>"
+                     f"<td>{unit_price:,.2f}</td><td>{total:,.2f}</td></tr>")
+            def _page(title, extra):
+                return f"""
+                <div style="page-break-after:always;font-family:Arial,Helvetica,sans-serif;max-width:800px;margin:30px auto;color:#222;">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1a1a2e;padding-bottom:8px;">
+                    <div><b style="font-size:18px;">{comp['company']}</b><br>
+                    <span style="font-size:11px;color:#666;">{comp['address']}</span></div>
+                    <h2 style="margin:0;letter-spacing:1px;">{title}</h2></div>
+                  <p style="font-size:13px;">No: <b>{so['order_no']}</b>　Date: {today_str}<br>Buyer: {buyer}</p>
+                  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <tr style="background:#f0f0f0;"><th style="border:1px solid #999;padding:6px;">Item</th>
+                    <th style="border:1px solid #999;padding:6px;">Qty</th>
+                    <th style="border:1px solid #999;padding:6px;">Unit Price</th>
+                    <th style="border:1px solid #999;padding:6px;">Amount</th></tr>
+                    <tr><td style="border:1px solid #999;padding:6px;">{so['product_summary']}</td>
+                    <td style="border:1px solid #999;padding:6px;">{qty_in}</td>
+                    <td style="border:1px solid #999;padding:6px;">{unit_price:,.2f}</td>
+                    <td style="border:1px solid #999;padding:6px;">{total:,.2f}</td></tr>
+                    <tr><td colspan="3" style="text-align:right;border:1px solid #999;padding:6px;"><b>TOTAL</b></td>
+                    <td style="border:1px solid #999;padding:6px;"><b>{total:,.2f} {cur}</b></td></tr>
+                  </table>
+                  <p style="font-size:13px;line-height:1.8;">{extra}</p></div>"""
+            _pi_html = _page("PROFORMA INVOICE",
+                             f"Price Term: {incoterm}<br>Payment: {pay_terms}<br>"
+                             f"Delivery: {so.get('delivery_date') or 'To be confirmed'}<br>{comp.get('bank','')}")
+            _sc_html = _page("SALES CONTRACT",
+                             f"Shipment: {_te.get('load_port','-')} -> {_te.get('dest_port','-')}<br>"
+                             f"Payment: {pay_terms}<br>HS Code: {_te.get('hs_code','-')}<br><br>"
+                             f"Seller: ____________________　Buyer: ____________________")
+            _ci_html = _page("COMMERCIAL INVOICE",
+                             f"Country of Origin: China<br>Price Term: {incoterm}<br>Consignee: {_consignee}<br>{comp.get('bank','')}")
+            _pl_html = f"""<div style="page-break-after:always;font-family:Arial,Helvetica,sans-serif;max-width:800px;margin:30px auto;color:#222;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1a1a2e;padding-bottom:8px;">
+                <div><b style="font-size:18px;">{comp['company']}</b></div><h2 style="margin:0;">PACKING LIST</h2></div>
+              <p style="font-size:13px;">No: <b>{so['order_no']}</b><br>Consignee: {_consignee}</p>
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <tr style="background:#f0f0f0;"><th style="border:1px solid #999;padding:6px;">Item</th>
+                <th style="border:1px solid #999;padding:6px;">Qty</th>
+                <th style="border:1px solid #999;padding:6px;">CTNS</th>
+                <th style="border:1px solid #999;padding:6px;">G.W.(kg)</th></tr>
+                <tr><td style="border:1px solid #999;padding:6px;">{so['product_summary']}</td>
+                <td style="border:1px solid #999;padding:6px;">{qty_in}</td>
+                <td style="border:1px solid #999;padding:6px;">{_ctns}</td>
+                <td style="border:1px solid #999;padding:6px;">{_gw_total:,.2f}</td></tr></table></div>"""
+            _full_html = f"<html><head><meta charset='utf-8'></head><body>{_pi_html}{_sc_html}{_ci_html}{_pl_html}</body></html>"
+            st.download_button("🖨️ 打印版（HTML，打开后 Ctrl+P 存 PDF）",
+                               _full_html, f"Docs_{so['order_no']}.html", "text/html",
+                               use_container_width=True, type="primary")
     
 # ============ 页面：博客SEO工作台 ============
 elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "blog":

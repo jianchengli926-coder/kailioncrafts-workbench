@@ -5064,40 +5064,39 @@ elif page == "📈 销售管道":
     for i, stage in enumerate(PIPELINE_STAGES):
         with cols[i]:
             data = pipeline_data[stage["key"]]
-    st.metric(stage["name"], data["count"], delta=f"{stage['description'][:10]}")
+            st.metric(stage["name"], data["count"], delta=stage['description'][:10])
 
     st.markdown("---")
 
     # 看板视图
     for stage in PIPELINE_STAGES:
         data = pipeline_data[stage["key"]]
-    with st.expander(f"📌 {stage['name']}（{data['count']}个客户）", expanded=True):
-        if data["customers"]:
-            for c in data["customers"]:
-                grade = c.get("grade", "C")
-            col1, col2, col3 = st.columns([3, 1, 1])
-            with col1:
-                st.markdown(f"""
-                <div class="customer-card grade-{grade}">
-                    <strong>{c.get('company_name', '未知')}</strong>
-                    <span style="float:right; color:{CUSTOMER_GRADES[grade]['color']}">{grade}级 | {c.get('score',0)}分</span><br>
-                    <small>{c.get('country', '')} | {c.get('products', '')[:40]}</small>
-                </div>
-                """, unsafe_allow_html=True)
-            with col2:
-                # 移动到下一阶段
-                stage_idx = next(i for i, s in enumerate(PIPELINE_STAGES) if s["key"] == stage["key"])
-                if stage_idx < len(PIPELINE_STAGES) - 1:
-                    next_stage = PIPELINE_STAGES[stage_idx + 1]
-                    if st.button(f"→ {next_stage['name']}", key=f"move_{c['id']}", use_container_width=True):
-                        cm.move_stage(c["id"], next_stage["key"])
-                        st.rerun()
-            with col3:
-                if st.button("👁️ 详情", key=f"view_{c['id']}", use_container_width=True):
-                    st.session_state["view_customer"] = c["id"]
-                    st.toast(f"已选中：{c.get('company_name','')}（请到「👥 客户中心 → 客户管理」查看完整档案）")
-                else:
-                    st.info("暂无客户")
+        with st.expander(f"📌 {stage['name']}（{data['count']}个客户）", expanded=True):
+            if data["customers"]:
+                for c in data["customers"]:
+                    grade = c.get("grade", "C")
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    with col1:
+                        st.markdown(f"""
+                        <div class="customer-card grade-{grade}">
+                            <strong>{c.get('company_name', '未知')}</strong>
+                            <span style="float:right; color:{CUSTOMER_GRADES[grade]['color']}">{grade}级 | {c.get('score',0)}分</span><br>
+                            <small>{c.get('country', '')} | {c.get('products', '')[:40]}</small>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with col2:
+                        stage_idx = next(i for i, s in enumerate(PIPELINE_STAGES) if s["key"] == stage["key"])
+                        if stage_idx < len(PIPELINE_STAGES) - 1:
+                            next_stage = PIPELINE_STAGES[stage_idx + 1]
+                            if st.button(f"→ {next_stage['name']}", key=f"move_{c['id']}", use_container_width=True):
+                                cm.move_stage(c["id"], next_stage["key"])
+                                st.rerun()
+                    with col3:
+                        if st.button("👁️ 详情", key=f"view_{c['id']}", use_container_width=True):
+                            st.session_state["view_customer"] = c["id"]
+                            st.toast(f"已选中：{c.get('company_name','')}（请到「👥 客户中心 → 客户管理」查看完整档案）")
+            else:
+                st.info("暂无客户")
 
     st.markdown("---")
     st.subheader("📊 管道转化率")
@@ -5105,8 +5104,8 @@ elif page == "📈 销售管道":
     if total > 0:
         for stage in PIPELINE_STAGES:
             count = pipeline_data[stage["key"]]["count"]
-    pct = count / total * 100
-    st.progress(pct / 100, text=f"{stage['name']}: {count}个 ({pct:.0f}%)")
+            pct = count / total * 100
+            st.progress(pct / 100, text=f"{stage['name']}: {count}个 ({pct:.0f}%)")
 
 # ============ 页面10：客户管理 ============
 elif page == "👥 客户管理":
@@ -7079,18 +7078,18 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "b
             for i, idea in enumerate(ideas):
                 with st.container():
                     st.markdown(f"**{idea['title']}**")
-                st.caption(f"方向：{idea.get('direction','')} | 品类：{idea.get('category','')} | 关键词：{idea.get('keyword','')} | {idea.get('date','')}")
-                if idea.get("note"):
-                    st.write(idea["note"])
-                c1, c2 = st.columns(2)
-                if c1.button("✍️ 用这个选题生成", key=f"gen_{i}"):
-                    st.session_state['_gen_idea'] = idea
-                    st.rerun()
-                if c2.button("🗑 删除", key=f"del_{i}"):
-                    ideas.pop(i)
-                    ideas_file.write_text(_json.dumps(ideas, ensure_ascii=False, indent=2), encoding="utf-8")
-                    st.rerun()
-                st.markdown("---")
+                    st.caption(f"方向：{idea.get('direction','')} | 品类：{idea.get('category','')} | 关键词：{idea.get('keyword','')} | {idea.get('date','')}")
+                    if idea.get("note"):
+                        st.write(idea["note"])
+                    c1, c2 = st.columns(2)
+                    if c1.button("✍️ 用这个选题生成", key=f"gen_{i}"):
+                        st.session_state['_gen_idea'] = idea
+                        st.rerun()
+                    if c2.button("🗑 删除", key=f"del_{i}"):
+                        ideas.pop(i)
+                        ideas_file.write_text(_json.dumps(ideas, ensure_ascii=False, indent=2), encoding="utf-8")
+                        st.rerun()
+                    st.markdown("---")
         else:
             st.info("还没有选题，随时记录你的博客灵感")
     
@@ -7284,38 +7283,38 @@ elif page == "📜 AI调用Trace":
     if not traces:
         st.info("暂无Trace记录。去使用一次AI功能（如询盘回复、客户分析）后，这里会自动显示。")
     else:
-    # 统计
+        # 统计
         success = [t for t in traces if t["status"]=="success"]
-    avg_time = sum(t["elapsed_seconds"] for t in success)/len(success) if success else 0
-    total_tokens = sum(t.get("total_tokens",0) for t in success if isinstance(t.get("total_tokens"), int))
-    
-    c1, c2, c3 = st.columns(3)
-    c1.metric("总调用次数", len(traces))
-    c2.metric("平均耗时", f"{avg_time:.1f}秒")
-    c3.metric("总Token消耗", total_tokens)
-    
-    st.markdown("---")
-    st.markdown("##### 📋 最近调用记录")
-    for t in traces:
-        status_icon = "✅" if t["status"]=="success" else "❌"
-    with st.expander(f"{status_icon} {t['time']} | {t['task']} | {t['model']} | {t['elapsed_seconds']}s"):
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown(f"**任务：** {t['task']}")
-            st.markdown(f"**时间：** {t['time']}")
-            st.markdown(f"**模型：** {t['model']}")
-            st.markdown(f"**提供商：** {t['provider']}")
-        with c2:
-            st.markdown(f"**耗时：** {t['elapsed_seconds']}秒")
-            st.markdown(f"**Prompt：** {t['prompt_chars']}字符")
-            st.markdown(f"**回复：** {t['completion_chars']}字符")
-            st.markdown(f"**Token：** {t.get('total_tokens','N/A')}")
-        if t.get("knowledge_refs"):
-            st.markdown("**引用知识库：**")
-            for ref in t["knowledge_refs"]:
-                st.markdown(f"- {ref}")
-        if t.get("error"):
-            st.error(f"错误：{t['error']}")
+        avg_time = sum(t["elapsed_seconds"] for t in success)/len(success) if success else 0
+        total_tokens = sum(t.get("total_tokens",0) for t in success if isinstance(t.get("total_tokens"), int))
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("总调用次数", len(traces))
+        c2.metric("平均耗时", f"{avg_time:.1f}秒")
+        c3.metric("总Token消耗", total_tokens)
+
+        st.markdown("---")
+        st.markdown("##### 📋 最近调用记录")
+        for t in traces:
+            status_icon = "✅" if t["status"]=="success" else "❌"
+            with st.expander(f"{status_icon} {t['time']} | {t['task']} | {t['model']} | {t['elapsed_seconds']}s"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown(f"**任务：** {t['task']}")
+                    st.markdown(f"**时间：** {t['time']}")
+                    st.markdown(f"**模型：** {t['model']}")
+                    st.markdown(f"**提供商：** {t['provider']}")
+                with c2:
+                    st.markdown(f"**耗时：** {t['elapsed_seconds']}秒")
+                    st.markdown(f"**Prompt：** {t['prompt_chars']}字符")
+                    st.markdown(f"**回复：** {t['completion_chars']}字符")
+                    st.markdown(f"**Token：** {t.get('total_tokens','N/A')}")
+                if t.get("knowledge_refs"):
+                    st.markdown("**引用知识库：**")
+                    for ref in t["knowledge_refs"]:
+                        st.markdown(f"- {ref}")
+                if t.get("error"):
+                    st.error(f"错误：{t['error']}")
     
 # ============ 页面14：设置 ============
 elif page == "⚙️ 设置":
@@ -7328,200 +7327,189 @@ elif page == "⚙️ 设置":
     
     with tab1:
         st.subheader("AI模型与API配置")
-    
-    # 提供商分类
-    provider_categories = {
-    "🇨🇳 国内主流": ["doubao", "deepseek", "moonshot", "qwen", "zhipu", "ernie", "spark", "minimax", "stepfun", "yi", "sensenova"],
-    "🌍 国际主流": ["openai", "claude", "gemini"],
-    "🏠 本地/自定义": ["ollama", "custom"],
-    }
-    
-    # 构建带分类的选项列表
-    provider_options = []
-    for cat, providers in provider_categories.items():
-        for p in providers:
-            if p in ALL_PROVIDERS:
-                provider_options.append((f"{cat} | {ALL_PROVIDERS[p]['name']}", p))
-    
-    provider_labels = [opt[0] for opt in provider_options]
-    provider_keys = [opt[1] for opt in provider_options]
-    
-    current_provider = current["provider"] if current["provider"] in ALL_PROVIDERS else "custom"
-    default_idx = provider_keys.index(current_provider) if current_provider in provider_keys else len(provider_keys) - 1
-    
-    provider_label = st.selectbox(
-    "选择AI提供商 *",
-    options=provider_labels,
-    index=default_idx,
-    help="支持15+主流大模型，绝大多数提供OpenAI兼容接口",
-    )
-    provider = provider_keys[provider_labels.index(provider_label)]
-    
-    # 显示提供商说明
-    provider_info = ALL_PROVIDERS.get(provider, {})
-    if provider_info.get("note"):
-        st.info(f"ℹ️ {provider_info['note']}")
-    
-    st.markdown("---")
-    
-    # API Key
-    api_key = st.text_input(
-    "API Key *",
-    value=current["api_key"],
-    type="password",
-    placeholder=f"粘贴你的{provider_info.get('name', '')} API Key",
-    help=f"在{provider_info.get('name', '')}控制台获取API Key",
-    )
-    
-    # 注册链接
-    if provider_info.get("signup_url"):
-        st.caption(f"📝 没有Key？[点击这里注册获取]({provider_info['signup_url']})")
-    
-    # Base URL
-    default_base = provider_info.get("base_url", "")
-    if provider == "custom":
-        base_url = st.text_input(
-        "API Base URL *",
-        value=current["base_url"] or "https://",
-        placeholder="例如：https://api.example.com/v1",
-        help="任何OpenAI兼容接口的Base URL都可以填入",
-    )
-    else:
-        base_url = st.text_input(
-        "API Base URL",
-        value=current["base_url"] if current["provider"] == provider else default_base,
-        help=f"{provider_info['name']}的API地址，一般不需要修改",
-    )
-    
-    # 模型选择
-    model_presets = provider_info.get("models", [])
-    model_names = [m["name"] for m in model_presets]
-    current_model = current["model"]
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if model_presets:
-            model_index = model_names.index(current_model) if current_model in model_names else len(model_names)
-        model = st.selectbox(
-            "主力模型（复杂任务）*",
-            options=model_names + ["自定义模型..."],
-            index=model_index,
-        )
-        if model == "自定义模型...":
-            model = st.text_input("输入模型名称", value=current_model, key="custom_model")
-        else:
-            model = st.text_input(
-            "主力模型名称 *",
-            value=current_model,
-            placeholder="例如：gpt-4o、deepseek-chat等",
-        )
-    
-    with col2:
-        lite_model = st.text_input(
-        "轻量模型（简单任务，可选）",
-        value=current.get("model_lite", "") or model,
-        placeholder="留空则与主力模型相同",
-        help="用于简报、分类等简单任务，可选更便宜的模型",
-    )
-    
-    # 显示模型描述
-    if model_presets:
-        for m in model_presets:
-            if m["name"] == model:
-                st.info(f"💡 {m['name']}：{m['desc']}")
-    
-    # 快速切换常用模型
-    if model_presets:
-        st.markdown("**⚡ 快速选择模型：**")
-    quick_cols = st.columns(min(4, len(model_presets)))
-    for i, m in enumerate(model_presets[:4]):
-        with quick_cols[i]:
-            if st.button(m["name"][:15], key=f"quick_{m['name']}", use_container_width=True):
-                model = m["name"]
-                st.rerun()
-    
-    st.markdown("---")
-    
-    # 测试连接
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🔌 测试连接", use_container_width=True):
-            if not api_key:
-                st.error("请先填写API Key")
-        else:
-            with st.spinner("正在测试连接..."):
-                success, msg = ai.test_connection(provider, api_key, base_url, model)
-            if success:
-                st.success(msg)
-            else:
-                st.error(msg)
-    
-    with col2:
-        if st.button("💾 保存配置", type="primary", use_container_width=True):
-            if not api_key:
-                st.error("API Key不能为空")
-        elif not model:
-            st.error("模型名称不能为空")
-        else:
-            save_config(provider, api_key, base_url, model, lite_model)
-            ai.update_config(provider, api_key, base_url, model, lite_model)
-            st.success("✅ 配置已保存！立即生效，无需重启")
-            st.balloons()
-    
-    # 当前状态
-    st.markdown("---")
-    st.subheader("当前状态")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if ai.is_configured():
-            st.success("✅ API已配置")
-        else:
-            st.warning("⚠️ API未配置")
-    with col2:
-        st.info(f"模型：{ai.model}")
-    with col3:
-        st.info(f"提供商：{ai.get_provider_name()}")
-    
-    # 支持的提供商一览
-    with st.expander("📋 查看所有支持的模型提供商"):
+
+        # 提供商分类
+        provider_categories = {
+            "🇨🇳 国内主流": ["doubao", "deepseek", "moonshot", "qwen", "zhipu", "ernie", "spark", "minimax", "stepfun", "yi", "sensenova"],
+            "🌍 国际主流": ["openai", "claude", "gemini"],
+            "🏠 本地/自定义": ["ollama", "custom"],
+        }
+
+        provider_options = []
         for cat, providers in provider_categories.items():
-            st.markdown(f"**{cat}**")
-        for p in providers:
-            if p in ALL_PROVIDERS:
-                info = ALL_PROVIDERS[p]
-                models_str = ", ".join([m["name"] for m in info.get("models", [])[:3]])
-                st.markdown(f"- **{info['name']}**: {models_str or '自定义模型'}")
-        st.markdown("")
-    
+            for p in providers:
+                if p in ALL_PROVIDERS:
+                    provider_options.append((f"{cat} | {ALL_PROVIDERS[p]['name']}", p))
+
+        provider_labels = [opt[0] for opt in provider_options]
+        provider_keys = [opt[1] for opt in provider_options]
+
+        current_provider = current["provider"] if current["provider"] in ALL_PROVIDERS else "custom"
+        default_idx = provider_keys.index(current_provider) if current_provider in provider_keys else len(provider_keys) - 1
+
+        provider_label = st.selectbox(
+            "选择AI提供商 *",
+            options=provider_labels,
+            index=default_idx,
+            help="支持15+主流大模型，绝大多数提供OpenAI兼容接口",
+        )
+        provider = provider_keys[provider_labels.index(provider_label)]
+
+        provider_info = ALL_PROVIDERS.get(provider, {})
+        if provider_info.get("note"):
+            st.info(f"ℹ️ {provider_info['note']}")
+
+        st.markdown("---")
+
+        api_key = st.text_input(
+            "API Key *",
+            value=current["api_key"],
+            type="password",
+            placeholder=f"粘贴你的{provider_info.get('name', '')} API Key",
+            help=f"在{provider_info.get('name', '')}控制台获取API Key",
+        )
+
+        if provider_info.get("signup_url"):
+            st.caption(f"📝 没有Key？[点击这里注册获取]({provider_info['signup_url']})")
+
+        default_base = provider_info.get("base_url", "")
+        if provider == "custom":
+            base_url = st.text_input(
+                "API Base URL *",
+                value=current["base_url"] or "https://",
+                placeholder="例如：https://api.example.com/v1",
+                help="任何OpenAI兼容接口的Base URL都可以填入",
+            )
+        else:
+            base_url = st.text_input(
+                "API Base URL",
+                value=current["base_url"] if current["provider"] == provider else default_base,
+                help=f"{provider_info['name']}的API地址，一般不需要修改",
+            )
+
+        model_presets = provider_info.get("models", [])
+        model_names = [m["name"] for m in model_presets]
+        current_model = current["model"]
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if model_presets:
+                model_index = model_names.index(current_model) if current_model in model_names else len(model_names)
+                model = st.selectbox(
+                    "主力模型（复杂任务）*",
+                    options=model_names + ["自定义模型..."],
+                    index=model_index,
+                )
+                if model == "自定义模型...":
+                    model = st.text_input("输入模型名称", value=current_model, key="custom_model")
+            else:
+                model = st.text_input(
+                    "主力模型名称 *",
+                    value=current_model,
+                    placeholder="例如：gpt-4o、deepseek-chat等",
+                )
+
+        with col2:
+            lite_model = st.text_input(
+                "轻量模型（简单任务，可选）",
+                value=current.get("model_lite", "") or model,
+                placeholder="留空则与主力模型相同",
+                help="用于简报、分类等简单任务，可选更便宜的模型",
+            )
+
+        if model_presets:
+            for m in model_presets:
+                if m["name"] == model:
+                    st.info(f"💡 {m['name']}：{m['desc']}")
+
+        if model_presets:
+            st.markdown("**⚡ 快速选择模型：**")
+            quick_cols = st.columns(min(4, len(model_presets)))
+            for i, m in enumerate(model_presets[:4]):
+                with quick_cols[i]:
+                    if st.button(m["name"][:15], key=f"quick_{m['name']}", use_container_width=True):
+                        model = m["name"]
+                        st.rerun()
+
+        st.markdown("---")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔌 测试连接", use_container_width=True):
+                if not api_key:
+                    st.error("请先填写API Key")
+                else:
+                    with st.spinner("正在测试连接..."):
+                        success, msg = ai.test_connection(provider, api_key, base_url, model)
+                    if success:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+
+        with col2:
+            if st.button("💾 保存配置", type="primary", use_container_width=True):
+                if not api_key:
+                    st.error("API Key不能为空")
+                elif not model:
+                    st.error("模型名称不能为空")
+                else:
+                    save_config(provider, api_key, base_url, model, lite_model)
+                    ai.update_config(provider, api_key, base_url, model, lite_model)
+                    st.success("✅ 配置已保存！立即生效，无需重启")
+                    st.balloons()
+
+        st.markdown("---")
+        st.subheader("当前状态")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if ai.is_configured():
+                st.success("✅ API已配置")
+            else:
+                st.warning("⚠️ API未配置")
+        with col2:
+            st.info(f"模型：{ai.model}")
+        with col3:
+            st.info(f"提供商：{ai.get_provider_name()}")
+
+        with st.expander("📋 查看所有支持的模型提供商"):
+            for cat, providers in provider_categories.items():
+                st.markdown(f"**{cat}**")
+                for p in providers:
+                    if p in ALL_PROVIDERS:
+                        info = ALL_PROVIDERS[p]
+                        models_str = ", ".join([m["name"] for m in info.get("models", [])[:3]])
+                        st.markdown(f"- **{info['name']}**: {models_str or '自定义模型'}")
+                st.markdown("")
+
     with tab2:
         st.subheader("关于工作台")
-    st.markdown(f"""
-    **KaiLionCrafts 企业级AI工作台**
+        st.markdown(f"""
+        **KaiLionCrafts 企业级AI工作台**
 
-    - 版本：v2.5
-    - 公司：{COMPANY['name_cn']}
-    - 品牌：{COMPANY['brand']}（{COMPANY['brand_cn']}）
-    - 定位：{COMPANY['positioning']}
-    - 创始人：{COMPANY['founder']}
+        - 版本：v2.5
+        - 公司：{COMPANY['name_cn']}
+        - 品牌：{COMPANY['brand']}（{COMPANY['brand_cn']}）
+        - 定位：{COMPANY['positioning']}
+        - 创始人：{COMPANY['founder']}
 
-    **功能导航（12个）：**
-    仪表盘 | 自研AI工具库 | 市场与产品分析 | 客户中心 | 独立站管理
-    订单台账 | 产品库 | 独立站SEO中心 | 公司知识库(含竞品与资源库) | 飞书协同 | 设置中心
+        **功能导航（12个）：**
+        仪表盘 | 自研AI工具库 | 市场与产品分析 | 客户中心 | 独立站管理
+        订单台账 | 产品库 | 独立站SEO中心 | 公司知识库(含竞品与资源库) | 飞书协同 | 设置中心
 
-    **数据资产：**
-    - 标准化知识库：18大分类 / 1200+ 文档
-    - 产品SKU：127 个已上架
-    - 竞品/资源站：78 个
-    - 团队：Leo / Jason / Owen / Julia 四人工作区
+        **数据资产：**
+        - 标准化知识库：18大分类 / 1200+ 文档
+        - 产品SKU：127 个已上架
+        - 竞品/资源站：78 个
+        - 团队：Leo / Jason / Owen / Julia 四人工作区
 
-    **技术栈：**
-    - Streamlit + Python（本地运行）
-    - 豆包/OpenAI兼容API · 可切本地Ollama
-    - 本地JSON存储（数据不出本机）
-    """)
-    
-    st.markdown("---")
-    st.caption("数据全部存储在本地，不上传任何服务器")
+        **技术栈：**
+        - Streamlit + Python（本地运行）
+        - 豆包/OpenAI兼容API · 可切本地Ollama
+        - 本地JSON存储（数据不出本机）
+        """)
+
+        st.markdown("---")
+        st.caption("数据全部存储在本地，不上传任何服务器")
     st.caption(f"工作台目录：{Path(__file__).parent}")
     
 # ============ 页脚 ============

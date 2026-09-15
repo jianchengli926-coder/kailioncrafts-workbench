@@ -185,6 +185,26 @@ st.markdown("""
 
 # ============ 侧边栏导航 ============
 with st.sidebar:
+    # ============ 注入CSS：缩小导航间距 ============
+    st.markdown("""
+    <style>
+    /* 缩小radio选项的上下间距 */
+    .stRadio > div {
+        gap: 2px !important;
+    }
+    .stRadio label {
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+        margin-bottom: 0px !important;
+    }
+    /* 缩小功能导航标题的margin */
+    .stMarkdown h5 {
+        margin-top: 8px !important;
+        margin-bottom: 4px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     # ============ 品牌区 ============
     logo_path = Path(__file__).parent / "assets" / "logo.png"
     if logo_path.exists():
@@ -340,7 +360,8 @@ with st.sidebar:
             page = "🤖 模型管理"
 
     st.markdown("---")
-    st.caption("信任第一 · 价值第二 · 价格第三")
+    st.caption("Trust First · Value Second · Price Last")
+    st.caption("信任为先 · 价值为本 · 价格为末")
     if ai.is_configured():
         st.success("✅ AI已连接")
     else:
@@ -609,7 +630,15 @@ if page == "🏠 仪表盘":
         if todos:
             _todo_changed = False
             for i, t in enumerate(todos[:8]):
-                _cb = st.checkbox(t["task"], value=t.get("done", False), key=f"dash_todo_{i}")
+                # checkbox + 删除按钮 左右布局
+                col_cb, col_del = st.columns([5, 1])
+                with col_cb:
+                    _cb = st.checkbox(t["task"], value=t.get("done", False), key=f"dash_todo_{i}")
+                with col_del:
+                    if st.button("🗑", key=f"del_todo_{i}", help="删除此待办"):
+                        todos.pop(i)
+                        todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+                        st.rerun()
                 if _cb != t.get("done", False):
                     todos[i]["done"] = _cb
                     _todo_changed = True
@@ -635,9 +664,24 @@ if page == "🏠 仪表盘":
                 for i, ds in enumerate(dates):
                     if ds in d:
                         inq_counts[i] += 1
-            trend_df = pd.DataFrame({"日期": dates, "询盘": inq_counts})
-            st.bar_chart(trend_df.set_index("日期"))
-        except:
+            # 用plotly做更好看的图表
+            import plotly.express as px
+            trend_df = pd.DataFrame({"日期": dates, "询盘数": inq_counts})
+            fig = px.bar(trend_df, x="日期", y="询盘数",
+                        color="询盘数",
+                        color_continuous_scale=["#e0e7ff", "#D4AF37"],
+                        text="询盘数",
+                        height=220)
+            fig.update_layout(
+                margin=dict(l=10, r=10, t=10, b=10),
+                showlegend=False,
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                coloraxis_showscale=False,
+            )
+            fig.update_traces(textposition="outside", textfont_size=11)
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception as e:
             st.caption("暂无数据")
 
     st.markdown("---")

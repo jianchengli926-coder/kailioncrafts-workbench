@@ -985,16 +985,30 @@ elif page == "👥 客户中心":
                             "做什么": st.text_input("用我们的产品做什么", cs.get("做什么", ""), key=f"cs_use_{i}"),
                             "解决/结果": st.text_input("解决问题 / 客户反馈", cs.get("解决问题", "") + "；" + cs.get("结果", ""), key=f"cs_res_{i}"),
                         })
-                if st.button("➕ 新增一个案例", key="ep_add_case"):
-                    cases.append({"行业": "", "地区": "", "做什么": "", "解决问题": "", "结果": ""})
-                    cases_save = {
-                        "cn_name": e_cn, "en_name": e_en, "founded": e_founded, "staff": e_staff,
-                        "factory_area": e_area, "main_biz": e_biz, "advantages": e_adv,
-                        "export_regions": e_region, "cert": e_cert, "intro": e_intro, "cases": cases,
-                    }
-                    import json as _j
-                    EP_FILE.write_text(_j.dumps(cases_save, ensure_ascii=False, indent=2), encoding="utf-8")
-                    st.rerun()
+                ca_col1, ca_col2 = st.columns(2)
+                with ca_col1:
+                    if st.button("➕ 新增一个案例", key="ep_add_case", use_container_width=True):
+                        cases.append({"行业": "", "地区": "", "做什么": "", "解决问题": "", "结果": ""})
+                        cases_save = {
+                            "cn_name": e_cn, "en_name": e_en, "founded": e_founded, "staff": e_staff,
+                            "factory_area": e_area, "main_biz": e_biz, "advantages": e_adv,
+                            "export_regions": e_region, "cert": e_cert, "intro": e_intro, "cases": cases,
+                        }
+                        import json as _j
+                        EP_FILE.write_text(_j.dumps(cases_save, ensure_ascii=False, indent=2), encoding="utf-8")
+                        st.rerun()
+                with ca_col2:
+                    if st.button("🗑 删除最后一个案例", key="ep_del_case", use_container_width=True):
+                        if len(cases) > 0:
+                            cases.pop()
+                            cases_save = {
+                                "cn_name": e_cn, "en_name": e_en, "founded": e_founded, "staff": e_staff,
+                                "factory_area": e_area, "main_biz": e_biz, "advantages": e_adv,
+                                "export_regions": e_region, "cert": e_cert, "intro": e_intro, "cases": cases,
+                            }
+                            import json as _j
+                            EP_FILE.write_text(_j.dumps(cases_save, ensure_ascii=False, indent=2), encoding="utf-8")
+                            st.rerun()
 
                 if st.button("💾 保存企业信息与案例", type="primary", key="ep_save", use_container_width=True):
                     saved_cases = []

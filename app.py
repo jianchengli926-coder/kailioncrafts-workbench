@@ -1207,8 +1207,8 @@ elif page == "👥 客户中心":
                         st.error(f"AI错误：{e}")
 
     elif cc_current == "✉️ 客户开发":
-        cc_p1, cc_d1, cc_d2, cc_g1 = st.tabs(
-            ["🎯 个性化开发信(网址+案例)", "✉️ 新开发信", "🔄 多轮跟进", "🎯 业绩目标"])
+        cc_p1, cc_d1, cc_d2, cc_g1, cc_find = st.tabs(
+            ["🎯 个性化开发信(网址+案例)", "✉️ 新开发信", "🔄 多轮跟进", "🎯 业绩目标", "🔍 找客户关键词"])
 
         # ===== 个性化开发信（personalized-email skill）=====
         EP_FILE = Path(__file__).parent / "data" / "enterprise_profile.json"
@@ -1500,6 +1500,40 @@ Best regards, {ep_now.get('en_name')}
                 st.caption("说明：开发信发送量、成交额暂未埋点，先以CRM建档客户数/成交单数为进度口径；后续可接 finance_db 订单财务自动取成交额。")
             except Exception as e:
                 st.error(f"读取CRM进度失败：{e}")
+
+        with cc_find:
+            st.subheader("🔍 Google 找客户关键词生成器")
+            st.caption("输入产品与目标市场，AI 输出可直接粘到 Google 的精准搜索语句；搜到客户网址后，回到「个性化开发信」做背调。")
+            with st.form("find_kw_form"):
+                fk1, fk2 = st.columns(2)
+                fk_product = fk1.selectbox("产品", ["厨房刀具", "专业剪刀", "户外刀具", "厨房用品"])
+                fk_market = fk2.text_input("目标市场（国家/州/城市）", placeholder="如：美国 / 德国 / 加州")
+                fk3, fk4 = st.columns(2)
+                fk_type = fk3.selectbox("目标客户类型", ["进口商/分销商", "品牌商/私有标签", "批发商", "电商卖家", "全部都要"])
+                fk_exclude = fk4.text_input("要排除的词（空格分隔）", value="amazon walmart aliexpress")
+                fk_submit = st.form_submit_button("🚀 生成搜索关键词", type="primary", use_container_width=True)
+            if fk_submit:
+                if not fk_market.strip():
+                    st.warning("请填目标市场")
+                else:
+                    with st.spinner("AI 正在生成找客户关键词..."):
+                        try:
+                            _excl = " -".join(fk_exclude.split())
+                            fk_prompt = (
+                                "你是B2B外贸自主开发客户专家，精通Google搜索找海外客户。\n"
+                                f"我是阳江刀剪出口商(KaiLionCrafts)，主营{fk_product}，支持OEM/ODM/Private Label、小批量试单。\n"
+                                f"目标市场：{fk_market}；目标客户类型：{fk_type}。\n\n"
+                                "请输出可直接复制到Google搜索的精准客户查找语句，要求：\n"
+                                "1. 不用我的产品词堆砌，要用客户会怎么描述他生意的词(importer/wholesaler/distributor/brand/supplier等)\n"
+                                "2. 输出12-15条可直接粘到Google的搜索语句，关键短语用英文双引号包裹做精准匹配\n"
+                                f"3. 每条语句末尾加上排除语法(-{_excl})\n"
+                                "4. 分两梯队：第一梯队=小单快反、能快速出结果；第二梯队=大订单但周期长\n"
+                                "5. 每条后面括号用中文注明：这条大概能搜到什么类型客户\n"
+                                "6. 最后用3行中文讲：搜出来第一两页不精准时，怎么调整关键词。"
+                            )
+                            st.markdown(ai.chat(fk_prompt))
+                        except Exception as e:
+                            st.error(f"AI错误：{e}")
 
     elif cc_current == "💬 客户问答":
         cc_q1, cc_q2 = st.tabs(["💬 智能回复", "🗣️ 沟通话术与文化禁忌"])

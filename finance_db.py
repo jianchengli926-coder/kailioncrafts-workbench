@@ -8,7 +8,7 @@ from datetime import datetime
 DB_PATH = Path(__file__).parent / "data" / "workbench.db"
 
 MEMBERS = ["Leo", "Jason", "Owen", "Julia"]
-ORDER_STATUS = ["询价", "报价", "确认", "生产", "出运", "完成"]
+ORDER_STATUS = ["待生产", "生产中", "待验货", "待装柜", "已发货(在途)", "已到港", "已完成", "已取消"]
 
 
 def _conn():

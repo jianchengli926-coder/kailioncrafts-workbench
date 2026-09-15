@@ -489,7 +489,7 @@ if page == "🏠 仪表盘":
         import finance_db as fdb
         fdb.init_db()
         _s = fdb.dashboard_summary()
-        _live = len([o for o in fdb.list_sales_orders() if o["status"] not in ("完成",)])
+        _live = len([o for o in fdb.list_sales_orders() if o["status"] not in ("完成", "已完成", "已取消")])
         f1, f2, f3, f4 = st.columns(4)
         f1.metric("进行中订单", _live)
         f2.metric("应收(未收)", f"${_s['ar']:,.0f}", delta="跟进尾款" if _s["ar"] > 0 else None)
@@ -529,7 +529,7 @@ if page == "🏠 仪表盘":
         today = _date.today(); nxt = today + _td(days=7)
         for o in _fdb.list_sales_orders():
             dd = o.get("delivery_date") or ""
-            if dd and o["status"] not in ("完成",):
+            if dd and o["status"] not in ("完成", "已完成", "已取消"):
                 try:
                     y, m, d = map(int, dd.split("-"))
                     dlv = _date(y, m, d)

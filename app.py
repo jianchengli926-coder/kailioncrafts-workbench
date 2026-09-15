@@ -4660,14 +4660,13 @@ elif page == "📚 公司知识库":
     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
     <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · KNOWLEDGE BASE</div>
     <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">公司知识库</h2>
-    <div style="color:rgba(255,243,224,.6);font-size:13px;">搜索 · 管理 · 版本 · 添加（含对话转知识）</div>
+    <div style="color:rgba(255,243,224,.6);font-size:13px;">搜索 · 管理统计(含最近更新) · 添加(含对话转知识) · 竞品资源库</div>
     </div>
     """, unsafe_allow_html=True)
 
     kb_sections = {
         "🔍 搜索浏览": "全文搜索 · 分类浏览",
-        "📊 管理统计": "知识库数量 · 文件统计",
-        "📋 版本管理": "版本号 · 日期 · 回退",
+        "📊 管理统计": "统计 · 体积 · 最近更新",
         "➕ 添加知识": "新建文档 / 上传 / 对话转知识",
         "🌐 竞品与资源库": "同行独立站 · 建站模仿",
     }
@@ -4675,7 +4674,7 @@ elif page == "📚 公司知识库":
         st.session_state["kb_sub"] = "🔍 搜索浏览"
     kb_current = st.session_state["kb_sub"]
 
-    kb_cols = st.columns(5)
+    kb_cols = st.columns(4)
     for i, (name, desc) in enumerate(kb_sections.items()):
         with kb_cols[i]:
             is_active = st.session_state["kb_sub"] == name
@@ -4831,11 +4830,46 @@ elif page == "📚 公司知识库":
                 </div>
                 """, unsafe_allow_html=True)
                 st.code(r["路径"], language=None)
+
+            # ===== 版本管理（最近更新记录，并入管理统计）=====
+            st.markdown("---")
+            st.markdown("##### 🕒 最近更新记录（知识库版本变化）")
+            st.caption("按修改时间倒序列出各知识库最近变动的文件，即本库最近新增/更新了什么")
+            import time as _time
+            recent = []
+            for s, info in sources.items():
+                p = info.get("path")
+                lib_name = info.get("name", s)
+                if not p or not os.path.exists(p):
+                    continue
+                for root, _, files in os.walk(p):
+                    for fn in files:
+                        fp = os.path.join(root, fn)
+                        try:
+                            mt = os.path.getmtime(fp)
+                            recent.append((mt, lib_name, fp, os.path.getsize(fp)))
+                        except OSError:
+                            pass
+            recent.sort(key=lambda x: x[0], reverse=True)
+            show_n = st.slider("显示最近多少条", 10, 100, 30, key="kb_recent_n")
+            if not recent:
+                st.info("知识库暂无文件记录")
+            else:
+                rows_recent = []
+                for mt, lib_name, fp, sz in recent[:show_n]:
+                    rows_recent.append({
+                        "更新时间": _time.strftime("%Y-%m-%d %H:%M", _time.localtime(mt)),
+                        "所属库": lib_name,
+                        "文件": os.path.basename(fp),
+                        "体积": _fmt_size(sz),
+                    })
+                import pandas as _pd
+                st.dataframe(_pd.DataFrame(rows_recent), use_container_width=True, hide_index=True)
+                today = _time.strftime("%Y-%m-%d")
+                today_cnt = sum(1 for mt, *_ in recent if _time.strftime("%Y-%m-%d", _time.localtime(mt)) == today)
+                st.success(f"📅 今天新增/更新了 {today_cnt} 个文件")
         except Exception as e:
             st.error(f"加载失败：{e}")
-
-    elif kb_current == "📋 版本管理":
-        st.info("版本管理功能开发中")
 
     elif kb_current == "➕ 添加知识":
         st.markdown("##### 📝 添加新文档到知识库")

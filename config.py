@@ -523,7 +523,7 @@ def get_current_config():
             "api_key": OPENAI_API_KEY,
             "base_url": OPENAI_BASE_URL,
             "model": OPENAI_MODEL,
-            "model_lite": "",
+            "model_lite": OPENAI_MODEL_LITE or OPENAI_MODEL,
         }
 
 

@@ -33,7 +33,7 @@ from provider_manager import (
     refresh_ollama_models, test_provider, get_provider_stats,
 )
 from knowledge_base import kb
-from customer_manager import cm
+from customer_manager import cm, PIPELINE_STAGES
 from ai_client import ai
 from prompts import (
     CUSTOMER_ANALYSIS_PROMPT, COLD_EMAIL_PROMPT, FOLLOW_UP_PROMPT,
@@ -41,7 +41,6 @@ from prompts import (
     DUE_DILIGENCE_PROMPT, MARKET_ANALYSIS_PROMPT, MORNING_BRIEF_PROMPT,
     EMAIL_AIDA_ANALYSIS_PROMPT,
 )
-from customer_manager import cm, PIPELINE_STAGES
 
 
 # ============ 通用：两步删除（防误删） ============
@@ -479,7 +478,9 @@ if page == "🏠 仪表盘":
     with c2:
         st.metric("平均评分", f"{stats['avg_score']:.0f}/100")
     with c3:
-        st.metric("待跟进", stats["by_status"].get("新客户", 0), delta="需处理")
+        _today_n = stats.get("follow_up_today", 0)
+        _overdue_n = stats.get("overdue_follow_up", 0)
+        st.metric("待跟进", f"{_today_n}今日", delta=f"{_overdue_n}逾期" if _overdue_n else None)
     with c4:
         closed = stats["by_pipeline"].get("closed", 0)
         st.metric("已成交", closed, delta=f"转化率 {closed/stats['total']*100:.0f}%" if stats["total"] else "0%")
@@ -489,7 +490,7 @@ if page == "🏠 仪表盘":
         import finance_db as fdb
         fdb.init_db()
         _s = fdb.dashboard_summary()
-        _live = len([o for o in fdb.list_sales_orders() if o["status"] not in ("完成", "已完成", "已取消")])
+        _live = len([o for o in fdb.list_sales_orders() if o["status"] not in ("已完成", "已取消")])
         f1, f2, f3, f4 = st.columns(4)
         f1.metric("进行中订单", _live)
         f2.metric("应收(未收)", f"${_s['ar']:,.0f}", delta="跟进尾款" if _s["ar"] > 0 else None)
@@ -529,7 +530,7 @@ if page == "🏠 仪表盘":
         today = _date.today(); nxt = today + _td(days=7)
         for o in _fdb.list_sales_orders():
             dd = o.get("delivery_date") or ""
-            if dd and o["status"] not in ("完成", "已完成", "已取消"):
+            if dd and o["status"] not in ("已完成", "已取消"):
                 try:
                     y, m, d = map(int, dd.split("-"))
                     dlv = _date(y, m, d)
@@ -610,8 +611,14 @@ if page == "🏠 仪表盘":
                 todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
                 st.rerun()
         if todos:
+            _todo_changed = False
             for i, t in enumerate(todos[:8]):
-                st.checkbox(t["task"], value=t.get("done", False), key=f"dash_todo_{i}")
+                _cb = st.checkbox(t["task"], value=t.get("done", False), key=f"dash_todo_{i}")
+                if _cb != t.get("done", False):
+                    todos[i]["done"] = _cb
+                    _todo_changed = True
+            if _todo_changed:
+                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
         else:
             st.caption("暂无待办")
 
@@ -1415,8 +1422,8 @@ EN: ...
                                          use_container_width=True, type="primary"):
                                 _name = (cust_extra or cust_url or "未命名客户").split("\n")[0][:40]
                                 cm.add_customer({
-                                    "name": _name, "country": cust_country or "未填",
-                                    "website": cust_url, "status": "已发开发信",
+                                    "company_name": _name, "country": cust_country or "未填",
+                                    "website": cust_url, "status": "已联系",
                                     "source": "AI开发信",
                                     "analysis": result[:800],
                                     "notes": f"网址:{cust_url}｜{cust_extra or ''}",
@@ -1892,7 +1899,7 @@ EN: ...
                 with n2:
                     nc_source = st.selectbox("客户来源", CUSTOMER_SOURCES)
                     nc_type = st.selectbox("客户类型", CUSTOMER_TYPES)
-                    nc_grade = st.selectbox("等级", ["A", "B", "C"])
+                    nc_grade = st.selectbox("等级", ["A", "B", "C", "D"])
                     nc_products = st.text_input("产品需求（可选）")
                 nc_stage = st.selectbox("初始阶段", [s["name"] for s in PIPELINE_STAGES])
                 nc_fu = st.number_input("几天后首次跟进提醒（0=不提醒）", 0, 60, 0)
@@ -6368,11 +6375,14 @@ elif page == "📋 今日待办":
         st.rerun()
     
     st.markdown("---")
+    _changed = False
     for i, t in enumerate(todos):
         cb = st.checkbox(t["task"], value=t["done"], key=f"todo_{i}")
-    if cb != t["done"]:
-        todos[i]["done"] = cb
-    todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+        if cb != t["done"]:
+            todos[i]["done"] = cb
+            _changed = True
+    if _changed:
+        todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
     
 # ============ 页面：订单台账 ============
 elif page == "🌍 海外社媒矩阵":
@@ -7203,7 +7213,7 @@ elif page == "⚙️ 设置中心":
         try:
             cfg = get_current_config()
             st.write(f"当前模型：{cfg.get('model', '未设置')}")
-            st.write(f"API Base：{cfg.get('api_base', '未设置')}")
+            st.write(f"API Base：{cfg.get('base_url', '未设置')}")
         except Exception as e:
             st.error(f"加载配置失败：{e}")
 

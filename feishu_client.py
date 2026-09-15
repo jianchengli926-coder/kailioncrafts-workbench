@@ -66,9 +66,10 @@ def test_connection():
     """测试连接，返回各项状态"""
     results = {}
     try:
-        results["token"] = "✅ 成功"
-    except:
-        results["token"] = "❌ 失败"
+        tok = get_token()
+        results["token"] = "✅ 成功" if tok else "❌ 失败"
+    except Exception as e:
+        results["token"] = f"❌ {e}"
     try:
         d = list_drive_files()
         results["drive"] = f"✅ {len(d.get('data',{}).get('files',[]))}个文件"

@@ -32,7 +32,7 @@ def init_db():
         qty INTEGER DEFAULT 0,
         total_amount REAL DEFAULT 0,
         currency TEXT DEFAULT 'USD',
-        status TEXT DEFAULT '询价',
+        status TEXT DEFAULT '待生产',
         order_date TEXT,
         delivery_date TEXT,
         logistics_fee REAL DEFAULT 0,
@@ -89,7 +89,7 @@ def add_sales_order(**kw):
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (order_no, kw.get("owner"), kw.get("customer"), kw.get("country"),
          kw.get("product_summary"), kw.get("qty", 0), kw.get("total_amount", 0),
-         kw.get("currency", "USD"), kw.get("status", "询价"),
+         kw.get("currency", "USD"), kw.get("status", "待生产"),
          kw.get("order_date") or datetime.now().strftime("%Y-%m-%d"),
          kw.get("delivery_date"), kw.get("logistics_fee", 0),
          kw.get("other_fee", 0), kw.get("notes")))

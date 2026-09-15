@@ -1768,6 +1768,45 @@ EN: ...
                             st.caption("该客户暂无订单记录（在「🧾 订单台账」录入后会自动按客户名关联）")
                     except Exception as _e:
                         st.caption(f"订单关联暂不可用：{_e}")
+                    # ---- ⚡ 快捷话术：一键生成给这个客户的场景化英文邮件 ----
+                    st.markdown("---")
+                    st.markdown("**⚡ 快捷话术（一键生成给这个客户的英文邮件草稿）**")
+                    _scenarios = {
+                        "报价后跟进": "客户收到报价3天左右没回。写礼貌的跟进邮件,询问是否有疑问,重申报价有效期,不催促。",
+                        "样品后跟进": "客户收到样品约一周。写邮件询问样品测试反馈,表达随时支持,轻推下一步。",
+                        "出货/到货通知": "订单已发出/预计到港。写邮件通知关键信息(船期/预计到港),祝销售顺利。",
+                        "催款/对账": "客户有应收款未付。写客气但清晰的对账催款邮件,列明发票号/金额/到期日,请求尽快安排。",
+                        "久未联系激活": "这个客户约30天没互动。写轻量的重新激活邮件,分享一条有价值的行业/产品资讯,不强推。",
+                    }
+                    _acts_txt = "；".join([f"{(a.get('created_at','') or '')[:10]} {a.get('description','')}" for a in acts[-5:]]) or "无记录"
+                    _qcols = st.columns(3)
+                    for i, _sc in enumerate(_scenarios.keys()):
+                        if _qcols[i % 3].button(_sc, key=f"qk_{sel}_{_sc}", use_container_width=True):
+                            with st.spinner("AI 生成中..."):
+                                try:
+                                    _vstyle = _load_voice().get("style_notes", "")
+                                    _prompt = f"""你是KaiLionCrafts的外贸业务员。基于下面这个真实客户信息,写一封场景化英文邮件草稿。
+
+# 客户信息
+公司:{cust.get('company_name','')}
+国家:{cust.get('country','')}
+阶段:{_stage_name(cust)}
+历史跟进:{_acts_txt}
+
+# 本次场景
+{_scenarios[_sc]}
+
+# 语气
+{_vstyle or '简洁、专业、不卑不亢'}
+
+直接输出可发客户的邮件,含Subject和正文,结尾署名 KaiLionCrafts。不要解释。"""
+                                    st.session_state[f"qk_res_{sel}"] = ai.chat(_prompt)
+                                except Exception as e:
+                                    st.session_state[f"qk_res_{sel}"] = f"生成失败:{e}"
+                    if st.session_state.get(f"qk_res_{sel}"):
+                        st.text_area("生成结果(可直接复制发送)", st.session_state[f"qk_res_{sel}"],
+                                     height=220, key=f"qk_ta_{sel}")
+
                     with st.form("add_act_form"):
                         st.markdown("**＋ 记一条跟进**")
                         af1, af2, af3 = st.columns([1, 2, 1])

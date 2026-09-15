@@ -1230,8 +1230,8 @@ elif page == "👥 客户中心":
                         st.error(f"AI错误：{e}")
 
     elif cc_current == "✉️ 客户开发":
-        cc_p1, cc_d1, cc_d2, cc_g1, cc_find = st.tabs(
-            ["🎯 个性化开发信(网址+案例)", "✉️ 新开发信", "🔄 多轮跟进", "🎯 业绩目标", "🔍 找客户关键词"])
+        cc_p1, cc_d1, cc_d2, cc_seq, cc_g1, cc_find = st.tabs(
+            ["🎯 个性化开发信(网址+案例)", "✉️ 新开发信", "🔄 多轮跟进", "📋 邮件序列设计", "🎯 业绩目标", "🔍 找客户关键词"])
 
         # ===== 个性化开发信（personalized-email skill）=====
         EP_FILE = Path(__file__).parent / "data" / "enterprise_profile.json"
@@ -1509,6 +1509,96 @@ EN: ...
                             products="刀剪全品类", country="未知", reply_status=fol_reply,
                             company_profile=kb.get_company_brief(),
                         )
+                        result = ai.chat(prompt)
+                        st.markdown(result)
+                    except Exception as e:
+                        st.error(f"AI错误：{e}")
+
+        with cc_seq:
+            st.subheader("📋 邮件序列设计（4-5封跟进全流程）")
+            st.caption("借鉴CC Switch外的Outbound Strategist方法：不是单封邮件，而是设计完整序列——每封有目标、时间点、退出条件，按客户回复状态自动分支")
+            with st.form("seq_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    seq_company = st.text_input("客户公司 *", key="seq_company")
+                    seq_country = st.text_input("客户国家", key="seq_country")
+                with col2:
+                    seq_product = st.selectbox("推荐产品", ["厨房刀具", "专业剪刀", "户外刀具", "厨房用品"], key="seq_product")
+                    seq_signal = st.selectbox("客户采购信号", [
+                        "无明显信号（冷开发）",
+                        "官网有招聘采购/质量岗位",
+                        "最近融资/扩张新闻",
+                        "在比价/询价中",
+                        "上次合作后流失",
+                        "行业展会参展记录",
+                    ], key="seq_signal")
+                seq_first_email = st.text_area("首封开发信内容（可选，贴进来更准）", height=80, key="seq_first_email",
+                                               placeholder="如果首封已发，贴进来AI会基于它设计跟进序列；留空则AI从头设计")
+                seq_submit = st.form_submit_button("📋 设计完整跟进序列", type="primary", use_container_width=True)
+            if seq_submit and seq_company:
+                with st.spinner("AI设计邮件序列中..."):
+                    try:
+                        prompt = f"""你是B2B外贸邮件序列设计专家（借鉴Outbound Strategist方法论）。
+我方：{kb.get_company_brief()}
+客户公司：{seq_company}
+客户国家：{seq_country or '未知'}
+推荐产品：{seq_product}
+客户采购信号：{seq_signal}
+首封开发信内容：{seq_first_email or '（无，从头设计）'}
+
+请设计一套完整的B2B开发信跟进序列（4-5封），按以下框架输出：
+
+# 序列设计
+
+## 触发条件
+- 目标客户类型：...
+- 采购信号分析：{seq_signal}（这个信号意味着什么？该用什么切入角度？）
+
+## 退出条件（必须明确）
+- 客户回复询价 → 立即结束序列，转入报价流程
+- 客户明确拒绝 → 发一封礼貌告别邮件后停止
+- 退订/投诉 → 立即停止
+- 序列跑完无回复 → 标记为"冷藏"，3个月后再激活
+
+## 邮件序列
+
+### 邮件1（Day 0 · 首封）
+- 目标：破冰+建立专业印象
+- 主题：...
+- 正文：...
+- CTA：...
+
+### 邮件2（Day 3 · 价值跟进）
+- 目标：提供价值，不催促
+- 主题：...
+- 正文：...
+- CTA：...
+
+### 邮件3（Day 7 · 痛点切入）
+- 目标：提出对方行业的痛点/问题
+- 主题：...
+- 正文：...
+- CTA：...
+
+### 邮件4（Day 14 · 社会证明）
+- 目标：用案例/数据建立信任
+- 主题：...
+- 正文：...
+- CTA：...
+
+### 邮件5（Day 21 · 最后尝试/软拒绝）
+- 目标：要么推进，要么礼貌收尾
+- 主题：...
+- 正文：...
+- CTA：...
+
+## 关键规则
+- 每封邮件不超过150字
+- 不要"just checking in"这类废话
+- 每封邮件的CTA必须具体（不是"let me know"，而是"15分钟通话/一份报价单"）
+- 根据{seq_signal}调整切入角度
+- 如果是英语国家，全部英文；否则英文+当地语言一句主题建议
+"""
                         result = ai.chat(prompt)
                         st.markdown(result)
                     except Exception as e:

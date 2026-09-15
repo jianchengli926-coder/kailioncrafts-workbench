@@ -4866,7 +4866,7 @@ elif page == "🤖 锴利自研AI工具库":
                     st.markdown(st.session_state['vr_result'])
                     save_to_kb_button(st.session_state['vr_result'], "视频反推", f"剪辑脚本_{datetime.now().strftime('%Y%m%d_%H%M')}")
 
-                st.success("✅ 已自动保存到知识库文件夹：data/kb_output/视频反推/")
+            st.caption("💡 点击上方「保存到知识库」按钮，结果会自动存档到 data/kb_output/视频反推/ 文件夹")
 
         # 知识库连接说明（所有工具都显示）
         with st.expander("📚 本工具连接的公司知识库", expanded=False):

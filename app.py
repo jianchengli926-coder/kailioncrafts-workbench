@@ -2129,6 +2129,81 @@ EN: ...
 
                 # ===== 筛选结果统计 + 导出按钮 =====
                 st.markdown(f"**筛选结果：{len(rows)} 个客户**")
+
+                # ===== 批量操作栏 =====
+                if rows:
+                    st.markdown("**⚡ 批量操作（对筛选出的所有客户生效）**")
+                    bc1, bc2, bc3, bc4 = st.columns([1, 1, 1, 1])
+                    with bc1:
+                        batch_stage = st.selectbox(
+                            "批量改阶段",
+                            ["（不操作）"] + [s["name"] for s in PIPELINE_STAGES],
+                            key="batch_stage"
+                        )
+                    with bc2:
+                        batch_grade = st.selectbox(
+                            "批量改等级",
+                            ["（不操作）", "A", "B", "C", "D"],
+                            key="batch_grade"
+                        )
+                    with bc3:
+                        batch_tag = st.text_input("批量加标签（可选）", key="batch_tag", placeholder="如：重点跟进")
+                    with bc4:
+                        if st.button("🚀 执行批量操作", key="do_batch", type="primary"):
+                            # 执行批量操作
+                            batch_count = 0
+                            batch_customer_ids = [customers[i]["id"] for i, r in enumerate(rows) if i < len(customers)]
+                            # 更准确的：从筛选结果里拿到对应的customer id
+                            filtered_customer_ids = []
+                            for c in customers:
+                                # 重新应用筛选条件，找到对应的customer id
+                                if kw and kw.lower() not in (c.get("company_name", "") + c.get("country", "") + c.get("products", "")).lower():
+                                    continue
+                                if g_f != "全部" and c.get("grade", "C") != g_f:
+                                    continue
+                                if stage_f != "全部" and _stage_name(c) != stage_f:
+                                    continue
+                                if country_f != "全部" and c.get("country", "") != country_f:
+                                    continue
+                                if source_f != "全部" and c.get("source", "") != source_f:
+                                    continue
+                                filtered_customer_ids.append(c["id"])
+
+                            for cid in filtered_customer_ids:
+                                updates = {}
+                                if batch_stage != "（不操作）":
+                                    stage_key = next((s["key"] for s in PIPELINE_STAGES if s["name"] == batch_stage), "lead")
+                                    updates["pipeline_stage"] = stage_key
+                                if batch_grade != "（不操作）":
+                                    updates["grade"] = batch_grade
+                                if batch_tag:
+                                    existing_tags = c.get("tags", "")
+                                    updates["tags"] = (existing_tags + "," + batch_tag).strip(",")
+                                if updates:
+                                    cm.update_customer(cid, updates)
+                                    batch_count += 1
+
+                            st.success(f"✅ 已对 {batch_count} 个客户执行批量操作")
+
+                            # 保存批量操作记录到知识库
+                            from datetime import datetime as _dt
+                            batch_content = f"""# 批量操作记录
+
+**操作时间**：{_dt.now().strftime("%Y-%m-%d %H:%M")}
+**操作客户数**：{batch_count} 个
+
+## 操作内容
+- 改阶段：{batch_stage if batch_stage != '（不操作）' else '未操作'}
+- 改等级：{batch_grade if batch_grade != '（不操作）' else '未操作'}
+- 加标签：{batch_tag if batch_tag else '未操作'}
+"""
+                            save_to_kb_button(batch_content, "客户管理/批量操作记录", f"批量操作_{_dt.now().strftime('%Y%m%d_%H%M')}", "md")
+
+                            st.rerun()
+
+                st.markdown("---")
+
+                # ===== 导出按钮 =====
                 exp_col1, exp_col2 = st.columns([3, 1])
                 with exp_col2:
                     if st.button("📤 导出筛选结果CSV", key="export_filtered"):
@@ -2506,7 +2581,8 @@ EN: ...
 
         # ---------- Tab5 新增客户 ----------
         with cc_m5:
-            st.subheader("➕ 新增客户档案")
+            # ===== 手动新增客户 =====
+            st.subheader("➕ 手动新增客户档案")
             with st.form("new_cust_form"):
                 n1, n2 = st.columns(2)
                 with n1:
@@ -2535,6 +2611,77 @@ EN: ...
                         if int(nc_fu) > 0 and _new_c:
                             cm.set_next_follow_up(_new_c["id"], int(nc_fu))
                         st.success(f"✅ 已添加客户：{nc_name}")
+
+            st.markdown("---")
+
+            # ===== Excel批量导入客户 =====
+            st.subheader("📤 Excel批量导入客户")
+            st.caption("上传Excel/CSV文件，自动导入客户档案，自动去重（按公司名）")
+
+            uploaded_file = st.file_uploader("选择文件", type=["xlsx", "csv"], key="import_cust_file")
+            if uploaded_file is not None:
+                try:
+                    # 读取文件
+                    if uploaded_file.name.endswith(".csv"):
+                        df = pd.read_csv(uploaded_file)
+                    else:
+                        df = pd.read_excel(uploaded_file)
+
+                    st.write(f"文件包含 {len(df)} 行，{len(df.columns)} 列")
+                    st.dataframe(df.head(), use_container_width=True, hide_index=True)
+
+                    # 字段映射
+                    st.markdown("**字段映射（自动识别，可调整）**")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        company_col = st.selectbox("公司名称列", df.columns, index=0 if "公司" in str(df.columns[0]) or "company" in str(df.columns[0]).lower() else 0)
+                    with col2:
+                        country_col = st.selectbox("国家列", df.columns, index=1 if len(df.columns) > 1 else 0)
+                    with col3:
+                        source_col = st.selectbox("来源列（可选）", ["（无）"] + list(df.columns))
+
+                    # 确认导入
+                    if st.button("🚀 确认导入", type="primary", key="confirm_import"):
+                        success_count = 0
+                        skip_count = 0
+                        customers_all = cm.list_customers()
+                        existing_names = [c.get("company_name", "").lower() for c in customers_all]
+
+                        for _, row in df.iterrows():
+                            company_name = str(row.get(company_col, "")).strip()
+                            if not company_name or company_name.lower() in existing_names:
+                                skip_count += 1
+                                continue
+                            country = str(row.get(country_col, "")).strip()
+                            source = str(row.get(source_col, "")).strip() if source_col != "（无）" else "其他"
+
+                            cm.add_customer({
+                                "company_name": company_name,
+                                "country": country,
+                                "source": source if source in CUSTOMER_SOURCES else "其他",
+                                "grade": "C",
+                                "pipeline_stage": "lead",
+                                "score": 0,
+                            })
+                            existing_names.append(company_name.lower())
+                            success_count += 1
+
+                        st.success(f"✅ 导入完成：成功 {success_count} 个，跳过（重复）{skip_count} 个")
+
+                        # 保存导入记录到知识库
+                        from datetime import datetime as _dt
+                        import_content = f"""# 客户导入记录
+
+**导入时间**：{_dt.now().strftime("%Y-%m-%d %H:%M")}
+**文件名**：{uploaded_file.name}
+**总行数**：{len(df)}
+**成功导入**：{success_count} 个
+**跳过（重复）**：{skip_count} 个
+"""
+                        save_to_kb_button(import_content, "客户管理/导入记录", f"导入记录_{_dt.now().strftime('%Y%m%d_%H%M')}", "md")
+
+                except Exception as e:
+                    st.error(f"导入失败：{e}")
 
 # ============ 页面3：客户分析（旧） ============
 elif page == "🎯 客户分析":

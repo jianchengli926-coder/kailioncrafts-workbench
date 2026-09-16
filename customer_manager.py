@@ -121,7 +121,7 @@ class CustomerManager:
         if status:
             data = [c for c in data if c.get("status") == status]
         if pipeline_stage:
-            data = [c for c in data if c.get("pipeline_stage") == pipeline_stage]
+            data = [c for c in data if c.get("pipeline_stage", "lead") == pipeline_stage]
         # 按分数排序
         data.sort(key=lambda x: x.get("score", 0), reverse=True)
         return data

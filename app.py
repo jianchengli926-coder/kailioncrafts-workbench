@@ -2735,6 +2735,31 @@ elif page == "📦 产品库":
     if not products_list:
         st.warning("产品数据库未找到")
     else:
+        # 预扫描：从各产品 SEO txt 提取零售价区间（缓存到 session_state）
+        if 'product_price_map' not in st.session_state:
+            import re as _re
+            _pm = {}
+            for _p in products_list:
+                _sp = _p.get('seo_doc', '')
+                if not (_sp and Path(_sp).is_file()):
+                    continue
+                try:
+                    _txt = Path(_sp).read_text(encoding='utf-8', errors='ignore')
+                except Exception:
+                    continue
+                for _line in _txt.splitlines():
+                    if '零售价区间' in _line or '价格区间' in _line:
+                        _nums = _re.findall(r'\$\s*(\d{1,3}(?:\.\d{1,2})?)', _line)
+                        if len(_nums) >= 2:
+                            _pm[_p['sku']] = f"${_nums[0]}–${_nums[1]}"
+                            break
+                        _m = _re.findall(r'(\d{1,3}(?:\.\d{1,2})?)\s*[-–]\s*(\d{1,3}(?:\.\d{1,2})?)\s*USD', _line)
+                        if _m:
+                            _pm[_p['sku']] = f"${_m[0][0]}–${_m[0][1]}"
+                            break
+            st.session_state['product_price_map'] = _pm
+        price_map = st.session_state['product_price_map']
+
         # 统计
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -2828,7 +2853,7 @@ elif page == "📦 产品库":
                             st.caption(f"材质: {(product.get('main_material') or '—')[:18]}")
                         with cmb:
                             st.caption(f"{product.get('image_count', 0)}张图")
-                        st.caption(f"{product.get('category','')} · 价格区间待补")
+                        st.caption(f"{product.get('category','')} · 💰{price_map.get(product['sku'], '价格待补')}")
 
                         # 查看详情按钮
                         if st.button(f"查看SEO资料", key=f"detail_{product['sku']}", use_container_width=True):
@@ -2864,6 +2889,7 @@ elif page == "📦 产品库":
                         "英文名称": product.get('name_en', ''),
                         "品类": product.get('category', ''),
                         "产品类型": product.get('product_type', ''),
+                        "建议零售价区间": price_map.get(product['sku'], '待补'),
                         "商品标题": product.get('product_title', '')[:100],
                         "固定链接": product.get('permalink', ''),
                         "图片数量": f"{product.get('image_count', 0)}张",

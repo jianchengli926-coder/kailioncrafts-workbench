@@ -2451,7 +2451,7 @@ EN: ...
                                 s1, s2 = st.columns([1, 3])
                                 with s1:
                                     step_day = st.number_input("间隔天数", 0, 90, step["day"], key=f"seq_day_{selected_seq}_{i}")
-                                    step_channel = st.selectbox("跟进渠道", ["邮件", "WhatsApp", "电话", "其他"], index=["邮件","WhatsApp","电话","其他"].index(step["channel"]), key=f"seq_channel_{selected_seq}_{i}")
+                                    step_channel = st.selectbox("跟进渠道", ["邮件", "WhatsApp", "电话", "其他"], index=(["邮件","WhatsApp","电话","其他"].index(step["channel"]) if step["channel"] in ["邮件","WhatsApp","电话","其他"] else 0), key=f"seq_channel_{selected_seq}_{i}")
                                 with s2:
                                     step_title = st.text_input("步骤标题", step["title"], key=f"seq_title_{selected_seq}_{i}")
                                     step_template = st.text_area("邮件内容模板", step["template"], height=100, key=f"seq_template_{selected_seq}_{i}")

@@ -3011,6 +3011,27 @@ elif page == "🤖 锴利自研AI工具库":
         st.markdown(f"### {tool['icon']} {tool['name']}")
         st.caption(f"分类：{tool['category']} | {tool['description']}")
 
+        # 原HTML工具公网链接（WorkBuddy 部署版，功能最全）
+        _html_links = {
+            "sku_naming": "https://ccd0156fff374dd2b1ee353f444691fe.app.workbuddy.host",
+            "line_art": "https://2fb8250492924d1e91be8560ba248cb8.app.workbuddy.host",
+            "visual_correction": "https://615c8d38239040638715dce9b80b41e2.app.workbuddy.host",
+            "prompt_library": "https://7a3acd41c0c348b5b0705ce98c0bbb96.app.workbuddy.host",
+            "scene_reverse": "https://c0eaa3cfd36a409ab386fcd5ef46cd56.app.workbuddy.host",
+            "white_balance": "https://238d6a7f38e545179657add9775cb030.app.workbuddy.host",
+            "raw_alignment": "https://58c26070f39e4dcd872cddf189e2519a.app.workbuddy.host",
+            "video_reverse": "https://video-reverse-prompt.app.workbuddy.host/",
+        }
+        _html_url = _html_links.get(tool_id)
+        if _html_url:
+            with st.container(border=True):
+                _c1, _c2 = st.columns([3, 1])
+                with _c1:
+                    st.markdown("**🌐 原HTML工具（完整版）**")
+                    st.caption("WorkBuddy 公网部署版 · 含全部原始功能；下方为本机 Streamlit 原生版")
+                with _c2:
+                    st.link_button("打开原工具 ↗", _html_url, use_container_width=True, type="primary")
+
         st.markdown("---")
 
         # ========== 1. SKU命名工具 ==========

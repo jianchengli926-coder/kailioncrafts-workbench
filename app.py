@@ -1885,9 +1885,9 @@ EN: ...
         ], output_folder="客户管理")
 
     elif cc_current == "📊 客户管理":
-        st.caption("数据总览 · 客户列表 · 客户详情 · 客户看板 · 待办提醒 · 新增客户")
-        cc_m1, cc_m2, cc_m3, cc_m4, cc_m5, cc_m6 = st.tabs(
-            ["📊 数据总览", "👥 客户列表", "📇 客户详情", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
+        st.caption("数据总览 · 客户列表 · 客户详情 · 跟进序列 · 客户看板 · 待办提醒 · 新增客户")
+        cc_m1, cc_m2, cc_m3, cc_m4, cc_m5, cc_m6, cc_m7 = st.tabs(
+            ["📊 数据总览", "👥 客户列表", "📇 客户详情", "🔄 跟进序列", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
 
         # 全局函数：获取客户阶段名称（所有tab共用）
         def _stage_name(c):
@@ -2384,8 +2384,278 @@ EN: ...
             except Exception as e:
                 st.error(f"加载失败：{e}")
 
-        # ---------- Tab4 客户看板（开发进度，按阶段分列）----------
+        # ---------- Tab4 自动跟进序列 ----------
         with cc_m4:
+            try:
+                import json
+                from datetime import datetime, timedelta
+
+                # 序列模板存储
+                SEQ_FILE = "data/followup_sequences.json"
+                def _load_sequences():
+                    if os.path.exists(SEQ_FILE):
+                        with open(SEQ_FILE, "r", encoding="utf-8") as f:
+                            return json.load(f)
+                    # 默认内置序列
+                    return {
+                        "新客户7天跟进": {
+                            "steps": [
+                                {"day": 0, "channel": "邮件", "title": "首次开发信", "template": "您好！我是KaiLionCrafts的XXX，我们是阳江刀剪专业制造商。看到您对我们的产品感兴趣，特此联系。我们的产品质量优良，价格有竞争力。期待您的回复！"},
+                                {"day": 3, "channel": "邮件", "title": "跟进1：询问是否收到", "template": "您好！请问您收到我上次的邮件了吗？如果有任何疑问，随时联系我。"},
+                                {"day": 7, "channel": "邮件", "title": "跟进2：提供更多信息", "template": "您好！为了让您更了解我们，附上我们的产品目录和公司介绍。如有需要样品，请告知。"},
+                            ]
+                        },
+                        "报价后跟进": {
+                            "steps": [
+                                {"day": 0, "channel": "邮件", "title": "报价发送确认", "template": "您好！这是您的报价单，请查收。如有任何问题，随时联系我。"},
+                                {"day": 3, "channel": "邮件", "title": "跟进1：询问是否有疑问", "template": "您好！请问报价单您看了吗？对价格或产品有任何疑问，欢迎随时沟通。"},
+                                {"day": 7, "channel": "邮件", "title": "跟进2：重申报价有效期", "template": "您好！提醒您一下，我们的报价有效期为15天。如果您确认下单，我们可以尽快安排生产。"},
+                                {"day": 14, "channel": "WhatsApp", "title": "跟进3：WhatsApp提醒", "template": "您好！报价还在有效期内，您这边考虑得怎么样了？"},
+                            ]
+                        },
+                        "样品后跟进": {
+                            "steps": [
+                                {"day": 0, "channel": "邮件", "title": "样品发货通知", "template": "您好！您的样品已发出，快递单号是XXX，预计X天到达。"},
+                                {"day": 7, "channel": "邮件", "title": "跟进1：询问样品测试", "template": "您好！样品应该已经收到了，测试结果怎么样？有任何反馈请告知。"},
+                                {"day": 14, "channel": "邮件", "title": "跟进2：轻推下一步", "template": "您好！样品测试满意的话，我们可以聊聊正式订单的事情。您这边需求量大概是多少？"},
+                            ]
+                        }
+                    }
+
+                def _save_sequences(seqs):
+                    os.makedirs(os.path.dirname(SEQ_FILE), exist_ok=True)
+                    with open(SEQ_FILE, "w", encoding="utf-8") as f:
+                        json.dump(seqs, f, ensure_ascii=False, indent=2)
+
+                sequences = _load_sequences()
+
+                st.subheader("🔄 自动跟进序列")
+                st.caption("给客户应用跟进序列，系统自动提醒今天该跟进谁、跟进什么内容，不会漏掉客户")
+
+                # 两个子tab：序列模板管理 + 今日待跟进
+                seq_tab1, seq_tab2 = st.tabs(["📋 序列模板管理", "📅 今日待跟进"])
+
+                # ===== 子tab1：序列模板管理 =====
+                with seq_tab1:
+                    st.markdown("**📋 跟进序列模板**")
+                    seq_names = list(sequences.keys())
+                    if seq_names:
+                        selected_seq = st.selectbox("选择序列模板", seq_names, key="selected_seq")
+                        seq_data = sequences[selected_seq]
+
+                        st.markdown(f"**序列：{selected_seq}**")
+                        st.markdown(f"共 {len(seq_data['steps'])} 个步骤")
+
+                        for i, step in enumerate(seq_data["steps"]):
+                            with st.expander(f"步骤{i+1}：第{step['day']}天 - {step['title']}", expanded=(i==0)):
+                                s1, s2 = st.columns([1, 3])
+                                with s1:
+                                    step_day = st.number_input("间隔天数", 0, 90, step["day"], key=f"seq_day_{selected_seq}_{i}")
+                                    step_channel = st.selectbox("跟进渠道", ["邮件", "WhatsApp", "电话", "其他"], index=["邮件","WhatsApp","电话","其他"].index(step["channel"]), key=f"seq_channel_{selected_seq}_{i}")
+                                with s2:
+                                    step_title = st.text_input("步骤标题", step["title"], key=f"seq_title_{selected_seq}_{i}")
+                                    step_template = st.text_area("邮件内容模板", step["template"], height=100, key=f"seq_template_{selected_seq}_{i}")
+
+                                if st.button(f"🗑️ 删除此步骤", key=f"seq_del_step_{selected_seq}_{i}"):
+                                    sequences[selected_seq]["steps"].pop(i)
+                                    _save_sequences(sequences)
+                                    st.rerun()
+
+                        # 添加新步骤
+                        with st.expander("➕ 添加新步骤"):
+                            ns1, ns2 = st.columns([1, 3])
+                            with ns1:
+                                new_day = st.number_input("间隔天数", 0, 90, 7, key="new_seq_day")
+                                new_channel = st.selectbox("跟进渠道", ["邮件", "WhatsApp", "电话", "其他"], key="new_seq_channel")
+                            with ns2:
+                                new_title = st.text_input("步骤标题", key="new_seq_title", placeholder="如：报价后第3天跟进")
+                                new_template = st.text_area("邮件内容模板", key="new_seq_template", height=100, placeholder="输入这一步要发给客户的邮件内容模板...")
+                            if st.button("➕ 添加步骤", key="add_seq_step"):
+                                if new_title and new_template:
+                                    sequences[selected_seq]["steps"].append({
+                                        "day": new_day,
+                                        "channel": new_channel,
+                                        "title": new_title,
+                                        "template": new_template
+                                    })
+                                    # 按天数排序
+                                    sequences[selected_seq]["steps"].sort(key=lambda x: x["day"])
+                                    _save_sequences(sequences)
+                                    st.success("✅ 步骤已添加")
+                                    st.rerun()
+                                else:
+                                    st.warning("请填写步骤标题和内容模板")
+
+                        # 保存修改
+                        if st.button("💾 保存序列修改", key="save_seq_edit", type="primary"):
+                            # 更新步骤
+                            new_steps = []
+                            for i, step in enumerate(sequences[selected_seq]["steps"]):
+                                new_steps.append({
+                                    "day": st.session_state.get(f"seq_day_{selected_seq}_{i}", step["day"]),
+                                    "channel": st.session_state.get(f"seq_channel_{selected_seq}_{i}", step["channel"]),
+                                    "title": st.session_state.get(f"seq_title_{selected_seq}_{i}", step["title"]),
+                                    "template": st.session_state.get(f"seq_template_{selected_seq}_{i}", step["template"]),
+                                })
+                            sequences[selected_seq]["steps"] = new_steps
+                            _save_sequences(sequences)
+                            st.success("✅ 序列已保存")
+
+                        # 删除序列
+                        if st.button("🗑️ 删除此序列", key=f"del_seq_{selected_seq}"):
+                            del sequences[selected_seq]
+                            _save_sequences(sequences)
+                            st.success("✅ 序列已删除")
+                            st.rerun()
+                    else:
+                        st.info("暂无序列模板")
+
+                    # 新建序列
+                    st.markdown("---")
+                    with st.expander("➕ 新建跟进序列"):
+                        new_seq_name = st.text_input("序列名称", key="new_seq_name", placeholder="如：新客户7天跟进")
+                        if st.button("➕ 创建序列", key="create_new_seq"):
+                            if new_seq_name:
+                                sequences[new_seq_name] = {"steps": []}
+                                _save_sequences(sequences)
+                                st.success(f"✅ 序列「{new_seq_name}」已创建，请添加步骤")
+                                st.rerun()
+                            else:
+                                st.warning("请输入序列名称")
+
+                # ===== 子tab2：今日待跟进 =====
+                with seq_tab2:
+                    st.markdown("**📅 今日待跟进（自动计算）**")
+
+                    # 读取所有客户的跟进序列状态
+                    customers_all = cm.list_customers()
+                    today_followups = []
+
+                    for cust in customers_all:
+                        seq_name = cust.get("followup_sequence", "")
+                        seq_start_date = cust.get("followup_start_date", "")
+                        if not seq_name or seq_name not in sequences:
+                            continue
+                        if not seq_start_date:
+                            continue
+
+                        try:
+                            start_date = datetime.strptime(seq_start_date[:10], "%Y-%m-%d")
+                            days_since_start = (datetime.now() - start_date).days
+                        except:
+                            continue
+
+                        steps = sequences[seq_name]["steps"]
+                        # 找到今天应该执行的步骤
+                        current_step_idx = -1
+                        for i, step in enumerate(steps):
+                            if days_since_start >= step["day"]:
+                                current_step_idx = i
+                            else:
+                                break
+
+                        # 检查是否已经完成了这一步（看跟进记录里有没有对应步骤的标记）
+                        completed_steps = cust.get("completed_steps", [])
+                        if current_step_idx >= 0 and current_step_idx not in completed_steps:
+                            step = steps[current_step_idx]
+                            today_followups.append({
+                                "customer_id": cust["id"],
+                                "company": cust.get("company_name", ""),
+                                "country": cust.get("country", ""),
+                                "sequence": seq_name,
+                                "step_idx": current_step_idx,
+                                "step_title": step["title"],
+                                "step_channel": step["channel"],
+                                "step_template": step["template"],
+                                "day": step["day"],
+                                "days_overdue": days_since_start - step["day"],
+                            })
+
+                    # 按超期天数排序
+                    today_followups.sort(key=lambda x: x["days_overdue"], reverse=True)
+
+                    if today_followups:
+                        st.markdown(f"**今日需要跟进 {len(today_followups)} 个客户**")
+                        for fu in today_followups:
+                            with st.container():
+                                c1, c2, c3 = st.columns([2, 1, 1])
+                                with c1:
+                                    st.markdown(f"**{fu['company']}** ({fu['country']})")
+                                    st.caption(f"序列：{fu['sequence']} · 第{fu['step_idx']+1}步：{fu['step_title']}")
+                                with c2:
+                                    if fu["days_overdue"] > 0:
+                                        st.warning(f"超期{fu['days_overdue']}天")
+                                    else:
+                                        st.info(f"今日到期")
+                                with c3:
+                                    if st.button(f"✓ 已完成", key=f"seq_done_{fu['customer_id']}_{fu['step_idx']}", use_container_width=True):
+                                        # 标记为已完成
+                                        cust_data = cm.get_customer(fu["customer_id"])
+                                        completed = cust_data.get("completed_steps", [])
+                                        completed.append(fu["step_idx"])
+                                        cm.update_customer(fu["customer_id"], {"completed_steps": completed})
+                                        # 记录跟进
+                                        cm.add_activity(fu["customer_id"], fu["step_channel"], f"[序列跟进] {fu['step_title']}")
+                                        st.success("✅ 已标记完成")
+                                        st.rerun()
+
+                                with st.expander("📧 查看邮件草稿"):
+                                    st.markdown(f"**渠道**：{fu['step_channel']}")
+                                    st.markdown(f"**内容模板**：")
+                                    st.write(fu["step_template"])
+                                    if st.button("🤖 AI优化此邮件", key=f"seq_ai_{fu['customer_id']}_{fu['step_idx']}"):
+                                        with st.spinner("AI 生成中..."):
+                                            try:
+                                                _vstyle = _load_voice().get("style_notes", "")
+                                                _prompt = f"""你是KaiLionCrafts的外贸业务员。基于下面的跟进邮件模板，结合客户信息，优化成一封更个性化、更有针对性的邮件。
+
+# 客户信息
+公司:{fu['company']}
+国家:{fu['country']}
+
+# 邮件模板
+{fu['step_template']}
+
+# 语气
+{_vstyle or '简洁、专业、不卑不亢'}
+
+直接输出可发客户的邮件，含Subject和正文，结尾署名 KaiLionCrafts。不要解释。"""
+                                                optimized = ai.chat(_prompt)
+                                                st.text_area("优化后的邮件（可直接复制发送）", optimized, height=200, key=f"seq_ai_result_{fu['customer_id']}_{fu['step_idx']}")
+                                            except Exception as e:
+                                                st.error(f"生成失败：{e}")
+
+                                st.markdown("---")
+                    else:
+                        st.success("🎉 今日所有跟进都已完成！")
+
+                    # 给客户应用序列
+                    st.markdown("---")
+                    st.markdown("**📤 给客户应用跟进序列**")
+                    all_cust_ids = [c["id"] for c in customers_all] or ["__empty__"]
+                    apply_cust = st.selectbox("选择客户", all_cust_ids,
+                                        format_func=lambda i: "（暂无客户）" if i == "__empty__" else next((c.get("company_name", "") for c in customers_all if c["id"] == i), i),
+                                        key="apply_seq_cust")
+                    apply_seq = st.selectbox("选择跟进序列", list(sequences.keys()), key="apply_seq_name")
+                    start_date = st.date_input("开始日期（从哪天开始算第0天）", value=datetime.now(), key="apply_seq_date")
+
+                    if st.button("🚀 应用跟进序列", key="do_apply_seq", type="primary"):
+                        if apply_cust != "__empty__":
+                            cm.update_customer(apply_cust, {
+                                "followup_sequence": apply_seq,
+                                "followup_start_date": start_date.strftime("%Y-%m-%d"),
+                                "completed_steps": []
+                            })
+                            st.success(f"✅ 已给客户应用「{apply_seq}」序列，从 {start_date} 开始")
+                            st.rerun()
+                        else:
+                            st.warning("请先选择客户")
+
+            except Exception as e:
+                st.error(f"加载失败：{e}")
+
+        # ---------- Tab5 客户看板（开发进度，按阶段分列）----------
+        with cc_m5:
             st.subheader("🗂️ 客户开发进度看板")
             st.caption("按销售阶段分列；点卡片下方按钮可把客户推进到下一阶段，变更自动存档到知识库")
             pdata = cm.get_pipeline_data()
@@ -2436,8 +2706,8 @@ EN: ...
                                 st.success(f"✅ 已推进到「{next_stage_name}」，变更已存档")
                                 st.rerun()
 
-        # ---------- Tab5 待办提醒（增强版：按类型分类+导出知识库）----------
-        with cc_m5:
+        # ---------- Tab6 待办提醒（增强版：按类型分类+导出知识库）----------
+        with cc_m6:
             st.subheader("⏰ 待办提醒")
             st.caption("今日该跟谁、谁已超期、谁报价后没回，一目了然")
             today_fu = cm.get_follow_up_today()
@@ -2581,8 +2851,8 @@ EN: ...
 - 30 天无互动：发激活/新品邮件重新触达
 """)
 
-        # ---------- Tab6 新增客户 ----------
-        with cc_m6:
+        # ---------- Tab7 新增客户 ----------
+        with cc_m7:
             # ===== 手动新增客户 =====
             st.subheader("➕ 手动新增客户档案")
             with st.form("new_cust_form"):

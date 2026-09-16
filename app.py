@@ -6171,8 +6171,8 @@ elif page == "🤖 锴利自研AI工具库":
                 "video_reverse": ["产品图片与SEO知识库（产品视觉参考）", "营销与客户开发知识库（短视频营销）", "公司简介与创始人（品牌故事）"],
             }
             kbs = kb_map.get(tool_id, ["标准化知识库", "产品图片与SEO知识库"])
-            for kb in kbs:
-                st.markdown(f"- {kb}")
+            for kbn in kbs:
+                st.markdown(f"- {kbn}")
 
         st.markdown("---")
 

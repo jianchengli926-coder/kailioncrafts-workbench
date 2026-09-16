@@ -2770,6 +2770,15 @@ elif page == "📦 产品库":
                     pass
         price_map = st.session_state['product_price_map']
 
+        # 主图映射（智能挑选的完整产品白底主图，优先于 json 里的 main_image_path）
+        _mimg_path = Path("data/product_main_images.json")
+        main_map = {}
+        if _mimg_path.exists():
+            try:
+                main_map = _json.loads(_mimg_path.read_text(encoding='utf-8'))
+            except Exception:
+                pass
+
         # 统计
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -2876,8 +2885,8 @@ elif page == "📦 产品库":
                 cols = st.columns(3)
                 for j, product in enumerate(row_products):
                     with cols[j]:
-                        # 主图：用 json 关联的原始产品文件夹主图路径
-                        mp = product.get('main_image_path', '')
+                        # 主图：优先智能挑选的完整产品白底图，回退 json main_image_path
+                        mp = main_map.get(product['sku']) or product.get('main_image_path', '')
                         if mp and Path(mp).exists():
                             st.image(str(mp), use_container_width=True)
                         else:
@@ -2896,6 +2905,7 @@ elif page == "📦 产品库":
                         # 查看详情按钮
                         if st.button(f"查看SEO资料", key=f"detail_{product['sku']}", use_container_width=True):
                             st.session_state['selected_product'] = product['sku']
+                            st.session_state['_scroll_to_detail'] = True
 
             if len(filtered) > 60:
                 st.info(f"还有 {len(filtered)-60} 个产品，请使用SKU或关键词精确搜索")
@@ -2905,6 +2915,9 @@ elif page == "📦 产品库":
             selected_sku = st.session_state['selected_product']
             product = next((p for p in products_list if p.get('sku') == selected_sku), None)
             if product:
+                # 点击"查看SEO资料"后自动滚动到详情区
+                if st.session_state.pop('_scroll_to_detail', False):
+                    components.html("<script>setTimeout(function(){window.parent.scrollTo(0,document.body.scrollHeight);},400)</script>", height=0)
                 st.markdown("---")
                 st.subheader(f"📦 {product.get('name', product['sku'])}")
                 st.caption(f"SKU: {product['sku']} | 品类: {product.get('category', '')} | 图片: {product.get('image_count', 0)}张")
@@ -2912,7 +2925,7 @@ elif page == "📦 产品库":
                 # 显示主图
                 col1, col2 = st.columns([1, 2])
                 with col1:
-                    mp = product.get('main_image_path', '')
+                    mp = main_map.get(product['sku']) or product.get('main_image_path', '')
                     if mp and Path(mp).exists():
                         st.image(str(mp), use_container_width=True)
                     else:

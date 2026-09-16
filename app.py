@@ -2758,6 +2758,16 @@ elif page == "📦 产品库":
                             _pm[_p['sku']] = f"${_m[0][0]}–${_m[0][1]}"
                             break
             st.session_state['product_price_map'] = _pm
+            # 手动改价覆盖（优先级最高，覆盖 txt 解析结果）
+            _ov_path = Path("data/price_overrides.json")
+            if _ov_path.exists():
+                try:
+                    _ov = _json.loads(_ov_path.read_text(encoding='utf-8'))
+                    for _k, _v in _ov.items():
+                        if _v:
+                            st.session_state['product_price_map'][_k] = _v
+                except Exception:
+                    pass
         price_map = st.session_state['product_price_map']
 
         # 统计
@@ -2895,6 +2905,50 @@ elif page == "📦 产品库":
                         "图片数量": f"{product.get('image_count', 0)}张",
                     }
                     st.table(pd.DataFrame(list(basic_data.items()), columns=["项目", "内容"]))
+
+                # 手动改价区（手动填写优先级高于 txt 自动解析，持久化到本地文件）
+                st.markdown("### ✏️ 修改建议零售价")
+                _input_key = f"price_input_{product['sku']}"
+                if _input_key not in st.session_state:
+                    _cur_v = price_map.get(product['sku'], '')
+                    st.session_state[_input_key] = '' if _cur_v in ('', '待补') else _cur_v
+                st.text_input("价格（格式如 $22.00–$38.00）", key=_input_key)
+                _ba, _bb = st.columns(2)
+                if _ba.button("💾 保存此价格", key=f"save_price_{product['sku']}", use_container_width=True):
+                    _ov_path = Path("data/price_overrides.json")
+                    _ov = {}
+                    if _ov_path.exists():
+                        try:
+                            _ov = _json.loads(_ov_path.read_text(encoding='utf-8'))
+                        except Exception:
+                            pass
+                    _val = st.session_state[_input_key].strip()
+                    if _val:
+                        _ov[product['sku']] = _val
+                        price_map[product['sku']] = _val
+                    else:
+                        _ov.pop(product['sku'], None)
+                        price_map[product['sku']] = '待补'
+                    _ov_path.parent.mkdir(parents=True, exist_ok=True)
+                    _ov_path.write_text(_json.dumps(_ov, ensure_ascii=False, indent=2), encoding='utf-8')
+                    st.session_state['product_price_map'] = price_map
+                    st.success(f"✅ 已保存价格：{_val or '已清空'}")
+                    st.rerun()
+                if _bb.button("↩️ 恢复 txt 默认", key=f"reset_price_{product['sku']}", use_container_width=True):
+                    _ov_path = Path("data/price_overrides.json")
+                    _ov = {}
+                    if _ov_path.exists():
+                        try:
+                            _ov = _json.loads(_ov_path.read_text(encoding='utf-8'))
+                        except Exception:
+                            pass
+                    _ov.pop(product['sku'], None)
+                    _ov_path.parent.mkdir(parents=True, exist_ok=True)
+                    _ov_path.write_text(_json.dumps(_ov, ensure_ascii=False, indent=2), encoding='utf-8')
+                    st.session_state.pop('product_price_map', None)
+                    st.session_state.pop(_input_key, None)
+                    st.success("✅ 已恢复 txt 默认价格")
+                    st.rerun()
 
                 st.markdown("---")
 

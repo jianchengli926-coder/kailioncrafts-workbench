@@ -2813,10 +2813,33 @@ elif page == "📦 产品库":
                 st.session_state.pop('selected_product', None)
         selected_cat = st.session_state['product_cat_pill']
 
+        # === 价格区间筛选（基于 price_map 的解析价/手动价）===
+        import re as _re2
+        def _price_lo(sku):
+            s = price_map.get(sku, '')
+            m = _re2.findall(r'(\d+(?:\.\d+)?)', s)
+            return float(m[0]) if m else None
+        _all_lo = [_price_lo(p['sku']) for p in products_list]
+        _all_lo = [x for x in _all_lo if x is not None]
+        pmin = int(min(_all_lo)) if _all_lo else 0
+        pmax = int(max(_all_lo)) if _all_lo else 100
+        price_range = st.slider(f"💰 按建议零售价区间筛选（$）", pmin, pmax, (pmin, pmax), key="price_range_filter")
+
+        # === 材质筛选 ===
+        all_mats = sorted(set(p.get('main_material', '') for p in products_list if p.get('main_material', '')))
+        sel_mats = st.multiselect("🔩 按材质筛选（可多选，留空=全部）", all_mats, key="material_filter")
+
         # 筛选产品
         filtered = products_list
         if selected_cat != "全部":
             filtered = [p for p in filtered if p.get('category') == selected_cat]
+        # 价格区间过滤（用区间最低价判断）
+        if price_range != (pmin, pmax):
+            _lo, _hi = price_range
+            filtered = [p for p in filtered if (_v := _price_lo(p['sku'])) is not None and _lo <= _v <= _hi]
+        # 材质过滤
+        if sel_mats:
+            filtered = [p for p in filtered if p.get('main_material', '') in sel_mats]
 
         if sku_search:
             # SKU精确匹配优先

@@ -1885,9 +1885,9 @@ EN: ...
         ], output_folder="客户管理")
 
     elif cc_current == "📊 客户管理":
-        st.caption("借鉴GlobalDesk思路：数据总览 · 客户列表 · 看板开发进度 · 待办提醒 · 新增客户")
-        cc_m1, cc_m2, cc_m3, cc_m4, cc_m5 = st.tabs(
-            ["📊 数据总览", "👥 客户列表", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
+        st.caption("数据总览 · 客户列表 · 客户详情 · 客户看板 · 待办提醒 · 新增客户")
+        cc_m1, cc_m2, cc_m3, cc_m4, cc_m5, cc_m6 = st.tabs(
+            ["📊 数据总览", "👥 客户列表", "📇 客户详情", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
 
         CUSTOMER_SOURCES = ["Google搜索", "Google Maps", "LinkedIn", "Alibaba", "展会", "客户转介绍", "抖音/社媒", "其他"]
         CUSTOMER_TYPES = ["进口商", "批发商", "零售商", "品牌商", "代理商", "制造商", "其他"]
@@ -2226,12 +2226,18 @@ EN: ...
                 else:
                     st.info("无匹配客户")
 
-                st.markdown("---")
+            except Exception as e:
+                st.error(f"加载失败：{e}")
+
+        # ---------- Tab3 客户详情（独立tab）----------
+        with cc_m3:
+            try:
                 st.markdown("**📇 客户详情与跟进记录**")
-                _cust_ids = [c["id"] for c in customers] or ["__empty__"]
+                customers_all = cm.list_customers()
+                _cust_ids = [c["id"] for c in customers_all] or ["__empty__"]
                 sel = st.selectbox("选择客户", _cust_ids,
-                                  format_func=lambda i: "（暂无客户）" if i == "__empty__" else next((c.get("company_name", "") for c in customers if c["id"] == i), i),
-                                  key="cl_sel")
+                                  format_func=lambda i: "（暂无客户）" if i == "__empty__" else next((c.get("company_name", "") for c in customers_all if c["id"] == i), i),
+                                  key="detail_sel")
                 cust = cm.get_customer(sel) if sel != "__empty__" else None
                 if cust:
                     dc1, dc2, dc3 = st.columns(3)
@@ -2244,24 +2250,18 @@ EN: ...
                     if acts:
                         st.markdown("---")
                         st.markdown(f"**📅 跟进时间线（共{len(acts)}条）**")
-
-                        # ===== 跟进时间线筛选 =====
                         all_types = sorted(list(set([a.get("type", "") for a in acts if a.get("type")])))
                         if all_types:
-                            ftype = st.selectbox("按渠道筛选", ["全部"] + all_types, key=f"act_type_{sel}")
+                            ftype = st.selectbox("按渠道筛选", ["全部"] + all_types, key=f"detail_type_{sel}")
                         else:
                             ftype = "全部"
-
-                        # ===== 显示跟进记录 =====
                         filtered_acts = [a for a in acts if ftype == "全部" or a.get("type") == ftype]
                         filtered_acts = list(reversed(filtered_acts))
-
                         if filtered_acts:
                             for a in filtered_acts:
                                 act_type = a.get("type", "")
                                 act_time = (a.get("created_at", "") or "")[:16]
                                 act_desc = a.get("description", "")
-                                # 根据类型显示不同颜色
                                 type_color = {
                                     "邮件": "#3B82F6",
                                     "WhatsApp": "#10B981",
@@ -2281,9 +2281,7 @@ EN: ...
                                 )
                         else:
                             st.info("该类型暂无跟进记录")
-
-                        # ===== 导出跟进记录到知识库 =====
-                        if st.button("💾 导出跟进记录到知识库", key=f"export_acts_{sel}"):
+                        if st.button("💾 导出跟进记录到知识库", key=f"detail_export_{sel}"):
                             from datetime import datetime as _dt
                             content = f"""# 客户跟进记录 - {cust.get('company_name','')}
 
@@ -2301,9 +2299,8 @@ EN: ...
                                 content += f"## {(a.get('created_at','') or '')[:16]}\n"
                                 content += f"**渠道**：{a.get('type','')}\n\n"
                                 content += f"{a.get('description','')}\n\n---\n\n"
-
                             save_to_kb_button(content, "客户管理/跟进记录", f"{cust.get('company_name','')[:20]}_跟进记录_{_dt.now().strftime('%Y%m%d')}", "md")
-                    # ---- P0: 关联订单与收款（客户名模糊匹配 finance_db）----
+                    # ---- 关联订单与收款 ----
                     try:
                         import finance_db as _fdb
                         _cn = (cust.get("company_name", "") or "").strip()
@@ -2325,11 +2322,9 @@ EN: ...
                                 "金额": f"${o['total_amount']:,.0f}", "状态": o["status"],
                                 "下单日": o["order_date"], "交期": o["delivery_date"],
                             } for o in _orders]), use_container_width=True, hide_index=True)
-                        else:
-                            st.caption("该客户暂无订单记录（在「🧾 订单台账」录入后会自动按客户名关联）")
                     except Exception as _e:
                         st.caption(f"订单关联暂不可用：{_e}")
-                    # ---- ⚡ 快捷话术：一键生成给这个客户的场景化英文邮件 ----
+                    # ---- 快捷话术 ----
                     st.markdown("---")
                     st.markdown("**⚡ 快捷话术（一键生成给这个客户的英文邮件草稿）**")
                     _scenarios = {
@@ -2342,7 +2337,7 @@ EN: ...
                     _acts_txt = "；".join([f"{(a.get('created_at','') or '')[:10]} {a.get('description','')}" for a in acts[-5:]]) or "无记录"
                     _qcols = st.columns(3)
                     for i, _sc in enumerate(_scenarios.keys()):
-                        if _qcols[i % 3].button(_sc, key=f"qk_{sel}_{_sc}", use_container_width=True):
+                        if _qcols[i % 3].button(_sc, key=f"detail_qk_{sel}_{_sc}", use_container_width=True):
                             with st.spinner("AI 生成中..."):
                                 try:
                                     _vstyle = _load_voice().get("style_notes", "")
@@ -2361,14 +2356,14 @@ EN: ...
 {_vstyle or '简洁、专业、不卑不亢'}
 
 直接输出可发客户的邮件,含Subject和正文,结尾署名 KaiLionCrafts。不要解释。"""
-                                    st.session_state[f"qk_res_{sel}"] = ai.chat(_prompt)
+                                    st.session_state[f"detail_qk_res_{sel}"] = ai.chat(_prompt)
                                 except Exception as e:
-                                    st.session_state[f"qk_res_{sel}"] = f"生成失败:{e}"
-                    if st.session_state.get(f"qk_res_{sel}"):
-                        st.text_area("生成结果(可直接复制发送)", st.session_state[f"qk_res_{sel}"],
-                                     height=220, key=f"qk_ta_{sel}")
-
-                    with st.form("add_act_form"):
+                                    st.session_state[f"detail_qk_res_{sel}"] = f"生成失败:{e}"
+                    if st.session_state.get(f"detail_qk_res_{sel}"):
+                        st.text_area("生成结果(可直接复制发送)", st.session_state[f"detail_qk_res_{sel}"],
+                                     height=220, key=f"detail_qk_ta_{sel}")
+                    # ---- 记一条跟进 ----
+                    with st.form("detail_add_act_form"):
                         st.markdown("**＋ 记一条跟进**")
                         af1, af2, af3 = st.columns([1, 2, 1])
                         with af1:
@@ -2382,11 +2377,13 @@ EN: ...
                             cm.set_next_follow_up(sel, int(adays))
                             st.success("✅ 已记录跟进并更新下次跟进时间")
                             st.rerun()
+                else:
+                    st.info("暂无客户，请先在「👥 客户列表」或「➕ 新增客户」添加客户")
             except Exception as e:
                 st.error(f"加载失败：{e}")
 
-        # ---------- Tab3 客户看板（开发进度，按阶段分列）----------
-        with cc_m3:
+        # ---------- Tab4 客户看板（开发进度，按阶段分列）----------
+        with cc_m4:
             st.subheader("🗂️ 客户开发进度看板")
             st.caption("按销售阶段分列；点卡片下方按钮可把客户推进到下一阶段，变更自动存档到知识库")
             pdata = cm.get_pipeline_data()
@@ -2437,8 +2434,8 @@ EN: ...
                                 st.success(f"✅ 已推进到「{next_stage_name}」，变更已存档")
                                 st.rerun()
 
-        # ---------- Tab4 待办提醒（增强版：按类型分类+导出知识库）----------
-        with cc_m4:
+        # ---------- Tab5 待办提醒（增强版：按类型分类+导出知识库）----------
+        with cc_m5:
             st.subheader("⏰ 待办提醒")
             st.caption("今日该跟谁、谁已超期、谁报价后没回，一目了然")
             today_fu = cm.get_follow_up_today()
@@ -2582,8 +2579,8 @@ EN: ...
 - 30 天无互动：发激活/新品邮件重新触达
 """)
 
-        # ---------- Tab5 新增客户 ----------
-        with cc_m5:
+        # ---------- Tab6 新增客户 ----------
+        with cc_m6:
             # ===== 手动新增客户 =====
             st.subheader("➕ 手动新增客户档案")
             with st.form("new_cust_form"):

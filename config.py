@@ -29,7 +29,7 @@ KB_SOURCES = {
     },
     "feishu": {
         "name": "飞书公司知识库（完整版）",
-        "path": Path("/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/飞书锴利公司知识库_副本/02_精简版飞书上传包_KailionCrafts知识库"),
+        "path": KB_DIR / "飞书公司知识库",
         "description": "16000+文件的完整公司知识库，含产品图片、SEO资料、财务等",
     },
     "trade_learning": {
@@ -44,7 +44,7 @@ KB_SOURCES = {
     },
     "codex": {
         "name": "Codex工作流库（亚马逊运营）",
-        "path": Path("/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/Codex-工作流Skill_副本"),
+        "path": KB_DIR / "Codex工作流库",
         "description": "659个md文档，含蓝海产品调研、关键词库、Listing优化、广告策略、VOC洞察等15个Skill",
     },
     "website_materials": {

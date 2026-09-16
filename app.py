@@ -2770,10 +2770,12 @@ elif page == "📦 产品库":
         if pill_cols[0].button(f"全部 ({len(products_list)})", use_container_width=True,
                                type="primary" if st.session_state['product_cat_pill'] == "全部" else "secondary"):
             st.session_state['product_cat_pill'] = "全部"
+            st.session_state.pop('selected_product', None)
         for i, c in enumerate(all_cats, 1):
             if pill_cols[i].button(f"{c} ({cat_counts[c]})", use_container_width=True,
                                   type="primary" if st.session_state['product_cat_pill'] == c else "secondary"):
                 st.session_state['product_cat_pill'] = c
+                st.session_state.pop('selected_product', None)
         selected_cat = st.session_state['product_cat_pill']
 
         # 筛选产品

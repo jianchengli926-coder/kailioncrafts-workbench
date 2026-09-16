@@ -2758,13 +2758,23 @@ elif page == "📦 产品库":
             key="sku_quick_search"
         )
 
-        # 普通搜索和筛选
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            search_query = st.text_input("搜索产品名称或材质", placeholder="例如：Chef Knife 或 Damascus")
-        with col2:
-            categories = ["全部"] + sorted(list(set(p.get('category', '') for p in products_list)))
-            selected_cat = st.selectbox("品类筛选", categories, key="product_cat_filter")
+        # 搜索框
+        search_query = st.text_input("搜索产品名称、SKU 或材质", placeholder="例如：Chef Knife / Damascus / KL-KN", key="product_text_search")
+
+        # 四大品类可点击筛选（pill 按钮行）
+        all_cats = ["厨房刀", "户外刀", "剪刀", "厨房用品"]
+        cat_counts = {c: len([p for p in products_list if p.get('category') == c]) for c in all_cats}
+        if 'product_cat_pill' not in st.session_state:
+            st.session_state['product_cat_pill'] = "全部"
+        pill_cols = st.columns(5)
+        if pill_cols[0].button(f"全部 ({len(products_list)})", use_container_width=True,
+                               type="primary" if st.session_state['product_cat_pill'] == "全部" else "secondary"):
+            st.session_state['product_cat_pill'] = "全部"
+        for i, c in enumerate(all_cats, 1):
+            if pill_cols[i].button(f"{c} ({cat_counts[c]})", use_container_width=True,
+                                  type="primary" if st.session_state['product_cat_pill'] == c else "secondary"):
+                st.session_state['product_cat_pill'] = c
+        selected_cat = st.session_state['product_cat_pill']
 
         # 筛选产品
         filtered = products_list
@@ -2801,20 +2811,22 @@ elif page == "📦 产品库":
                 cols = st.columns(3)
                 for j, product in enumerate(row_products):
                     with cols[j]:
-                        # 显示正面图
-                        main_img_dir = KB_DIR / "15_产品图片与SEO知识库" / "05_产品正面图"
-                        ext = Path(product.get('main_image', '')).suffix if product.get('main_image') else '.webp'
-                        img_path = main_img_dir / f"{product['sku']}{ext}"
-                        if img_path.exists():
-                            st.image(str(img_path), use_container_width=True)
+                        # 主图：用 json 关联的原始产品文件夹主图路径
+                        mp = product.get('main_image_path', '')
+                        if mp and Path(mp).exists():
+                            st.image(str(mp), use_container_width=True)
                         else:
                             st.info("📷 无图片")
 
                         st.markdown(f"**{product['sku']}**")
-                        st.caption(product.get('name', '')[:50])
-                        if product.get('main_material'):
-                            st.caption(f"材质: {product['main_material'][:30]}")
-                        st.caption(f"{product.get('category', '')} · {product.get('image_count', 0)}张图")
+                        st.caption(product.get('name_en', product.get('name', ''))[:48])
+                        # 材质 + 图片张数 同一行
+                        cma, cmb = st.columns([2, 1])
+                        with cma:
+                            st.caption(f"材质: {(product.get('main_material') or '—')[:18]}")
+                        with cmb:
+                            st.caption(f"{product.get('image_count', 0)}张图")
+                        st.caption(f"{product.get('category','')} · 价格区间待补")
 
                         # 查看详情按钮
                         if st.button(f"查看SEO资料", key=f"detail_{product['sku']}", use_container_width=True):
@@ -2835,11 +2847,9 @@ elif page == "📦 产品库":
                 # 显示主图
                 col1, col2 = st.columns([1, 2])
                 with col1:
-                    main_img_dir = KB_DIR / "15_产品图片与SEO知识库" / "05_产品正面图"
-                    ext = Path(product.get('main_image', '')).suffix if product.get('main_image') else '.webp'
-                    img_path = main_img_dir / f"{product['sku']}{ext}"
-                    if img_path.exists():
-                        st.image(str(img_path), use_container_width=True)
+                    mp = product.get('main_image_path', '')
+                    if mp and Path(mp).exists():
+                        st.image(str(mp), use_container_width=True)
                     else:
                         st.info("📷 无图片")
 
@@ -2903,11 +2913,44 @@ elif page == "📦 产品库":
 
                 st.markdown("---")
 
+                # 全部白底图展示（遍历原始产品文件夹，6-8张全量展示）
+                folder = product.get('folder', '')
+                if folder and Path(folder).is_dir():
+                    try:
+                        all_imgs = sorted([f for f in os.listdir(folder)
+                                           if f.lower().endswith(('.webp', '.jpg', '.jpeg', '.png'))
+                                           and not f.startswith('.')])
+                    except Exception:
+                        all_imgs = []
+                    if all_imgs:
+                        seo_map = {}
+                        for im in product.get('images_seo', []):
+                            seo_map[im.get('filename', '').split(' ')[0].lower()] = im
+                        st.markdown(f"### 🖼️ 全部产品图片（{len(all_imgs)}张白底图）")
+                        for r in range(0, len(all_imgs), 3):
+                            icols = st.columns(3)
+                            for k, fn in enumerate(all_imgs[r:r+3]):
+                                with icols[k]:
+                                    st.image(str(Path(folder) / fn), use_container_width=True)
+                                    info = seo_map.get(fn.lower())
+                                    if info:
+                                        st.caption(f"角度: {info.get('angle', '')}")
+                                        st.caption(f"Alt: {info.get('alt_text', '')[:55]}…")
+                                    else:
+                                        st.caption(fn[:38])
+                    st.markdown("---")
+
+                # SEO 工作流 TXT 原文
+                seo_doc = product.get('seo_doc', '')
+                if seo_doc and Path(seo_doc).is_file():
+                    with st.expander("📄 查看 SEO 工作流 TXT 原文"):
+                        st.code(Path(seo_doc).read_text(encoding='utf-8', errors='ignore'), language='text')
+
                 # 文件位置
                 with st.expander("📁 文件位置"):
                     st.code(f"产品文件夹: {product.get('folder', '')}")
                     st.code(f"SEO文档: {product.get('seo_doc', '')}")
-                    st.code(f"正面图: {img_path if img_path.exists() else '未找到'}")
+                    st.code(f"主图: {mp if (mp and Path(mp).exists()) else '未找到'}")
 
                 # 关闭详情
                 if st.button("关闭详情", key=f"close_{product['sku']}"):

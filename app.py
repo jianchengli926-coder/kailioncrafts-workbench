@@ -2823,7 +2823,12 @@ elif page == "📦 产品库":
         _all_lo = [x for x in _all_lo if x is not None]
         pmin = int(min(_all_lo)) if _all_lo else 0
         pmax = int(max(_all_lo)) if _all_lo else 100
-        price_range = st.slider(f"💰 按建议零售价区间筛选（$）", pmin, pmax, (pmin, pmax), key="price_range_filter")
+        # 防止手动改价导致区间 min/max 变化后，滑杆旧值越界
+        _pk = "price_range_filter"
+        if _pk in st.session_state:
+            _o = st.session_state[_pk]
+            st.session_state[_pk] = (max(pmin, min(pmax, _o[0])), max(pmin, min(pmax, _o[1])))
+        price_range = st.slider(f"💰 按建议零售价区间筛选（$）", pmin, pmax, (pmin, pmax), key=_pk)
 
         # === 材质筛选 ===
         all_mats = sorted(set(p.get('main_material', '') for p in products_list if p.get('main_material', '')))

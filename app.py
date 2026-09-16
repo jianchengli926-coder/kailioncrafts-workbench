@@ -8735,6 +8735,57 @@ Price Term: {incoterm}
                                _full_html, f"Docs_{so['order_no']}.html", "text/html",
                                use_container_width=True, type="primary")
 
+            # ===== 存档到知识库 =====
+            st.markdown("---")
+            st.markdown("**💾 存档到知识库**")
+            if st.button("📁 保存所有单据到知识库", key="save_docs_to_kb", use_container_width=True):
+                # 生成完整的单据内容
+                docs_content = f"""# 贸易单据 - {so['order_no']}
+
+**订单号**：{so['order_no']}
+**客户**：{buyer}
+**产品**：{so['product_summary']}
+**数量**：{qty_in}
+**总金额**：{total:,.2f} {cur}
+**贸易条款**：{incoterm}
+**付款条款**：{pay_terms}
+**生成时间**：{datetime.now().strftime("%Y-%m-%d %H:%M")}
+
+---
+
+## 1. 形式发票 (PI)
+
+```
+{pi_text}
+```
+
+---
+
+## 2. 销售合同 (SC)
+
+```
+{sc_text}
+```
+
+---
+
+## 3. 商业发票 (CI)
+
+```
+{ci_text}
+```
+
+---
+
+## 4. 装箱单 (PL)
+
+```
+{pl_text}
+```
+"""
+                save_to_kb_button(docs_content, "订单台账/贸易单据", f"{so['order_no']}_{buyer[:20]}_贸易单据_{datetime.now().strftime('%Y%m%d')}", "md")
+                st.success("✅ 单据已存档到知识库")
+
     with of:
         st.subheader("💰 定价敏感度测算")
         st.caption("借鉴Pricing Analyst方法论：±20%价格变动对利润的影响，帮你找到最优定价点")

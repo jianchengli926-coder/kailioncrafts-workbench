@@ -1974,14 +1974,10 @@ EN: ...
             except Exception as e:
                 st.error(f"加载失败：{e}")
 
-        # ---------- Tab2 客户列表（表格+高级筛选+详情+跟进记录）----------
+        # ---------- Tab2 客户列表（表格+筛选+详情+跟进记录）----------
         with cc_m2:
             try:
                 customers = cm.list_customers()
-
-                # ===== 高级筛选区 =====
-                st.markdown("**🔍 高级筛选**")
-                # 第一行：关键词 + 等级 + 阶段
                 cF1, cF2, cF3 = st.columns([3, 1, 1])
                 with cF1:
                     kw = st.text_input("搜索（公司/国家/产品）", key="cl_kw")
@@ -1990,87 +1986,23 @@ EN: ...
                 with cF3:
                     stage_f = st.selectbox("阶段", ["全部"] + [s["name"] for s in PIPELINE_STAGES], key="cl_s")
 
-                # 第二行：国家 + 来源 + 跟进时间区间
-                cF4, cF5, cF6 = st.columns([1, 1, 2])
-                with cF4:
-                    # 提取所有国家
-                    all_countries = sorted(list(set([c.get("country", "") for c in customers if c.get("country")])))
-                    country_f = st.selectbox("国家", ["全部"] + all_countries, key="cl_country")
-                with cF5:
-                    all_sources = sorted(list(set([c.get("source", "") for c in customers if c.get("source")])))
-                    source_f = st.selectbox("来源", ["全部"] + all_sources, key="cl_source")
-                with cF6:
-                    days_f = st.selectbox(
-                        "上次跟进时间",
-                        ["全部", "7天内", "30天内", "90天内", "超过90天"],
-                        key="cl_days"
-                    )
-
-                # ===== 应用筛选 =====
                 def _stage_name(c):
                     return next((s["name"] for s in PIPELINE_STAGES if s["key"] == c.get("pipeline_stage", "lead")),
                                 c.get("status", ""))
                 rows = []
                 for c in customers:
-                    # 关键词筛选
                     if kw and kw.lower() not in (c.get("company_name", "") + c.get("country", "") + c.get("products", "")).lower():
                         continue
-                    # 等级筛选
                     if g_f != "全部" and c.get("grade", "C") != g_f:
                         continue
-                    # 阶段筛选
                     if stage_f != "全部" and _stage_name(c) != stage_f:
                         continue
-                    # 国家筛选
-                    if country_f != "全部" and c.get("country", "") != country_f:
-                        continue
-                    # 来源筛选
-                    if source_f != "全部" and c.get("source", "") != source_f:
-                        continue
-                    # 跟进时间筛选
-                    if days_f != "全部":
-                        last_fu = c.get("last_follow_up", "")
-                        if last_fu:
-                            try:
-                                from datetime import datetime as _dt
-                                days_since = (_dt.now() - _dt.strptime(last_fu[:10], "%Y-%m-%d")).days
-                                if days_f == "7天内" and days_since > 7:
-                                    continue
-                                if days_f == "30天内" and days_since > 30:
-                                    continue
-                                if days_f == "90天内" and days_since > 90:
-                                    continue
-                                if days_f == "超过90天" and days_since <= 90:
-                                    continue
-                            except:
-                                pass
-                        else:
-                            # 没有跟进记录的，如果筛选7/30/90天内就排除
-                            if days_f in ["7天内", "30天内", "90天内"]:
-                                continue
                     rows.append({
                         "公司": c.get("company_name", ""), "国家": c.get("country", ""),
                         "来源": c.get("source", ""), "等级": c.get("grade", "C"),
                         "阶段": _stage_name(c), "评分": c.get("score", 0),
                         "下次跟进": c.get("next_follow_up", ""),
                     })
-
-                # ===== 筛选结果统计 + 导出按钮 =====
-                st.markdown(f"**筛选结果：{len(rows)} 个客户**")
-                exp_col1, exp_col2 = st.columns([3, 1])
-                with exp_col2:
-                    if st.button("📤 导出筛选结果CSV", key="export_filtered"):
-                        if rows:
-                            save_to_kb_button(
-                                "\n".join([",".join([str(v) for v in r.values()]) for r in rows]),
-                                "客户管理/导出报表",
-                                f"筛选客户_{__import__('datetime').datetime.now().strftime('%Y%m%d_%H%M')}",
-                                "csv"
-                            )
-                            st.success("✅ 导出按钮已生成，点击保存到知识库")
-                        else:
-                            st.warning("无数据可导出")
-
                 if rows:
                     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
                 else:
@@ -2180,198 +2112,56 @@ EN: ...
         # ---------- Tab3 客户看板（开发进度，按阶段分列）----------
         with cc_m3:
             st.subheader("🗂️ 客户开发进度看板")
-            st.caption("按销售阶段分列；点卡片下方按钮可把客户推进到下一阶段，变更自动存档到知识库")
+            st.caption("按销售阶段分列；点卡片下方按钮可把客户推进到下一阶段")
             pdata = cm.get_pipeline_data()
-
-            # ===== 顶部统计条 =====
-            total_pipeline = sum(v.get("count", 0) for v in pdata.values())
-            st.markdown(f"**总客户数：{total_pipeline}**")
-            st.markdown("---")
-
             cols = st.columns(len(PIPELINE_STAGES))
             for i, stage in enumerate(PIPELINE_STAGES):
                 with cols[i]:
                     v = pdata.get(stage["key"], {})
                     st.markdown(
-                        f'<div style="border-top:4px solid {stage["color"]};padding:8px;background:#fafafa;border-radius:8px;">'
-                        f'<b>{stage["name"]}</b> <span style="float:right;color:{stage["color"]};font-weight:700;">{v.get("count",0)}</span></div>',
+                        f'<div style="border-top:4px solid {stage["color"]};padding:6px;background:#fafafa;border-radius:6px;">'
+                        f'<b>{stage["name"]}</b> <span style="float:right;color:{stage["color"]};">{v.get("count",0)}</span></div>',
                         unsafe_allow_html=True)
                     for c in v.get("customers", []):
                         g = c.get("grade", "C")
                         st.markdown(
                             f'<div style="background:#fff;border:1px solid #eee;border-left:4px solid {_grade_color.get(g,"#999")};'
-                            f'padding:8px;border-radius:6px;margin:6px 0;font-size:12px;">'
+                            f'padding:7px;border-radius:4px;margin:5px 0;font-size:12px;">'
                             f'<b>{c.get("company_name","")}</b><br/>'
                             f'<span style="color:#888">{c.get("country","")} · {c.get("source","")}</span><br/>'
                             f'<span style="color:#fd7e14">下次跟进:{c.get("next_follow_up","未定")}</span></div>',
                             unsafe_allow_html=True)
                         if stage["key"] != "closed":
                             next_stage = PIPELINE_STAGES[i + 1]["key"] if i + 1 < len(PIPELINE_STAGES) else stage["key"]
-                            next_stage_name = PIPELINE_STAGES[i + 1]["name"] if i + 1 < len(PIPELINE_STAGES) else stage["name"]
-                            btn_key = f"mv_{c['id']}_{stage['key']}"
-                            if st.button(f"→ {next_stage_name}", key=btn_key, use_container_width=True):
-                                # 记录阶段变更到知识库
-                                from datetime import datetime as _dt
-                                old_stage_name = stage["name"]
-                                change_content = f"""# 商机阶段变更记录
-
-**变更时间**：{_dt.now().strftime("%Y-%m-%d %H:%M:%S")}
-**客户名称**：{c.get('company_name','')}
-**所在国家**：{c.get('country','')}
-**变更前阶段**：{old_stage_name}
-**变更后阶段**：{next_stage_name}
-**客户等级**：{g}级
-**客户来源**：{c.get('source','')}
-**下次跟进**：{c.get('next_follow_up','未定')}
-"""
-                                save_to_kb_button(change_content, "客户管理/商机管道", f"阶段变更_{c.get('company_name','')[:20]}_{_dt.now().strftime('%Y%m%d_%H%M')}", "md")
+                            if st.button(f"→ {next_stage}", key=f"mv_{c['id']}_{stage['key']}", use_container_width=True):
                                 cm.move_stage(c["id"], next_stage)
-                                st.success(f"✅ 已推进到「{next_stage_name}」，变更已存档")
                                 st.rerun()
 
-        # ---------- Tab4 待办提醒（增强版：按类型分类+导出知识库）----------
+        # ---------- Tab4 待办提醒 ----------
         with cc_m4:
             st.subheader("⏰ 待办提醒")
-            st.caption("今日该跟谁、谁已超期、谁报价后没回，一目了然")
+            st.caption("今日该跟谁、谁已超期，一目了然")
             today_fu = cm.get_follow_up_today()
             overdue = cm.get_overdue_follow_up()
-
-            # ===== 智能分类：按提醒类型分组 =====
-            customers_all = cm.list_customers()
-            from datetime import datetime, timedelta
-            today = datetime.now().strftime("%Y-%m-%d")
-
-            # 分类1：已超期未跟进
-            overdue_list = overdue
-
-            # 分类2：报价后未回（阶段=已报价，且超过3天没跟进）
-            quoted_no_reply = []
-            for c in customers_all:
-                stage_key = c.get("pipeline_stage", "lead")
-                if stage_key == "quoted":
-                    last_fu = c.get("last_follow_up", "")
-                    if last_fu:
-                        try:
-                            days_since = (datetime.now() - datetime.strptime(last_fu[:10], "%Y-%m-%d")).days
-                            if days_since >= 3:
-                                quoted_no_reply.append({**c, "days_since": days_since})
-                        except:
-                            pass
-
-            # 分类3：样品寄出待确认（阶段=样品，且超过7天没跟进）
-            sample_wait = []
-            for c in customers_all:
-                stage_key = c.get("pipeline_stage", "lead")
-                if stage_key == "sample":
-                    last_fu = c.get("last_follow_up", "")
-                    if last_fu:
-                        try:
-                            days_since = (datetime.now() - datetime.strptime(last_fu[:10], "%Y-%m-%d")).days
-                            if days_since >= 7:
-                                sample_wait.append({**c, "days_since": days_since})
-                        except:
-                            pass
-
-            # 分类4：A级客户7天未跟进
-            a_grade_idle = []
-            for c in customers_all:
-                if c.get("grade") == "A":
-                    last_fu = c.get("last_follow_up", "")
-                    if last_fu:
-                        try:
-                            days_since = (datetime.now() - datetime.strptime(last_fu[:10], "%Y-%m-%d")).days
-                            if days_since >= 7:
-                                a_grade_idle.append({**c, "days_since": days_since})
-                        except:
-                            pass
-
-            # ===== 显示分类提醒卡片 =====
-            card1, card2, card3, card4 = st.columns(4)
-            card1.metric("🚨 已超期", len(overdue_list), delta_color="inverse")
-            card2.metric("💬 报价未回", len(quoted_no_reply), delta_color="inverse")
-            card3.metric("📦 样品待确认", len(sample_wait), delta_color="inverse")
-            card4.metric("⭐ A级未跟进", len(a_grade_idle), delta_color="inverse")
-
+            st.markdown(f"**📌 今日待跟进（{len(today_fu)}）**")
+            if today_fu:
+                for c in today_fu:
+                    st.markdown(f"- **{c.get('company_name','')}**（{c.get('country','')} · {c.get('grade','C')}级）— 计划今日跟进")
+            else:
+                st.success("今日暂无待跟进客户")
             st.markdown("---")
-
-            # ===== 详细列表 =====
-            def _render_alert_list(title, icon, items, reason_fn):
-                st.markdown(f"**{icon} {title}（{len(items)}）**")
-                if items:
-                    for c in items:
-                        reason = reason_fn(c)
-                        st.warning(f"**{c.get('company_name','')}**（{c.get('country','')} · {c.get('grade','C')}级）— {reason}")
-                else:
-                    st.success("✅ 无")
-                st.markdown("")
-
-            _render_alert_list(
-                "已超期未跟进", "🚨",
-                overdue_list,
-                lambda c: f"计划跟进日 {c.get('next_follow_up','')} 已过"
-            )
-
-            _render_alert_list(
-                "报价后未回复（≥3天）", "💬",
-                quoted_no_reply,
-                lambda c: f"报价后 {c.get('days_since',0)} 天未回复"
-            )
-
-            _render_alert_list(
-                "样品寄出待确认（≥7天）", "📦",
-                sample_wait,
-                lambda c: f"样品寄出 {c.get('days_since',0)} 天未确认反馈"
-            )
-
-            _render_alert_list(
-                "A级客户7天未跟进", "⭐",
-                a_grade_idle,
-                lambda c: f"A级客户已 {c.get('days_since',0)} 天未互动"
-            )
-
-            st.markdown("---")
-
-            # ===== 导出到知识库 =====
-            st.markdown("**📤 导出提醒清单到知识库**")
-            if st.button("💾 导出今日提醒清单", key="export_reminders"):
-                from datetime import datetime as _dt
-                today_str = _dt.now().strftime("%Y%m%d")
-                content = f"""# 客户跟进提醒清单 - {_dt.now().strftime("%Y-%m-%d %H:%M")}
-
-## 🚨 已超期未跟进（{len(overdue_list)}个）
-"""
-                for c in overdue_list:
-                    content += f"- {c.get('company_name','')}（{c.get('country','')}）— 计划跟进日 {c.get('next_follow_up','')}\n"
-
-                content += f"""
-## 💬 报价后未回复（{len(quoted_no_reply)}个）
-"""
-                for c in quoted_no_reply:
-                    content += f"- {c.get('company_name','')}（{c.get('country','')}）— 报价后 {c.get('days_since',0)} 天\n"
-
-                content += f"""
-## 📦 样品寄出待确认（{len(sample_wait)}个）
-"""
-                for c in sample_wait:
-                    content += f"- {c.get('company_name','')}（{c.get('country','')}）— 样品寄出 {c.get('days_since',0)} 天\n"
-
-                content += f"""
-## ⭐ A级客户7天未跟进（{len(a_grade_idle)}个）
-"""
-                for c in a_grade_idle:
-                    content += f"- {c.get('company_name','')}（{c.get('country','')}）— 已 {c.get('days_since',0)} 天未互动\n"
-
-                save_to_kb_button(content, "客户管理/跟进提醒", f"提醒清单_{today_str}", "md")
-
+            st.markdown(f"**🚨 已超期未跟进（{len(overdue)}）**")
+            if overdue:
+                for c in overdue:
+                    st.warning(f"**{c.get('company_name','')}**（{c.get('country','')}）— 计划跟进日 {c.get('next_follow_up','')} 已过")
+            else:
+                st.success("无超期客户")
             with st.expander("📋 智能提醒规则（说明）"):
                 st.markdown("""
-- **🚨 已超期未跟进**：计划跟进日已过，但还没跟进
-- **💬 报价后未回复**：发了报价超过3天，客户没回复
-- **📦 样品寄出待确认**：寄了样品超过7天，客户没反馈
-- **⭐ A级客户7天未跟进**：A级重点客户，7天没互动容易丢单
 - 报价后 3 天未复：建议发一次报价跟进邮件
 - 样品寄出后 7 天：询问客户收到与试用反馈
 - 30 天无互动：发激活/新品邮件重新触达
+- A 级客户 7 天未跟进：优先处理，防止丢单
 """)
 
         # ---------- Tab5 新增客户 ----------
@@ -2980,15 +2770,6 @@ elif page == "📦 产品库":
                     pass
         price_map = st.session_state['product_price_map']
 
-        # 主图映射（智能挑选的完整产品白底主图，优先于 json 里的 main_image_path）
-        _mimg_path = Path("data/product_main_images.json")
-        main_map = {}
-        if _mimg_path.exists():
-            try:
-                main_map = _json.loads(_mimg_path.read_text(encoding='utf-8'))
-            except Exception:
-                pass
-
         # 统计
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -3087,17 +2868,16 @@ elif page == "📦 产品库":
             product = filtered[0]
             st.session_state['selected_product'] = product['sku']
 
-        # 产品网格展示（全部产品展示，不做数量截断）
+        # 产品网格展示
         if filtered:
-            for i in range(0, len(filtered), 3):
+            # 每行3个产品
+            for i in range(0, min(len(filtered), 60), 3):
                 row_products = filtered[i:i+3]
                 cols = st.columns(3)
                 for j, product in enumerate(row_products):
                     with cols[j]:
-                        # 主图：优先智能挑选的完整产品白底图，文件失效时回退 json main_image_path
-                        mp = main_map.get(product['sku'], '')
-                        if not mp or not Path(mp).exists():
-                            mp = product.get('main_image_path', '')
+                        # 主图：用 json 关联的原始产品文件夹主图路径
+                        mp = product.get('main_image_path', '')
                         if mp and Path(mp).exists():
                             st.image(str(mp), use_container_width=True)
                         else:
@@ -3116,18 +2896,15 @@ elif page == "📦 产品库":
                         # 查看详情按钮
                         if st.button(f"查看SEO资料", key=f"detail_{product['sku']}", use_container_width=True):
                             st.session_state['selected_product'] = product['sku']
-                            st.session_state['_scroll_to_detail'] = True
+
+            if len(filtered) > 60:
+                st.info(f"还有 {len(filtered)-60} 个产品，请使用SKU或关键词精确搜索")
 
         # 产品详情（完整SEO表格）
         if 'selected_product' in st.session_state:
             selected_sku = st.session_state['selected_product']
             product = next((p for p in products_list if p.get('sku') == selected_sku), None)
             if product:
-                # 锚点：详情顶部定位点（供自动滚动用）
-                st.markdown('<div id="kailion-detail-anchor"></div>', unsafe_allow_html=True)
-                # 点击"查看SEO资料"后自动滚动到详情锚点
-                if st.session_state.pop('_scroll_to_detail', False):
-                    components.html("<script>setTimeout(function(){try{var el=window.parent.document.getElementById('kailion-detail-anchor');if(el){el.scrollIntoView({behavior:'smooth',block:'start'});}else{window.parent.scrollTo(0,window.parent.document.body.scrollHeight);}}catch(e){}},1000);</script>", height=10)
                 st.markdown("---")
                 st.subheader(f"📦 {product.get('name', product['sku'])}")
                 st.caption(f"SKU: {product['sku']} | 品类: {product.get('category', '')} | 图片: {product.get('image_count', 0)}张")
@@ -3135,9 +2912,7 @@ elif page == "📦 产品库":
                 # 显示主图
                 col1, col2 = st.columns([1, 2])
                 with col1:
-                    mp = main_map.get(product['sku'], '')
-                    if not mp or not Path(mp).exists():
-                        mp = product.get('main_image_path', '')
+                    mp = product.get('main_image_path', '')
                     if mp and Path(mp).exists():
                         st.image(str(mp), use_container_width=True)
                     else:

@@ -2877,10 +2877,9 @@ elif page == "📦 产品库":
             product = filtered[0]
             st.session_state['selected_product'] = product['sku']
 
-        # 产品网格展示
+        # 产品网格展示（全部产品展示，不做数量截断）
         if filtered:
-            # 每行3个产品
-            for i in range(0, min(len(filtered), 60), 3):
+            for i in range(0, len(filtered), 3):
                 row_products = filtered[i:i+3]
                 cols = st.columns(3)
                 for j, product in enumerate(row_products):
@@ -2907,9 +2906,6 @@ elif page == "📦 产品库":
                             st.session_state['selected_product'] = product['sku']
                             st.session_state['_scroll_to_detail'] = True
 
-            if len(filtered) > 60:
-                st.info(f"还有 {len(filtered)-60} 个产品，请使用SKU或关键词精确搜索")
-
         # 产品详情（完整SEO表格）
         if 'selected_product' in st.session_state:
             selected_sku = st.session_state['selected_product']
@@ -2917,7 +2913,7 @@ elif page == "📦 产品库":
             if product:
                 # 点击"查看SEO资料"后自动滚动到详情区
                 if st.session_state.pop('_scroll_to_detail', False):
-                    components.html("<script>setTimeout(function(){window.parent.scrollTo(0,document.body.scrollHeight);},400)</script>", height=0)
+                    components.html("<script>setTimeout(function(){var w=window.parent;try{w.scrollTo({top:w.document.body.scrollHeight,behavior:'smooth'});}catch(e){w.scrollTo(0,w.document.body.scrollHeight);}},800);</script>", height=120)
                 st.markdown("---")
                 st.subheader(f"📦 {product.get('name', product['sku'])}")
                 st.caption(f"SKU: {product['sku']} | 品类: {product.get('category', '')} | 图片: {product.get('image_count', 0)}张")

@@ -2913,9 +2913,11 @@ elif page == "📦 产品库":
             selected_sku = st.session_state['selected_product']
             product = next((p for p in products_list if p.get('sku') == selected_sku), None)
             if product:
-                # 点击"查看SEO资料"后自动滚动到详情区
+                # 锚点：详情顶部定位点（供自动滚动用）
+                st.markdown('<div id="kailion-detail-anchor"></div>', unsafe_allow_html=True)
+                # 点击"查看SEO资料"后自动滚动到详情锚点
                 if st.session_state.pop('_scroll_to_detail', False):
-                    components.html("<script>setTimeout(function(){var w=window.parent;try{w.scrollTo({top:w.document.body.scrollHeight,behavior:'smooth'});}catch(e){w.scrollTo(0,w.document.body.scrollHeight);}},800);</script>", height=120)
+                    components.html("<script>setTimeout(function(){try{var el=window.parent.document.getElementById('kailion-detail-anchor');if(el){el.scrollIntoView({behavior:'smooth',block:'start'});}else{window.parent.scrollTo(0,window.parent.document.body.scrollHeight);}}catch(e){}},1000);</script>", height=10)
                 st.markdown("---")
                 st.subheader(f"📦 {product.get('name', product['sku'])}")
                 st.caption(f"SKU: {product['sku']} | 品类: {product.get('category', '')} | 图片: {product.get('image_count', 0)}张")

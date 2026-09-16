@@ -5539,9 +5539,18 @@ elif page == "🤖 锴利自研AI工具库":
                         else:
                             with st.spinner("AI正在分析参考图..."):
                                 try:
-                                    from ai_client import ai_client
-                                    sys_prompt = "你是专业商业产品摄影导演。分析参考场景图，提取互动类型、场景类型、动作姿态、关键词、构图、光线、氛围。输出JSON。"
-                                    result = ai_client.chat(messages=[{"role":"user","content":sys_prompt}], model=model_choice, temperature=0.3)
+                                    sys_prompt = (
+                                        "你是专业商业产品摄影导演。根据用户选择的品类与光影氛围，"
+                                        "输出一个商业场景摄影方案JSON，字段必须为：interaction(互动类型), "
+                                        "scene(场景类型英文), action(动作姿态英文), keywords(英文关键词数组), "
+                                        "composition(构图), lighting(光线), mood(氛围)。只输出JSON，不要解释。"
+                                    )
+                                    user_prompt = (
+                                        f"品类：{category}\n光影氛围：{'、'.join(lighting) if lighting else '商业摄影光效'}\n"
+                                        "请基于以上信息，输出该产品在海外B2B独立站详情页的商业场景摄影方案JSON。"
+                                    )
+                                    result = ai.chat(user_prompt, system_prompt=sys_prompt,
+                                                     temperature=0.3, task_name="场景图反推")
                                     st.session_state["sr_result"] = result
                                 except Exception as e:
                                     st.error(f"调用AI失败：{e}")
@@ -6889,34 +6898,34 @@ elif page == "👥 客户管理":
     if customers:
         for c in customers:
             grade = c.get("grade", "C")
-    with st.expander(f"{c.get('company_name', '未知')} | {grade}级 | {c.get('score', 0)}分 | {c.get('country', '')}"):
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.write(f"**官网：** {c.get('website', '无')}")
-            st.write(f"**主营：** {c.get('products', '无')}")
-            st.write(f"**状态：** {c.get('status', '新客户')}")
-            st.write(f"**添加时间：** {c.get('created_at', '')[:10]}")
-            if c.get("analysis"):
-                with st.expander("查看AI分析"):
-                    st.markdown(c["analysis"])
-            if c.get("emails"):
-                st.write(f"**邮件记录：** {len(c['emails'])}封")
-                for e in c["emails"][-3:]:
-                    st.caption(f"- [{e['type']}] {e['subject'][:50]}")
-        with col2:
-            new_status = st.selectbox("更新状态",
-                ["新客户", "跟进中", "已报价", "已成交", "已流失"],
-                index=["新客户", "跟进中", "已报价", "已成交", "已流失"].index(c.get("status", "新客户")),
-                key=f"status_{c['id']}")
-            if st.button("更新", key=f"update_{c['id']}"):
-                cm.update_customer(c["id"], {"status": new_status})
-                st.success("已更新！")
-                st.rerun()
-            if two_step_delete("🗑️ 删除", f"del_{c['id']}", "删除该客户及其跟进记录，不可恢复") == "yes":
-                cm.delete_customer(c["id"])
-                st.rerun()
-            else:
-                st.info("没有符合条件的客户")
+            with st.expander(f"{c.get('company_name', '未知')} | {grade}级 | {c.get('score', 0)}分 | {c.get('country', '')}"):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"**官网：** {c.get('website', '无')}")
+                    st.write(f"**主营：** {c.get('products', '无')}")
+                    st.write(f"**状态：** {c.get('status', '新客户')}")
+                    st.write(f"**添加时间：** {c.get('created_at', '')[:10]}")
+                    if c.get("analysis"):
+                        with st.expander("查看AI分析"):
+                            st.markdown(c["analysis"])
+                    if c.get("emails"):
+                        st.write(f"**邮件记录：** {len(c['emails'])}封")
+                        for e in c["emails"][-3:]:
+                            st.caption(f"- [{e['type']}] {e['subject'][:50]}")
+                with col2:
+                    new_status = st.selectbox("更新状态",
+                        ["新客户", "跟进中", "已报价", "已成交", "已流失"],
+                        index=["新客户", "跟进中", "已报价", "已成交", "已流失"].index(c.get("status", "新客户")),
+                        key=f"status_{c['id']}")
+                    if st.button("更新", key=f"update_{c['id']}"):
+                        cm.update_customer(c["id"], {"status": new_status})
+                        st.success("已更新！")
+                        st.rerun()
+                    if two_step_delete("🗑️ 删除", f"del_{c['id']}", "删除该客户及其跟进记录，不可恢复") == "yes":
+                        cm.delete_customer(c["id"])
+                        st.rerun()
+    else:
+        st.info("没有符合条件的客户")
 
     # 导出
     st.markdown("---")

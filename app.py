@@ -1885,9 +1885,9 @@ EN: ...
         ], output_folder="客户管理")
 
     elif cc_current == "📊 客户管理":
-        st.caption("数据总览 · 客户列表 · 客户详情 · 跟进序列 · 客户看板 · 待办提醒 · 新增客户")
-        cc_m1, cc_m2, cc_m3, cc_m4, cc_m5, cc_m6, cc_m7 = st.tabs(
-            ["📊 数据总览", "👥 客户列表", "📇 客户详情", "🔄 跟进序列", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
+        st.caption("数据总览 · 客户列表 · 客户详情 · 跟进序列 · 线索分层 · 客户看板 · 待办提醒 · 新增客户")
+        cc_m1, cc_m2, cc_m3, cc_m4, cc_m5, cc_m6, cc_m7, cc_m8 = st.tabs(
+            ["📊 数据总览", "👥 客户列表", "📇 客户详情", "🔄 跟进序列", "🎯 线索分层", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
 
         # 全局函数：获取客户阶段名称（所有tab共用）
         def _stage_name(c):
@@ -2654,8 +2654,193 @@ EN: ...
             except Exception as e:
                 st.error(f"加载失败：{e}")
 
-        # ---------- Tab5 客户看板（开发进度，按阶段分列）----------
+        # ---------- Tab5 线索分层管理 ----------
         with cc_m5:
+            try:
+                st.subheader("🎯 线索分层管理")
+                st.caption("根据客户信息自动分层，重点跟进A级客户，合理分配精力")
+
+                customers_all = cm.list_customers()
+                total = len(customers_all)
+
+                # ===== 分层规则说明 =====
+                with st.expander("📋 分层规则说明", expanded=False):
+                    st.markdown("""
+                    **A级（重点客户）**：
+                    - 发达国家（美/加/欧/澳/日/韩）
+                    - 有明确产品需求或已报价
+                    - 有官网/LinkedIn等正规公司信息
+                    - 优先级：⭐⭐⭐⭐⭐ 每周跟进
+
+                    **B级（潜在客户）**：
+                    - 发展中国家（中东/东南亚/南美）
+                    - 有产品兴趣但未报价
+                    - 信息完整度一般
+                    - 优先级：⭐⭐⭐⭐ 每两周跟进
+
+                    **C级（一般线索）**：
+                    - 信息不完整，只有邮箱/名称
+                    - 来源不明确
+                    - 优先级：⭐⭐ 每月跟进一次
+
+                    **D级（无效线索）**：
+                    - 邮箱无效/多次不回复
+                    - 同行/骗子/索要免费样品
+                    - 优先级：❌ 暂时放弃
+                    """)
+
+                # ===== 自动分层计算 =====
+                def _auto_grade(cust):
+                    score = 0
+                    # 国家加分
+                    country = cust.get("country", "").lower()
+                    developed = ["united states", "usa", "canada", "germany", "uk", "france",
+                                 "italy", "spain", "australia", "japan", "korea", "netherlands",
+                                 "belgium", "sweden", "norway", "denmark", "switzerland"]
+                    if any(d in country for d in developed):
+                        score += 3
+                    elif country:
+                        score += 1
+
+                    # 阶段加分
+                    stage = cust.get("pipeline_stage", "lead")
+                    if stage in ["quoted", "sample", "negotiation"]:
+                        score += 3
+                    elif stage == "contacted":
+                        score += 2
+                    elif stage == "lead":
+                        score += 1
+
+                    # 信息完整度加分
+                    if cust.get("website"):
+                        score += 1
+                    if cust.get("phone") or cust.get("whatsapp"):
+                        score += 1
+                    if cust.get("products"):
+                        score += 1
+
+                    # 历史跟进加分
+                    acts = cust.get("activities", [])
+                    if len(acts) >= 5:
+                        score += 2
+                    elif len(acts) >= 2:
+                        score += 1
+
+                    # 评分转等级
+                    if score >= 7:
+                        return "A"
+                    elif score >= 5:
+                        return "B"
+                    elif score >= 3:
+                        return "C"
+                    else:
+                        return "D"
+
+                # ===== 分层看板 =====
+                st.markdown("**📊 客户分层看板**")
+                grade_counts = {"A": 0, "B": 0, "C": 0, "D": 0}
+                for c in customers_all:
+                    g = c.get("grade", "C")
+                    if g in grade_counts:
+                        grade_counts[g] += 1
+
+                g1, g2, g3, g4 = st.columns(4)
+                g1.metric("A级（重点）", grade_counts["A"], delta=f"{grade_counts['A']/total*100:.1f}%" if total else "0%", delta_color="off")
+                g2.metric("B级（潜在）", grade_counts["B"], delta=f"{grade_counts['B']/total*100:.1f}%" if total else "0%", delta_color="off")
+                g3.metric("C级（一般）", grade_counts["C"], delta=f"{grade_counts['C']/total*100:.1f}%" if total else "0%", delta_color="off")
+                g4.metric("D级（无效）", grade_counts["D"], delta=f"{grade_counts['D']/total*100:.1f}%" if total else "0%", delta_color="off")
+
+                # ===== 按等级查看客户 =====
+                st.markdown("---")
+                st.markdown("**👥 按等级查看客户**")
+                grade_filter = st.selectbox("选择等级", ["全部", "A", "B", "C", "D"], key="grade_filter")
+
+                filtered = []
+                for c in customers_all:
+                    g = c.get("grade", "C")
+                    if grade_filter == "全部" or g == grade_filter:
+                        filtered.append({
+                            "公司": c.get("company_name", ""),
+                            "国家": c.get("country", ""),
+                            "等级": g,
+                            "阶段": _stage_name(c),
+                            "来源": c.get("source", ""),
+                            "下次跟进": c.get("next_follow_up", ""),
+                        })
+
+                if filtered:
+                    st.dataframe(pd.DataFrame(filtered), use_container_width=True, hide_index=True)
+                else:
+                    st.info("该等级暂无客户")
+
+                # ===== 自动分层 =====
+                st.markdown("---")
+                st.markdown("**🤖 自动分层（根据客户信息自动计算推荐等级）**")
+                st.caption("点击按钮后，系统会根据客户国家、阶段、信息完整度、跟进历史自动计算推荐等级")
+
+                if st.button("🚀 开始自动分层", key="auto_grade_btn", type="primary"):
+                    updated = 0
+                    for c in customers_all:
+                        recommended = _auto_grade(c)
+                        current = c.get("grade", "C")
+                        if recommended != current:
+                            cm.update_customer(c["id"], {"grade": recommended})
+                            updated += 1
+                    st.success(f"✅ 自动分层完成！共调整了 {updated} 个客户的等级")
+                    st.rerun()
+
+                # ===== 批量调整等级 =====
+                st.markdown("---")
+                st.markdown("**⚡ 批量调整等级**")
+                batch_grade_from = st.selectbox("从等级", ["A", "B", "C", "D"], key="batch_grade_from")
+                batch_grade_to = st.selectbox("调整到等级", ["A", "B", "C", "D"], key="batch_grade_to")
+
+                if st.button(f"📤 批量把{batch_grade_from}级调整为{batch_grade_to}级", key="do_batch_grade"):
+                    batch_count = 0
+                    for c in customers_all:
+                        if c.get("grade", "C") == batch_grade_from:
+                            cm.update_customer(c["id"], {"grade": batch_grade_to})
+                            batch_count += 1
+                    st.success(f"✅ 已把 {batch_count} 个{batch_grade_from}级客户调整为{batch_grade_to}级")
+                    st.rerun()
+
+                # ===== 导出分层报表 =====
+                st.markdown("---")
+                if st.button("📤 导出分层报表到知识库", key="export_grade_report"):
+                    from datetime import datetime as _dt
+                    report = f"""# 客户分层报表
+
+**生成时间**：{_dt.now().strftime("%Y-%m-%d %H:%M")}
+**客户总数**：{total}
+
+---
+
+## 分层统计
+
+| 等级 | 客户数 | 占比 | 跟进频率 |
+|------|--------|------|----------|
+| A级（重点） | {grade_counts['A']} | {grade_counts['A']/total*100:.1f}% | 每周跟进 |
+| B级（潜在） | {grade_counts['B']} | {grade_counts['B']/total*100:.1f}% | 每两周跟进 |
+| C级（一般） | {grade_counts['C']} | {grade_counts['C']/total*100:.1f}% | 每月跟进一次 |
+| D级（无效） | {grade_counts['D']} | {grade_counts['D']/total*100:.1f}% | 暂时放弃 |
+
+---
+
+## A级客户明细（{grade_counts['A']}个）
+
+"""
+                    for c in customers_all:
+                        if c.get("grade") == "A":
+                            report += f"- {c.get('company_name','')} ({c.get('country','')})\n"
+
+                    save_to_kb_button(report, "客户管理/线索分层", f"客户分层报表_{_dt.now().strftime('%Y%m%d_%H%M')}", "md")
+                    st.success("✅ 报表已导出")
+
+            except Exception as e:
+                st.error(f"加载失败：{e}")
+
+        # ---------- Tab6 客户看板（开发进度，按阶段分列）----------
+        with cc_m6:
             st.subheader("🗂️ 客户开发进度看板")
             st.caption("按销售阶段分列；点卡片下方按钮可把客户推进到下一阶段，变更自动存档到知识库")
             pdata = cm.get_pipeline_data()
@@ -2706,8 +2891,8 @@ EN: ...
                                 st.success(f"✅ 已推进到「{next_stage_name}」，变更已存档")
                                 st.rerun()
 
-        # ---------- Tab6 待办提醒（增强版：按类型分类+导出知识库）----------
-        with cc_m6:
+        # ---------- Tab7 待办提醒（增强版：按类型分类+导出知识库）----------
+        with cc_m7:
             st.subheader("⏰ 待办提醒")
             st.caption("今日该跟谁、谁已超期、谁报价后没回，一目了然")
             today_fu = cm.get_follow_up_today()
@@ -2851,8 +3036,8 @@ EN: ...
 - 30 天无互动：发激活/新品邮件重新触达
 """)
 
-        # ---------- Tab7 新增客户 ----------
-        with cc_m7:
+        # ---------- Tab8 新增客户 ----------
+        with cc_m8:
             # ===== 手动新增客户 =====
             st.subheader("➕ 手动新增客户档案")
             with st.form("new_cust_form"):

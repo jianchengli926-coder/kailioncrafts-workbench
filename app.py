@@ -1885,9 +1885,9 @@ EN: ...
         ], output_folder="客户管理")
 
     elif cc_current == "📊 客户管理":
-        st.caption("数据总览 · 客户列表 · 客户详情 · 跟进序列 · 线索分层 · 客户看板 · 待办提醒 · 新增客户")
-        cc_m1, cc_m2, cc_m3, cc_m4, cc_m5, cc_m6, cc_m7, cc_m8 = st.tabs(
-            ["📊 数据总览", "👥 客户列表", "📇 客户详情", "🔄 跟进序列", "🎯 线索分层", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
+        st.caption("数据总览 · 客户列表 · 客户详情 · 跟进序列 · 线索分层 · 客户公池 · 客户看板 · 待办提醒 · 新增客户")
+        cc_m1, cc_m2, cc_m3, cc_m4, cc_m5, cc_m6, cc_m7, cc_m8, cc_m9 = st.tabs(
+            ["📊 数据总览", "👥 客户列表", "📇 客户详情", "🔄 跟进序列", "🎯 线索分层", "🌊 客户公池", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
 
         # 全局函数：获取客户阶段名称（所有tab共用）
         def _stage_name(c):
@@ -2839,8 +2839,161 @@ EN: ...
             except Exception as e:
                 st.error(f"加载失败：{e}")
 
-        # ---------- Tab6 客户看板（开发进度，按阶段分列）----------
+        # ---------- Tab6 客户公池 + 清洗规则 ----------
         with cc_m6:
+            try:
+                st.subheader("🌊 客户公池")
+                st.caption("公海客户池：没人跟进的客户放这里，大家都可以认领；清洗规则自动把很久没跟进的客户移到公池")
+
+                customers_all = cm.list_customers()
+
+                # 公池客户：owner为空或者"公池"的客户
+                def _is_in_pool(c):
+                    owner = c.get("owner", "").strip()
+                    return not owner or owner == "公池" or owner == "pool"
+
+                pool_customers = [c for c in customers_all if _is_in_pool(c)]
+                my_customers = [c for c in customers_all if not _is_in_pool(c)]
+
+                # ===== 公池看板 =====
+                st.markdown("**📊 公池看板**")
+                p1, p2, p3 = st.columns(3)
+                p1.metric("公池客户数", len(pool_customers))
+                p2.metric("我名下客户", len(my_customers))
+                p3.metric("总客户数", len(customers_all))
+
+                # ===== 公池客户列表 =====
+                st.markdown("---")
+                st.markdown("**🌊 公池客户列表（可认领）**")
+
+                if pool_customers:
+                    pool_rows = []
+                    for c in pool_customers:
+                        pool_rows.append({
+                            "公司": c.get("company_name", ""),
+                            "国家": c.get("country", ""),
+                            "等级": c.get("grade", "C"),
+                            "来源": c.get("source", ""),
+                            "入库时间": c.get("created_at", "")[:10],
+                            "cust_id": c["id"],
+                        })
+                    st.dataframe(pd.DataFrame([{k:v for k,v in r.items() if k != "cust_id"} for r in pool_rows]),
+                                use_container_width=True, hide_index=True)
+
+                    # 认领客户
+                    st.markdown("**📥 认领客户**")
+                    pool_cust_ids = [r["cust_id"] for r in pool_rows]
+                    pick_cust = st.selectbox("选择要认领的客户", pool_cust_ids,
+                                           format_func=lambda i: next((r["公司"] for r in pool_rows if r["cust_id"] == i), i),
+                                           key="pick_pool_cust")
+                    if st.button("📥 认领到我名下", key="claim_cust", type="primary"):
+                        cm.update_customer(pick_cust, {"owner": "我"})
+                        # 记录跟进
+                        cm.add_activity(pick_cust, "系统", "[公池认领] 从公池认领到名下")
+                        st.success("✅ 已认领成功")
+                        st.rerun()
+                else:
+                    st.info("🎉 公池里暂时没有客户")
+
+                # ===== 我的客户（释放到公池） =====
+                st.markdown("---")
+                st.markdown("**📤 我的客户（可释放到公池）**")
+
+                if my_customers:
+                    my_rows = []
+                    for c in my_customers:
+                        my_rows.append({
+                            "公司": c.get("company_name", ""),
+                            "国家": c.get("country", ""),
+                            "等级": c.get("grade", "C"),
+                            "负责人": c.get("owner", ""),
+                            "上次跟进": c.get("last_follow_up", ""),
+                            "cust_id": c["id"],
+                        })
+                    st.dataframe(pd.DataFrame([{k:v for k,v in r.items() if k != "cust_id"} for r in my_rows]),
+                                use_container_width=True, hide_index=True)
+
+                    # 释放客户
+                    st.markdown("**📤 释放客户到公池**")
+                    my_cust_ids = [r["cust_id"] for r in my_rows]
+                    release_cust = st.selectbox("选择要释放的客户", my_cust_ids,
+                                              format_func=lambda i: next((r["公司"] for r in my_rows if r["cust_id"] == i), i),
+                                              key="release_my_cust")
+                    release_reason = st.text_input("释放原因（可选）", key="release_reason", placeholder="如：太久没跟进，放到公池让其他人试试")
+                    if st.button("📤 释放到公池", key="do_release_cust"):
+                        cm.update_customer(release_cust, {"owner": "公池"})
+                        # 记录跟进
+                        reason_txt = f"，原因：{release_reason}" if release_reason else ""
+                        cm.add_activity(release_cust, "系统", f"[释放公池] 释放到公池{reason_txt}")
+                        st.success("✅ 已释放到公池")
+                        st.rerun()
+                else:
+                    st.info("你名下暂时没有客户")
+
+                # ===== 清洗规则 =====
+                st.markdown("---")
+                st.markdown("**🧹 自动清洗规则**")
+                st.caption("超过N天没跟进的客户，自动移到公池，释放给其他人跟进")
+
+                from datetime import datetime, timedelta
+                clean_days = st.number_input("超过多少天没跟进自动清洗到公池", 30, 365, 90, key="clean_days")
+
+                if st.button("🧹 执行清洗", key="do_clean", type="primary"):
+                    cleaned = 0
+                    for c in customers_all:
+                        if _is_in_pool(c):
+                            continue  # 已经在公池了
+                        last_fu = c.get("last_follow_up", "")
+                        if not last_fu:
+                            # 从来没跟进过的，按创建时间算
+                            created = c.get("created_at", "")
+                            if created:
+                                try:
+                                    created_date = datetime.strptime(created[:10], "%Y-%m-%d")
+                                    days_since = (datetime.now() - created_date).days
+                                    if days_since >= clean_days:
+                                        cm.update_customer(c["id"], {"owner": "公池"})
+                                        cm.add_activity(c["id"], "系统", f"[自动清洗] {days_since}天没跟进，自动移到公池")
+                                        cleaned += 1
+                                except:
+                                    pass
+                        else:
+                            try:
+                                last_date = datetime.strptime(last_fu[:10], "%Y-%m-%d")
+                                days_since = (datetime.now() - last_date).days
+                                if days_since >= clean_days:
+                                    cm.update_customer(c["id"], {"owner": "公池"})
+                                    cm.add_activity(c["id"], "系统", f"[自动清洗] {days_since}天没跟进，自动移到公池")
+                                    cleaned += 1
+                            except:
+                                pass
+                    st.success(f"✅ 清洗完成！共把 {cleaned} 个客户移到公池")
+                    st.rerun()
+
+                # ===== 清洗记录 =====
+                st.markdown("---")
+                st.markdown("**📋 最近清洗记录**")
+                clean_records = []
+                for c in customers_all:
+                    acts = c.get("activities", [])
+                    for a in reversed(acts):
+                        if "自动清洗" in a.get("description", "") or "释放公池" in a.get("description", ""):
+                            clean_records.append({
+                                "客户": c.get("company_name", ""),
+                                "时间": (a.get("created_at", "") or "")[:16],
+                                "操作": a.get("description", ""),
+                            })
+                            break  # 只取最新一条
+                if clean_records:
+                    st.dataframe(pd.DataFrame(clean_records[:20]), use_container_width=True, hide_index=True)
+                else:
+                    st.info("暂无清洗记录")
+
+            except Exception as e:
+                st.error(f"加载失败：{e}")
+
+        # ---------- Tab7 客户看板（开发进度，按阶段分列）----------
+        with cc_m7:
             st.subheader("🗂️ 客户开发进度看板")
             st.caption("按销售阶段分列；点卡片下方按钮可把客户推进到下一阶段，变更自动存档到知识库")
             pdata = cm.get_pipeline_data()
@@ -2891,8 +3044,8 @@ EN: ...
                                 st.success(f"✅ 已推进到「{next_stage_name}」，变更已存档")
                                 st.rerun()
 
-        # ---------- Tab7 待办提醒（增强版：按类型分类+导出知识库）----------
-        with cc_m7:
+        # ---------- Tab8 待办提醒（增强版：按类型分类+导出知识库）----------
+        with cc_m8:
             st.subheader("⏰ 待办提醒")
             st.caption("今日该跟谁、谁已超期、谁报价后没回，一目了然")
             today_fu = cm.get_follow_up_today()
@@ -3036,8 +3189,8 @@ EN: ...
 - 30 天无互动：发激活/新品邮件重新触达
 """)
 
-        # ---------- Tab8 新增客户 ----------
-        with cc_m8:
+        # ---------- Tab9 新增客户 ----------
+        with cc_m9:
             # ===== 手动新增客户 =====
             st.subheader("➕ 手动新增客户档案")
             with st.form("new_cust_form"):

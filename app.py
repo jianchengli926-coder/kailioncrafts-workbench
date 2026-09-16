@@ -2170,6 +2170,9 @@ EN: ...
                                 filtered_customer_ids.append(c["id"])
 
                             for cid in filtered_customer_ids:
+                                c = cm.get_customer(cid)
+                                if not c:
+                                    continue
                                 updates = {}
                                 if batch_stage != "（不操作）":
                                     stage_key = next((s["key"] for s in PIPELINE_STAGES if s["name"] == batch_stage), "lead")

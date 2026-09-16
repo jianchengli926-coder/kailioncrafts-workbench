@@ -33,9 +33,9 @@ KB_SOURCES = {
         "description": "16000+文件的完整公司知识库，含产品图片、SEO资料、财务等",
     },
     "trade_learning": {
-        "name": "外贸学习资料库（456份）",
-        "path": Path("/Users/a123/Desktop/锴利外贸学习初文档"),
-        "description": "外贸学习文档456份，含谈客户技巧、谈判报价、邮件开发、社媒运营等",
+        "name": "外贸学习资料库",
+        "path": KB_DIR / "锴利外贸学习初文档",
+        "description": "外贸学习文档（谈客户技巧、谈判报价、邮件开发、社媒运营、AI工具等），已转成可检索文本",
     },
     "website": {
         "name": "独立站知识库（159页）",

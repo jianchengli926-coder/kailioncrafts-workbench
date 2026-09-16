@@ -1889,6 +1889,11 @@ EN: ...
         cc_m1, cc_m2, cc_m3, cc_m4, cc_m5, cc_m6 = st.tabs(
             ["📊 数据总览", "👥 客户列表", "📇 客户详情", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
 
+        # 全局函数：获取客户阶段名称（所有tab共用）
+        def _stage_name(c):
+            return next((s["name"] for s in PIPELINE_STAGES if s["key"] == c.get("pipeline_stage", "lead")),
+                        c.get("status", ""))
+
         CUSTOMER_SOURCES = ["Google搜索", "Google Maps", "LinkedIn", "Alibaba", "展会", "客户转介绍", "抖音/社媒", "其他"]
         CUSTOMER_TYPES = ["进口商", "批发商", "零售商", "品牌商", "代理商", "制造商", "其他"]
         _grade_color = {"A": "#28a745", "B": "#fd7e14", "C": "#6c757d"}
@@ -2079,9 +2084,6 @@ EN: ...
                     )
 
                 # ===== 应用筛选 =====
-                def _stage_name(c):
-                    return next((s["name"] for s in PIPELINE_STAGES if s["key"] == c.get("pipeline_stage", "lead")),
-                                c.get("status", ""))
                 rows = []
                 for c in customers:
                     # 关键词筛选

@@ -1913,16 +1913,35 @@ EN: ...
                 m6.metric("已成交", _closed)
 
                 st.markdown("**销售漏斗（按阶段）**")
-                _maxc = max([v["count"] for v in _pdata.values()] + [1])
-                for key, v in _pdata.items():
-                    w = int(v["count"] / _maxc * 100)
-                    st.markdown(
-                        f'<div style="display:flex;align-items:center;margin:3px 0;">'
-                        f'<div style="width:64px;font-size:12px;">{v["name"]}</div>'
-                        f'<div style="flex:1;background:#f0f0f0;border-radius:6px;height:20px;">'
-                        f'<div style="width:{w}%;background:{v["color"]};height:20px;border-radius:6px;color:#fff;'
-                        f'font-size:11px;line-height:20px;padding-left:6px;">{v["count"]}</div></div></div>',
-                        unsafe_allow_html=True)
+                # ===== 用plotly画漏斗图 =====
+                try:
+                    import plotly.graph_objects as go
+                    stages_list = list(_pdata.values())
+                    fig = go.Figure(go.Funnel(
+                        y=[v["name"] for v in stages_list],
+                        x=[v["count"] for v in stages_list],
+                        textinfo="value+percent initial",
+                        marker={"color": [v["color"] for v in stages_list]},
+                        connector={"line": {"color": "#ccc", "width": 1}},
+                    ))
+                    fig.update_layout(
+                        margin=dict(l=20, r=20, t=20, b=20),
+                        height=300,
+                        showlegend=False,
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as _pe:
+                    # plotly失败时降级到HTML条形图
+                    _maxc = max([v["count"] for v in _pdata.values()] + [1])
+                    for key, v in _pdata.items():
+                        w = int(v["count"] / _maxc * 100)
+                        st.markdown(
+                            f'<div style="display:flex;align-items:center;margin:3px 0;">'
+                            f'<div style="width:64px;font-size:12px;">{v["name"]}</div>'
+                            f'<div style="flex:1;background:#f0f0f0;border-radius:6px;height:20px;">'
+                            f'<div style="width:{w}%;background:{v["color"]};height:20px;border-radius:6px;color:#fff;'
+                            f'font-size:11px;line-height:20px;padding-left:6px;">{v["count"]}</div></div></div>',
+                            unsafe_allow_html=True)
 
                 # ===== 漏斗转化率分析（借鉴sales-pipeline-analyst） =====
                 st.markdown("**📊 漏斗转化率分析（哪一步流失最多？）**")
@@ -1971,6 +1990,59 @@ EN: ...
                     st.info(f"今日待跟进 {len(_today_fu)} 个客户，请到「⏰ 待办提醒」处理")
                     if _overdue:
                         st.warning(f"⚠️ {len(_overdue)} 个客户已超期未跟进，建议优先处理")
+
+                # ===== 导出经营报表到知识库 =====
+                st.markdown("---")
+                st.markdown("**📤 导出经营报表到知识库**")
+                exp_c1, exp_c2 = st.columns(2)
+                with exp_c1:
+                    if st.button("📊 导出销售漏斗报表", key="export_funnel"):
+                        from datetime import datetime as _dt
+                        funnel_content = f"""# 销售漏斗报表 - {_dt.now().strftime("%Y-%m-%d")}
+
+**统计时间**：{_dt.now().strftime("%Y-%m-%d %H:%M")}
+**客户总数**：{_total}
+
+---
+
+## 各阶段客户数
+"""
+                        for key, v in _pdata.items():
+                            funnel_content += f"- **{v['name']}**：{v['count']} 个客户\n"
+
+                        funnel_content += f"""
+---
+
+## 等级分布
+- A级：{_st['by_grade'].get('A', 0)} 个
+- B级：{_st['by_grade'].get('B', 0)} 个
+- C级：{_st['by_grade'].get('C', 0)} 个
+
+---
+
+## 跟进情况
+- 今日待跟进：{len(_today_fu)} 个
+- 已超期未跟进：{len(_overdue)} 个
+"""
+                        save_to_kb_button(funnel_content, "客户管理/漏斗报表", f"销售漏斗_{_dt.now().strftime('%Y%m%d')}", "md")
+                with exp_c2:
+                    if st.button("📋 导出全部客户清单", key="export_all_customers"):
+                        from datetime import datetime as _dt
+                        all_cust = cm.list_customers()
+                        csv_lines = ["公司,国家,来源,等级,阶段,下次跟进"]
+                        for c in all_cust:
+                            stage_name = next((s["name"] for s in PIPELINE_STAGES if s["key"] == c.get("pipeline_stage", "lead")), "")
+                            csv_lines.append(
+                                f"{c.get('company_name','')},{c.get('country','')},"
+                                f"{c.get('source','')},{c.get('grade','C')},"
+                                f"{stage_name},{c.get('next_follow_up','')}"
+                            )
+                        save_to_kb_button(
+                            "\n".join(csv_lines),
+                            "客户管理/导出报表",
+                            f"全部客户清单_{_dt.now().strftime('%Y%m%d')}",
+                            "csv"
+                        )
             except Exception as e:
                 st.error(f"加载失败：{e}")
 
@@ -2092,9 +2164,67 @@ EN: ...
                         st.caption(f"备注：{cust['notes']}")
                     acts = cust.get("activities", [])
                     if acts:
-                        st.markdown("**跟进时间线**")
-                        for a in reversed(acts[-8:]):
-                            st.markdown(f"- `{(a.get('created_at','') or '')[:16]}` 【{a.get('type','')}】{a.get('description','')}")
+                        st.markdown("---")
+                        st.markdown(f"**📅 跟进时间线（共{len(acts)}条）**")
+
+                        # ===== 跟进时间线筛选 =====
+                        all_types = sorted(list(set([a.get("type", "") for a in acts if a.get("type")])))
+                        if all_types:
+                            ftype = st.selectbox("按渠道筛选", ["全部"] + all_types, key=f"act_type_{sel}")
+                        else:
+                            ftype = "全部"
+
+                        # ===== 显示跟进记录 =====
+                        filtered_acts = [a for a in acts if ftype == "全部" or a.get("type") == ftype]
+                        filtered_acts = list(reversed(filtered_acts))
+
+                        if filtered_acts:
+                            for a in filtered_acts:
+                                act_type = a.get("type", "")
+                                act_time = (a.get("created_at", "") or "")[:16]
+                                act_desc = a.get("description", "")
+                                # 根据类型显示不同颜色
+                                type_color = {
+                                    "邮件": "#3B82F6",
+                                    "WhatsApp": "#10B981",
+                                    "电话": "#F59E0B",
+                                    "面谈": "#8B5CF6",
+                                    "样品": "#EC4899",
+                                    "报价": "#EF4444",
+                                }.get(act_type, "#6B7280")
+                                st.markdown(
+                                    f'<div style="border-left:3px solid {type_color};padding:6px 10px;margin:4px 0;'
+                                    f'background:#f9fafb;border-radius:0 6px 6px 0;">'
+                                    f'<span style="font-size:11px;color:#888;">{act_time}</span><br/>'
+                                    f'<span style="color:{type_color};font-weight:600;font-size:12px;">【{act_type}】</span>'
+                                    f'<span style="font-size:13px;">{act_desc}</span>'
+                                    f'</div>',
+                                    unsafe_allow_html=True
+                                )
+                        else:
+                            st.info("该类型暂无跟进记录")
+
+                        # ===== 导出跟进记录到知识库 =====
+                        if st.button("💾 导出跟进记录到知识库", key=f"export_acts_{sel}"):
+                            from datetime import datetime as _dt
+                            content = f"""# 客户跟进记录 - {cust.get('company_name','')}
+
+**客户名称**：{cust.get('company_name','')}
+**所在国家**：{cust.get('country','')}
+**客户等级**：{cust.get('grade','C')}级
+**当前阶段**：{_stage_name(cust)}
+**跟进记录总数**：{len(acts)}条
+**导出时间**：{_dt.now().strftime("%Y-%m-%d %H:%M")}
+
+---
+
+"""
+                            for a in reversed(acts):
+                                content += f"## {(a.get('created_at','') or '')[:16]}\n"
+                                content += f"**渠道**：{a.get('type','')}\n\n"
+                                content += f"{a.get('description','')}\n\n---\n\n"
+
+                            save_to_kb_button(content, "客户管理/跟进记录", f"{cust.get('company_name','')[:20]}_跟进记录_{_dt.now().strftime('%Y%m%d')}", "md")
                     # ---- P0: 关联订单与收款（客户名模糊匹配 finance_db）----
                     try:
                         import finance_db as _fdb

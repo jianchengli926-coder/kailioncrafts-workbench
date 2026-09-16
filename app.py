@@ -2884,8 +2884,10 @@ elif page == "📦 产品库":
                 cols = st.columns(3)
                 for j, product in enumerate(row_products):
                     with cols[j]:
-                        # 主图：优先智能挑选的完整产品白底图，回退 json main_image_path
-                        mp = main_map.get(product['sku']) or product.get('main_image_path', '')
+                        # 主图：优先智能挑选的完整产品白底图，文件失效时回退 json main_image_path
+                        mp = main_map.get(product['sku'], '')
+                        if not mp or not Path(mp).exists():
+                            mp = product.get('main_image_path', '')
                         if mp and Path(mp).exists():
                             st.image(str(mp), use_container_width=True)
                         else:
@@ -2921,7 +2923,9 @@ elif page == "📦 产品库":
                 # 显示主图
                 col1, col2 = st.columns([1, 2])
                 with col1:
-                    mp = main_map.get(product['sku']) or product.get('main_image_path', '')
+                    mp = main_map.get(product['sku'], '')
+                    if not mp or not Path(mp).exists():
+                        mp = product.get('main_image_path', '')
                     if mp and Path(mp).exists():
                         st.image(str(mp), use_container_width=True)
                     else:

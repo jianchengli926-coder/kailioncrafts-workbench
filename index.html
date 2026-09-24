@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V25.0</div>
+        <div class="b2">KaiLionCrafts Crafts V26.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -3141,7 +3141,7 @@ function viewSettings(root){
         <div class="card card-pad">
           <div class="card-title">关于锴利工作台</div>
           <div class="text-sm" style="line-height:2">
-            <b>版本</b> V25.0 · 锴利外贸获客工作台<br>
+            <b>版本</b> V26.0 · 锴利外贸获客工作台<br>
             <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
             <b>哲学</b> AI 只干脏活累活，发送我自己来，数据全在本地<br>
             <b>Slogan</b> <span class="text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</span>
@@ -5186,8 +5186,13 @@ function viewAutoSearch(root){
       <div class="card card-pad"><div class="stat-label">📥 已导入台账</div><div class="stat-value" style="color:var(--success)">${stats.imported}</div></div>
       <div class="card card-pad"><div class="stat-label">⭐ 平均匹配度</div><div class="stat-value" style="color:var(--gold)">${stats.avgMatch}%</div></div>
     </div>
+    <div class="flex gap8 mb16">
+      ${[['engine','🔍 搜客引擎'],['map','🌍 全球采购商地图'],['decision','🎯 决策人挖掘']].map(([k,l])=>
+        `<button class="btn ${autoSearchTab===k?'btn-gold':'btn-outline'}" onclick="autoSearchTab='${k}';renderView()">${l}</button>`).join('')}
+    </div>
+    ${autoSearchTab==='engine'?`
     <div class="card card-pad mb16">
-      <div class="card-title">🎯 搜客任务配置</div>
+      <div class="card-title">🎯 搜客任务配置</div>`:''}
       <div class="grid-3" style="gap:12px;margin-bottom:12px">
         <div><label class="text-sm">产品关键词</label><input type="text" id="as_keyword" value="kitchen shears wholesale" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
         <div><label class="text-sm">目标国家</label><select id="as_country" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">${SEARCH_COUNTRIES.map(c=>`<option>${c}</option>`).join('')}</select></div>
@@ -5219,12 +5224,13 @@ function viewAutoSearch(root){
       </div>
       <div id="as_resultsList">${renderSearchResults()}</div>
     </div>
-    <div class="card card-pad">
+    ${autoSearchTab==='map'?globalMapView():autoSearchTab==='decision'?decisionMinerView():''}
+    ${autoSearchTab==='engine'?`<div class="card card-pad">
       <div class="card-title">📜 搜客历史记录</div>
       ${(as.history||[]).length?`<table class="tbl"><thead><tr><th>时间</th><th>关键词</th><th>国家</th><th>来源</th><th>找到</th><th>导入</th><th>操作</th></tr></thead><tbody>
         ${(as.history||[]).slice(0,10).map(h=>`<tr><td class="text-xs">${h.time}</td><td class="text-xs">${h.keyword}</td><td class="text-xs">${h.country}</td><td class="text-xs">${h.sources}</td><td class="text-xs">${h.found}</td><td class="text-xs">${h.imported||0}</td><td><button class="btn btn-sm btn-outline" onclick="loadSearchHistory('${h.id}')">加载结果</button></td></tr>`).join('')}
       </tbody></table>`:'<div class="text-sm text-muted" style="padding:20px;text-align:center">暂无搜客历史，启动第一次搜客吧！</div>'}
-    </div>`;
+    </div>`:''}`;
 }
 
 function renderSearchResults(){
@@ -5244,6 +5250,7 @@ function renderSearchResults(){
   </tbody></table>`;
 }
 
+let autoSearchTab='engine';
 function startAutoSearch(){
   if(searchRunning){ toast('搜客正在进行中...'); return; }
   const kw = document.getElementById('as_keyword').value.trim();
@@ -6220,7 +6227,7 @@ function generateLeadEmail(idx){
 
 
 /* ============================================================
- * V25.0 开发信审核发送中心 + SMTP配置
+ * V26.0 开发信审核发送中心 + SMTP配置
  * ============================================================ */
 function saveSmtpConfig(){
   const cfg={
@@ -6461,6 +6468,252 @@ function loadDemoMails(){
 }
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function nowStr(){const d=new Date();return todayStr()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+
+
+/* ============================================================
+ * V26.0 全球采购商地图 + 决策人挖掘
+ * ============================================================ */
+function globalMapView(){
+  const regions=[
+    {name:'北美',countries:'美国/加拿大/墨西哥',count:128,color:'#3182ce',hot:'成熟市场，工业商超采购商资源丰富',icon:'🇺🇸'},
+    {name:'欧洲',countries:'德国/英国/法国/意大利/西班牙/荷兰等',count:256,color:'#805ad5',hot:'消费力强，优质采购商集中，值得深耕',icon:'🇪🇺'},
+    {name:'东南亚',countries:'越南/泰国/马来西亚/印尼/菲律宾',count:89,color:'#38a169',hot:'市场增速快，轻工日用品需求旺盛',icon:'🇻🇳'},
+    {name:'中东',countries:'阿联酋/沙特/卡塔尔/以色列',count:67,color:'#d69e2e',hot:'高端市场，大型采购商比较多',icon:'🇦🇪'},
+    {name:'南美',countries:'巴西/阿根廷/智利/哥伦比亚',count:78,color:'#e53e3e',hot:'新兴蓝海市场，近几年进口需求持续上涨',icon:'🇧🇷'},
+    {name:'大洋洲',countries:'澳大利亚/新西兰',count:45,color:'#319795',hot:'成熟市场，重点开发线下经销商零售商',icon:'🇦🇺'},
+    {name:'非洲',countries:'南非/尼日利亚/埃及/肯尼亚',count:52,color:'#dd6b20',hot:'潜力市场，人口基数大，适合日用五金品类',icon:'🇿🇦'},
+    {name:'东亚',countries:'日本/韩国',count:93,color:'#718096',hot:'高品质要求市场，适合中高端产品',icon:'🇯🇵'}
+  ];
+  const total=regions.reduce((a,r)=>a+r.count,0);
+  return `
+  <div class="grid-4 mb16" style="gap:12px">
+    <div class="card card-pad"><div class="stat-label">🌍 覆盖国家/地区</div><div class="stat-value">200+</div></div>
+    <div class="card card-pad"><div class="stat-label">🏢 全球采购商总数</div><div class="stat-value" style="color:var(--primary)">${total}+</div></div>
+    <div class="card card-pad"><div class="stat-label">🔥 热门市场</div><div class="stat-value" style="color:var(--gold)">欧洲/北美</div></div>
+    <div class="card card-pad"><div class="stat-label">📈 增速最快</div><div class="stat-value" style="color:var(--success)">东南亚/南美</div></div>
+  </div>
+  <div class="card card-pad mb16">
+    <div class="card-title">🗺️ 全球采购商分布热力图</div>
+    <div class="text-sm text-muted mb12">点击地区卡片查看该市场详细分析和推荐开发策略</div>
+    <div class="grid-4" style="gap:12px">
+      ${regions.map(r=>`<div class="card card-pad" style="cursor:pointer;border-left:4px solid ${r.color};transition:transform .2s" onclick="showRegionDetail('${r.name}')" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+        <div style="font-size:28px">${r.icon}</div>
+        <div class="fw700 mt4">${r.name}</div>
+        <div class="text-xs text-muted">${r.countries}</div>
+        <div class="stat-value mt8" style="font-size:24px;color:${r.color}">${r.count}</div>
+        <div class="text-xs text-muted">家采购商</div>
+        <div class="text-xs mt8" style="color:${r.color}">🔥 ${r.hot}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+  <div class="card card-pad mb16">
+    <div class="card-title">🎯 按国家精准搜客</div>
+    <div class="text-sm text-muted mb12">选择目标国家，系统将自动生成该国专属搜索关键词和开发策略</div>
+    <div class="grid-3" style="gap:12px;margin-bottom:12px">
+      <div><label class="text-sm">目标地区</label><select id="gm_region" onchange="updateCountryList()" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">
+        <option value="all">全部地区</option>
+        ${regions.map(r=>`<option value="${r.name}">${r.icon} ${r.name}</option>`).join('')}
+      </select></div>
+      <div><label class="text-sm">目标国家</label><select id="gm_country" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">
+        <option>美国</option><option>德国</option><option>英国</option><option>法国</option><option>日本</option><option>澳大利亚</option><option>加拿大</option><option>荷兰</option><option>意大利</option><option>西班牙</option><option>巴西</option><option>阿联酋</option><option>沙特</option><option>越南</option><option>泰国</option><option>墨西哥</option><option>韩国</option><option>印度</option><option>南非</option><option>新西兰</option>
+      </select></div>
+      <div><label class="text-sm">产品关键词</label><input type="text" id="gm_keyword" value="kitchen shears" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="startCountrySearch()">🚀 启动该国精准搜客</button>
+      <button class="btn btn-outline" onclick="toast('已生成该国开发策略（演示）')">📋 生成开发策略</button>
+    </div>
+  </div>
+  <div class="card card-pad">
+    <div class="card-title">📊 各地区采购商类型分布</div>
+    <div style="display:flex;gap:8px;align-items:flex-end;height:200px;padding:16px 0">
+      ${regions.map(r=>`<div style="flex:1;text-align:center">
+        <div style="background:${r.color};width:100%;height:${r.count/3}px;border-radius:4px 4px 0 0;transition:height .3s" title="${r.count}家"></div>
+        <div class="text-xs mt4">${r.name}</div>
+        <div class="text-xs text-muted">${r.count}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+function showRegionDetail(name){
+  const details={
+    '北美':{market:'成熟市场，工业商超采购商资源丰富，体量巨大',buyers:'Walmart/Target/Home Depot/Lowe's等大型零售商，Amazon卖家，独立经销商',strategy:'重点开发线下经销商和零售商，注重产品认证（FDA/LFGB），价格敏感但量大',language:'英语为主，墨西哥需西班牙语',best:'Q4旺季前（9-11月）备货期'},
+    '欧洲':{market:'消费力强，优质采购商集中，值得深耕',buyers:'德国专业经销商、英国连锁超市、法国进口商、荷兰贸易公司',strategy:'注重品质和认证（CE/LFGB/REACH），MOQ适中，重视长期合作关系',language:'德语/英语/法语/意大利语/西班牙语',best:'春季展会后（3-5月）和秋季采购季（9-10月）'},
+    '东南亚':{market:'市场增速快，轻工日用品需求旺盛',buyers:'越南新兴进口商、泰国连锁商超、马来西亚华人贸易商、印尼分销商',strategy:'价格敏感，适合中低端产品，小批量多频次，注重交期',language:'英语+当地语言，华人客户可用中文',best:'开斋节后（4-5月）和年末采购季'},
+    '中东':{market:'高端市场，大型采购商比较多，推荐使用阿拉伯文检索',buyers:'阿联酋大型进口商、沙特分销商、卡塔尔政府采购、以色列专业采购',strategy:'注重品质和品牌，价格不敏感，喜欢高端包装，重视个人关系',language:'阿拉伯语+英语，以色列用希伯来语/英语',best:'斋月前后（2-4月）和古尔邦节前'},
+    '南美':{market:'新兴蓝海市场，近几年进口的需求持续上涨',buyers:'巴西大型进口商、阿根廷分销商、智利连锁商超、哥伦比亚贸易公司',strategy:'价格敏感，适合中端产品，付款方式灵活（注意收汇风险），注重性价比',language:'葡萄牙语（巴西）/西班牙语（其他）',best:'圣诞节前（9-11月）备货期'},
+    '大洋洲':{market:'成熟市场，重点开发线下经销商零售商',buyers:'澳大利亚连锁商超、新西兰进口商、专业厨具经销商',strategy:'注重品质和认证，价格适中，重视环保和可持续性，MOQ较低',language:'英语',best:'年末圣诞采购季（10-12月）'},
+    '非洲':{market:'潜力市场，大型采购商比较多，人口基数大，适合日用五金品类开发',buyers:'南非进口商、尼日利亚分销商、埃及贸易商、肯尼亚批发商',strategy:'价格极度敏感，适合低端产品，小批量试单，注意付款风险（建议前TT）',language:'英语/法语/阿拉伯语',best:'宗教节日前和年末采购季'},
+    '东亚':{market:'高品质要求市场，适合中高端产品',buyers:'日本专业进口商、韩国连锁商超、高端厨具品牌商',strategy:'极致品质要求，注重细节和包装，认证齐全，价格不敏感，重视长期合作',language:'日语/韩语/英语',best:'春季（3-4月）和秋季（9-10月）采购季'}
+  };
+  const d=details[name]||{};
+  showModal(`
+    <div class="modal-title">🌍 ${name}市场深度分析</div>
+    <div class="mb12"><b>📈 市场特点：</b>${d.market||'-'}</div>
+    <div class="mb12"><b>🏢 主要买家类型：</b>${d.buyers||'-'}</div>
+    <div class="mb12"><b>🎯 开发策略：</b>${d.strategy||'-'}</div>
+    <div class="mb12"><b>🗣️ 语言：</b>${d.language||'-'}</div>
+    <div class="mb12"><b>📅 最佳开发时机：</b>${d.best||'-'}</div>
+    <div class="btn-row mt16">
+      <button class="btn btn-primary" onclick="closeModal();autoSearchTab='engine';renderView()">🚀 去搜客引擎开发该市场</button>
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+    </div>`);
+}
+function updateCountryList(){toast('已更新国家列表（演示）');}
+function startCountrySearch(){
+  const country=document.getElementById('gm_country').value;
+  const keyword=document.getElementById('gm_keyword').value;
+  toast(`正在启动${country}精准搜客：${keyword}...`);
+  setTimeout(()=>{
+    autoSearchTab='engine';
+    document.getElementById('as_keyword').value=keyword+' '+country.toLowerCase();
+    document.getElementById('as_country').value=country;
+    renderView();
+    toast('已切换到搜客引擎，关键词和国家已自动填充');
+  },800);
+}
+function decisionMinerView(){
+  const roles=[
+    {title:'CEO / Owner / Founder',icon:'👑',desc:'公司最高决策者，能直接拍板订单，适合大客户直接对接',color:'#e53e3e',priority:'⭐⭐⭐⭐⭐'},
+    {title:'Purchasing Manager / Buyer',icon:'🛒',desc:'直接负责采购的关键人，日常对接的主要对象',color:'#3182ce',priority:'⭐⭐⭐⭐⭐'},
+    {title:'Sourcing Manager / Sourcing Specialist',icon:'🔍',desc:'负责寻找和评估供应商，新产品导入的关键人',color:'#805ad5',priority:'⭐⭐⭐⭐'},
+    {title:'Supply Chain Director / Manager',icon:'🔗',desc:'负责供应链管理，影响供应商选择和订单分配',color:'#38a169',priority:'⭐⭐⭐⭐'},
+    {title:'Product Manager / Product Developer',icon:'📦',desc:'负责产品开发和选型，新产品的关键影响者',color:'#d69e2e',priority:'⭐⭐⭐'},
+    {title:'Quality Manager / QA Director',icon:'✅',desc:'负责质量管控，供应商准入的关键审核者',color:'#319795',priority:'⭐⭐⭐'},
+    {title:'Sales Manager / Marketing Director',icon:'📢',desc:'了解市场需求和产品趋势，可间接影响采购决策',color:'#dd6b20',priority:'⭐⭐'},
+    {title:'General Manager / COO',icon:'⚙️',desc:'公司运营负责人，大型订单的审批者',color:'#718096',priority:'⭐⭐⭐⭐'}
+  ];
+  return `
+  <div class="grid-4 mb16" style="gap:12px">
+    <div class="card card-pad"><div class="stat-label">🎯 决策人角色</div><div class="stat-value">8类</div></div>
+    <div class="card card-pad"><div class="stat-label">🔗 领英3步定位法</div><div class="stat-value" style="color:var(--primary)">已集成</div></div>
+    <div class="card card-pad"><div class="stat-label">🌐 获客工具</div><div class="stat-value" style="color:var(--gold)">3大网站</div></div>
+    <div class="card card-pad"><div class="stat-label">📊 客户质量评分</div><div class="stat-value" style="color:var(--success)">10维度</div></div>
+  </div>
+  <div class="card card-pad mb16">
+    <div class="card-title">👥 B2B客户决策人角色图谱</div>
+    <div class="text-sm text-muted mb12">不同角色有不同的关注点和沟通策略，找到对的人比发100封邮件更有效</div>
+    <div class="grid-4" style="gap:12px">
+      ${roles.map(r=>`<div class="card card-pad" style="border-top:3px solid ${r.color}">
+        <div style="font-size:24px">${r.icon}</div>
+        <div class="fw700 mt4 text-sm">${r.title}</div>
+        <div class="text-xs text-muted mt4" style="line-height:1.6">${r.desc}</div>
+        <div class="text-xs mt8" style="color:${r.color}">优先级：${r.priority}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+  <div class="card card-pad mb16">
+    <div class="card-title">🎯 领英精准定位决策人「3步组合拳」</div>
+    <div class="text-sm text-muted mb12">学习自外贸实战经验，找到决策人后回复率比通用邮箱高几倍</div>
+    <div class="grid-3" style="gap:12px">
+      <div class="card card-pad" style="background:#f0fff4;border-left:4px solid #38a169">
+        <div class="fw700 mb8" style="color:#276749">第1步：快捷搜索</div>
+        <div class="text-sm" style="line-height:1.8">
+          在领英搜索栏输入：<br>
+          <code style="background:#fff;padding:2px 6px;border-radius:3px;font-size:12px">公司全称 + Purchasing/Buyer</code><br>
+          试探性粗筛决策人。<br>
+          <span class="text-muted">搜不到别慌，正常现象！</span>
+        </div>
+      </div>
+      <div class="card card-pad" style="background:#f0f4ff;border-left:4px solid #3182ce">
+        <div class="fw700 mb8" style="color:#2c5282">第2步：公司主页会员排查</div>
+        <div class="text-sm" style="line-height:1.8">
+          搜公司全称 → 进入官方主页 → 点击【会员（People）】<br>
+          这里是公司的全员地图。<br>
+          人员较多时：用小搜索框搜 <code style="background:#fff;padding:2px 6px;border-radius:3px;font-size:12px">Purchasing/Sourcing/CEO/Owner</code>
+        </div>
+      </div>
+      <div class="card card-pad" style="background:#fffaf0;border-left:4px solid #d69e2e">
+        <div class="fw700 mb8" style="color:#975a16">第3步：谷歌辅助查找</div>
+        <div class="text-sm" style="line-height:1.8">
+          打开谷歌输入：<br>
+          <code style="background:#fff;padding:2px 6px;border-radius:3px;font-size:12px">Linkedin "公司名称" "职位"</code><br>
+          借助谷歌索引直接破除领英3度人脉限制，秒抓真实姓名和个人主页！<br>
+          <span class="text-muted">带针对性附言申请Connect，回复率直接翻倍！</span>
+        </div>
+      </div>
+    </div>
+    <div class="mt12" style="background:#fff5f5;padding:12px;border-radius:6px">
+      <div class="text-sm fw700 mb4" style="color:var(--red)">⚠️ 决策人沟通禁忌</div>
+      <div class="text-xs" style="line-height:1.8">
+        ① 不要一上来就推销产品，先建立信任 ② 不要群发模板邮件，必须个性化 ③ 不要只联系一个人，多角色并行触达 ④ 不要忽略行政助理（Gatekeeper），她们能决定你能不能见到老板
+      </div>
+    </div>
+  </div>
+  <div class="card card-pad mb16">
+    <div class="card-title">🌐 3大外贸获客神器网站导航</div>
+    <div class="text-sm text-muted mb12">外贸公司最怕业务员知道的3个网站，搞透了根本不愁大客户询盘</div>
+    <div class="grid-3" style="gap:12px">
+      <div class="card card-pad" style="border-top:3px solid #e53e3e">
+        <div class="fw700 mb4">💣 ImportGenius</div>
+        <div class="text-xs text-muted mb8">圈内人称"海关核武器"</div>
+        <div class="text-sm" style="line-height:1.8">
+          各行各业的真实采购记录都能查：<br>
+          • 谁买的、买的什么、在哪买的<br>
+          • 采购价是多少、供应商是谁<br>
+          • 甚至能挖到同行的客户<br>
+          <span class="text-muted">等于直接给你指明一条精准获客的道路</span>
+        </div>
+        <button class="btn btn-outline btn-sm mt12" onclick="toast('ImportGenius: https://www.importgenius.com（需付费订阅）')">🔗 访问网站</button>
+      </div>
+      <div class="card card-pad" style="border-top:3px solid #3182ce">
+        <div class="fw700 mb4">🚢 Panjiva</div>
+        <div class="text-xs text-muted mb8">供应商的开挂神器</div>
+        <div class="text-sm" style="line-height:1.8">
+          全球买家的物流记录精准跟踪：<br>
+          • 直接挖掘决策人的邮箱<br>
+          • 比领英搜索快十几倍<br>
+          • 以前找一个客户邮箱要一天半<br>
+          • 现在三十秒就能搞定<br>
+          <span class="text-muted">效率直接拉满！</span>
+        </div>
+        <button class="btn btn-outline btn-sm mt12" onclick="toast('Panjiva: https://www.panjiva.com（需付费订阅）')">🔗 访问网站</button>
+      </div>
+      <div class="card card-pad" style="border-top:3px solid #805ad5">
+        <div class="fw700 mb4">🚀 RocketReach</div>
+        <div class="text-xs text-muted mb8">人称"老板直通车"</div>
+        <div class="text-sm" style="line-height:1.8">
+          直接绕过采购商和经理：<br>
+          • 30秒找到对方公司CEO的联系电话<br>
+          • 私人邮箱、工作邮箱、WhatsApp手机号<br>
+          • 跟老板谈生意比跟采购员容易十倍<br>
+          • 很多大订单都是直接跟老板谈成的<br>
+          <span class="text-muted">最狠的获客武器！</span>
+        </div>
+        <button class="btn btn-outline btn-sm mt12" onclick="toast('RocketReach: https://rocketreach.co（有免费额度）')">🔗 访问网站</button>
+      </div>
+    </div>
+  </div>
+  <div class="card card-pad">
+    <div class="card-title">📊 客户质量10维度评分系统（V26增强）</div>
+    <div class="text-sm text-muted mb12">在原有6维度基础上，新增4个锋目AI核心筛选维度，从大量数据里找到真正可能成交的客户</div>
+    <div class="grid-2" style="gap:12px">
+      <div class="card card-pad" style="background:#f7fafc">
+        <div class="fw700 mb8 text-sm">原有6维度（V16）</div>
+        <div class="text-xs" style="line-height:2">
+          ① 公司规模与实力（15分）<br>
+          ② 产品匹配度（20分）<br>
+          ③ 市场区域价值（10分）<br>
+          ④ 采购频率与量级（15分）<br>
+          ⑤ 竞争激烈程度（10分）<br>
+          ⑥ 合作潜力与忠诚度（10分）
+        </div>
+      </div>
+      <div class="card card-pad" style="background:#fffaf0">
+        <div class="fw700 mb8 text-sm" style="color:#975a16">新增4维度（V26 锋目AI）</div>
+        <div class="text-xs" style="line-height:2">
+          ⑦ <b>产品关系匹配</b>（5分）：对方业务和你的产品确实存在应用采购或渠道关系<br>
+          ⑧ <b>公司类型匹配</b>（5分）：进口商/经销商/工程商/品牌方/设备厂/终端企业<br>
+          ⑨ <b>联系人角色匹配</b>（5分）：找到的不是公共邮箱，而是采购/技术/决策岗位<br>
+          ⑩ <b>潜在采购信号</b>（5分）：正在增加产品线/进入新市场/近期有采购动态
+        </div>
+      </div>
+    </div>
+    <div class="mt12 text-center">
+      <button class="btn btn-gold" onclick="toast('10维度评分已应用到搜客结果（演示）')">🎯 应用10维度评分到当前搜客结果</button>
+    </div>
+  </div>`;
+}
 
 </body>
 </html>

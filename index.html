@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V26.0</div>
+        <div class="b2">KaiLionCrafts Crafts V27.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -513,6 +513,7 @@ function loadState(){
   S.mailQueue = DB.load('mailQueue') || [];
   S.mailLogs = DB.load('mailLogs') || [];
   S.smtpConfig = DB.load('smtpConfig') || null;
+  S.devPlans = DB.load('devPlans') || [];
   S.apiLogs = DB.load('apiLogs') || [];
   S.prompts = DB.load('prompts') || null;
   S.knowledge = DB.load('knowledge') || [];
@@ -1349,6 +1350,7 @@ const NAV = [
   {key:'dashboard',icon:'📊',label:'数据看板',title:'数据看板',crumb:'每天先联系谁？'},
   {key:'plans',icon:'🎯',label:'开发任务',title:'AI 开发任务',crumb:'搜索 → 核证据 → 写草稿'},
   {key:'autosearch',icon:'🔍',label:'自动搜客',title:'自动搜客中心',crumb:'地图+海关+社媒 · AI决策人挖掘'},
+  {key:'devplans',icon:'📋',label:'开发计划',title:'开发计划中心',crumb:'多计划并行 · AI自动运行'},
   {key:'customers',icon:'👥',label:'客户台账',title:'客户台账',crumb:'39 家线索 · 按优先级分层'},
   {key:'drafts',icon:'✉️',label:'开发信',title:'开发信管理',crumb:'AI 草稿 · 人工发送'},
   {group:'沟通与跟进'},
@@ -1401,7 +1403,7 @@ function go(view, params){
 function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
-  const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, planDetail:viewPlanDetail,
+  const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, devplans:viewDevPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
     seo:viewSEO, reports:viewReports, agents:viewAgents, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, settings:viewSettings};
@@ -3157,7 +3159,7 @@ function viewSettings(root){
         <div class="card card-pad">
           <div class="card-title">关于锴利工作台</div>
           <div class="text-sm" style="line-height:2">
-            <b>版本</b> V26.0 · 锴利外贸获客工作台<br>
+            <b>版本</b> V27.0 · 锴利外贸获客工作台<br>
             <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
             <b>哲学</b> AI 只干脏活累活，发送我自己来，数据全在本地<br>
             <b>Slogan</b> <span class="text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</span>
@@ -6251,7 +6253,7 @@ function generateLeadEmail(idx){
 
 
 /* ============================================================
- * V26.0 开发信审核发送中心 + SMTP配置
+ * V27.0 开发信审核发送中心 + SMTP配置
  * ============================================================ */
 function saveSmtpConfig(){
   const cfg={
@@ -6495,7 +6497,7 @@ function nowStr(){const d=new Date();return todayStr()+' '+String(d.getHours()).
 
 
 /* ============================================================
- * V26.0 全球采购商地图 + 决策人挖掘
+ * V27.0 全球采购商地图 + 决策人挖掘
  * ============================================================ */
 function globalMapView(){
   const regions=[
@@ -6737,6 +6739,204 @@ function decisionMinerView(){
       <button class="btn btn-gold" onclick="toast('10维度评分已应用到搜客结果（演示）')">🎯 应用10维度评分到当前搜客结果</button>
     </div>
   </div>`;
+}
+
+
+/* ============================================================
+ * V27.0 开发计划中心 - 多计划并行 AI自动运行
+ * ============================================================ */
+function viewDevPlans(root){
+  const plans = S.devPlans || [];
+  const running = plans.filter(p=>p.status==='运行中').length;
+  const totalFound = plans.reduce((a,p)=>a+(p.found||0),0);
+  const totalSent = plans.reduce((a,p)=>a+(p.sent||0),0);
+  root.innerHTML = `
+  <div class="grid-4 mb16" style="gap:12px">
+    <div class="card card-pad"><div class="stat-label">📋 总开发计划</div><div class="stat-value">${plans.length}</div></div>
+    <div class="card card-pad"><div class="stat-label">⚡ 运行中</div><div class="stat-value" style="color:var(--primary)">${running}</div></div>
+    <div class="card card-pad"><div class="stat-label">🎯 已发现客户</div><div class="stat-value" style="color:var(--gold)">${totalFound}</div></div>
+    <div class="card card-pad"><div class="stat-label">📤 已发开发信</div><div class="stat-value" style="color:var(--success)">${totalSent}</div></div>
+  </div>
+  <div class="card card-pad mb16">
+    <div class="card-title">➕ 创建开发计划</div>
+    <div class="text-sm text-muted mb12">选择行业、产品关键词、目标国家，AI将自动运行：搜客→筛选→评级→挖邮箱→写开发信→定时跟进</div>
+    <div class="grid-4" style="gap:12px;margin-bottom:12px">
+      <div><label class="text-sm">行业</label><select id="dp_industry" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">
+        <option>厨房用品/厨具</option><option>五金工具</option><option>家居用品</option><option>电子产品</option><option>服装纺织</option><option>机械设备</option><option>食品饮料</option><option>其他</option>
+      </select></div>
+      <div><label class="text-sm">产品关键词</label><input type="text" id="dp_keyword" value="kitchen shears" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+      <div><label class="text-sm">目标国家</label><select id="dp_country" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">
+        <option>美国</option><option>德国</option><option>英国</option><option>法国</option><option>日本</option><option>澳大利亚</option><option>加拿大</option><option>荷兰</option><option>意大利</option><option>西班牙</option><option>巴西</option><option>阿联酋</option><option>沙特</option><option>越南</option><option>泰国</option><option>墨西哥</option><option>韩国</option><option>印度</option><option>南非</option>
+      </select></div>
+      <div><label class="text-sm">目标客户数</label><select id="dp_count" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">
+        <option value="50">50家（快速测试）</option><option value="100" selected>100家（标准）</option><option value="200">200家（深度开发）</option><option value="500">500家（大规模）</option>
+      </select></div>
+    </div>
+    <div class="flex" style="gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <span class="text-sm">跟进节奏：</span>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="dp_rhythm" value="standard" checked> <span class="text-sm">标准（3/7/14/28天）</span></label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="dp_rhythm" value="aggressive"> <span class="text-sm">密集（1/2/5/13天）</span></label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="dp_rhythm" value="gentle"> <span class="text-sm">温和（7/14/30/60天）</span></label>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-gold" onclick="createDevPlan()">🚀 创建并启动计划</button>
+      <button class="btn btn-outline" onclick="loadDemoDevPlans()">📥 加载3条演示计划</button>
+    </div>
+  </div>
+  <div class="card card-pad">
+    <div class="card-title">📋 开发计划列表 <span class="text-sm text-muted">（${plans.length}条计划）</span></div>
+    ${plans.length? `<div class="table-wrap"><table class="tbl">
+      <colgroup><col style="width:22%"><col style="width:10%"><col style="width:8%"><col style="width:20%"><col style="width:12%"><col style="width:10%"><col style="width:18%"></colgroup>
+      <thead><tr><th>计划名称</th><th>国家</th><th>状态</th><th>进度</th><th>客户评级</th><th>已发信</th><th>操作</th></tr></thead>
+      <tbody>${plans.map(p=>{
+        const pct = p.progress||0;
+        const gradeColor = p.sGrade>0?'var(--red)':p.aGrade>0?'var(--gold)':'var(--muted)';
+        return `<tr>
+          <td><b>${esc(p.name)}</b><div class="text-xs text-muted">${esc(p.keyword)} · ${p.count}家目标</div></td>
+          <td>${esc(p.country)}</td>
+          <td><span class="badge ${p.status==='运行中'?'badge-blue':p.status==='已完成'?'badge-a':'badge-gray'}">${p.status}</span></td>
+          <td><div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--primary),var(--gold));border-radius:3px;transition:width .5s"></div></div>
+            <span class="text-xs">${pct}%</span>
+          </div></td>
+          <td><span class="text-xs" style="color:var(--red)">S:${p.sGrade||0}</span> <span class="text-xs" style="color:var(--gold)">A:${p.aGrade||0}</span> <span class="text-xs text-muted">B:${p.bGrade||0}</span></td>
+          <td>${p.sent||0}/${p.found||0}</td>
+          <td>
+            <button class="btn btn-outline btn-sm" onclick="viewDevPlanDetail('${p.id}')">👁️ 详情</button>
+            ${p.status==='运行中'?`<button class="btn btn-outline btn-sm" onclick="pauseDevPlan('${p.id}')">⏸️ 暂停</button>`:''}
+            ${p.status==='已暂停'?`<button class="btn btn-primary btn-sm" onclick="resumeDevPlan('${p.id}')">▶️ 继续</button>`:''}
+            <button class="btn btn-outline btn-sm" onclick="deleteDevPlan('${p.id}')">🗑️</button>
+          </td></tr>`;
+      }).join('')}</tbody>
+    </table></div>` : '<div class="empty"><div class="big">📋</div><p>暂无开发计划</p><p class="text-sm text-muted">创建第一条开发计划，让AI自动帮你找客户、写开发信、定时跟进</p><button class="btn btn-gold btn-sm mt12" onclick="loadDemoDevPlans()">📥 加载3条演示计划</button></div>'}
+  </div>`;
+}
+function createDevPlan(){
+  const industry = document.getElementById('dp_industry').value;
+  const keyword = document.getElementById('dp_keyword').value.trim();
+  const country = document.getElementById('dp_country').value;
+  const count = parseInt(document.getElementById('dp_count').value);
+  const rhythm = document.querySelector('input[name="dp_rhythm"]:checked').value;
+  if(!keyword){toast('请输入产品关键词','error');return;}
+  const plan = {
+    id:'plan_'+Date.now(),
+    name: country+' '+keyword+'开发计划',
+    industry:industry, keyword:keyword, country:country, count:count, rhythm:rhythm,
+    status:'运行中', progress:5, found:0, sent:0, sGrade:0, aGrade:0, bGrade:0,
+    customers:[], logs:[], createdAt:new Date().toLocaleString('zh-CN')
+  };
+  S.devPlans.unshift(plan);
+  DB.save('devPlans',S.devPlans);
+  toast('计划已创建，AI开始自动运行...');
+  renderView();
+  simulateDevPlan(plan.id);
+}
+function simulateDevPlan(planId){
+  const plan = S.devPlans.find(p=>p.id===planId);
+  if(!plan||plan.status!=='运行中') return;
+  const stages = [
+    {pct:15,log:'🔍 正在搜索相关网站...',found:Math.floor(plan.count*0.3)},
+    {pct:35,log:'📊 正在分析公司信息...',found:Math.floor(plan.count*0.5)},
+    {pct:55,log:'⭐ 正在评级筛选客户（S/A/B级）...',found:Math.floor(plan.count*0.7)},
+    {pct:75,log:'📧 正在挖掘决策人邮箱...',found:plan.count},
+    {pct:90,log:'✉️ 正在生成个性化开发信...',found:plan.count},
+    {pct:100,log:'✅ 计划完成！开发信已进入发送队列',found:plan.count}
+  ];
+  let i=0;
+  function nextStage(){
+    if(i>=stages.length){
+      plan.status='已完成';
+      plan.progress=100;
+      plan.sent=Math.floor(plan.count*0.6);
+      plan.sGrade=Math.floor(plan.count*0.05);
+      plan.aGrade=Math.floor(plan.count*0.2);
+      plan.bGrade=Math.floor(plan.count*0.35);
+      plan.logs.push({time:new Date().toLocaleString('zh-CN'),msg:'✅ 计划完成'});
+      DB.save('devPlans',S.devPlans);
+      renderView();
+      return;
+    }
+    const s=stages[i];
+    plan.progress=s.pct;
+    plan.found=s.found;
+    plan.logs.push({time:new Date().toLocaleString('zh-CN'),msg:s.log});
+    if(plan.logs.length>20) plan.logs=plan.logs.slice(-20);
+    DB.save('devPlans',S.devPlans);
+    renderView();
+    i++;
+    setTimeout(nextStage,1500);
+  }
+  nextStage();
+}
+function viewDevPlanDetail(planId){
+  const p = S.devPlans.find(x=>x.id===planId);
+  if(!p) return;
+  const logsHtml = (p.logs||[]).slice().reverse().map(l=>`<div class="text-xs py2" style="border-bottom:1px solid #f0f0f0"><span class="text-muted">${l.time}</span> ${l.msg}</div>`).join('');
+  showModal(`
+    <div class="modal-head"><h3>📋 ${esc(p.name)}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="grid-3 mb16" style="gap:8px">
+        <div class="card card-pad" style="text-align:center"><div class="stat-value" style="font-size:20px">${p.progress}%</div><div class="text-xs text-muted">进度</div></div>
+        <div class="card card-pad" style="text-align:center"><div class="stat-value" style="font-size:20px;color:var(--gold)">${p.found}</div><div class="text-xs text-muted">发现客户</div></div>
+        <div class="card card-pad" style="text-align:center"><div class="stat-value" style="font-size:20px;color:var(--success)">${p.sent}</div><div class="text-xs text-muted">已发开发信</div></div>
+      </div>
+      <div class="mb16">
+        <div class="fw700 text-sm mb8">📊 客户评级分布</div>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1;background:#fff5f5;padding:8px;border-radius:6px;text-align:center"><div style="color:var(--red);font-size:18px;font-weight:bold">${p.sGrade||0}</div><div class="text-xs">S级（高价值）</div></div>
+          <div style="flex:1;background:#fffaf0;padding:8px;border-radius:6px;text-align:center"><div style="color:var(--gold);font-size:18px;font-weight:bold">${p.aGrade||0}</div><div class="text-xs">A级（优质）</div></div>
+          <div style="flex:1;background:#f7fafc;padding:8px;border-radius:6px;text-align:center"><div style="color:var(--muted);font-size:18px;font-weight:bold">${p.bGrade||0}</div><div class="text-xs">B级（普通）</div></div>
+        </div>
+      </div>
+      <div class="mb16">
+        <div class="fw700 text-sm mb8">📝 运行日志</div>
+        <div style="max-height:200px;overflow-y:auto;background:#f7fafc;padding:8px;border-radius:6px">
+          ${logsHtml||'<div class="text-xs text-muted">暂无日志</div>'}
+        </div>
+      </div>
+      <div class="mb16">
+        <div class="fw700 text-sm mb8">⚙️ 计划配置</div>
+        <div class="text-xs" style="line-height:2">
+          <b>行业：</b>${esc(p.industry)} &nbsp; <b>关键词：</b>${esc(p.keyword)} &nbsp; <b>国家：</b>${esc(p.country)}<br>
+          <b>目标数量：</b>${p.count}家 &nbsp; <b>跟进节奏：</b>${p.rhythm==='standard'?'标准（3/7/14/28天）':p.rhythm==='aggressive'?'密集（1/2/5/13天）':'温和（7/14/30/60天）'}<br>
+          <b>创建时间：</b>${p.createdAt} &nbsp; <b>状态：</b>${p.status}
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+      ${p.status==='已完成'?`<button class="btn btn-gold" onclick="closeModal();toast('客户已导入客户台账（演示）')">📥 导入客户到台账</button>`:''}
+    </div>`);
+}
+function pauseDevPlan(planId){
+  const p=S.devPlans.find(x=>x.id===planId);if(!p)return;
+  p.status='已暂停';DB.save('devPlans',S.devPlans);
+  toast('计划已暂停');renderView();
+}
+function resumeDevPlan(planId){
+  const p=S.devPlans.find(x=>x.id===planId);if(!p)return;
+  p.status='运行中';DB.save('devPlans',S.devPlans);
+  toast('计划已继续');renderView();
+  simulateDevPlan(planId);
+}
+function deleteDevPlan(planId){
+  if(!confirm('确定删除这条开发计划？'))return;
+  S.devPlans=S.devPlans.filter(x=>x.id!==planId);
+  DB.save('devPlans',S.devPlans);
+  toast('计划已删除');renderView();
+}
+function loadDemoDevPlans(){
+  const demos=[
+    {name:'美国 kitchen shears 开发计划',industry:'厨房用品/厨具',keyword:'kitchen shears',country:'美国',count:100,rhythm:'standard',status:'已完成',progress:100,found:100,sent:67,sGrade:5,aGrade:22,bGrade:38,createdAt:'2026-09-20 10:30:00',logs:[{time:'2026-09-20 10:30:00',msg:'🚀 计划启动'},{time:'2026-09-20 10:32:00',msg:'🔍 搜索到320个相关网站'},{time:'2026-09-20 10:35:00',msg:'📊 分析完成100家公司'},{time:'2026-09-20 10:38:00',msg:'⭐ 评级完成：S级5家/A级22家/B级38家'},{time:'2026-09-20 10:40:00',msg:'📧 挖掘到87个决策人邮箱'},{time:'2026-09-20 10:42:00',msg:'✉️ 生成67封个性化开发信'},{time:'2026-09-20 10:45:00',msg:'✅ 计划完成'}]},
+    {name:'德国 kitchenware 开发计划',industry:'厨房用品/厨具',keyword:'kitchenware',country:'德国',count:200,rhythm:'gentle',status:'运行中',progress:65,found:130,sent:45,sGrade:8,aGrade:35,bGrade:52,createdAt:'2026-09-23 14:00:00',logs:[{time:'2026-09-23 14:00:00',msg:'🚀 计划启动'},{time:'2026-09-23 14:03:00',msg:'🔍 搜索到580个相关网站'},{time:'2026-09-23 14:07:00',msg:'📊 已分析130家公司'},{time:'2026-09-23 14:10:00',msg:'⭐ 正在评级筛选...'}]},
+    {name:'日本 cutlery 开发计划',industry:'厨房用品/厨具',keyword:'cutlery',country:'日本',count:50,rhythm:'aggressive',status:'已暂停',progress:40,found:20,sent:0,sGrade:2,aGrade:8,bGrade:10,createdAt:'2026-09-24 09:15:00',logs:[{time:'2026-09-24 09:15:00',msg:'🚀 计划启动'},{time:'2026-09-24 09:17:00',msg:'🔍 搜索到150个相关网站'},{time:'2026-09-24 09:20:00',msg:'⏸️ 用户手动暂停'}]}
+  ];
+  demos.forEach((d,i)=>{
+    S.devPlans.unshift({id:'plan_demo_'+Date.now()+'_'+i,...d});
+  });
+  DB.save('devPlans',S.devPlans);
+  toast('已加载3条演示开发计划');
+  renderView();
 }
 
 </body>

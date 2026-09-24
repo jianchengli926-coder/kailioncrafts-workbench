@@ -309,7 +309,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">方舟获客工作台</div>
-        <div class="b2">KaiLionCrafts Ark V7.0</div>
+        <div class="b2">KaiLionCrafts Ark V8.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -408,6 +408,9 @@ function loadState(){
   S.aftersales = DB.load('aftersales') || null;
   S.referrals = DB.load('referrals') || null;
   S.maintenance = DB.load('maintenance') || null;
+  S.tiktok = DB.load('tiktok') || null;
+  S.b2b = DB.load('b2b') || null;
+  S.googleads = DB.load('googleads') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -421,6 +424,7 @@ function persist(){
   DB.save('exhibitions',S.exhibitions); DB.save('negotiations',S.negotiations);
   DB.save('shipments',S.shipments); DB.save('forwarders',S.forwarders); DB.save('aftersales',S.aftersales);
   DB.save('referrals',S.referrals); DB.save('maintenance',S.maintenance);
+  DB.save('tiktok',S.tiktok); DB.save('b2b',S.b2b); DB.save('googleads',S.googleads);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
@@ -887,7 +891,17 @@ function defaultKnowledge(){
     {id:uid(),title:'原产地证类型选择',cat:'物流单证',tags:'CO,Form A',content:'一般CO普惠制Form A（欧盟/日本）；RCEP产地证（东盟/日韩澳）；中韩/中澳自贸协定税率优惠。',createdAt:daysAgo(1)},
     // V7 客户维护
     {id:uid(),title:'节日问候模板',cat:'客户维护',tags:'节日,问候',content:'英文模板：Hi [Name], wishing you a great Christmas / Thanksgiving / New Year! Let me know if you need cutlery supplies this season.',createdAt:daysAgo(1)},
-    {id:uid(),title:'售后处理原则',cat:'客户维护',tags:'售后,原则',content:'态度真诚不推卸+24h内响应+先道歉再查原因+给方案不找借口+闭环确认满意度。',createdAt:daysAgo(1)}
+    {id:uid(),title:'售后处理原则',cat:'客户维护',tags:'售后,原则',content:'态度真诚不推卸+24h内响应+先道歉再查原因+给方案不找借口+闭环确认满意度。',createdAt:daysAgo(1)},
+    // V8 TikTok营销
+    {id:uid(),title:'TikTok养号指南',cat:'TikTok营销',tags:'养号,0-30天',content:'前3天只刷不发，每天3-30分钟刷产品相关视频；第4-7天开始发每天1条；前30条不投流。',createdAt:daysAgo(1)},
+    {id:uid(),title:'不出镜视频脚本模板',cat:'TikTok营销',tags:'脚本,不出镜',content:'开头3秒钩子(POV/疑问/反常识)→中间产品特写+文字→结尾引导(评论区打关键词/私信要目录)。3个创意：袋子视角/涂鸦变成品/鼠标滑动展示。',createdAt:daysAgo(1)},
+    {id:uid(),title:'TikTok投放技巧',cat:'TikTok营销',tags:'投放,表单',content:'日预算$20-40起步；表单设置4-5个筛选问题(公司名/职位/采购量/目标价/国家)；高曝光低点击换主图，高点击低转化优化落地页。',createdAt:daysAgo(1)},
+    // V8 B2B平台运营
+    {id:uid(),title:'直通车P4P优化',cat:'B2B平台运营',tags:'P4P,出价',content:'排名=出价×推广评分；3星以上才有资格进前5；高曝光低点击改主图定价，点击正常不下单优化详情页；定期清理否定词。',createdAt:daysAgo(1)},
+    {id:uid(),title:'产品星级提升',cat:'B2B平台运营',tags:'星级,产品',content:'5星产品=标题完整+主图≥3张+详情≥5屏+参数完整+信保交易+好评；低效款先改标题关键词再决定是否下架。',createdAt:daysAgo(1)},
+    // V8 Google Ads
+    {id:uid(),title:'关键词匹配策略',cat:'Google Ads',tags:'匹配,关键词',content:'新手先用词组匹配("keyword")和完全匹配([keyword])；广泛匹配容易浪费预算；定期加否定词(free/cheap/used/jobs/reviews)。',createdAt:daysAgo(1)},
+    {id:uid(),title:'质量得分优化',cat:'Google Ads',tags:'质量得分,RSA',content:'质量得分<5→提高关键词与广告组相关性+优化落地页；RSA写15个标题+4个描述，让Google自动组合测试。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1308,9 +1322,35 @@ function viewDashboard(root){
       <div class="stat-card"><div class="stat-label">📝 已发文章</div><div class="stat-value">18</div><div class="stat-trend up">本月 +2</div></div>
     </div>
     <div class="card card-pad mb16">
-      <div class="card-title">💰 各渠道获客成本</div>
-      ${[['AI搜索',3],['LinkedIn',5],['海关数据',8],['谷歌广告',12],['展会',25]].map(([k,c])=>
-        '<div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span>'+k+'</span><b>$'+c+'/客户</b></div><div style="background:#f1f5f9;height:12px"><div style="width:'+(100-c*3)+'%;background:'+(c<=5?'var(--green)':c<=10?'#ed8936':'var(--red)')+';height:100%"></div></div></div>').join('')}
+      <div class="card-title">💰 获客渠道 ROI 对比（按 ROI 降序）</div>
+      <table class="tbl"><thead><tr><th>渠道</th><th>投入</th><th>获客</th><th>询盘</th><th>成交</th><th>成交额</th><th>ROI</th><th>单客成本</th></tr></thead>
+      <tbody>
+        ${[
+          ['SEO',0,8,5,2,'$12K',600,0],
+          ['转介绍',50,3,3,2,'$18K',3500,17],
+          ['TikTok',360,6,4,1,'$5K',39,60],
+          ['AI搜索',0,24,10,2,'$20K',null,0],
+          ['海关数据',800,15,6,1,'$8K',9,53],
+          ['LinkedIn',200,8,3,0,'$0',null,25],
+          ['Google Ads',275,7,3,1,'$6K',21,39],
+          ['B2B平台',500,28,10,1,'$7K',13,18],
+          ['展会',3000,12,5,1,'$15K',5,250],
+        ].sort((a,b)=>(b[6]||0)-(a[6]||0)).map(([ch,cost,leads,inq,deals,amt,roi,cpl])=>`
+          <tr>
+            <td><b>${ch}</b></td>
+            <td>$${cost}</td>
+            <td>${leads}</td><td>${inq}</td><td>${deals}</td><td>${amt}</td>
+            <td style="color:${roi==null?'var(--muted)':roi>=100?'var(--green)':roi>=20?'#ed8936':'var(--red)'}"><b>${roi==null?'--':roi+'%'}</b></td>
+            <td>${cost===0?'<span class="text-muted">免费</span>':'$'+cpl}</td>
+          </tr>`).join('')}
+      </tbody></table>
+      <div class="text-sm text-muted mt8">💡 建议：加大 SEO、TikTok、转介绍投入；Google Ads 优化质量得分后可继续；展会ROI低但品牌背书价值高，保留。</div>
+    </div>
+    <div class="grid-4 mb16">
+      <div class="stat-card"><div class="stat-label">🎵 TikTok 询盘</div><div class="stat-value">12</div><div class="stat-trend up">本月 +5</div></div>
+      <div class="stat-card"><div class="stat-label">🏪 B2B 询盘</div><div class="stat-value">28</div><div class="stat-trend up">阿里 18</div></div>
+      <div class="stat-card"><div class="stat-label">🔍 Google Ads</div><div class="stat-value">$275</div><div class="stat-trend down">CPA $39</div></div>
+      <div class="stat-card"><div class="stat-label">💰 全渠道 ROI</div><div class="stat-value" style="color:var(--green)">4.2x</div><div class="stat-trend up">+0.8</div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -2690,7 +2730,7 @@ async function aiAsk(){
  * ============================================================ */
 let knowCat='全部', knowQ='';
 function viewKnowledge(root){
-  const cats=['全部','产品知识库','SOP知识库','客户案例库','行业资讯'];
+  const cats=['全部',...new Set((S.knowledge||[]).map(k=>k.cat))];
   let list = S.knowledge||[];
   if(knowCat!=='全部') list=list.filter(k=>k.cat===knowCat);
   if(knowQ){ const q=knowQ.toLowerCase(); list=list.filter(k=>(k.title+k.content+k.tags).toLowerCase().includes(q)); }
@@ -3345,6 +3385,192 @@ function retAs(){
       <tr><td>BritChef</td><td class="text-sm">物流外箱压损</td><td><span class="badge badge-gold">中</span></td><td><span class="badge badge-a">已解决</span></td><td>⭐⭐⭐⭐⭐</td></tr>
       <tr><td>ABC Home</td><td class="text-sm">1把剪刀关节松</td><td><span class="badge badge-blue">低</span></td><td><span class="badge badge-blue">处理中</span></td><td>-</td></tr>
     </tbody></table></div>`;
+}
+
+/* V8 TikTok营销 */
+let ttTab='acc';
+function viewTikTok(root){
+  root.innerHTML=`
+  <div class="page-head"><h2>🎵 TikTok营销</h2><p class="sub">养号→短视频→投放→私信转化，不用真人出镜</p>
+    <button class="btn btn-primary" onclick="toast('发布视频（演示）')">＋ 发布视频</button></div>
+  <div class="btn-row mb16">
+    ${[['acc','👤 账号'],['vid','🎬 短视频'],['ads','📊 投放'],['script','💬 话术']].map(([k,l])=>
+      `<button class="btn ${ttTab===k?'btn-gold':'btn-outline'}" onclick="ttTab='${k}';renderView()">${l}</button>`).join('')}
+  </div>
+  ${ttTab==='acc'?ttAcc():ttTab==='vid'?ttVid():ttTab==='ads'?ttAds():ttScript()}`;
+}
+function ttAcc(){
+  return `<div class="grid-2">
+    <div class="card card-pad"><b>主号 @kailion.crafts</b>
+      <div class="text-sm text-muted mt8">简介：Yangjiang OEM cutlery factory · 10 years · DM for catalog</div>
+      <div class="mt8"><span class="badge badge-a">稳定期</span> <span class="badge badge-blue">粉丝 12.5K</span></div></div>
+    <div class="card card-pad"><b>矩阵号 @knife.factory.life</b>
+      <div class="text-sm text-muted mt8">工厂实拍视角，养号中</div>
+      <div class="mt8"><span class="badge badge-gold">测试期</span> <span class="badge badge-blue">粉丝 820</span></div></div>
+  </div>
+  <div class="card card-pad mt16"><div class="card-title">🌱 养号计划</div>
+    <div class="text-sm" style="line-height:2">前3天只刷不发，每天3-30分钟刷产品相关视频；第4-7天开始发，每天1条；前30条不投流。</div></div>`;
+}
+function ttVid(){
+  const vids=[
+    {t:'POV: unboxing our kitchen shears',v:45000,l:3200,c:89,s:120,inq:8,hot:1},
+    {t:'From steel rod to finished knife',v:28000,l:1800,c:45,s:80,inq:5,hot:1},
+    {t:'Trying the world\'s sharpest peeler',v:8200,l:450,c:12,s:5,inq:1,hot:0},
+    {t:'Factory tour: how knives are made',v:15000,l:900,c:30,s:45,inq:3,hot:0}
+  ];
+  return `<div class="card card-pad">
+    <div class="card-title">📹 已发布视频（${vids.length}）</div>
+    <table class="tbl"><thead><tr><th>标题</th><th>播放</th><th>点赞</th><th>评论</th><th>分享</th><th>询盘</th></tr></thead>
+    <tbody>${vids.map(v=>`<tr>
+      <td>${v.hot?'🔥 ':''}${v.t}</td>
+      <td><b>${v.v.toLocaleString()}</b></td><td>${v.l}</td><td>${v.c}</td><td>${v.s}</td>
+      <td><b style="color:${v.inq>=5?'var(--green)':'inherit'}">${v.inq}</b></td></tr>`).join('')}</tbody></table>
+    <div class="divider"></div>
+    <b class="text-sm">3个不出镜创意模板</b>
+    <div class="text-sm mt8" style="line-height:2">① 袋子视角（POV开箱） ② 涂鸦变成品（手绘→实物） ③ 鼠标滑动展示（产品特写+文字）</div>
+  </div>`;
+}
+function ttAds(){
+  return `<div class="card card-pad"><div class="card-title">📊 投放数据</div>
+    <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat-card"><div class="stat-label">日预算</div><div class="stat-value">$30</div></div>
+      <div class="stat-card"><div class="stat-label">表单提交</div><div class="stat-value">28</div></div>
+      <div class="stat-card"><div class="stat-label">询盘成本</div><div class="stat-value" style="color:var(--green)">$4.2</div></div>
+      <div class="stat-card"><div class="stat-label">ROI</div><div class="stat-value" style="color:var(--green)">3.2x</div></div>
+    </div>
+    <div class="divider"></div>
+    <b class="text-sm">📝 筛选问题（4-5题）</b>
+    <div class="text-sm mt8">1. Company name 2. Your role 3. Monthly volume 4. Target price 5. Country</div>
+  </div>`;
+}
+function ttScript(){
+  return `<div class="card card-pad"><div class="card-title">💬 话术库</div>
+    <div class="text-sm" style="line-height:2.2">
+      <b>主页简介（工厂直供型）：</b>Yangjiang OEM cutlery factory · 10 years · MOQ 500 · DM for free catalog<br>
+      <b>评论区引导：</b>Comment "CATALOG" for our 2026 price list!<br>
+      <b>私信初次：</b>Hi! Thanks for your interest. Could you share your email and what products you need? I'll send our catalog.<br>
+      <b>视频文案钩子：</b>POV: you just found a cutlery factory that makes knives for 5-star hotels...
+    </div></div>`;
+}
+
+/* V8 B2B平台 */
+let b2bTab='plat';
+function viewB2B(root){
+  root.innerHTML=`
+  <div class="page-head"><h2>🏪 B2B平台</h2><p class="sub">阿里国际站·Made-in-China·环球资源</p></div>
+  <div class="btn-row mb16">
+    ${[['plat','🏬 平台账号'],['prod','📦 产品'],['p4p','🎯 P4P直通车'],['inquiry','📨 平台询盘']].map(([k,l])=>
+      `<button class="btn ${b2bTab===k?'btn-gold':'btn-outline'}" onclick="b2bTab='${k}';renderView()">${l}</button>`).join('')}
+  </div>
+  ${b2bTab==='plat'?b2bPlat():b2bTab==='prod'?b2bProd():b2bTab==='p4p'?b2bP4P():b2bInq()}`;
+}
+function b2bPlat(){
+  return `<div class="grid-3">
+    ${[['阿里国际站','5年','4.5星','信保 $50K',12500,320,18],['Made-in-China','3年','钻石会员','$20K',6800,150,7],['环球资源','2年','银牌','-',3200,68,3]].map(([n,y,lv,cr,exp,vis,inq])=>
+      `<div class="card card-pad"><b>${n}</b>
+        <div class="text-sm mt8">${y} · ${lv}</div>
+        <div class="text-sm text-muted">信保额度 ${cr}</div>
+        <div class="divider"></div>
+        <div class="text-sm">曝光 <b>${exp.toLocaleString()}</b> · 访客 <b>${vis}</b> · 询盘 <b style="color:var(--green)">${inq}</b></div></div>`).join('')}
+  </div>`;
+}
+function b2bProd(){
+  return `<div class="card card-pad"><div class="card-title">产品分层（爆款/潜力/普通/低效）</div>
+    <table class="tbl"><thead><tr><th>产品</th><th>价格</th><th>MOQ</th><th>推广评分</th><th>分层</th></tr></thead>
+    <tbody>
+      <tr><td>厨房剪刀 8.5寸</td><td>$1.85</td><td>1000</td><td>⭐⭐⭐⭐⭐</td><td><span class="badge badge-a">爆款</span></td></tr>
+      <tr><td>主厨刀 8寸</td><td>$6.80</td><td>500</td><td>⭐⭐⭐⭐</td><td><span class="badge badge-gold">潜力款</span></td></tr>
+      <tr><td>削皮器</td><td>$0.45</td><td>5000</td><td>⭐⭐⭐</td><td><span class="badge badge-blue">普通款</span></td></tr>
+      <tr><td>户外折叠刀</td><td>$3.20</td><td>1000</td><td>⭐⭐</td><td><span class="badge badge-red">低效款</span></td></tr>
+    </tbody></table></div>`;
+}
+function b2bP4P(){
+  return `<div class="card card-pad"><div class="card-title">🎯 P4P关键词（排名=出价×推广评分）</div>
+    <table class="tbl"><thead><tr><th>关键词</th><th>出价</th><th>排名</th><th>星级</th><th>消耗</th><th>询盘</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">kitchen scissors manufacturer</td><td>$1.20</td><td>#3</td><td>⭐⭐⭐⭐⭐</td><td>$45</td><td>3</td></tr>
+      <tr><td class="mono">chef knife OEM</td><td>$0.95</td><td>#7</td><td>⭐⭐⭐⭐</td><td>$28</td><td>1</td></tr>
+      <tr><td class="mono">outdoor knife wholesale</td><td>$0.80</td><td>#12</td><td>⭐⭐⭐</td><td>$12</td><td>0</td></tr>
+    </tbody></table>
+    <div class="divider"></div>
+    <b class="text-sm">🚫 否定词库</b>
+    <div class="text-sm mt8">二手 · 清仓 · 样品 · 免费 · 代理 · 加盟 · 求职 · 国内采购 · 比价</div></div>`;
+}
+function b2bInq(){
+  return `<div class="card card-pad"><div class="card-title">平台询盘（L3+为优质）</div>
+    <table class="tbl"><thead><tr><th>来源</th><th>客户</th><th>产品</th><th>质量</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>阿里国际站</td><td>ABC Home</td><td>厨房剪刀</td><td><span class="badge badge-a">L3</span></td><td>已报价</td></tr>
+      <tr><td>MIC</td><td>XYZ Ltd</td><td>主厨刀</td><td><span class="badge badge-gold">L2</span></td><td>跟进中</td></tr>
+    </tbody></table></div>`;
+}
+
+/* V8 Google Ads */
+let gaTab='camp';
+function viewGoogleAds(root){
+  root.innerHTML=`
+  <div class="page-head"><h2>🔍 Google Ads</h2><p class="sub">搜索广告获客 · 质量得分×出价=排名</p></div>
+  <div class="btn-row mb16">
+    ${[['camp','📊 广告系列'],['kw','🔑 关键词'],['ad','✍️ 广告文案'],['data','📈 数据分析']].map(([k,l])=>
+      `<button class="btn ${gaTab===k?'btn-gold':'btn-outline'}" onclick="gaTab='${k}';renderView()">${l}</button>`).join('')}
+  </div>
+  ${gaTab==='camp'?gaCamp():gaTab==='kw'?gaKw():gaTab==='ad'?gaAd():gaData()}`;
+}
+function gaCamp(){
+  return `<div class="grid-2">
+    <div class="card card-pad"><b>搜索广告：厨房剪刀厂家</b>
+      <div class="text-sm mt8">目标：潜在客户 · 日预算 $25 · 美国/德国/英国</div>
+      <div class="mt8"><span class="badge badge-a">启用中</span></div>
+      <div class="divider"></div>
+      <div class="text-sm">消耗 $180 · 点击 120 · CTR 4.2% · 转化 5 · CPA $36</div></div>
+    <div class="card card-pad"><b>购物广告：主厨刀</b>
+      <div class="text-sm mt8">目标：销售 · 日预算 $15 · 英语国家</div>
+      <div class="mt8"><span class="badge badge-a">启用中</span></div>
+      <div class="divider"></div>
+      <div class="text-sm">消耗 $95 · 点击 80 · CTR 2.8% · 转化 2 · CPA $47</div></div>
+  </div>`;
+}
+function gaKw(){
+  const kws=[
+    ['kitchen scissors manufacturer','完全','$1.50',8,420,18,'4.3%','$1.20',3],
+    ['chef knife OEM supplier','词组','$1.20',6,280,10,'3.6%','$1.10',1],
+    ['outdoor knife wholesale','广泛','$0.80',4,150,5,'2.1%','$0.90',0]
+  ];
+  return `<div class="card card-pad"><div class="card-title">关键词表格（新手先用词组+完全匹配）</div>
+    <table class="tbl"><thead><tr><th>关键词</th><th>匹配</th><th>出价</th><th>质量分</th><th>曝光</th><th>点击</th><th>CTR</th><th>CPC</th><th>转化</th></tr></thead>
+    <tbody>${kws.map(r=>`<tr><td class="mono">${r[0]}</td><td>${r[1]}</td><td>$${r[2]}</td>
+      <td style="color:${r[3]>=7?'var(--green)':'#ed8936'}"><b>${r[3]}</b>/10</td>
+      <td>${r[4]}</td><td>${r[5]}</td><td>${r[6]}</td><td>$${r[7]}</td><td>${r[8]}</td></tr>`).join('')}</tbody></table>
+    <div class="divider"></div>
+    <b class="text-sm">🚫 否定词</b>
+    <div class="text-sm mt8">free · cheap · used · jobs · careers · diy · reviews · reddit</div></div>`;
+}
+function gaAd(){
+  return `<div class="card card-pad"><div class="card-title">✍️ 响应式搜索广告（RSA）</div>
+    <div class="text-sm" style="line-height:2">
+      <b>标题1：</b>Kitchen Scissors Manufacturer<br>
+      <b>标题2：</b>BSCI Certified Factory · Yangjiang<br>
+      <b>标题3：</b>MOQ 500 · Free Sample Available<br>
+      <b>描述1：</b>10 years OEM experience. 0.3% defect rate. 20-day lead time.<br>
+      <b>描述2：</b>Request our 2026 catalog today for wholesale pricing.
+    </div></div>`;
+}
+function gaData(){
+  return `<div class="card card-pad"><div class="card-title">📈 核心指标（本月）</div>
+    <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat-card"><div class="stat-label">消耗</div><div class="stat-value">$275</div></div>
+      <div class="stat-card"><div class="stat-label">点击</div><div class="stat-value">200</div></div>
+      <div class="stat-card"><div class="stat-label">转化</div><div class="stat-value">7</div></div>
+      <div class="stat-card"><div class="stat-label">CPA</div><div class="stat-value" style="color:var(--green)">$39</div></div>
+    </div>
+    <div class="divider"></div>
+    <b class="text-sm">💡 优化建议</b>
+    <div class="text-sm mt8" style="line-height:2">
+      • 高曝光低点击 → 优化文案和出价<br>
+      • 高点击低转化 → 优化落地页<br>
+      • 高CPC低转化 → 降价或暂停<br>
+      • 质量分<5 → 提高关键词与广告组相关性
+    </div></div>`;
 }
 
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }

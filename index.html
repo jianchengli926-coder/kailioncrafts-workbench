@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V15.0</div>
+        <div class="b2">KaiLionCrafts Crafts V16.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -1102,7 +1102,13 @@ function defaultKnowledge(){
     // V15 强相关产品匹配
     {id:uid(),title:'强相关产品比对',cat:'强相关产品匹配',tags:'匹配,产品',content:'拿我方主推产品跟客户官网比对：品类/材质/规格/用途/价格带。🔥强相关(有对应产品)/⚡弱相关(可替代)/❌不相关。开发信必须引用强相关信息。',createdAt:daysAgo(1)},
     // V15 各国买家性格
-    {id:uid(),title:'10国买家性格表',cat:'各国买家性格',tags:'买家,性格',content:'🇩🇪德国严谨重数据报实价；🇯🇵日本重细节样品完美；🇺🇸美国直接重时效；🇬🇧英国传统重礼仪；🇫🇷法国重设计；🇮🇳印度顶级砍价高开低走；东南亚重关系；🇧🇷巴西热情注意付款风险；🇦🇺澳洲直接务实；🇷🇺俄罗斯谨慎重认证。',createdAt:daysAgo(1)}
+    {id:uid(),title:'10国买家性格表',cat:'各国买家性格',tags:'买家,性格',content:'🇩🇪德国严谨重数据报实价；🇯🇵日本重细节样品完美；🇺🇸美国直接重时效；🇬🇧英国传统重礼仪；🇫🇷法国重设计；🇮🇳印度顶级砍价高开低走；东南亚重关系；🇧🇷巴西热情注意付款风险；🇦🇺澳洲直接务实；🇷🇺俄罗斯谨慎重认证。',createdAt:daysAgo(1)},
+    // V16 AI精准获客评分
+    {id:uid(),title:'6维评分公式',cat:'AI精准获客评分',tags:'评分,权重',content:'行业25%+产品25%+公司类型15%+联系人10%+采购信号15%+国家10%。≥85 S级/70-84 A/50-69 B/<50 C。切入点：产品/价格/认证/新品。',createdAt:daysAgo(1)},
+    // V16 客户分层管理
+    {id:uid(),title:'ABCD五级分层',cat:'客户分层管理',tags:'分级,跟进',content:'🏆S级每日/A级2天/B级3天/C级7天/D级14天。S/A超60天无互动=流失预警；B级问报价要样品→建议升A。',createdAt:daysAgo(1)},
+    // V16 询盘质量评估
+    {id:uid(),title:'询盘4看1分级',cat:'询盘质量评估',tags:'询盘,分级',content:'看需求具体/看愿补充/看身份可验证/看除价格外关注点。A级24h方案→B级48h培养→C级模板回复入公海。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1627,6 +1633,12 @@ function viewDashboard(root){
       <div class="card card-pad"><div class="stat-label">🔥 强相关客户</div><div class="stat-value">15</div><div class="text-sm text-muted">本周新匹配</div></div>
       <div class="card card-pad"><div class="stat-label">✂️ 短开发信</div><div class="stat-value">12<span style="font-size:14px;color:var(--muted)">/30</span></div><div class="text-sm text-muted">回复3 · 25%</div></div>
       <div class="card card-pad" style="border-top:3px solid var(--red)"><div class="stat-label">💬 待人工介入</div><div class="stat-value" style="color:var(--red)">3</div><div class="text-sm text-muted">高意向回复</div></div>
+    </div>
+    <div class="grid-4 mb16">
+      <div class="card card-pad"><div class="stat-label">🎯 客户等级分布</div><div class="stat-value">S2·A5·B12</div><div class="text-sm text-muted">C15·D5</div></div>
+      <div class="card card-pad"><div class="stat-label">🔔 升降级预警</div><div class="stat-value" style="color:var(--gold)">3</div><div class="text-sm text-muted">升级1·降级1·流失1</div></div>
+      <div class="card card-pad"><div class="stat-label">💬 询盘质量</div><div class="stat-value">A2·B3·C1</div><div class="text-sm text-muted">A级待处理2</div></div>
+      <div class="card card-pad"><div class="stat-label">📈 开发计划</div><div class="stat-value">1🔄·1✅</div><div class="text-sm text-muted">执行中/已完成</div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -3660,6 +3672,19 @@ function viewAgents(root){
       <tr><td>🛠️ 运维Agent</td><td>每日</td><td>2026-09-24</td><td>2026-09-25</td><td><span class="badge badge-gray">⏸ 暂停</span></td></tr>
     </tbody></table></div>`;
 }
+function showScoreCard(){
+  const root=document.getElementById('flowLog'); if(!root) return;
+  // 真实6维评分计算
+  const dims=[['行业匹配',90,0.25],['产品匹配',85,0.25],['公司类型',80,0.15],['联系人角色',70,0.10],['采购信号',75,0.15],['国家优先级',85,0.10]];
+  const total=dims.reduce((a,[,sc,w])=>a+sc*w,0);
+  const grade=total>=85?'🔥 S级':total>=70?'🟢 A级':total>=50?'🟡 B级':'🔴 C级';
+  root.innerHTML+=`<div style="background:#f7efdd;padding:12px;border-radius:6px;margin-top:12px">
+    <b>📊 客户6维评分（Messerei Schmidt GmbH）：</b>
+    ${dims.map(([n,sc,w])=>`<div style="font-size:12px;margin-top:4px">${n} <b>${sc}</b> <span class="text-muted">×${w}</span> = ${(sc*w).toFixed(1)}</div>`).join('')}
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e0d5b8">综合得分：<b style="font-size:16px;color:var(--gold)">${total.toFixed(1)}</b> → ${grade}</div>
+    <div class="text-sm mt8">🎯 切入点：客户在售专业厨房剪，我方有可拆卸升级款；CE认证已具备</div>
+  </div>`;
+}
 function runAgents(){
   if(agentRunning) return; agentRunning=true;
   const log=document.getElementById('agentLogCard'); const out=document.getElementById('agentLog');
@@ -4600,6 +4625,7 @@ function runAIFlow(){
       if(bar) bar.style.width=(flowStep/7*100)+'%';
       if(flowStep>=7){
         if(log) log.innerHTML+=`<div style="color:var(--gold);font-weight:bold;margin-top:8px">🎉 全流程完成！15家客户入库，15封开发信待审批</div>`;
+        showScoreCard();
       } else next();
     },1000);
   }

@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">方舟获客工作台</div>
-        <div class="b2">KaiLionCrafts Ark V8.0</div>
+        <div class="b2">KaiLionCrafts Ark V9.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -529,6 +529,9 @@ function loadState(){
   S.tiktok = DB.load('tiktok') || null;
   S.b2b = DB.load('b2b') || null;
   S.googleads = DB.load('googleads') || null;
+  S.payments = DB.load('payments') || null;
+  S.certifications = DB.load('certifications') || null;
+  S.whatsapp = DB.load('whatsapp') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -543,6 +546,7 @@ function persist(){
   DB.save('shipments',S.shipments); DB.save('forwarders',S.forwarders); DB.save('aftersales',S.aftersales);
   DB.save('referrals',S.referrals); DB.save('maintenance',S.maintenance);
   DB.save('tiktok',S.tiktok); DB.save('b2b',S.b2b); DB.save('googleads',S.googleads);
+  DB.save('payments',S.payments); DB.save('certifications',S.certifications); DB.save('whatsapp',S.whatsapp);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
@@ -1019,7 +1023,20 @@ function defaultKnowledge(){
     {id:uid(),title:'产品星级提升',cat:'B2B平台运营',tags:'星级,产品',content:'5星产品=标题完整+主图≥3张+详情≥5屏+参数完整+信保交易+好评；低效款先改标题关键词再决定是否下架。',createdAt:daysAgo(1)},
     // V8 Google Ads
     {id:uid(),title:'关键词匹配策略',cat:'Google Ads',tags:'匹配,关键词',content:'新手先用词组匹配("keyword")和完全匹配([keyword])；广泛匹配容易浪费预算；定期加否定词(free/cheap/used/jobs/reviews)。',createdAt:daysAgo(1)},
-    {id:uid(),title:'质量得分优化',cat:'Google Ads',tags:'质量得分,RSA',content:'质量得分<5→提高关键词与广告组相关性+优化落地页；RSA写15个标题+4个描述，让Google自动组合测试。',createdAt:daysAgo(1)}
+    {id:uid(),title:'质量得分优化',cat:'Google Ads',tags:'质量得分,RSA',content:'质量得分<5→提高关键词与广告组相关性+优化落地页；RSA写15个标题+4个描述，让Google自动组合测试。',createdAt:daysAgo(1)},
+    // V9 WhatsApp营销
+    {id:uid(),title:'WhatsApp Business账号设置',cat:'WhatsApp营销',tags:'账号,Business',content:'用Business版：企业头像(真人照)+公司简介+产品目录+自动回复+快捷标签。名字=产品+人名，如"做剪刀的Leo"。',createdAt:daysAgo(1)},
+    {id:uid(),title:'WhatsApp客户挖掘',cat:'WhatsApp营销',tags:'挖掘,搜索',content:'谷歌搜：产品名+import+whatsapp+国家区号（kitchen knife whatsapp +49）；叠加importer/distributor；FB/IG行业小组扒成员；行业群组拉人一对一。',createdAt:daysAgo(1)},
+    {id:uid(),title:'WhatsApp开场白话术',cat:'WhatsApp营销',tags:'话术,破冰',content:'不要只发"你好"，直接发工厂实拍视频+一句话产品介绍。破冰句："你好，你还记得我吗？"回复率翻倍。',createdAt:daysAgo(1)},
+    {id:uid(),title:'WhatsApp群发与封号预防',cat:'WhatsApp营销',tags:'群发,封号',content:'新号日发≤50，老号≤100；客户当地工作日8-11点发；预热期先聊不发广告；被封立即换号，不要硬刚。',createdAt:daysAgo(1)},
+    // V9 付款方式与收汇
+    {id:uid(),title:'9种付款方式选择',cat:'付款方式与收汇',tags:'T/T,L/C,D/P',content:'新客户100%前T/T；老客户30%+70%见提单副本；大额即期L/C；D/A和O/A绝对不做；样品费西联/PayPal。',createdAt:daysAgo(1)},
+    {id:uid(),title:'信用证三大隐形炸弹',cat:'付款方式与收汇',tags:'L/C,软条款',content:'①软条款(凭买方签字)②不符点(单证必须一致)③开证行风险(小银行+首单→要求保兑)。看到"凭买方""待通知"直接改证。',createdAt:daysAgo(1)},
+    {id:uid(),title:'防钓鱼邮件指南',cat:'付款方式与收汇',tags:'诈骗,钓鱼',content:'黑客改收款账户是外贸第一高发诈骗。每次付款前电话/视频核实账户。不信水单截图，钱到账再发货。',createdAt:daysAgo(1)},
+    // V9 产品认证与合规
+    {id:uid(),title:'全球认证速查表',cat:'产品认证与合规',tags:'CE,RoHS,FCC',content:'欧盟CE/RoHS/REACH；美国FCC/FDA/CPC；英国UKCA；日本PSE；韩国KC；俄罗斯EAC；锂电池UN38.3。出货前按目的国核对。',createdAt:daysAgo(1)},
+    {id:uid(),title:'RoHS 10项有害物质',cat:'产品认证与合规',tags:'RoHS,限值',content:'铅Pb/镉Cd(≤0.01%)/汞Hg/六价铬Cr6+/PBB/PBDE/DEHP/BBP/DBP/DIBP，其他≤0.1%。',createdAt:daysAgo(1)},
+    {id:uid(),title:'PPWR包装新规',cat:'产品认证与合规',tags:'PPWR,2026',content:'2026-08-12强制：纸箱/胶带/塑封/标签测铅汞铬六价铬四项重金属；食品包装加测PFAS。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1396,6 +1413,9 @@ function viewDashboard(root){
         <span class="text-sm" style="color:var(--red)">💤 <b>14</b> 家沉睡客户待唤醒</span>
         <span class="text-sm">🔄 本月复购 <b>3</b> 家</span>
         <span class="text-sm" style="color:var(--red)">🔴 高风险客户 <b>${S.customers.filter(c=>c.riskLevel==='high').length}</b></span>
+        <span class="text-sm" style="color:var(--red)">💳 逾期应收 <b>$1,200</b></span>
+        <span class="text-sm" style="color:#ed8936">📜 RoHS证书 <b>剩21天</b> 到期</span>
+        <span class="text-sm">💬 WhatsApp回复率 <b>14%</b></span>
         <span class="text-sm text-gold">📌 客户不是找不到，很多时候是跟丢了</span>
       </div>
     </div>
@@ -3496,6 +3516,37 @@ function retCare(){
       <tr><td>国家节日</td><td class="text-sm">圣诞/感恩节/新年</td><td class="text-sm">节日问候邮件</td></tr>
     </tbody></table></div>`;
 }
+function retWA(){
+  return `<div class="grid-2 mb16">
+    <div class="card card-pad"><b>主号 Business</b>
+      <div class="text-sm mt8">名字：做剪刀的Leo · 头像：真人工厂照</div>
+      <div class="mt8"><span class="badge badge-a">正常</span> <span class="badge badge-blue">Business版</span></div></div>
+    <div class="card card-pad"><b>副号 个人</b>
+      <div class="text-sm mt8">名字：Leo Yangjiang Knife</div>
+      <div class="mt8"><span class="badge badge-gold">预热期</span></div></div>
+  </div>
+  <div class="card card-pad mb16"><div class="card-title">🔍 客户挖掘方法</div>
+    <div class="text-sm" style="line-height:2">
+      谷歌搜索：<code class="mono">kitchen knife import whatsapp +49</code><br>
+      叠加：importer / distributor / wholesaler<br>
+      Facebook/Instagram 行业小组扒成员 → WhatsApp 群组搜索行业关键词 → 一对一联系
+    </div></div>
+  <div class="card card-pad mb16"><div class="card-title">💬 话术库</div>
+    <div class="text-sm" style="line-height:2.2">
+      <b>开场白：</b>不要只发"你好"，直接发工厂实拍视频+一句话产品介绍<br>
+      <b>破冰：</b>"你好，你还记得我吗？"（回复率翻倍技巧）<br>
+      <b>动态评论：</b>"Very good, I am very interested in your product, how to cooperate?"<br>
+      <b>自动回复：</b>"How can we help? Please provide your needs, sales will contact you ASAP"
+    </div></div>
+  <div class="card card-pad"><div class="card-title">📊 群发效果（本周）</div>
+    <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat-card"><div class="stat-label">发送</div><div class="stat-value">86</div></div>
+      <div class="stat-card"><div class="stat-label">已读</div><div class="stat-value">64</div></div>
+      <div class="stat-card"><div class="stat-label">回复</div><div class="stat-value" style="color:var(--green)">12</div></div>
+      <div class="stat-card"><div class="stat-label">回复率</div><div class="stat-value" style="color:var(--green)">14%</div></div>
+    </div>
+    <div class="text-sm mt8" style="color:var(--red)">⚠️ 新号日发量≤50，老号≤100；客户当地工作日8-11点发送最佳。</div></div>`;
+}
 function retAs(){
   return `<div class="card card-pad"><div class="card-title">🛠 售后工单</div>
     <table class="tbl"><thead><tr><th>客户</th><th>问题类型</th><th>严重度</th><th>状态</th><th>满意度</th></tr></thead>
@@ -3688,6 +3739,138 @@ function gaData(){
       • 高点击低转化 → 优化落地页<br>
       • 高CPC低转化 → 降价或暂停<br>
       • 质量分<5 → 提高关键词与广告组相关性
+    </div></div>`;
+}
+
+/* V9 付款收汇 */
+let payTab='methods';
+function viewPayments(root){
+  root.innerHTML=`
+  <div class="page-head"><h2>💳 付款收汇</h2><p class="sub">9种付款方式对比 · 信用证三大坑 · 防骗指南</p></div>
+  <div class="btn-row mb16">
+    ${[['methods','💱 9种方式'],['lc','📜 信用证'],['risk','⚠️ 收汇风控'],['records','💰 收款记录']].map(([k,l])=>
+      `<button class="btn ${payTab===k?'btn-gold':'btn-outline'}" onclick="payTab='${k}';renderView()">${l}</button>`).join('')}
+  </div>
+  ${payTab==='methods'?payMethods():payTab==='lc'?payLC():payTab==='risk'?payRisk():payRecords()}`;
+}
+function payMethods(){
+  const ms=[
+    ['100%前T/T','极低🟢','新客户首单','收到全款再发货','0.1%','1-3天','资金最安全'],
+    ['30%前T/T+70%见提单副本','低🟢','新手最常用','定金+尾款凭B/L复印件','0.1%','3-7天','推荐默认方式'],
+    ['即期L/C','极低🟢','大额订单','银行担保付款','0.15%','7-14天','银行信用'],
+    ['远期L/C','中🟡','老客户大额','资金被压30-90天','0.15%','视期限','需贴现'],
+    ['D/P付款交单','中高🟠','老客户','客户付款后银行交单','0.2%','7-14天','不建议新客户'],
+    ['D/A承兑交单','高🔴','绝对信任客户','承兑后交单','0.2%','风险大','不推荐新手'],
+    ['O/A赊销','极高🔴','长期战略客户','先货后款','-','60-90天','慎用中信保兜底'],
+    ['西联汇款','低🟢','样品费小额','个人收汇','$15-50','即时','小额方便'],
+    ['PayPal','中🟡','样品费','第三方托管','4.4%+$0.3','即时','有冻结风险']
+  ];
+  return `<div class="card card-pad">
+    <div class="card-title">💱 9种付款方式对比</div>
+    <table class="tbl"><thead><tr><th>方式</th><th>风险</th><th>适用</th><th>手续费</th><th>到账</th><th>要点</th></tr></thead>
+    <tbody>${ms.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[4]}</td><td>${r[5]}</td><td>${r[6]}</td></tr>`).join('')}</tbody></table>
+    <div class="divider"></div>
+    <b class="text-sm">🤖 推荐引擎</b>
+    <div class="text-sm mt8">新客户高风险 → 100%前T/T；老客户大额 → 30%+70%见提单副本；样品费 → 西联/PayPal。</div>
+  </div>`;
+}
+function payLC(){
+  return `<div class="card card-pad mb16" style="border-left:3px solid var(--red)">
+    <div class="card-title" style="color:var(--red)">🚫 信用证三大隐形炸弹</div>
+    <div class="text-sm" style="line-height:2">
+      <b>1. 软条款：</b>"需买方出具检验合格确认书方可付款" → 看到"凭买方签字""待通知"直接要求改证<br>
+      <b>2. 不符点：</b>发票日期差5天、品名少写"100%" → 银行只认单据表面，做到"单证一致、单单一致、单货一致"<br>
+      <b>3. 开证行风险：</b>小银行+首次交易+买方单方面指定 → 款货两空 → 开证行必须双方共同选定，高风险地区要求保兑
+    </div></div>
+  <div class="card card-pad"><div class="card-title">📜 草本审核清单</div>
+    <div class="text-sm" style="line-height:2.2">
+      ✅ 申请人/受益人名称地址一致<br>
+      ✅ 货值与合同一致（大小写金额）<br>
+      ✅ 即期 vs 远期确认<br>
+      ✅ 有效期/交单期/装运期合理<br>
+      ○ 所需单证清单（B/L、PL、CI、CO、装箱单）<br>
+      ○ 保兑条款（高风险地区）
+    </div></div>`;
+}
+function payRisk(){
+  return `<div class="card card-pad mb16" style="border-left:3px solid var(--gold)">
+    <div class="card-title">🛡 4条安全收款黄金准则</div>
+    <div class="text-sm" style="line-height:2.2">
+      <b>1.</b> 组合使用渠道，不依赖单一方式<br>
+      <b>2.</b> 合规永远第一位<br>
+      <b>3.</b> 任何方式都以实际到账为发货前提（不信水单截图）<br>
+      <b>4.</b> 高风险订单善用出口信用保险（中信保）兜底
+    </div></div>
+  <div class="card card-pad">
+    <b>⚠️ 最高发诈骗：钓鱼邮件改账户</b>
+    <div class="text-sm mt8">每次付款前电话或视频核实收款账户信息！黑客入侵邮箱篡改账户是外贸诈骗第一高发。</div>
+  </div>`;
+}
+function payRecords(){
+  return `<div class="card card-pad"><div class="card-title">💰 收款记录</div>
+    <table class="tbl"><thead><tr><th>订单号</th><th>客户</th><th>金额</th><th>方式</th><th>到账日</th><th>手续费</th></tr></thead>
+    <tbody>
+      <tr><td>KL20260901</td><td>Messerei Schmidt</td><td>$8,200</td><td>30%T/T+70%提单</td><td>2026-09-10</td><td>$8.2</td></tr>
+      <tr><td>KL20260815</td><td>Kitchen Universe</td><td>$5,600</td><td>100%前T/T</td><td>2026-08-20</td><td>$5.6</td></tr>
+    </tbody></table></div>`;
+}
+
+/* V9 认证合规 */
+let certTab='lib';
+function viewCerts(root){
+  root.innerHTML=`
+  <div class="page-head"><h2>📜 认证合规</h2><p class="sub">全球认证清单 · 产品证书 · 出货前检查</p></div>
+  <div class="btn-row mb16">
+    ${[['lib','🌍 认证库'],['prod','📋 产品认证'],['pre','✅ 出货检查']].map(([k,l])=>
+      `<button class="btn ${certTab===k?'btn-gold':'btn-outline'}" onclick="certTab='${k}';renderView()">${l}</button>`).join('')}
+  </div>
+  ${certTab==='lib'?certLib():certTab==='prod'?certProd():certPre()}`;
+}
+function certLib(){
+  return `<div class="card card-pad">
+    <div class="card-title">🌍 全球认证清单（按地区）</div>
+    <table class="tbl"><thead><tr><th>地区</th><th>强制认证</th><th>适用产品</th></tr></thead>
+    <tbody>
+      <tr><td>🇪🇺 欧盟</td><td>CE / RoHS / REACH / WEEE</td><td>电子/机械/玩具/灯具</td></tr>
+      <tr><td>🇩🇪 德国</td><td>GS / 电池法 / 包装法(PPWR)</td><td>电子/电池/包装</td></tr>
+      <tr><td>🇺🇸 美国</td><td>FCC / UL / FDA / CPC</td><td>电子/食品/儿童产品</td></tr>
+      <tr><td>🇬🇧 英国</td><td>UKCA</td><td>大部分产品</td></tr>
+      <tr><td>🇯🇵 日本</td><td>PSE / TELEC</td><td>电器/无线</td></tr>
+      <tr><td>🇰🇷 韩国</td><td>KC</td><td>电子产品</td></tr>
+      <tr><td>🇷🇺 俄罗斯</td><td>EAC</td><td>大部分产品</td></tr>
+      <tr><td>🔋 锂电池</td><td>UN38.3</td><td>含电池产品</td></tr>
+    </tbody></table>
+    <div class="divider"></div>
+    <b class="text-sm">⚠️ RoHS 10项有害物质</b>
+    <div class="text-sm mt8">铅Pb / 镉Cd(≤0.01%) / 汞Hg / 六价铬Cr6+ / PBB / PBDE / DEHP / BBP / DBP / DIBP（其他≤0.1%）</div>
+    <div class="divider"></div>
+    <b class="text-sm" style="color:var(--red)">🆕 欧盟PPWR包装废弃法（2026-08-12强制）</b>
+    <div class="text-sm mt8">纸箱/胶带/塑封膜/标签必须检测铅汞铬六价铬四项重金属；食品包装加测PFAS。</div>
+  </div>`;
+}
+function certProd(){
+  return `<div class="card card-pad"><div class="card-title">📋 产品认证状态</div>
+    <table class="tbl"><thead><tr><th>产品</th><th>CE</th><th>RoHS</th><th>FDA</th><th>BSCI验厂</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>厨房剪刀</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td><span class="badge badge-a">齐全</span></td></tr>
+      <tr><td>主厨刀</td><td>✅</td><td>⚠️待更新</td><td>✅</td><td>✅</td><td><span class="badge badge-gold">待更新</span></td></tr>
+      <tr><td>户外折叠刀</td><td>⚠️</td><td>-</td><td>-</td><td>✅</td><td><span class="badge badge-red">缺CE</span></td></tr>
+    </tbody></table>
+    <div class="divider"></div>
+    <b class="text-sm">🔔 到期提醒</b>
+    <div class="text-sm mt8" style="line-height:2">
+      🔴 RoHS报告 2026-10-15 到期（剩21天）<br>
+      ⚠️ BSCI验厂 2026-12-01 到期（剩68天）
+    </div></div>`;
+}
+function certPre(){
+  return `<div class="card card-pad"><div class="card-title">✅ 出货前合规检查</div>
+    <div class="text-sm" style="line-height:2.4">
+      ✅ 目标国所需认证齐全（CE/RoHS）<br>
+      ✅ 产品标签含CE标志+英文警示语<br>
+      ✅ 包装PPWR重金属检测报告<br>
+      ○ 说明书英文版本<br>
+      ○ 可回收标识打印
     </div></div>`;
 }
 

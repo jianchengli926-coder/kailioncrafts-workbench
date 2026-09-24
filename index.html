@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V12.0</div>
+        <div class="b2">KaiLionCrafts Crafts V13.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -539,6 +539,9 @@ function loadState(){
   S.aisales = DB.load('aisales') || null;
   S.pipeline = DB.load('pipeline') || null;
   S.documents = DB.load('documents') || null;
+  S.finance = DB.load('finance') || null;
+  S.catalog = DB.load('catalog') || null;
+  S.team = DB.load('team') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -557,6 +560,7 @@ function persist(){
   DB.save('rfm',S.rfm); DB.save('landingpages',S.landingpages); DB.save('competitors',S.competitors);
   DB.save('productmedia',S.productmedia); DB.save('aisales',S.aisales);
   DB.save('pipeline',S.pipeline); DB.save('documents',S.documents);
+  DB.save('finance',S.finance); DB.save('catalog',S.catalog); DB.save('team',S.team);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
@@ -1077,7 +1081,15 @@ function defaultKnowledge(){
     // V12 外贸单据制作
     {id:uid(),title:'8种外贸单据',cat:'外贸单据制作',tags:'PI,CI,PL,B/L',content:'报价单QT→形式发票PI→销售合同→商业发票CI→装箱单PL→提单BN→产地证CO/FA→验货报告。编号规则：QT-2026-001。',createdAt:daysAgo(1)},
     // V12 客户跟进SOP
-    {id:uid(),title:'跟进频率标准',cat:'客户跟进SOP',tags:'频率,超时',content:'A类≤3天/B类≤7天/C类≤14天/D类≤30天。<7天绿/7-14黄/14-30橙/>30红。严重超时一键生成跟进建议。',createdAt:daysAgo(1)}
+    {id:uid(),title:'跟进频率标准',cat:'客户跟进SOP',tags:'频率,超时',content:'A类≤3天/B类≤7天/C类≤14天/D类≤30天。<7天绿/7-14黄/14-30橙/>30红。严重超时一键生成跟进建议。',createdAt:daysAgo(1)},
+    // V13 团队管理与公海池
+    {id:uid(),title:'公海池三铁则',cat:'团队管理与公海池',tags:'公海,回收',content:'🛡️保护期7-15天 / 🔄超期自动回收 / ⭐原跟进人7天优先捞回。私海上限100个，180天未成交自动回收。',createdAt:daysAgo(1)},
+    {id:uid(),title:'阶梯提成制度',cat:'团队管理与公海池',tags:'提成,考核',content:'毛利<5万5% / 5-10万8% / 10-20万10% / >20万12%。结果指标+过程指标双考核。',createdAt:daysAgo(1)},
+    // V13 产品电子画册
+    {id:uid(),title:'画册询价单流程',cat:'产品电子画册',tags:'画册,询价',content:'客户选品→生成询价清单→一键发送→自动转询盘。画册首页放认证图标+产能数据建立信任。',createdAt:daysAgo(1)},
+    // V13 外贸财务核算
+    {id:uid(),title:'换汇成本公式',cat:'外贸财务核算',tags:'换汇成本,利润',content:'换汇成本=不含税成本×(1+征退税率差)÷FOB美元。5-8正常，>8预警，<5高利润。实际利润=FOB收入+退税-采购成本-国内费用。',createdAt:daysAgo(1)},
+    {id:uid(),title:'三单匹配',cat:'外贸财务核算',tags:'退税,报关',content:'报关单/进货发票/收汇水单：品名/数量/单位必须一致。报关后36个月内申报退税。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1580,6 +1592,16 @@ function viewDashboard(root){
         <div class="text-sm" style="line-height:2.2">本月丢单 <b>4</b> 笔，合计 <b style="color:var(--red)">$11K</b>
           <div class="text-sm mt8">价格太高 <b style="color:var(--red)">2</b> · 选择竞品 <b style="color:#ed8936">1</b> · 需求取消 <b style="color:var(--muted)">1</b></div>
         </div></div>
+    </div>
+    <div class="grid-2 mb16">
+      <div class="card card-pad"><div class="card-title">🏆 团队业绩 TOP3</div>
+        <table class="tbl"><tbody>
+          <tr><td>🥇 Sarah</td><td style="text-align:right">$28K</td><td class="text-sm text-muted">毛利$5.6K</td></tr>
+          <tr><td>🥈 Tom</td><td style="text-align:right">$18K</td><td class="text-sm text-muted">毛利$3.2K</td></tr>
+          <tr><td>🥉 Mike</td><td style="text-align:right">$12K</td><td class="text-sm text-muted">跟单</td></tr>
+        </tbody></table></div>
+      <div class="card card-pad"><div class="card-title">💰 本月财务</div>
+        <div class="text-sm" style="line-height:2.2">本月利润率：<b style="color:var(--green)">18.5%</b><br>总利润：<b>¥18.6K</b><br>换汇成本异常：<b style="color:var(--red)">1 单</b><br>退税待申报：<b>2</b> 笔 · 待到账 <b style="color:var(--gold)">¥7.8K</b></div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -2776,6 +2798,23 @@ function openContractDetail(cid){
 function viewSettings(root){
   const s = S.settings.company;
   root.innerHTML = `
+    <div class="card card-pad mb16"><div class="card-title">👥 团队管理</div>
+      <table class="tbl mb16"><thead><tr><th>姓名</th><th>角色</th><th>负责市场</th><th>月度目标</th></tr></thead>
+      <tbody>
+        <tr><td>Leo</td><td><span class="badge badge-gold">👑 老板</span></td><td>全部</td><td>$50K</td></tr>
+        <tr><td>Tom</td><td><span class="badge badge-blue">📊 经理</span></td><td>欧洲</td><td>$20K</td></tr>
+        <tr><td>Sarah</td><td><span class="badge badge-a">💼 业务员</span></td><td>欧美</td><td>$15K</td></tr>
+        <tr><td>Mike</td><td>📦 跟单</td><td>—</td><td>—</td></tr>
+      </tbody></table>
+      <div class="grid-3" style="gap:12px">
+        <div style="background:#f7efdd;padding:10px;border-radius:6px"><b>🛡️ 保护期</b><div class="text-sm">新客户分配后7-15天专属跟进</div></div>
+        <div style="background:#fde8e8;padding:10px;border-radius:6px"><b>🔄 回收线</b><div class="text-sm">超期未跟进自动回收公海</div></div>
+        <div style="background:#e8f0fd;padding:10px;border-radius:6px"><b>⭐ 优先权</b><div class="text-sm">原跟进人7天内优先捞回</div></div>
+      </div>
+      <div class="text-sm mt16">💼 公海池在池 <b>5</b> 家 · 今日回收 <b>1</b> 家 · 私海上限 <b>100</b> 个</div>
+      <div class="divider"></div>
+      <b class="text-sm">阶梯提成：</b><span class="text-sm">&nbsp;毛利&lt;5万→5% · 5-10万→8% · 10-20万→10% · &gt;20万→12%</span>
+    </div>
     ${renderApiSettings()}
     ${renderMonitorSettings()}
     ${renderEmailHealth()}
@@ -4287,6 +4326,126 @@ function viewPipeline(root){
       <tr><td>Kitchen Universe</td><td><span class="badge badge-gold">报价中</span></td><td>$6K</td><td style="color:var(--red)"><b>12天⚠️</b></td><td>🔴 催回复</td></tr>
       <tr><td>ABC Home GmbH</td><td><span class="badge badge-blue">需求确认</span></td><td>$5K</td><td>2天</td><td>发样品</td></tr>
     </tbody></table></div>`;
+}
+
+/* V13 利润核算 */
+let finTab='calc';
+let finInputs={cost:15.0,vat:13,rebate:13,domestic:1.5,exchange:7.2,freight:0.8,insurance:0.15,margin:15};
+function viewFinance(root){
+  if(finTab==='orders') return viewFinOrders(root);
+  if(finTab==='rate') return viewFinRate(root);
+  if(finTab==='tax') return viewFinTax(root);
+  // calc
+  const i=finInputs;
+  const exCost=i.cost/(1+i.vat/100);
+  const rebate=exCost*(i.rebate/100);
+  const fobCNY=(exCost+i.domestic)*(1+i.margin/100);
+  const fobUSD=fobCNY/i.exchange;
+  const cifUSD=fobUSD+i.freight+i.insurance;
+  const realProfit=fobCNY+rebate-i.cost-i.domestic;
+  const realMargin=realProfit/(i.cost+i.domestic)*100;
+  const swapCost=exCost*(1+(i.vat-i.rebate)/100)/fobUSD;
+  const swapColor=swapCost>8?'var(--red)':swapCost<5?'var(--green)':'var(--gold)';
+  root.innerHTML=`
+  <div class="page-head"><h2>💰 利润核算</h2><p class="sub">真实计算·换汇成本预警·退税</p></div>
+  <div class="flex gap8 mb16">
+    ${[['calc','🧮 报价计算器'],['orders','📋 订单利润'],['rate','💱 汇率管理'],['tax','🧾 出口退税']].map(([k,l])=>
+      `<button class="btn ${finTab===k?'btn-gold':'btn-outline'}" onclick="finTab='${k}';renderView()">${l}</button>`).join('')}
+  </div>
+  <div class="grid-2">
+    <div class="card card-pad"><div class="card-title">输入项</div>
+      ${[['cost','采购成本(含税¥)','number'],['vat','增值税率%','number'],['rebate','退税率%','number'],['domestic','国内费用¥','number'],['exchange','汇率USD','number'],['freight','海运费$','number'],['insurance','保险费$','number'],['margin','期望利润率%','number']].map(([k,l,t])=>`
+        <div class="form-row"><label>${l}</label><input type="${t}" step="0.01" class="form-control" value="${i[k]}" oninput="finInputs.${k}=parseFloat(this.value)||0;renderView();setTimeout(()=>document.activeElement&&document.activeElement.focus(),0)"></div>
+      `).join('')}
+    </div>
+    <div class="card card-pad"><div class="card-title">实时计算结果</div>
+      <table class="tbl"><tbody>
+        <tr><td>不含税成本</td><td style="text-align:right"><b>¥${exCost.toFixed(2)}</b></td></tr>
+        <tr><td>退税额</td><td style="text-align:right;color:var(--green)"><b>+¥${rebate.toFixed(2)}</b></td></tr>
+        <tr><td>FOB报价</td><td style="text-align:right"><b style="color:var(--gold);font-size:18px">$${fobUSD.toFixed(2)}</b></td></tr>
+        <tr><td>CIF报价</td><td style="text-align:right"><b style="color:var(--gold);font-size:18px">$${cifUSD.toFixed(2)}</b></td></tr>
+        <tr><td>实际利润</td><td style="text-align:right;color:${realProfit>0?'var(--green)':'var(--red)'}"><b>¥${realProfit.toFixed(2)}</b></td></tr>
+        <tr><td>实际利润率</td><td style="text-align:right"><b>${realMargin.toFixed(1)}%</b></td></tr>
+        <tr><td>换汇成本</td><td style="text-align:right"><b style="color:${swapColor}">${swapCost.toFixed(2)}</b></td></tr>
+      </tbody></table>
+      <div class="text-sm mt8" style="background:#f7efdd;padding:10px;border-radius:6px">
+        ${swapCost>8?'🔴 换汇成本>8，价格偏低，建议提高报价':swapCost<5?'🟢 换汇成本<5，高利润区间':'🟢 换汇成本5-8，正常区间'}
+      </div></div>
+  </div>`;
+}
+function viewFinOrders(root){
+  const orders=[
+    ['SO-2026-001','Messerei Schmidt',12000,7.2,68000,5200,7800,12600,15.2],
+    ['SO-2026-002','BritChef Ltd',8000,7.2,48000,3500,5500,4600,7.9],
+    ['SO-2026-003','Kitchen Universe',6000,7.18,52000,4800,4200,-2600,-3.8]
+  ];
+  root.innerHTML=`<div class="page-head"><h2>📋 订单利润</h2></div>
+  <div class="card card-pad"><table class="tbl"><thead><tr><th>订单号</th><th>客户</th><th>金额$</th><th>收汇¥</th><th>采购¥</th><th>费用¥</th><th>退税¥</th><th>利润¥</th><th>利润率</th></tr></thead>
+  <tbody>${orders.map(o=>`<tr><td class="mono">${o[0]}</td><td>${o[1]}</td><td>$${o[2]}</td><td>7.2</td><td>¥${o[4]}</td><td>¥${o[5]}</td><td style="color:var(--green)">+¥${o[6]}</td><td style="color:${o[7]>0?'var(--green)':'var(--red)'}"><b>${o[7]>0?'✅':'🔴'} ¥${o[7]}</b></td><td>${o[8]}%</td></tr>`).join('')}</tbody></table></div>`;
+}
+function viewFinRate(root){
+  root.innerHTML=`<div class="page-head"><h2>💱 汇率管理</h2></div>
+  <div class="card card-pad"><table class="tbl"><thead><tr><th>币种</th><th>现汇买入</th><th>现汇卖出</th><th>波动</th></tr></thead>
+  <tbody>
+    <tr><td>USD 美元</td><td>7.18</td><td>7.22</td><td style="color:var(--red)">+0.8%</td></tr>
+    <tr><td>EUR 欧元</td><td>7.82</td><td>7.88</td><td>+0.3%</td></tr>
+    <tr><td>GBP 英镑</td><td>9.15</td><td>9.22</td><td style="color:var(--green)">-0.2%</td></tr>
+    <tr><td>JPY 日元</td><td>0.048</td><td>0.049</td><td>-0.5%</td></tr>
+  </tbody></table>
+  <div class="text-sm mt8" style="background:#f7efdd;padding:10px;border-radius:6px">💡 USD 7.18-7.22 区间震荡，建议大额订单锁汇</div></div>`;
+}
+function viewFinTax(root){
+  root.innerHTML=`<div class="page-head"><h2>🧾 出口退税</h2></div>
+  <div class="grid-3">
+    <div class="card card-pad"><div class="card-title">退税进度</div>
+      <div class="text-sm" style="line-height:2">待申报：<b>2</b> 笔<br>已申报：<b>1</b> 笔<br>已到账：<b style="color:var(--green)">¥7,800</b></div></div>
+    <div class="card card-pad"><div class="card-title">三单匹配</div>
+      <div class="text-sm">✅ 报关单<br>✅ 进货发票<br>✅ 收汇水单<br><b>全部匹配</b></div></div>
+    <div class="card card-pad"><div class="card-title">申报期限</div>
+      <div class="text-sm">报关后 <b>36个月</b> 内申报<br>当前最近单：剩 <b style="color:var(--gold)">312天</b></div></div>
+  </div>`;
+}
+
+/* V13 电子画册 */
+function viewCatalog(root){
+  const prods=[
+    ['KL-001','不锈钢厨房剪刀','$1.85','500pcs','#c0c8d4'],
+    ['KL-002','主厨刀 8寸','$3.20','300pcs','#d4c0c0'],
+    ['KL-003','削皮器','$0.65','1000pcs','#c0d4c8'],
+    ['KL-004','户外折叠刀','$2.40','500pcs','#c8c0d4'],
+    ['KL-005','多用剪刀','$2.10','500pcs','#d4d0c0'],
+    ['KL-006','陶瓷水果刀','$1.20','1000pcs','#c0c8d4'],
+    ['KL-007','万用剪刀套装','$4.50','200pcs','#d4c0d0'],
+    ['KL-008','厨房剪+削皮器套装','$2.80','500pcs','#c0d4d4']
+  ];
+  root.innerHTML=`
+  <div class="page-head"><h2>📖 KaiLionCrafts 电子画册</h2><p class="sub">阳江五金刀剪·CE/BSCI认证·支持OEM</p>
+    <button class="btn btn-primary" onclick="toast('询价单（演示）')">🛒 询价单 (0)</button></div>
+  <div class="card card-pad mb16" style="background:linear-gradient(120deg,#1e3a5f,#2c5282);color:#fff">
+    <div style="font-size:22px;font-weight:700">KaiLionCrafts Industrial Co., Ltd.</div>
+    <div class="text-sm mt8">✅ CE · ✅ ISO9001 · ✅ BSCI · ✅ FDA<br>成立2012年 · 年产能500万把 · 出口30+国家</div>
+  </div>
+  <div class="grid-4 mb16">
+    <div class="card card-pad" style="text-align:center"><div style="font-size:32px">🔪</div><b>厨房剪刀</b></div>
+    <div class="card card-pad" style="text-align:center"><div style="font-size:32px">🍴</div><b>主厨刀</b></div>
+    <div class="card card-pad" style="text-align:center"><div style="font-size:32px">🌿</div><b>厨房配件</b></div>
+    <div class="card card-pad" style="text-align:center"><div style="font-size:32px">🏕️</div><b>户外刀</b></div>
+  </div>
+  <div class="card card-pad"><div class="card-title">热门产品 TOP8</div>
+    <div class="grid-4">
+      ${prods.map(p=>`
+        <div class="card" style="overflow:hidden;cursor:pointer" onclick="toast('查看 ${p[1]} 详情')">
+          <div style="height:120px;background:${p[4]};display:flex;align-items:center;justify-content:center;font-size:40px">🔪</div>
+          <div class="card-pad">
+            <div class="text-sm" style="color:var(--muted)">${p[0]}</div>
+            <b>${p[1]}</b>
+            <div class="flex-between mt8"><b style="color:var(--gold)">${p[2]}</b><span class="text-sm text-muted">MOQ ${p[3]}</span></div>
+            <button class="btn btn-outline btn-sm mt8" style="width:100%" onclick="event.stopPropagation();toast('已加入询价单')">＋ 询价</button>
+          </div></div>`).join('')}
+    </div></div>
+  <div class="card card-pad mt16 text-muted text-sm">
+    📧 sales@kailioncrafts.com · 📱 WhatsApp +86-138-XXXX · 📍 阳江市阳东区
+  </div>`;
 }
 
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }

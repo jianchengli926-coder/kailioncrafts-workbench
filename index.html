@@ -309,7 +309,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">方舟获客工作台</div>
-        <div class="b2">KaiLionCrafts Ark V6.0</div>
+        <div class="b2">KaiLionCrafts Ark V7.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -403,6 +403,11 @@ function loadState(){
   S.agentLogs = DB.load('agentLogs') || [];
   S.exhibitions = DB.load('exhibitions') || null;
   S.negotiations = DB.load('negotiations') || [];
+  S.shipments = DB.load('shipments') || null;
+  S.forwarders = DB.load('forwarders') || null;
+  S.aftersales = DB.load('aftersales') || null;
+  S.referrals = DB.load('referrals') || null;
+  S.maintenance = DB.load('maintenance') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -414,6 +419,8 @@ function persist(){
   DB.save('emailStats',S.emailStats); DB.save('abTests',S.abTests); DB.save('socialRecords',S.socialRecords);
   DB.save('keywords',S.keywords); DB.save('contents',S.contents); DB.save('backlinks',S.backlinks); DB.save('agentLogs',S.agentLogs);
   DB.save('exhibitions',S.exhibitions); DB.save('negotiations',S.negotiations);
+  DB.save('shipments',S.shipments); DB.save('forwarders',S.forwarders); DB.save('aftersales',S.aftersales);
+  DB.save('referrals',S.referrals); DB.save('maintenance',S.maintenance);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
@@ -870,7 +877,17 @@ function defaultKnowledge(){
     {id:uid(),title:'三档报价法',cat:'报价核算',tags:'报价,三档',content:'高端（5Cr15Mov+礼盒+免费Logo）、中端（3Cr13+彩盒，主推）、基础（2Cr13+白盒）。锚定高端让中端显得划算。',createdAt:daysAgo(1)},
     {id:uid(),title:'阶梯报价模板',cat:'报价核算',tags:'报价,阶梯',content:'500pcs $2.10 / 1000pcs $1.85 / 5000pcs $1.60 / 10000pcs $1.45。用量引导客户增量。',createdAt:daysAgo(1)},
     {id:uid(),title:'价格让步SOP',cat:'报价核算',tags:'让步,条件',content:'让步幅度递减：第一次5%→第二次3%→第三次1%。每分钱让利换回条件（数量/付款方式/交期）。守住底线价。',createdAt:daysAgo(1)},
-    {id:uid(),title:'谈判前准备清单',cat:'报价核算',tags:'准备,清单',content:'摸清三件事：客户采购量、预算、决策能力。竞品价格调研。设定底线价和目标价。',createdAt:daysAgo(1)}
+    {id:uid(),title:'谈判前准备清单',cat:'报价核算',tags:'准备,清单',content:'摸清三件事：客户采购量、预算、决策能力。竞品价格调研。设定底线价和目标价。',createdAt:daysAgo(1)},
+    // V7 风控合规
+    {id:uid(),title:'客户背调方法清单',cat:'风控合规',tags:'背调,方法',content:'谷歌搜索+官网+LinkedIn+Facebook+WHOIS+谷歌地图+海关数据+行业目录+商标专利，9个渠道交叉验证。',createdAt:daysAgo(1)},
+    {id:uid(),title:'制裁名单查询',cat:'风控合规',tags:'制裁,OFAC',content:'交易前查OFAC SDN List、EU Consolidated List、UN Sanctions、World Bank Debarred。高风险国家+新公司要求100%前T/T。',createdAt:daysAgo(1)},
+    {id:uid(),title:'付款风险防范',cat:'风控合规',tags:'付款,风险',content:'新客户首单T/T 30%定金+70%见提单副本；老客户可L/C at sight；坚决不接受D/A；付款人必须与合同买方一致。',createdAt:daysAgo(1)},
+    // V7 物流单证
+    {id:uid(),title:'提单填写指南',cat:'物流单证',tags:'提单,B/L',content:'Consignee-To Order / Notify Party / 货物描述与发票一致 / 运费预付或到付 / 签发份数3正3副。',createdAt:daysAgo(1)},
+    {id:uid(),title:'原产地证类型选择',cat:'物流单证',tags:'CO,Form A',content:'一般CO普惠制Form A（欧盟/日本）；RCEP产地证（东盟/日韩澳）；中韩/中澳自贸协定税率优惠。',createdAt:daysAgo(1)},
+    // V7 客户维护
+    {id:uid(),title:'节日问候模板',cat:'客户维护',tags:'节日,问候',content:'英文模板：Hi [Name], wishing you a great Christmas / Thanksgiving / New Year! Let me know if you need cutlery supplies this season.',createdAt:daysAgo(1)},
+    {id:uid(),title:'售后处理原则',cat:'客户维护',tags:'售后,原则',content:'态度真诚不推卸+24h内响应+先道歉再查原因+给方案不找借口+闭环确认满意度。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -935,6 +952,14 @@ function seedExtra(){
   if(!S.customers || !S.customers.length) return;
   // 公海池：把第 20-23 个客户 owner 设为 null
   S.customers.forEach((c,i)=>{ if(i>=20 && i<=23 && !c.isOld) c.owner=null; });
+  // V7：给客户分配风险等级
+  S.customers.forEach((c,i)=>{
+    if(!c.riskLevel){ c.riskLevel = i<3?'low':i<6?'low':i<9?'medium':'low'; }
+    if(!c.riskChecklist) c.riskChecklist = {acq:[1,1,1],bg:[1,1,0],contract:[1,1,1],pay:[0,0,0],ship:[0,0],after:[0,0]};
+  });
+  // 标记 1-2 个高风险
+  if(S.customers[10]) S.customers[10].riskLevel='high';
+  if(S.customers[20]) S.customers[20].riskLevel='medium';
   // V4：给已发送草稿分配追踪状态
   (S.drafts||[]).forEach((d,i)=>{
     if(d.status==='已发送' && !d.trackStatus){
@@ -1235,6 +1260,10 @@ function viewDashboard(root){
         <span class="text-sm">📦 <b>${(S.samples||[]).filter(x=>x.status==='已签收' && !x.feedback).length}</b> 个样品已签收未反馈</span>
         <span class="text-sm">📝 <b>${S.contracts.filter(c=>c.status==='待签').length}</b> 份合同待签署</span>
         <span class="text-sm">🚚 <b>${S.contracts.filter(c=>c.status==='执行中').length}</b> 个订单在生产中</span>
+        <span class="text-sm">🚢 <b>2</b> 票货物在途（1运输/1清关）</span>
+        <span class="text-sm" style="color:var(--red)">💤 <b>14</b> 家沉睡客户待唤醒</span>
+        <span class="text-sm">🔄 本月复购 <b>3</b> 家</span>
+        <span class="text-sm" style="color:var(--red)">🔴 高风险客户 <b>${S.customers.filter(c=>c.riskLevel==='high').length}</b></span>
         <span class="text-sm text-gold">📌 客户不是找不到，很多时候是跟丢了</span>
       </div>
     </div>
@@ -1782,6 +1811,29 @@ function openCustomerDetail(cid){
           🌐 停留时长 12分45秒 · 浏览 5 个页面
         </div>
       </div>
+      <div class="card card-pad mb16" style="border-left:3px solid ${c.riskLevel==='high'?'var(--red)':c.riskLevel==='medium'?'#ed8936':'var(--green)'}">
+        <div class="card-title">🛡 风险评级
+          ${c.riskLevel==='high'?'<span class="badge badge-red">🔴 高风险</span>':c.riskLevel==='medium'?'<span class="badge badge-gold">🟡 中风险</span>':'<span class="badge badge-a">🟢 低风险</span>'}
+        </div>
+        ${c.riskLevel==='high'?'<div style="background:#fff5f5;border:1px solid #feb2b2;padding:10px;border-radius:6px;margin:8px 0;font-size:13px;color:var(--red)">⚠️ 高风险客户，建议100%预付款，不提供账期</div>':''}
+        <div class="text-sm" style="line-height:2">
+          年采购额估算：<b>$20K-50K</b> · 付款及时性：<b>良好</b><br>
+          违约记录：<b style="color:var(--green)">无</b> · 制裁名单（OFAC/EU/UN）：<b style="color:var(--green)">未命中</b>
+        </div>
+      </div>
+      <div class="card card-pad mb16">
+        <div class="card-title">🔒 风控六环节检查</div>
+        ${(()=>{
+          const r=c.riskChecklist||{};
+          const stages=[['获客',['真实性核验','官网可访问','联系方式有效'],r.acq],['背调',['海关数据','社媒验证','谷歌地图'],r.bg],['签约',['合同条款','付款方式','PI确认'],r.contract],['收款',['付款人关联','水单核验','到账确认'],r.pay],['发货',['货代信用','柜号封条'],r.ship],['售后',['满意度回访','问题闭环'],r.after]];
+          return stages.map(([n,items,arr],i)=>{
+            arr=arr||[]; const done=arr.filter(Boolean).length; const total=items.length;
+            return `<div style="margin-bottom:8px"><b style="font-size:13px">${i+1}. ${n}</b>
+              <div class="text-sm text-muted">${items.map((it,j)=>arr[j]?'✅ '+it:'○ '+it).join(' · ')}</div></div>`;
+          }).join('');
+        })()}
+      </div>
+
       <div class="card card-pad mb16">
         <div class="card-title">🤝 谈判记录
           <button class="btn btn-outline btn-sm" onclick="toast('新增谈判记录（演示）')">＋ 记录</button></div>
@@ -3169,6 +3221,130 @@ function calcQuote(){
     '<tr><td><span class="badge badge-a">高端</span></td><td>$'+(fob*1.15).toFixed(2)+'</td><td class="text-sm">5Cr15Mov+礼盒+免费激光Logo</td></tr>'+
     '<tr><td><span class="badge badge-gold">中端</span></td><td>$'+fob.toFixed(2)+'</td><td class="text-sm">3Cr13+彩盒+性价比</td></tr>'+
     '<tr><td><span class="badge badge-gray">基础</span></td><td>$'+(fob*0.85).toFixed(2)+'</td><td class="text-sm">2Cr13+白盒</td></tr></tbody></table>';
+}
+
+/* V7 物流发货 */
+let shipTab='list';
+const SHIP_STEPS=['询价订舱','提箱装货','出口报关','装船出海','签发提单','目的港清关','末端派送','已签收'];
+function viewShipments(root){
+  if(!S.shipments) S.shipments=[
+    {id:uid(),no:'SH20260920-01',customer:'Messerei Schmidt GmbH',contract:'CT2026-008',product:'户外折叠刀×2000',qty:2000,amount:6800,
+     from:'Yantian, Shenzhen',to:'Bremerhaven, Germany',step:3,eta:daysAgo(-18),etd:daysAgo(-5),vessel:'COSCO PRIDE / 089E',ctn:'CRLU1234567',seal:'CN987654',
+      milestones:[['订舱',daysAgo(-20)],['提柜',daysAgo(-18)],['装货',daysAgo(-17)],['报关',daysAgo(-16)],['开船',daysAgo(-5)]]},
+    {id:uid(),no:'SH20260915-02',customer:'Toronto Cutlery Distributors',contract:'CT2026-005',product:'厨房剪刀×5000',qty:5000,amount:9250,
+     from:'Yantian, Shenzhen',to:'Toronto, Canada',step:1,eta:daysAgo(-32),etd:daysAgo(-2),vessel:'MAERSK SEALAND / 102W',ctn:'MSCU7654321',seal:'CN112233',
+      milestones:[['订舱',daysAgo(-8)],['提柜',daysAgo(-3)]]},
+    {id:uid(),no:'SH20260801-03',customer:'BritChef Supplies Ltd',contract:'CT2026-002',product:'主厨刀×1000',qty:1000,amount:6800,
+     from:'Yantian, Shenzhen',to:'Felixstowe, UK',step:7,eta:daysAgo(-3),etd:daysAgo(-25),vessel:'EVER AURA / 056N',ctn:'EISU9988776',seal:'CN445566',
+      milestones:[['订舱',daysAgo(-30)],['开船',daysAgo(-25)],['到港',daysAgo(-5)],['清关完成',daysAgo(-4)]]}
+  ];
+  if(!S.forwarders) S.forwarders=[
+    {id:uid(),name:'中外运 Sinotrans',contact:'王经理',phone:'+86-138-xxxx',routes:'欧洲/北美',rating:5},
+    {id:uid(),name:'嘉里物流 Kerry Logistics',contact:'李小姐',phone:'+86-139-xxxx',routes:'北美/英国',rating:4},
+    {id:uid(),name:'递四方 4PX',contact:'陈先生',phone:'+86-137-xxxx',routes:'东南亚/快递',rating:4}
+  ];
+  root.innerHTML=`
+  <div class="page-head"><h2>🚢 物流发货</h2><p class="sub">8步状态跟踪 · 单证齐全 · 货代比价</p>
+    <button class="btn btn-primary" onclick="toast('新建发货单（演示）')">＋ 新建发货单</button></div>
+  <div class="btn-row mb16">
+    ${[['list','📦 发货单'],['fwd','🚚 货代'],['doc','📄 单证']].map(([k,l])=>
+      `<button class="btn ${shipTab===k?'btn-gold':'btn-outline'}" onclick="shipTab='${k}';renderView()">${l}</button>`).join('')}
+  </div>
+  ${shipTab==='list'?shipList():shipTab==='fwd'?shipFwd():shipDoc()}`;
+}
+function shipList(){
+  return `<div class="card card-pad">
+    <table class="tbl"><thead><tr><th>发货单号</th><th>客户</th><th>产品/金额</th><th>航线</th><th>状态（${SHIP_STEPS.length}步）</th><th>ETA</th></tr></thead>
+    <tbody>${S.shipments.map(s=>`<tr>
+      <td class="mono text-sm">${s.no}</td><td>${esc(s.customer)}</td>
+      <td class="text-sm">${esc(s.product)}<br><b>$${s.amount.toLocaleString()}</b></td>
+      <td class="text-sm">${esc(s.from)} → ${esc(s.to)}</td>
+      <td><div style="display:flex;gap:3px">${SHIP_STEPS.map((st,i)=>
+        `<div title="${st}" style="width:14px;height:14px;border-radius:50%;background:${i<s.step?'var(--green)':i===s.step?'var(--gold)':'#e2e8f0'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px">${i<s.step?'✓':i+1}</div>`).join('')}</div>
+        <div class="text-sm text-muted" style="margin-top:4px">${SHIP_STEPS[s.step]||'已签收'}</div></td>
+      <td class="text-sm">${fmtDay(s.eta)}</td></tr>`).join('')}</tbody></table>
+  </div>`;
+}
+function shipFwd(){
+  return `<div class="grid-3">${S.forwarders.map(f=>`<div class="card card-pad">
+    <b>${f.name}</b><div class="text-sm text-muted mt8">${f.contact} · ${f.phone}</div>
+    <div class="mt8">优势航线：<span class="badge badge-blue">${f.routes}</span></div>
+    <div class="mt8">服务评分：${'⭐'.repeat(f.rating)}${'☆'.repeat(5-f.rating)}</div></div>`).join('')}</div>`;
+}
+function shipDoc(){
+  return `<div class="card card-pad"><div class="card-title">📄 单证齐全度检查</div>
+    ${['提单 B/L','装箱单 PL','商业发票 CI','报关单','原产地证 CO'].map(d=>
+      `<div style="padding:8px 0;border-bottom:1px solid var(--border)">✓ ${d} <span class="text-sm text-muted">— 已出具</span></div>`).join('')}
+    <div style="padding:8px 0">○ Form A（普惠制） <span class="badge badge-gold">待办理</span></div>
+  </div>`;
+}
+
+/* V7 客户维护 */
+let retTab='layers';
+function viewRetention(root){
+  root.innerHTML=`
+  <div class="page-head"><h2>🤝 客户维护</h2><p class="sub">分层维护 · 复购提醒 · 转介绍 · 售后闭环</p></div>
+  <div class="grid-4 mb16">
+    <div class="stat-card" style="border-left:3px solid var(--gold)"><div class="stat-label">🌟 战略客户</div><div class="stat-value">2</div><div class="stat-trend up">月回访 · 占比65%</div></div>
+    <div class="stat-card"><div class="stat-label">⭐ 重要客户</div><div class="stat-value">5</div><div class="stat-trend up">季回访 · 占比25%</div></div>
+    <div class="stat-card"><div class="stat-label">普通客户</div><div class="stat-value">18</div><div class="stat-trend">半年回访 · 占比8%</div></div>
+    <div class="stat-card" style="border-left:3px solid var(--red)"><div class="stat-label">💤 沉睡客户</div><div class="stat-value">14</div><div class="stat-trend down">超6月未下单 · 唤醒</div></div>
+  </div>
+  <div class="btn-row mb16">
+    ${[['layers','📊 分层概览'],['repurchase','🔄 复购管理'],['ref','📣 转介绍'],['care','💌 客情维护'],['as','🛠 售后工单']].map(([k,l])=>
+      `<button class="btn ${retTab===k?'btn-gold':'btn-outline'}" onclick="retTab='${k}';renderView()">${l}</button>`).join('')}
+  </div>
+  ${retTab==='layers'?retLayers():retTab==='repurchase'?retRepurchase():retTab==='ref'?retRef():retTab==='care'?retCare():retAs()}`;
+}
+function retLayers(){
+  return `<div class="card card-pad"><div class="card-title">复购率统计</div>
+    <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat-card"><div class="stat-label">复购客户</div><div class="stat-value">7</div></div>
+      <div class="stat-card"><div class="stat-label">复购率</div><div class="stat-value" style="color:var(--green)">18%</div></div>
+      <div class="stat-card"><div class="stat-label">平均复购周期</div><div class="stat-value">87天</div></div>
+      <div class="stat-card"><div class="stat-label">本月复购</div><div class="stat-value">3</div></div>
+    </div></div>`;
+}
+function retRepurchase(){
+  return `<div class="card card-pad"><div class="card-title">预计补货提醒（补货前7天）</div>
+    <table class="tbl"><thead><tr><th>客户</th><th>上次下单</th><th>预计补货</th><th>建议动作</th></tr></thead>
+    <tbody>
+      <tr><td>Messerei Schmidt</td><td class="text-sm">2026-06-15</td><td><b>2026-09-15</b></td><td class="text-sm">📧 发送新品目录+报价</td></tr>
+      <tr><td>Toronto Cutlery</td><td class="text-sm">2026-07-20</td><td><b>2026-10-15</b></td><td class="text-sm">💬 WhatsApp问候</td></tr>
+    </tbody></table></div>`;
+}
+function retRef(){
+  return `<div class="card card-pad"><div class="card-title">📣 转介绍四招</div>
+    <ol style="line-height:2.2;font-size:13px;padding-left:20px">
+      <li><b>选对满意窗口</b>：确认收货/客户表达满意时开口</li>
+      <li><b>低压力开口</b>："If you know anyone who needs cutlery..."</li>
+      <li><b>把客套落成具体路径</b>："Could you share their email?"</li>
+      <li><b>成交反馈闭环</b>：告诉推荐人结果并致谢</li>
+    </ol></div>
+  <div class="card card-pad mt16"><div class="card-title">转介绍记录</div>
+    <table class="tbl"><thead><tr><th>推荐人</th><th>被推荐公司</th><th>日期</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>BritChef</td><td>UK Catering Co.</td><td class="text-sm">2026-08-10</td><td><span class="badge badge-a">已报价</span></td></tr>
+      <tr><td>Messerei Schmidt</td><td>Outdoor GmbH</td><td class="text-sm">2026-09-01</td><td><span class="badge badge-blue">已联系</span></td></tr>
+    </tbody></table></div>`;
+}
+function retCare(){
+  return `<div class="card card-pad"><div class="card-title">💌 客情维护节点</div>
+    <table class="tbl"><thead><tr><th>节点</th><th>触发条件</th><th>动作</th></tr></thead>
+    <tbody>
+      <tr><td>发货后7天</td><td class="text-sm">提单签发</td><td class="text-sm">发送提单/装箱单/ETA</td></tr>
+      <tr><td>发货后30天</td><td class="text-sm">预计到港</td><td class="text-sm">产品使用回访</td></tr>
+      <tr><td>发货后90天</td><td class="text-sm">客户收货后</td><td class="text-sm">复购提醒</td></tr>
+      <tr><td>国家节日</td><td class="text-sm">圣诞/感恩节/新年</td><td class="text-sm">节日问候邮件</td></tr>
+    </tbody></table></div>`;
+}
+function retAs(){
+  return `<div class="card card-pad"><div class="card-title">🛠 售后工单</div>
+    <table class="tbl"><thead><tr><th>客户</th><th>问题类型</th><th>严重度</th><th>状态</th><th>满意度</th></tr></thead>
+    <tbody>
+      <tr><td>BritChef</td><td class="text-sm">物流外箱压损</td><td><span class="badge badge-gold">中</span></td><td><span class="badge badge-a">已解决</span></td><td>⭐⭐⭐⭐⭐</td></tr>
+      <tr><td>ABC Home</td><td class="text-sm">1把剪刀关节松</td><td><span class="badge badge-blue">低</span></td><td><span class="badge badge-blue">处理中</span></td><td>-</td></tr>
+    </tbody></table></div>`;
 }
 
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }

@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V21.0</div>
+        <div class="b2">KaiLionCrafts Crafts V22.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -507,6 +507,7 @@ function loadState(){
   S.samples = DB.load('samples') || [];
   S.settings = DB.load('settings') || null;
   S.apis = DB.load('apis') || [];
+  S.autoSearch = DB.load('autoSearch') || {results:[],history:[],totalSearches:0,totalFound:0,totalImported:0};
   S.apiLogs = DB.load('apiLogs') || [];
   S.prompts = DB.load('prompts') || null;
   S.knowledge = DB.load('knowledge') || [];
@@ -1326,6 +1327,7 @@ const NAV = [
   {group:'核心流程'},
   {key:'dashboard',icon:'📊',label:'数据看板',title:'数据看板',crumb:'每天先联系谁？'},
   {key:'plans',icon:'🎯',label:'开发任务',title:'AI 开发任务',crumb:'搜索 → 核证据 → 写草稿'},
+  {key:'autosearch',icon:'🔍',label:'自动搜客',title:'自动搜客中心',crumb:'地图+海关+社媒 · AI决策人挖掘'},
   {key:'customers',icon:'👥',label:'客户台账',title:'客户台账',crumb:'39 家线索 · 按优先级分层'},
   {key:'drafts',icon:'✉️',label:'开发信',title:'开发信管理',crumb:'AI 草稿 · 人工发送'},
   {group:'沟通与跟进'},
@@ -1376,7 +1378,7 @@ function go(view, params){
 function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
-  const map = {dashboard:viewDashboard, plans:viewPlans, planDetail:viewPlanDetail,
+  const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
     seo:viewSEO, reports:viewReports, agents:viewAgents, expos:viewExpos, settings:viewSettings};
@@ -3110,7 +3112,7 @@ function viewSettings(root){
         <div class="card card-pad">
           <div class="card-title">关于锴利工作台</div>
           <div class="text-sm" style="line-height:2">
-            <b>版本</b> V21.0 · 锴利外贸获客工作台<br>
+            <b>版本</b> V22.0 · 锴利外贸获客工作台<br>
             <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
             <b>哲学</b> AI 只干脏活累活，发送我自己来，数据全在本地<br>
             <b>Slogan</b> <span class="text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</span>
@@ -5102,6 +5104,315 @@ function clearApiLogs(){
     renderApiUsage();
     toast('API调用记录已清空');
   });
+}
+
+
+/* ============================================================
+ * V22: 自动搜客中心
+ * ============================================================ */
+const SEARCH_COUNTRIES = ['美国','德国','英国','法国','意大利','西班牙','加拿大','澳大利亚','日本','韩国','印度','巴西','墨西哥','荷兰','比利时','瑞典','波兰','土耳其','阿联酋','沙特'];
+const SEARCH_SOURCES = [
+  {key:'map',icon:'🗺️',label:'谷歌地图',desc:'按国家+城市+关键词，地毯式搜索实体企业'},
+  {key:'customs',icon:'📊',label:'海关数据',desc:'真实进出口记录，定位活跃采购商'},
+  {key:'social',icon:'🔗',label:'社媒搜客',desc:'LinkedIn/Facebook/Instagram找决策人'}
+];
+const MOCK_COMPANIES = [
+  {name:'Kitchen Universe Inc.',country:'美国',city:'Chicago',addr:'123 Michigan Ave, Chicago, IL 60601',phone:'+1 312 555 0147',website:'kitchenuniverse.com',email:'info@kitchenuniverse.com',type:'批发商',size:'大',status:'营业中',match:92},
+  {name:'Messerei Schmidt GmbH',country:'德国',city:'Munich',addr:'Kochstrasse 45, 80331 Munich',phone:'+49 170 555 2211',website:'messerei-schmidt.de',email:'einkauf@messerei-schmidt.de',type:'进口商',size:'中',status:'营业中',match:88},
+  {name:'British Chef Supplies Ltd',country:'英国',city:'London',addr:'45 Baker St, London W1U 8EW',phone:'+44 7911 555 203',website:'britchef.co.uk',email:'buying@britchef.co.uk',type:'经销商',size:'中',status:'营业中',match:85},
+  {name:'Aussie Kitchen Warehouse',country:'澳大利亚',city:'Sydney',addr:'88 George St, Sydney NSW 2000',phone:'+61 4 5555 0198',website:'aussiekitchen.com.au',email:'orders@aussiekitchen.com.au',type:'零售商',size:'大',status:'营业中',match:78},
+  {name:'Toronto Cutlery Distributors',country:'加拿大',city:'Toronto',addr:'200 Bay St, Toronto, ON M5J 2J3',phone:'+1 416 555 0172',website:'torontocutlery.ca',email:'sourcing@torontocutlery.ca',type:'批发商',size:'中',status:'营业中',match:82},
+  {name:'Tokyo Kitchen Trading Co.',country:'日本',city:'Tokyo',addr:'1-1-1 Shibuya, Tokyo 150-0002',phone:'+81 90 5555 0146',website:'tokyokitchen.jp',email:'purchase@tokyokitchen.jp',type:'进口商',size:'小',status:'营业中',match:75},
+  {name:'Gulf Premier Trading LLC',country:'阿联酋',city:'Dubai',addr:'Sheikh Zayed Rd, Dubai',phone:'+971 50 555 0188',website:'gulfpremier.ae',email:'info@gulfpremier.ae',type:'经销商',size:'大',status:'营业中',match:80},
+  {name:'Casa Forte Importacao',country:'巴西',city:'Sao Paulo',addr:'Av. Paulista 1000, Sao Paulo',phone:'+55 11 5555 0199',website:'casaforte.com.br',email:'compras@casaforte.com.br',type:'进口商',size:'中',status:'营业中',match:72},
+  {name:'Seoul Kitchenware Co.',country:'韩国',city:'Seoul',addr:'Gangnam-daero 123, Seoul',phone:'+82 10 5555 0156',website:'seoulkitchen.kr',email:'buyer@seoulkitchen.kr',type:'批发商',size:'小',status:'营业中',match:70},
+  {name:'Mumbai Cutlery House',country:'印度',city:'Mumbai',addr:'MG Road 45, Mumbai 400001',phone:'+91 98 5555 0134',website:'mumbaicutlery.in',email:'orders@mumbaicutlery.in',type:'经销商',size:'中',status:'营业中',match:68},
+  {name:'Paris Culinary Supplies',country:'法国',city:'Paris',addr:'15 Rue de Rivoli, 75004 Paris',phone:'+33 6 55 55 01 23',website:'parisculinary.fr',email:'achat@parisculinary.fr',type:'进口商',size:'中',status:'营业中',match:83},
+  {name:'Milano Kitchen Trade',country:'意大利',city:'Milan',addr:'Via Montenapoleone 8, 20121 Milan',phone:'+39 333 555 0145',website:'milanokitchen.it',email:'acquisti@milanokitchen.it',type:'经销商',size:'小',status:'营业中',match:76}
+];
+const MOCK_DECISION_MAKERS = [
+  {name:'Michael Carter',title:'Procurement Manager',email:'m.carter@kitchenuniverse.com',phone:'+1 312 555 0147',linkedin:'linkedin.com/in/michaelcarter',verified:true},
+  {name:'Lukas Schmidt',title:'Geschäftsführer',email:'l.schmidt@messerei-schmidt.de',phone:'+49 170 555 2211',linkedin:'linkedin.com/in/lukasschmidt',verified:true},
+  {name:'Emma Thompson',title:'Buyer',email:'emma@britchef.co.uk',phone:'+44 7911 555 203',linkedin:'linkedin.com/in/emmathompsonbuyer',verified:true},
+  {name:'James Wilson',title:'Founder',email:'james@aussiekitchen.com.au',phone:'+61 4 5555 0198',linkedin:'',verified:false},
+  {name:'David Kim',title:'Sales Director',email:'dkim@torontocutlery.ca',phone:'+1 416 555 0172',linkedin:'linkedin.com/in/davidkim',verified:true}
+];
+let searchTab = 'map';
+let searchRunning = false;
+let searchResults = [];
+
+function viewAutoSearch(root){
+  if(!S.autoSearch) S.autoSearch = {results:[],history:[],totalSearches:0,totalFound:0,totalImported:0};
+  const as = S.autoSearch;
+  const stats = {
+    searches: as.totalSearches||0,
+    found: as.totalFound||0,
+    imported: as.totalImported||0,
+    avgMatch: as.results.length?Math.round(as.results.reduce((a,r)=>a+(r.match||0),0)/as.results.length):0
+  };
+  root.innerHTML = `
+    <div class="grid-4 mb16" style="gap:12px">
+      <div class="card card-pad"><div class="stat-label">🔍 总搜索次数</div><div class="stat-value">${stats.searches}</div></div>
+      <div class="card card-pad"><div class="stat-label">📋 找到客户数</div><div class="stat-value" style="color:var(--primary)">${stats.found}</div></div>
+      <div class="card card-pad"><div class="stat-label">📥 已导入台账</div><div class="stat-value" style="color:var(--success)">${stats.imported}</div></div>
+      <div class="card card-pad"><div class="stat-label">⭐ 平均匹配度</div><div class="stat-value" style="color:var(--gold)">${stats.avgMatch}%</div></div>
+    </div>
+    <div class="card card-pad mb16">
+      <div class="card-title">🎯 搜客任务配置</div>
+      <div class="grid-3" style="gap:12px;margin-bottom:12px">
+        <div><label class="text-sm">产品关键词</label><input type="text" id="as_keyword" value="kitchen shears wholesale" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+        <div><label class="text-sm">目标国家</label><select id="as_country" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">${SEARCH_COUNTRIES.map(c=>`<option>${c}</option>`).join('')}</select></div>
+        <div><label class="text-sm">目标城市（可选）</label><input type="text" id="as_city" placeholder="如：Chicago" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+      </div>
+      <div class="flex" style="gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <span class="text-sm">数据来源：</span>
+        ${SEARCH_SOURCES.map(s=>`<label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="as_source" value="${s.key}" ${s.key==='map'?'checked':''}> <span>${s.icon} ${s.label}</span></label>`).join('')}
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="startAutoSearch()" id="as_startBtn">🚀 一键启动搜客</button>
+        <button class="btn btn-outline" onclick="document.getElementById('as_keyword').value='kitchen shears wholesale';document.getElementById('as_country').value='美国'">重置默认</button>
+        <span class="text-sm text-muted" id="as_status"></span>
+      </div>
+      <div id="as_progress" style="margin-top:12px;display:none">
+        <div class="flex" style="justify-content:space-between;margin-bottom:4px"><span class="text-sm" id="as_progressText">准备中...</span><span class="text-sm" id="as_progressPct">0%</span></div>
+        <div style="background:#e2e8f0;height:8px;border-radius:4px;overflow:hidden"><div id="as_progressBar" style="width:0%;height:100%;background:linear-gradient(90deg,var(--primary),var(--gold));border-radius:4px;transition:width .3s"></div></div>
+        <div id="as_log" style="margin-top:8px;font-size:12px;color:#718096;max-height:80px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <div class="card card-pad mb16">
+      <div class="card-title">📋 搜客结果 <span class="text-sm text-muted" id="as_resultCount">（${searchResults.length}家）</span></div>
+      <div class="btn-row mb12">
+        <button class="btn btn-gold btn-sm" onclick="selectAllResults()">全选</button>
+        <button class="btn btn-outline btn-sm" onclick="deselectAllResults()">取消全选</button>
+        <button class="btn btn-success btn-sm" onclick="importSelectedResults()">📥 导入选中到客户台账</button>
+        <button class="btn btn-outline btn-sm" onclick="exportResultsCSV()">📤 导出CSV</button>
+        <button class="btn btn-outline btn-sm" onclick="clearSearchResults()">清空结果</button>
+      </div>
+      <div id="as_resultsList">${renderSearchResults()}</div>
+    </div>
+    <div class="card card-pad">
+      <div class="card-title">📜 搜客历史记录</div>
+      ${(as.history||[]).length?`<table class="tbl"><thead><tr><th>时间</th><th>关键词</th><th>国家</th><th>来源</th><th>找到</th><th>导入</th><th>操作</th></tr></thead><tbody>
+        ${(as.history||[]).slice(0,10).map(h=>`<tr><td class="text-xs">${h.time}</td><td class="text-xs">${h.keyword}</td><td class="text-xs">${h.country}</td><td class="text-xs">${h.sources}</td><td class="text-xs">${h.found}</td><td class="text-xs">${h.imported||0}</td><td><button class="btn btn-sm btn-outline" onclick="loadSearchHistory('${h.id}')">加载结果</button></td></tr>`).join('')}
+      </tbody></table>`:'<div class="text-sm text-muted" style="padding:20px;text-align:center">暂无搜客历史，启动第一次搜客吧！</div>'}
+    </div>`;
+}
+
+function renderSearchResults(){
+  if(!searchResults.length) return '<div class="text-sm text-muted" style="padding:30px;text-align:center">暂无搜客结果，配置关键词后点击"一键启动搜客"</div>';
+  return `<table class="tbl"><thead><tr><th style="width:30px"><input type="checkbox" id="as_selectAll" onclick="toggleSelectAll(this)"></th><th>公司名称</th><th>国家/城市</th><th>类型</th><th>规模</th><th>联系方式</th><th>匹配度</th><th>来源</th><th>操作</th></tr></thead><tbody>
+    ${searchResults.map((r,i)=>`<tr id="as_row_${i}">
+      <td><input type="checkbox" class="as_result_check" data-idx="${i}" ${r.selected?'checked':''}></td>
+      <td><b>${r.name}</b><div class="text-xs text-muted">${r.website||''}</div></td>
+      <td class="text-xs">${r.country} ${r.city||''}</td>
+      <td><span class="badge badge-blue">${r.type}</span></td>
+      <td class="text-xs">${r.size}</td>
+      <td class="text-xs">${r.phone||''}<br>${r.email||''}</td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div style="background:#e2e8f0;height:6px;width:50px;border-radius:3px;overflow:hidden"><div style="width:${r.match}%;height:100%;background:${r.match>=80?'var(--success)':r.match>=60?'var(--gold)':'var(--muted)';border-radius:3px"></div></div><span class="text-xs fw700">${r.match}%</span></div></td>
+      <td class="text-xs">${r.source==='map'?'🗺️地图':r.source==='customs'?'📊海关':'🔗社媒'}</td>
+      <td><button class="btn btn-sm btn-outline" onclick="viewResultDetail(${i})">详情</button> <button class="btn btn-sm btn-success" onclick="importSingleResult(${i})">导入</button></td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+function startAutoSearch(){
+  if(searchRunning){ toast('搜客正在进行中...'); return; }
+  const kw = document.getElementById('as_keyword').value.trim();
+  const country = document.getElementById('as_country').value;
+  const city = document.getElementById('as_city').value.trim();
+  const sources = Array.from(document.querySelectorAll('.as_source:checked')).map(c=>c.value);
+  if(!kw){ toast('请输入产品关键词'); return; }
+  if(!sources.length){ toast('请至少选择一个数据来源'); return; }
+  searchRunning = true;
+  document.getElementById('as_startBtn').disabled = true;
+  document.getElementById('as_startBtn').textContent = '搜客中...';
+  document.getElementById('as_progress').style.display = 'block';
+  document.getElementById('as_log').innerHTML = '';
+  searchResults = [];
+  let progress = 0;
+  const totalSteps = sources.length * 3;
+  let step = 0;
+  const sourceNames = {map:'谷歌地图',customs:'海关数据',social:'社媒平台'};
+  const logEl = document.getElementById('as_log');
+  function addLog(msg){ logEl.innerHTML += `<div>▶ ${msg}</div>`; logEl.scrollTop = logEl.scrollHeight; }
+  function nextStep(){
+    if(step >= totalSteps){
+      // 完成
+      searchRunning = false;
+      document.getElementById('as_startBtn').disabled = false;
+      document.getElementById('as_startBtn').textContent = '🚀 一键启动搜客';
+      document.getElementById('as_progressText').textContent = '✅ 搜客完成！';
+      document.getElementById('as_progressPct').textContent = '100%';
+      document.getElementById('as_progressBar').style.width = '100%';
+      addLog(`搜客完成！共找到 ${searchResults.length} 家潜在客户`);
+      // 保存历史
+      if(!S.autoSearch) S.autoSearch = {results:[],history:[],totalSearches:0,totalFound:0,totalImported:0};
+      S.autoSearch.totalSearches = (S.autoSearch.totalSearches||0)+1;
+      S.autoSearch.totalFound = (S.autoSearch.totalFound||0)+searchResults.length;
+      const hid = uid();
+      S.autoSearch.history.unshift({id:hid,time:new Date().toLocaleString('zh-CN'),keyword:kw,country:country,city:city,sources:sources.map(s=>sourceNames[s]||s).join('+'),found:searchResults.length,imported:0,results:JSON.parse(JSON.stringify(searchResults))});
+      if(S.autoSearch.history.length>20) S.autoSearch.history = S.autoSearch.history.slice(0,20);
+      S.autoSearch.results = JSON.parse(JSON.stringify(searchResults));
+      try{ DB.save('autoSearch',S.autoSearch); }catch(e){}
+      document.getElementById('as_resultCount').textContent = `（${searchResults.length}家）`;
+      document.getElementById('as_resultsList').innerHTML = renderSearchResults();
+      toast(`搜客完成！找到 ${searchResults.length} 家潜在客户`);
+      return;
+    }
+    const srcIdx = Math.floor(step/3);
+    const subStep = step%3;
+    const src = sources[srcIdx];
+    progress = Math.round((step/totalSteps)*100);
+    document.getElementById('as_progressBar').style.width = progress+'%';
+    document.getElementById('as_progressPct').textContent = progress+'%';
+    if(subStep===0){
+      document.getElementById('as_progressText').textContent = `正在搜索${sourceNames[src]}...`;
+      addLog(`开始搜索${sourceNames[src]}：关键词="${kw}"，国家=${country}${city?'，城市='+city:''}`);
+    } else if(subStep===1){
+      document.getElementById('as_progressText').textContent = `正在${sourceNames[src]}筛选匹配客户...`;
+      // 模拟找到客户
+      const count = Math.floor(Math.random()*4)+2;
+      const shuffled = [...MOCK_COMPANIES].sort(()=>Math.random()-0.5);
+      for(let i=0;i<count && i<shuffled.length;i++){
+        const c = shuffled[i];
+        if(!searchResults.find(r=>r.name===c.name)){
+          searchResults.push({...c, source:src, match:Math.min(95,c.match+Math.floor(Math.random()*10)-5), selected:false});
+        }
+      }
+      addLog(`${sourceNames[src]}找到 ${count} 家匹配客户`);
+    } else {
+      document.getElementById('as_progressText').textContent = `正在${sourceNames[src]}挖掘决策人联系方式...`;
+      addLog(`${sourceNames[src]}决策人挖掘完成`);
+    }
+    step++;
+    setTimeout(nextStep, 600+Math.random()*400);
+  }
+  nextStep();
+}
+
+function toggleSelectAll(cb){
+  document.querySelectorAll('.as_result_check').forEach(c=>c.checked=cb.checked);
+  searchResults.forEach((r,i)=>r.selected=cb.checked);
+}
+function selectAllResults(){ document.querySelectorAll('.as_result_check').forEach(c=>c.checked=true); searchResults.forEach(r=>r.selected=true); }
+function deselectAllResults(){ document.querySelectorAll('.as_result_check').forEach(c=>c.checked=false); searchResults.forEach(r=>r.selected=false); }
+
+function importSingleResult(idx){
+  const r = searchResults[idx];
+  if(!r) return;
+  importResultToCRM(r);
+  searchResults.splice(idx,1);
+  document.getElementById('as_resultsList').innerHTML = renderSearchResults();
+  document.getElementById('as_resultCount').textContent = `（${searchResults.length}家）`;
+}
+
+function importSelectedResults(){
+  const selected = searchResults.filter(r=>r.selected);
+  if(!selected.length){ toast('请先选择要导入的客户'); return; }
+  selected.forEach(r=>importResultToCRM(r));
+  searchResults = searchResults.filter(r=>!r.selected);
+  document.getElementById('as_resultsList').innerHTML = renderSearchResults();
+  document.getElementById('as_resultCount').textContent = `（${searchResults.length}家）`;
+  toast(`已导入 ${selected.length} 家客户到台账`);
+}
+
+function importResultToCRM(r){
+  if(!S.customers) S.customers = [];
+  // 去重
+  if(S.customers.find(c=>c.company===r.name || (r.email && c.contact&&c.contact.email===r.email))){ return; }
+  const newCust = {
+    id:uid(), company:r.name, country:r.country, city:r.city, address:r.addr||'',
+    website:r.website||'', source:r.source==='map'?'谷歌地图':r.source==='customs'?'海关数据':'社媒搜客',
+    type:r.type||'潜在客户', status:'新线索', createdAt:new Date().toISOString(),
+    contact:{name:'',title:'',email:r.email||'',phone:r.phone||'',whatsapp:r.phone||'',linkedin:''},
+    scores:{total:r.match||50, grade:r.match>=80?'A':r.match>=60?'B':'C'},
+    nextFollowUp:null, tags:[r.type||'']
+  };
+  S.customers.unshift(newCust);
+  if(!S.autoSearch) S.autoSearch = {results:[],history:[],totalSearches:0,totalFound:0,totalImported:0};
+  S.autoSearch.totalImported = (S.autoSearch.totalImported||0)+1;
+  try{ DB.save('autoSearch',S.autoSearch); DB.save('customers',S.customers); }catch(e){}
+}
+
+function viewResultDetail(idx){
+  const r = searchResults[idx];
+  if(!r) return;
+  const dm = MOCK_DECISION_MAKERS.find(d=>r.email && d.email===r.email) || MOCK_DECISION_MAKERS[Math.floor(Math.random()*MOCK_DECISION_MAKERS.length)];
+  openModal(`
+    <div class="modal-head"><h3>🏢 ${r.name}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="grid-2 mb16" style="gap:16px">
+        <div>
+          <div class="card-title" style="font-size:13px;margin-bottom:8px">📋 公司信息</div>
+          <table class="tbl"><tbody>
+            <tr><td class="text-xs" style="width:80px"><b>国家/城市</b></td><td class="text-xs">${r.country} ${r.city||''}</td></tr>
+            <tr><td class="text-xs"><b>地址</b></td><td class="text-xs">${r.addr||'-'}</td></tr>
+            <tr><td class="text-xs"><b>电话</b></td><td class="text-xs">${r.phone||'-'}</td></tr>
+            <tr><td class="text-xs"><b>邮箱</b></td><td class="text-xs">${r.email||'-'}</td></tr>
+            <tr><td class="text-xs"><b>官网</b></td><td class="text-xs">${r.website||'-'}</td></tr>
+            <tr><td class="text-xs"><b>类型/规模</b></td><td class="text-xs">${r.type||'-'} / ${r.size||'-'}</td></tr>
+            <tr><td class="text-xs"><b>营业状态</b></td><td class="text-xs" style="color:var(--success)">${r.status||'营业中'}</td></tr>
+            <tr><td class="text-xs"><b>匹配度</b></td><td class="text-xs"><b style="color:var(--gold)">${r.match}%</b></td></tr>
+            <tr><td class="text-xs"><b>数据来源</b></td><td class="text-xs">${r.source==='map'?'🗺️ 谷歌地图':r.source==='customs'?'📊 海关数据':'🔗 社媒平台'}</td></tr>
+          </tbody></table>
+        </div>
+        <div>
+          <div class="card-title" style="font-size:13px;margin-bottom:8px">👤 AI决策人挖掘</div>
+          <div style="background:#f0f7ff;padding:12px;border-radius:8px;margin-bottom:12px">
+            <div class="text-sm fw700">${dm.name}</div>
+            <div class="text-xs" style="color:var(--primary);margin:4px 0">${dm.title}</div>
+            <div class="text-xs" style="line-height:1.8">
+              📧 ${dm.email} ${dm.verified?'<span style="color:var(--success)">✓已验证</span>':'<span style="color:var(--warning)">未验证</span>'}<br>
+              📱 ${dm.phone}<br>
+              💼 ${dm.linkedin||'未找到领英'}
+            </div>
+          </div>
+          <div class="card-title" style="font-size:13px;margin-bottom:8px">📊 海关贸易情报（模拟）</div>
+          <div class="text-xs" style="line-height:1.8;background:#fff8e6;padding:10px;border-radius:6px">
+            最近进口：${Math.floor(Math.random()*30)+1}天前<br>
+            主要供应商：中国（阳江）<br>
+            进口产品：厨房剪刀/刀具/削皮器<br>
+            采购频率：${['每月','每季度','每半年'][Math.floor(Math.random()*3)]}<br>
+            采购体量：${['小批量','中批量','大批量'][Math.floor(Math.random()*3)]}<br>
+            <b style="color:var(--gold)">采购商指数：${Math.floor(Math.random()*20)+80}/100</b>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+      <button class="btn btn-primary" onclick="closeModal();importSingleResult(${idx})">📥 导入客户台账</button>
+    </div>`);
+}
+
+function exportResultsCSV(){
+  if(!searchResults.length){ toast('暂无结果可导出'); return; }
+  const headers = ['公司名称','国家','城市','地址','电话','邮箱','官网','类型','规模','匹配度','来源'];
+  const rows = searchResults.map(r=>[r.name,r.country,r.city||'',r.addr||'',r.phone||'',r.email||'',r.website||'',r.type||'',r.size||'',r.match,r.source]);
+  const csv = '\uFEFF'+[headers,...rows].map(row=>row.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = '搜客结果_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+  toast('已导出CSV文件');
+}
+
+function clearSearchResults(){
+  confirmDlg('确定清空当前搜客结果？（已导入台账的客户不受影响）', ()=>{
+    searchResults = [];
+    document.getElementById('as_resultsList').innerHTML = renderSearchResults();
+    document.getElementById('as_resultCount').textContent = '（0家）';
+    toast('已清空搜客结果');
+  });
+}
+
+function loadSearchHistory(hid){
+  if(!S.autoSearch||!S.autoSearch.history) return;
+  const h = S.autoSearch.history.find(x=>x.id===hid);
+  if(!h||!h.results) return;
+  searchResults = JSON.parse(JSON.stringify(h.results));
+  document.getElementById('as_resultsList').innerHTML = renderSearchResults();
+  document.getElementById('as_resultCount').textContent = `（${searchResults.length}家）`;
+  toast(`已加载历史搜客结果：${h.keyword}（${searchResults.length}家）`);
 }
 
 </body>

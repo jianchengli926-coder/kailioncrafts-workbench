@@ -21,10 +21,12 @@
   --text-3:#8a96a8;
   --success:#2f855a;
   --success-bg:#e6f4ec;
+  --green:#2f855a;
   --warning:#c05621;
   --warning-bg:#fdf0e4;
   --danger:#c53030;
   --danger-bg:#fbeaea;
+  --red:#c53030;
   --info:#2b6cb0;
   --info-bg:#e8f0fa;
   --gray:#718096;
@@ -366,8 +368,8 @@ const now = ()=> new Date().toISOString();
 const todayStr = ()=> new Date().toISOString().slice(0,10);
 function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString(); }
 function daysLater(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString(); }
-function fmtDate(iso){ if(!iso) return '-'; const d=new Date(iso); return (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
-function fmtDay(iso){ if(!iso) return '-'; const d=new Date(iso); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fmtDate(iso){ if(!iso) return '-'; let d=new Date(iso); if(isNaN(d.getTime())){ const m=String(iso).match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})[T ]?(\d{1,2})?:?(\d{1,2})?/); if(m){ d=new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0)); } } if(isNaN(d.getTime())) return '-'; return (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function fmtDay(iso){ if(!iso) return '-'; let d=new Date(iso); if(isNaN(d.getTime())){ const m=String(iso).match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); if(m){ d=new Date(+m[1],+m[2]-1,+m[3]); } } if(isNaN(d.getTime())) return '-'; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function toast(msg,type){ type=type||'ok'; const root=document.getElementById('toastRoot'); const t=document.createElement('div'); t.className='toast '+type; t.innerHTML=(type==='ok'?'✓ ':type==='err'?'✕ ':'ℹ ')+esc(msg); root.appendChild(t); setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},2200); }
 
@@ -816,10 +818,16 @@ function defaultApis(){
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'智谱 GLM-4-Flash', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
      apiKey:b64enc('ce5df9d38c5342c5993fef25bd7403b8.EwA0H7uNGYBUSLm5'),
-     model:'glm-4-flash-250414', temperature:0.1, enabled:false, isDefault:true,
+     model:'glm-4-flash', temperature:0.1, enabled:false, isDefault:true,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
-    {id:uid(), name:'本地 Ollama', type:'ollama', baseURL:'http://localhost:11434/v1',
-     apiKey:b64enc(''), model:'qwen2.5', temperature:0.7, enabled:false, isDefault:false,
+    {id:uid(), name:'本地 Qwen2.5-7B(文本)', type:'ollama', baseURL:'http://localhost:11434/v1',
+     apiKey:b64enc(''), model:'qwen2.5:7b', temperature:0.7, enabled:false, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'本地 DeepSeek-R1-7B(推理)', type:'ollama', baseURL:'http://localhost:11434/v1',
+     apiKey:b64enc(''), model:'deepseek-r1:7b', temperature:0.7, enabled:false, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'本地 Qwen2.5VL-7B(视觉)', type:'ollama', baseURL:'http://localhost:11434/v1',
+     apiKey:b64enc(''), model:'qwen2.5vl:7b', temperature:0.7, enabled:false, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}}
   ];
 }
@@ -884,7 +892,10 @@ async function callAI(messages, opts={}){
     const headers = {'Content-Type':'application/json'};
     if(cfg.type!=='ollama' || b64dec(cfg.apiKey)) headers['Authorization']='Bearer '+b64dec(cfg.apiKey);
     const body = { model:cfg.model, messages, temperature: opts.temperature!=null?opts.temperature:cfg.temperature, stream:false };
-    const r = await fetch(cfg.baseURL.replace(/\s+$/,'').replace(/\/$/,'')+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body)});
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=>controller.abort(), 60000);
+    const r = await fetch(cfg.baseURL.replace(/\s+$/,'').replace(/\/$/,'')+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+    clearTimeout(timeoutId);
     if(!r.ok){ const txt = await r.text(); return {content:null,usage:{},error:'HTTP '+r.status+' '+txt.slice(0,200),model:cfg.model}; }
     const j = await r.json();
     return { content: j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'',
@@ -1006,6 +1017,12 @@ const NAV = [
   {key:'orders',icon:'💰',label:'报价与订单',title:'报价与订单',crumb:'Quotations · Contracts · Orders'},
   {key:'products',icon:'📦',label:'产品与样品',title:'产品与样品',crumb:'Product Catalog · Samples'},
   {key:'knowledge',icon:'📚',label:'知识库',title:'企业知识库',crumb:'Products · SOP · Cases · News'},
+  {group:'营销与增长'},
+  {key:'seo',icon:'📈',label:'SEO内容营销',title:'SEO与内容营销',crumb:'关键词 · 内容 · GEO · 外链'},
+  {key:'expos',icon:'🎪',label:'展会管理',title:'展会管理',crumb:'展前邀约 · 展中分级 · 展后跟进'},
+  {group:'数据与智能'},
+  {key:'reports',icon:'🏆',label:'业绩战报',title:'业绩战报',crumb:'漏斗看未来 · 战报看现在 · 行为看过程'},
+  {key:'agents',icon:'🤖',label:'AI Agent团队',title:'AI Agent团队',crumb:'AI CEO调度 · 11个专业Agent协同'},
   {group:'系统'},
   {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings'}
 ];
@@ -1019,7 +1036,7 @@ function renderNav(){
     if(n.group){ html += `<div class="nav-group">${n.group}</div>`; return; }
     let badge = '';
     if(n.key==='customers'){ const n = S.customers.filter(c=>c.nextFollowUp && new Date(c.nextFollowUp)<=new Date() && c.status!=='已回复').length; if(n>0) badge=`<span class="nav-badge">${n}</span>`; }
-    if(n.key==='drafts'){ const n = S.drafts.filter(d=>d.status==='待审核').length; if(n>0) badge=`<span class="nav-badge">${n}</span>`; }
+    if(n.key==='drafts'){ const n = S.drafts.filter(d=>d.status==='待检查').length; if(n>0) badge=`<span class="nav-badge">${n}</span>`; }
     html += `<div class="nav-item ${currentView===n.key?'active':''}" onclick="go('${n.key}')">
       <span class="icon">${n.icon}</span><span class="label">${n.label}</span>${badge}</div>`;
   });
@@ -1041,7 +1058,8 @@ function renderView(){
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
   const map = {dashboard:viewDashboard, plans:viewPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
-    inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge, settings:viewSettings};
+    inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
+    seo:viewSEO, reports:viewReports, agents:viewAgents, expos:viewExpos, settings:viewSettings};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
@@ -1578,7 +1596,7 @@ function viewCustomers(root){
 }
 function gotoCustPage(p){ custFilter.page=p; renderView(); }
 function toggleCustSel(id,on){ if(on){ if(!custFilter.selected.includes(id))custFilter.selected.push(id); } else { custFilter.selected=custFilter.selected.filter(x=>x!==id); } }
-function toggleAllCust(on){ if(on){ pageList.forEach(c=>{ if(!custFilter.selected.includes(c.id))custFilter.selected.push(c.id); }); } else { custFilter.selected=[]; } renderView(); }
+function toggleAllCust(on){ const list=(typeof custFilter!=='undefined'&&custFilter.filtered)?custFilter.filtered:S.customers; if(on){ list.forEach(c=>{ if(!custFilter.selected.includes(c.id))custFilter.selected.push(c.id); }); } else { custFilter.selected=[]; } renderView(); }
 function aiBatchCheck(){
   const ids = custFilter.selected.length? custFilter.selected : S.customers.filter(c=>!c.isOld).slice(0,8).map(c=>c.id);
   if(!ids.length){ toast('请先勾选客户','err'); return; }
@@ -2050,7 +2068,7 @@ function editDraftForCustomer(cid){
   const c = S.customers.find(x=>x.id===cid); if(!c) return;
   const d = S.drafts.find(x=>x.customerId===cid) || {
     id:uid(), customerId:cid, customerName:c.company, country:c.country, language: c.country==='德国'?'德语':c.country==='日本'?'日语':'英语',
-    subject:'', body:'', aiNotes:[], status:'待审核', createdAt:now(), sentAt:null};
+    subject:'', body:'', aiNotes:[], status:'待检查', createdAt:now(), sentAt:null};
   openDraftEditor(d.id, true);
 }
 function openDraftEditor(did, isNew){
@@ -2460,7 +2478,7 @@ function viewSettings(root){
         <div class="card card-pad">
           <div class="card-title">关于方舟工作台</div>
           <div class="text-sm" style="line-height:2">
-            <b>版本</b> v1.0 · KaiLionCrafts Ark<br>
+            <b>版本</b> v6.0 · KaiLionCrafts Ark<br>
             <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
             <b>哲学</b> AI 只干脏活累活，发送我自己来，数据全在本地<br>
             <b>Slogan</b> <span class="text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</span>
@@ -2479,7 +2497,7 @@ function saveSettings(){
 }
 function exportData(){
   const data = {};
-  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings'].forEach(k=>data[k]=S[k]);
+  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations'].forEach(k=>{ if(S[k]!==undefined) data[k]=S[k]; });
   const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'kailion-ark-backup-'+todayStr()+'.json'; a.click();
@@ -2487,7 +2505,7 @@ function exportData(){
 }
 function resetData(){
   confirmDlg('将清空所有本地数据并重新注入演示数据，确定？', ()=>{
-    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings'].forEach(k=>DB.remove(k));
+    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations'].forEach(k=>DB.remove(k));
     loadState(); seedData(); go('dashboard'); toast('已重置为演示数据');
   });
 }
@@ -2714,7 +2732,14 @@ function openApiForm(aid){
       <div class="form-group"><label>API Key（密码掩码）</label>
         <div style="display:flex;gap:8px"><input type="password" class="form-control" id="ap_key" value="${esc(show)}" style="flex:1">
         <button class="btn btn-outline" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'">👁</button></div></div>
-      <div class="form-group"><label>模型名称</label><input class="form-control mono" id="ap_model" value="${esc(a.model)}"></div>
+      <div class="form-group"><label>模型名称</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+          <span class="badge badge-blue" style="cursor:pointer" onclick="document.getElementById('ap_model').value='qwen2.5:7b'">qwen2.5:7b</span>
+          <span class="badge badge-blue" style="cursor:pointer" onclick="document.getElementById('ap_model').value='deepseek-r1:7b'">deepseek-r1:7b</span>
+          <span class="badge badge-blue" style="cursor:pointer" onclick="document.getElementById('ap_model').value='qwen2.5vl:7b'">qwen2.5vl:7b(视觉)</span>
+          <span class="badge badge-blue" style="cursor:pointer" onclick="document.getElementById('ap_model').value='llama3.2-vision'">llama3.2-vision</span>
+        </div>
+        <input class="form-control mono" id="ap_model" value="${esc(a.model)}"></div>
       <div class="form-group"><label>温度 (0-1)</label><input type="number" step="0.1" min="0" max="1" class="form-control" id="ap_temp" value="${a.temperature}"></div>
     </div>
     <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal()">取消</button>
@@ -2784,7 +2809,9 @@ function exportFollowups(){
 function exportBackup(){
   const all={customers:S.customers,plans:S.plans,drafts:S.drafts,inquiries:S.inquiries,quotes:S.quotes,
     contracts:S.contracts,followups:S.followups,inbox:S.inbox,products:S.products,samples:S.samples,
-    knowledge:S.knowledge,apis:S.apis,settings:S.settings,exportedAt:new Date().toISOString()};
+    knowledge:S.knowledge,apis:S.apis,settings:S.settings,monitors:S.monitors,monitorLogs:S.monitorLogs,
+    keywords:S.keywords,contents:S.contents,backlinks:S.backlinks,exhibitions:S.exhibitions,
+    prompts:S.prompts,publicPool:S.publicPool,receivables:S.receivables,exportedAt:new Date().toISOString()};
   downloadFile('kailion_backup_'+todayStr()+'.json',JSON.stringify(all,null,2),'application/json');
   toast('已导出全量备份');
 }
@@ -2819,7 +2846,18 @@ function spamCheck(){
   const words=body.split(/\s+/).filter(Boolean).length; if(words<50){ score-=5; issues.push('正文太短('+words+'词)'); }
   score=Math.max(0,Math.min(100,score));
   const color = score>=80?'var(--green)':score>=60?'#ed8936':'var(--red)';
-  alert(`进箱率评分：${score}/100\n\n${issues.length?'问题：\n- '+issues.join('\n- '):'✓ 未发现明显垃圾邮件特征'}\n\n建议：${score>=80?'进箱率良好':'适当调整敏感词和链接数'}`);
+  openModal(`<div class="modal-head"><h3>🛡 进箱率检测</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div style="text-align:center;padding:20px">
+        <div style="font-size:48px;font-weight:800;color:${color}">${score}</div>
+        <div class="text-muted">/ 100 分</div>
+      </div>
+      <div class="divider"></div>
+      ${issues.length?'<b>⚠️ 发现问题：</b><ul style="padding-left:20px;margin-top:8px;line-height:2">'+issues.map(i=>'<li>'+i+'</li>').join('')+'</ul>':'<div style="color:var(--green);text-align:center;padding:16px">✓ 未发现明显垃圾邮件特征</div>'}
+      <div class="divider"></div>
+      <div class="text-sm"><b>建议：</b>${score>=80?'进箱率良好，可放心发送':'适当调整敏感词和链接数，降低进垃圾箱风险'}</div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-primary" onclick="closeModal()">知道了</button></div>`);
 }
 
 /* V4 邮箱健康度 + 邮件配置指南 */

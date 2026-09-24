@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V27.0</div>
+        <div class="b2">KaiLionCrafts Crafts V28.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -1589,6 +1589,8 @@ function viewDashboard(root){
         <span class="text-sm">⏰ <b>${S.quotes.filter(q=>q.status==='已发送' && (new Date(q.validUntil)-new Date())<7*86400000).length}</b> 张报价7天内到期</span>
         <span class="text-sm">📦 <b>${(S.samples||[]).filter(x=>x.status==='已签收' && !x.feedback).length}</b> 个样品已签收未反馈</span>
         <span class="text-sm">📝 <b>${S.contracts.filter(c=>c.status==='待签').length}</b> 份合同待签署</span>
+        <span class="text-sm" style="color:var(--warning)">⏰ <b>${getTodayFollowCount()}</b> 个客户今日需跟进</span>
+        <span class="text-sm" style="color:var(--red)">🔴 <b>${getFollowOverdueCount()}</b> 个客户跟进超时（>14天）</span>
         <span class="text-sm">🚚 <b>${S.contracts.filter(c=>c.status==='执行中').length}</b> 个订单在生产中</span>
         <span class="text-sm">🚢 <b>2</b> 票货物在途（1运输/1清关）</span>
         <span class="text-sm" style="color:var(--red)">💤 <b>14</b> 家沉睡客户待唤醒</span>
@@ -2062,8 +2064,8 @@ function viewCustomers(root){
     ${custFilter.q?`<div class="mb16 text-sm">搜索 “<b>${esc(custFilter.q)}</b>” 共 ${list.length} 条 <a class="text-gold" style="cursor:pointer" onclick="custFilter.q='';routeParams.q='';renderView()">清除</a></div>`:''}
     <div class="card">
       <div class="table-wrap"><table class="tbl">
-        <colgroup><col style="width:4%"><col style="width:22%"><col style="width:8%"><col style="width:6%"><col style="width:17%"><col style="width:19%"><col style="width:12%"><col style="width:12%"></colgroup>
-        <thead><th><input type="checkbox" onchange="toggleAllCust(this.checked)"></th><th>公司</th><th>国家</th><th>等级</th><th>主营产品</th><th>决策人邮箱</th><th>下次跟进</th><th>状态</th></tr></thead>
+        <colgroup><col style="width:4%"><col style="width:20%"><col style="width:7%"><col style="width:6%"><col style="width:15%"><col style="width:16%"><col style="width:10%"><col style="width:10%"><col style="width:12%"></colgroup>
+        <thead><th><input type="checkbox" onchange="toggleAllCust(this.checked)"></th><th>公司</th><th>国家</th><th>等级</th><th>主营产品</th><th>决策人邮箱</th><th>距上次跟进</th><th>下次跟进</th><th>状态</th></tr></thead>
         <tbody>
         ${pageList.length? pageList.map(c=>`
           <tr style="cursor:pointer" onclick="openCustomerDetail('${c.id}')">
@@ -2073,10 +2075,11 @@ function viewCustomers(root){
             <td>${gradeBadge(c.scores.grade)} <span class="text-sm text-muted">${c.scores.total}</span></td>
             <td class="text-sm">${esc(c.products)}</td>
             <td class="text-sm mono">${esc(c.contact.email)}</td>
+            <td>${followDaysBadge(c)}</td>
             <td class="text-sm">${fmtDay(c.nextFollowUp)}</td>
             <td><span class="badge ${c.status==='已回复'?'badge-a':c.status==='跟进中'?'badge-blue':c.status==='待跟进'?'badge-gold':'badge-gray'}">${esc(c.status)}</span>${!c.owner?'<button class="btn btn-gold btn-sm" style="margin-left:6px" onclick="event.stopPropagation();claimCust(\''+c.id+'\')">领取</button>':''}</td>
           </tr>`).join('')
-        : `<tr><td colspan="8"><div class="empty"><div class="big">🔍</div><p>没有符合条件的客户</p></div></td></tr>`}
+        : `<tr><td colspan="9"><div class="empty"><div class="big">🔍</div><p>没有符合条件的客户</p></div></td></tr>`}
         </tbody>
       </table></div>
       ${pager(list.length, custFilter.page, CUST_PAGE, 'gotoCustPage')}
@@ -3159,7 +3162,7 @@ function viewSettings(root){
         <div class="card card-pad">
           <div class="card-title">关于锴利工作台</div>
           <div class="text-sm" style="line-height:2">
-            <b>版本</b> V27.0 · 锴利外贸获客工作台<br>
+            <b>版本</b> V28.0 · 锴利外贸获客工作台<br>
             <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
             <b>哲学</b> AI 只干脏活累活，发送我自己来，数据全在本地<br>
             <b>Slogan</b> <span class="text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</span>
@@ -6253,7 +6256,7 @@ function generateLeadEmail(idx){
 
 
 /* ============================================================
- * V27.0 开发信审核发送中心 + SMTP配置
+ * V28.0 开发信审核发送中心 + SMTP配置
  * ============================================================ */
 function saveSmtpConfig(){
   const cfg={
@@ -6497,7 +6500,7 @@ function nowStr(){const d=new Date();return todayStr()+' '+String(d.getHours()).
 
 
 /* ============================================================
- * V27.0 全球采购商地图 + 决策人挖掘
+ * V28.0 全球采购商地图 + 决策人挖掘
  * ============================================================ */
 function globalMapView(){
   const regions=[
@@ -6743,7 +6746,7 @@ function decisionMinerView(){
 
 
 /* ============================================================
- * V27.0 开发计划中心 - 多计划并行 AI自动运行
+ * V28.0 开发计划中心 - 多计划并行 AI自动运行
  * ============================================================ */
 function viewDevPlans(root){
   const plans = S.devPlans || [];
@@ -6937,6 +6940,41 @@ function loadDemoDevPlans(){
   DB.save('devPlans',S.devPlans);
   toast('已加载3条演示开发计划');
   renderView();
+}
+
+
+/* ============================================================
+ * V28.0 客户跟进超时预警 - 距上次跟进天数+颜色标识
+ * ============================================================ */
+function followDaysBadge(c){
+  const lastFollow = (c.followUpHistory && c.followUpHistory.length) ? c.followUpHistory[c.followUpHistory.length-1].t : c.createdAt;
+  if(!lastFollow) return '<span class="text-xs text-muted">无记录</span>';
+  const days = Math.floor((new Date() - new Date(lastFollow)) / (1000*60*60*24));
+  let color, bg, label;
+  if(days <= 7){ color='#16a34a'; bg='#f0fdf4'; label='正常'; }
+  else if(days <= 14){ color='#ca8a04'; bg='#fefce8'; label='需关注'; }
+  else if(days <= 30){ color='#ea580c'; bg='#fff7ed'; label='快超时'; }
+  else { color='#dc2626'; bg='#fef2f2'; label='已超时'; }
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${bg};color:${color};font-size:11px;font-weight:bold">${days}天</span> <span class="text-xs" style="color:${color}">${label}</span>`;
+}
+function getFollowOverdueCount(){
+  let count = 0;
+  S.customers.forEach(c=>{
+    const lastFollow = (c.followUpHistory && c.followUpHistory.length) ? c.followUpHistory[c.followUpHistory.length-1].t : c.createdAt;
+    if(lastFollow){
+      const days = Math.floor((new Date() - new Date(lastFollow)) / (1000*60*60*24));
+      if(days > 14) count++;
+    }
+  });
+  return count;
+}
+function getTodayFollowCount(){
+  let count = 0;
+  const today = new Date().toDateString();
+  S.customers.forEach(c=>{
+    if(c.nextFollowUp && new Date(c.nextFollowUp).toDateString() === today) count++;
+  });
+  return count;
 }
 
 </body>

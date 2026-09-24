@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V13.0</div>
+        <div class="b2">KaiLionCrafts Crafts V14.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -1089,7 +1089,14 @@ function defaultKnowledge(){
     {id:uid(),title:'画册询价单流程',cat:'产品电子画册',tags:'画册,询价',content:'客户选品→生成询价清单→一键发送→自动转询盘。画册首页放认证图标+产能数据建立信任。',createdAt:daysAgo(1)},
     // V13 外贸财务核算
     {id:uid(),title:'换汇成本公式',cat:'外贸财务核算',tags:'换汇成本,利润',content:'换汇成本=不含税成本×(1+征退税率差)÷FOB美元。5-8正常，>8预警，<5高利润。实际利润=FOB收入+退税-采购成本-国内费用。',createdAt:daysAgo(1)},
-    {id:uid(),title:'三单匹配',cat:'外贸财务核算',tags:'退税,报关',content:'报关单/进货发票/收汇水单：品名/数量/单位必须一致。报关后36个月内申报退税。',createdAt:daysAgo(1)}
+    {id:uid(),title:'三单匹配',cat:'外贸财务核算',tags:'退税,报关',content:'报关单/进货发票/收汇水单：品名/数量/单位必须一致。报关后36个月内申报退税。',createdAt:daysAgo(1)},
+    // V14 AI全流程自动化
+    {id:uid(),title:'7步全流程',cat:'AI全流程自动化',tags:'全流程,Agent',content:'市场分析→线索挖掘→质量过滤→背调→开发信→审批→CRM同步。每步800-1500ms，实时日志滚动。',createdAt:daysAgo(1)},
+    // V14 多Agent协作
+    {id:uid(),title:'4个常驻Agent',cat:'多Agent协作',tags:'常驻,调度',content:'🔍找客户(每周)/📱社媒(每日)/📝内容(每周)/🛠️运维(每日)。每个独立开关+频率+参数。',createdAt:daysAgo(1)},
+    // V14 CRM AI大脑
+    {id:uid(),title:'成交概率预测',cat:'CRM AI大脑',tags:'概率,预测',content:'基于最近跟进/报价次数/样品/回复频率计算。🟢>70%高/🟡40-70中/🟠<40低。高概率优先跟进。',createdAt:daysAgo(1)},
+    {id:uid(),title:'4种决策风格',cat:'CRM AI大脑',tags:'决策风格,话术',content:'🎯结果导向(直接给数据)/🤝关系导向(先建立信任)/🔬分析导向(给详细参数)/🎨创新导向(给差异化卖点)。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1602,6 +1609,12 @@ function viewDashboard(root){
         </tbody></table></div>
       <div class="card card-pad"><div class="card-title">💰 本月财务</div>
         <div class="text-sm" style="line-height:2.2">本月利润率：<b style="color:var(--green)">18.5%</b><br>总利润：<b>¥18.6K</b><br>换汇成本异常：<b style="color:var(--red)">1 单</b><br>退税待申报：<b>2</b> 笔 · 待到账 <b style="color:var(--gold)">¥7.8K</b></div></div>
+    </div>
+    <div class="grid-4 mb16">
+      <div class="card card-pad" style="border-top:3px solid var(--gold)"><div class="stat-label">🤖 AI全流程</div><div class="stat-value" style="color:var(--gold)">5</div><div class="text-sm text-muted">待审批</div></div>
+      <div class="card card-pad"><div class="stat-label">🛡️ 线索过滤</div><div class="stat-value">65%</div><div class="text-sm text-muted">23→15通过</div></div>
+      <div class="card card-pad"><div class="stat-label">🎯 高概率客户</div><div class="stat-value" style="color:var(--green)">7</div><div class="text-sm text-muted">🟢高/🟡中12/🟠低20</div></div>
+      <div class="card card-pad"><div class="stat-label">📈 开发信健康度</div><div class="stat-value" style="color:var(--green)">85</div><div class="text-sm text-muted">回复率21%</div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -3493,9 +3506,16 @@ const AGENTS=[
   {emoji:'💬',name:'社媒运营Agent',role:'社媒内容和互动',status:'idle'},
   {emoji:'✍️',name:'内容创作Agent',role:'博客和SEO内容',status:'idle'}
 ];
+let agentTab='team';
+let flowStep=0,flowLogs=[],flowRunning=false;
 function viewAgents(root){
+  if(agentTab==='flow') return viewAIFlow(root);
   root.innerHTML = `
   <div class="page-head"><h2>🤖 AI Agent 团队</h2><p class="sub">AI CEO 调度，11个专业Agent协同获客</p></div>
+  <div class="flex gap8 mb16">
+    <button class="btn ${agentTab==='team'?'btn-gold':'btn-outline'}" onclick="agentTab='team';renderView()">👥 Agent团队</button>
+    <button class="btn ${agentTab==='flow'?'btn-gold':'btn-outline'}" onclick="agentTab='flow';renderView()">⚡ 全流程自动化</button>
+  </div>
   <div class="card card-pad mb16" style="background:linear-gradient(120deg,var(--primary),#2c5282);color:#fff">
     <div style="display:flex;align-items:center;gap:16px">
       <div style="font-size:36px">👑</div>
@@ -3568,7 +3588,15 @@ function viewAgents(root){
       <div class="stat-card" style="border-top:3px solid var(--gold)"><div class="stat-label">🗂 待审批</div><div class="stat-value" style="color:var(--gold)">5</div></div>
     </div>
     <div class="text-sm text-muted mt8">💡 AI先dry run预览，人工确认后标记"已审批可发送"。设置最低价$1.40、最高折扣15%。</div>
-  </div>`;
+  </div>
+  <div class="card card-pad mt16"><div class="card-title">🔄 4个常驻Agent配置</div>
+    <table class="tbl"><thead><tr><th>Agent</th><th>频率</th><th>上次执行</th><th>下次执行</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>🔍 找客户Agent</td><td>每周一</td><td>2026-09-22</td><td>2026-09-29</td><td><span class="badge badge-a">✅ 启用</span></td></tr>
+      <tr><td>📱 社媒Agent</td><td>每日</td><td>2026-09-24</td><td>2026-09-25</td><td><span class="badge badge-a">✅ 启用</span></td></tr>
+      <tr><td>📝 内容Agent</td><td>每周三</td><td>2026-09-18</td><td>2026-09-25</td><td><span class="badge badge-a">✅ 启用</span></td></tr>
+      <tr><td>🛠️ 运维Agent</td><td>每日</td><td>2026-09-24</td><td>2026-09-25</td><td><span class="badge badge-gray">⏸ 暂停</span></td></tr>
+    </tbody></table></div>`;
 }
 function runAgents(){
   if(agentRunning) return; agentRunning=true;
@@ -4446,6 +4474,70 @@ function viewCatalog(root){
   <div class="card card-pad mt16 text-muted text-sm">
     📧 sales@kailioncrafts.com · 📱 WhatsApp +86-138-XXXX · 📍 阳江市阳东区
   </div>`;
+}
+
+/* V14 AI全流程自动化 */
+const FLOW_STEPS=[
+  ['📊','市场分析师','分析目标市场需求、竞品渠道'],
+  ['🔍','线索挖掘员','按关键词+国家+类型搜索客户'],
+  ['🛡️','质量审核员','砍垃圾线索（平台邮箱/重复/不匹配）'],
+  ['📋','背调分析师','读官网+社媒，生成客户画像'],
+  ['✍️','开发信撰写员','基于画像生成个性化开发信'],
+  ['✅','审批员','汇总预览待人工确认'],
+  ['🗂️','CRM管理员','同步到客户台账']
+];
+function viewAIFlow(root){
+  root.innerHTML=`
+  <div class="page-head"><h2>⚡ 全流程自动化</h2><p class="sub">一句话启动AI获客全流程</p></div>
+  <div class="card card-pad mb16">
+    <div class="card-title">📝 自然语言指令</div>
+    <textarea class="form-control" id="flowCmd" rows="3" placeholder="用一句话描述你要AI做什么...">帮我找50家美国做厨房剪刀的批发商，需要公司名称、官网、邮箱、电话</textarea>
+    <div class="flex gap8 mt8" style="flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('flowCmd').value='帮我开发德国的厨具经销商，产品是不锈钢厨房剪，目标年采购>10万美金';renderView()">德国厨具经销商</button>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('flowCmd').value='帮我背调Messerei Schmidt GmbH，分析采购实力和决策人';renderView()">背调特定客户</button>
+    </div>
+    <button class="btn btn-gold mt16" onclick="runAIFlow()">▶ 启动AI全流程</button>
+  </div>
+  <div class="card card-pad mb16">
+    <div class="card-title">执行进度</div>
+    <div style="background:#f1f5f9;height:18px;border-radius:9px;overflow:hidden"><div id="flowBar" style="width:0%;background:linear-gradient(90deg,var(--primary),var(--gold));height:100%;transition:width .5s"></div></div>
+    <div id="flowSteps" class="mt16" style="display:flex;flex-direction:column;gap:8px">
+      ${FLOW_STEPS.map((s,i)=>`<div id="fstep-${i}" class="flex gap8" style="align-items:center;font-size:13px;opacity:.4">
+        <span style="font-size:18px">${s[0]}</span><b>${s[1]}</b><span class="text-muted">— ${s[2]}</span>
+      </div>`).join('')}
+    </div>
+  </div>
+  <div class="card card-pad"><div class="card-title">实时日志</div>
+    <div id="flowLog" style="max-height:240px;overflow-y:auto;font-family:monospace;font-size:12px;line-height:1.9;color:var(--muted)">
+      <span style="opacity:.5">等待启动...</span>
+    </div></div>`;
+}
+function runAIFlow(){
+  flowStep=0;flowLogs=[];flowRunning=true;
+  const log=document.getElementById('flowLog');
+  const bar=document.getElementById('flowBar');
+  function next(){
+    if(flowStep>=7||!flowRunning) return;
+    const s=FLOW_STEPS[flowStep];
+    document.getElementById('fstep-'+flowStep).style.opacity='1';
+    document.getElementById('fstep-'+flowStep).style.color='var(--gold)';
+    if(log) log.innerHTML+=`<div>🔄 [${new Date().toLocaleTimeString()}] ${s[1]}：${s[2]}...</div>`;
+    setTimeout(()=>{
+      if(!flowRunning) return;
+      document.getElementById('fstep-'+flowStep).style.color='var(--green)';
+      if(log){
+        const results=['✅ 市场报告完成','✅ 找到 23 家','✅ 过滤后剩余 15 家','✅ 15家画像已生成','✅ 生成 15 封开发信','✅ 5封待审批','✅ 已同步CRM'];
+        log.innerHTML+=`<div style="color:var(--green)">✅ [${new Date().toLocaleTimeString()}] ${results[flowStep]}</div>`;
+        log.scrollTop=log.scrollHeight;
+      }
+      flowStep++;
+      if(bar) bar.style.width=(flowStep/7*100)+'%';
+      if(flowStep>=7){
+        if(log) log.innerHTML+=`<div style="color:var(--gold);font-weight:bold;margin-top:8px">🎉 全流程完成！15家客户入库，15封开发信待审批</div>`;
+      } else next();
+    },1000);
+  }
+  next();
 }
 
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }

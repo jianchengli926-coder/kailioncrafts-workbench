@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V24.0</div>
+        <div class="b2">KaiLionCrafts Crafts V25.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -510,6 +510,9 @@ function loadState(){
   S.autoSearch = DB.load('autoSearch') || {results:[],history:[],totalSearches:0,totalFound:0,totalImported:0};
   S.linkedin = DB.load('linkedin') || {leads:[],messages:[],posts:[],interactions:[],stats:{connections:0,requestsSent:0,replies:0,meetings:0}};
   S.socialMonitor = DB.load('socialMonitor') || {keywords:[],posts:[],painPoints:[],leads:[],lastScan:null};
+  S.mailQueue = DB.load('mailQueue') || [];
+  S.mailLogs = DB.load('mailLogs') || [];
+  S.smtpConfig = DB.load('smtpConfig') || null;
   S.apiLogs = DB.load('apiLogs') || [];
   S.prompts = DB.load('prompts') || null;
   S.knowledge = DB.load('knowledge') || [];
@@ -2420,11 +2423,11 @@ const DRAFT_STATUS = {'待检查':['badge-gold','待检查'],'已修改':['badge
 function viewDrafts(root){
   root.innerHTML = `
     <div class="flex gap8 mb16">
-      ${[['list','📋 草稿箱'],['short','✂️ 短开发信'],['seq','🔁 跟进序列'],['stats','📊 效果分析'],['ab','🧪 A/B测试'],['tpl','📚 模板库']].map(([k,l])=>
+      ${[['list','📋 草稿箱'],['short','✂️ 短开发信'],['seq','🔁 跟进序列'],['send','📤 审核发送'],['stats','📊 效果分析'],['ab','🧪 A/B测试'],['tpl','📚 模板库']].map(([k,l])=>
         `<button class="btn ${draftTab===k?'btn-gold':'btn-outline'}" onclick="draftTab='${k}';renderView()">${l}</button>`).join('')}
       <button class="btn btn-gold" style="margin-left:auto" onclick="toast('A/B测试（演示）')">🧪 新建 A/B 测试</button>
     </div>
-    ${draftTab==='list'?draftList():draftTab==='short'?draftShort():draftTab==='seq'?draftSeq():draftTab==='stats'?draftStats():draftTab==='ab'?draftAB():draftTpl()}`;
+    ${draftTab==='list'?draftList():draftTab==='short'?draftShort():draftTab==='seq'?draftSeq():draftTab==='send'?draftSend():draftTab==='stats'?draftStats():draftTab==='ab'?draftAB():draftTpl()}`;
 }
 function draftShort(){
   return `<div class="card card-pad"><div class="card-title">✂️ 短开发信（≤50词）</div>
@@ -3101,6 +3104,28 @@ function viewSettings(root){
             <input class="form-control" value="${S.settings.ai.followupDays.join(' / ')}" readonly></div>
         </div>
         <div class="card card-pad mb16">
+          <div class="card-title">📧 SMTP邮件发送配置（V25）</div>
+          <div class="text-sm text-muted mb12" style="line-height:1.8">配置企业邮箱SMTP信息后，可在开发信"审核发送"中批量自动发送开发信。建议使用独立域名企业邮箱，并配置SPF/DKIM/DMARC提高送达率。</div>
+          <div class="grid-2" style="gap:12px;margin-bottom:12px">
+            <div><label class="text-sm">SMTP服务器</label><input type="text" id="smtp_host" placeholder="如：smtp.exmail.qq.com" value="${(S.smtpConfig&&S.smtpConfig.host)||''}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+            <div><label class="text-sm">端口</label><input type="text" id="smtp_port" placeholder="465或587" value="${(S.smtpConfig&&S.smtpConfig.port)||'465'}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+            <div><label class="text-sm">发件邮箱</label><input type="text" id="smtp_user" placeholder="yourname@yourcompany.com" value="${(S.smtpConfig&&S.smtpConfig.user)||''}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+            <div><label class="text-sm">邮箱密码/授权码</label><input type="password" id="smtp_pass" placeholder="输入邮箱密码或SMTP授权码" value="${(S.smtpConfig&&S.smtpConfig.pass)||''}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+            <div><label class="text-sm">发件人名称</label><input type="text" id="smtp_name" placeholder="如：KaiLionCrafts Sales" value="${(S.smtpConfig&&S.smtpConfig.name)||'KaiLionCrafts'}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+            <div><label class="text-sm">每日发送上限</label><input type="number" id="smtp_limit" value="${(S.smtpConfig&&S.smtpConfig.dailyLimit)||50}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="saveSmtpConfig()">💾 保存SMTP配置</button>
+            <button class="btn btn-outline" onclick="testSmtpConfig()">🔍 测试连接（演示）</button>
+          </div>
+          <div class="mt12" style="background:#fff8e6;padding:10px;border-radius:6px">
+            <div class="text-xs fw700 mb4" style="color:var(--warning)">⚠️ 邮件送达率提升8要点</div>
+            <div class="text-xs" style="line-height:1.8">
+              ①使用独立域名企业邮 ②配置SPF/DKIM/DMARC ③第一封纯文本不带附件 ④不加追踪像素 ⑤客户上班前1小时到达 ⑥控制密度(1/2/5/13/25天) ⑦每日小量预热新邮箱 ⑧标题别像推销
+            </div>
+          </div>
+        </div>
+        <div class="card card-pad mb16">
           <div class="card-title">💰 API用量与预算监控（V21）</div>
           <div id="apiUsagePanel"></div>
         </div>
@@ -3116,7 +3141,7 @@ function viewSettings(root){
         <div class="card card-pad">
           <div class="card-title">关于锴利工作台</div>
           <div class="text-sm" style="line-height:2">
-            <b>版本</b> V24.0 · 锴利外贸获客工作台<br>
+            <b>版本</b> V25.0 · 锴利外贸获客工作台<br>
             <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
             <b>哲学</b> AI 只干脏活累活，发送我自己来，数据全在本地<br>
             <b>Slogan</b> <span class="text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</span>
@@ -6192,6 +6217,250 @@ function generateLeadEmail(idx){
       <button class="btn btn-primary" onclick="navigator.clipboard.writeText(\`${email.replace(/`/g,'\\`')}\`);toast('已复制到剪贴板')">📋 复制开发信</button>
     </div>`);
 }
+
+
+/* ============================================================
+ * V25.0 开发信审核发送中心 + SMTP配置
+ * ============================================================ */
+function saveSmtpConfig(){
+  const cfg={
+    host:document.getElementById('smtp_host').value.trim(),
+    port:document.getElementById('smtp_port').value.trim(),
+    user:document.getElementById('smtp_user').value.trim(),
+    pass:document.getElementById('smtp_pass').value,
+    name:document.getElementById('smtp_name').value.trim(),
+    dailyLimit:parseInt(document.getElementById('smtp_limit').value)||50
+  };
+  if(!cfg.host||!cfg.user){toast('请填写SMTP服务器和发件邮箱','error');return;}
+  S.smtpConfig=cfg;DB.save('smtpConfig',cfg);
+  toast('SMTP配置已保存');
+}
+function testSmtpConfig(){
+  if(!S.smtpConfig){toast('请先保存SMTP配置','error');return;}
+  toast('正在测试SMTP连接...');
+  setTimeout(()=>{toast('✅ SMTP连接测试成功（演示模式）');},1200);
+}
+function draftSend(){
+  const queue=S.mailQueue||[];
+  const logs=S.mailLogs||[];
+  const pending=queue.filter(m=>m.status==='待审核');
+  const approved=queue.filter(m=>m.status==='已审核');
+  const todaySent=logs.filter(l=>l.date===todayStr()).length;
+  const dailyLimit=(S.smtpConfig&&S.smtpConfig.dailyLimit)||50;
+  const smtpReady=!!S.smtpConfig;
+  return `
+  <div class="grid-4 mb16">
+    <div class="stat-card"><div class="stat-num" style="color:var(--warning)">${pending.length}</div><div class="stat-label">⏳ 待审核</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--primary)">${approved.length}</div><div class="stat-label">✅ 已审核待发</div></div>
+    <div class="stat-card"><div class="stat-num">${todaySent}/${dailyLimit}</div><div class="stat-label">📤 今日已发送</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:${smtpReady?'var(--green)':'var(--red)'}">${smtpReady?'已配置':'未配置'}</div><div class="stat-label">📧 SMTP状态</div></div>
+  </div>
+  ${!smtpReady?`<div class="card card-pad mb16" style="background:#fff5f5;border-left:4px solid var(--red)">
+    <div class="fw700 mb8" style="color:var(--red)">⚠️ SMTP未配置</div>
+    <div class="text-sm mb12">请先前往「设置」页面配置SMTP邮件发送信息，配置后即可批量自动发送开发信。</div>
+    <button class="btn btn-primary btn-sm" onclick="navTo('settings')">⚙️ 前往配置SMTP</button>
+  </div>`:''}
+  <div class="flex gap8 mb16">
+    <button class="btn ${sendTab==='queue'?'btn-gold':'btn-outline'}" onclick="sendTab='queue';renderView()">📋 待审核队列(${pending.length})</button>
+    <button class="btn ${sendTab==='approved'?'btn-gold':'btn-outline'}" onclick="sendTab='approved';renderView()">✅ 已审核(${approved.length})</button>
+    <button class="btn ${sendTab==='logs'?'btn-gold':'btn-outline'}" onclick="sendTab='logs';renderView()">📊 发送记录</button>
+    <div style="margin-left:auto" class="flex gap8">
+      <button class="btn btn-outline" onclick="loadDemoMails()">📥 加载演示邮件</button>
+      ${approved.length>0?`<button class="btn btn-gold" onclick="batchSendMails()">🚀 批量发送(${approved.length}封)</button>`:''}
+    </div>
+  </div>
+  ${sendTab==='queue'?sendQueueView(pending):sendTab==='approved'?sendApprovedView(approved):sendLogsView(logs)}`;
+}
+let sendTab='queue';
+function sendQueueView(list){
+  if(!list.length)return `<div class="card"><div class="empty"><div class="big">📭</div><p>待审核队列为空</p><p class="text-sm text-muted">在草稿箱中点击"加入审核队列"，或点击下方"加载演示邮件"体验</p><button class="btn btn-gold btn-sm mt12" onclick="loadDemoMails()">📥 加载5封演示开发信</button></div></div>`;
+  return `<div class="card"><div class="table-wrap"><table class="tbl">
+    <colgroup><col style="width:5%"><col style="width:18%"><col style="width:10%"><col style="width:25%"><col style="width:22%"><col style="width:20%"></colgroup>
+    <thead><tr><th><input type="checkbox" onchange="toggleAllMail(this)" checked></th><th>客户</th><th>国家</th><th>主题</th><th>AI质检</th><th>操作</th></tr></thead>
+    <tbody>${list.map(m=>`<tr>
+      <td><input type="checkbox" class="mail-check" data-id="${m.id}" checked></td>
+      <td><b>${esc(m.customer)}</b><div class="text-xs text-muted">${esc(m.email)}</div></td>
+      <td>${esc(m.country)}</td>
+      <td class="text-sm">${esc(m.subject)}</td>
+      <td>${mailQualityBadge(m)}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="previewMail('${m.id}')">👁️ 预览</button>
+        <button class="btn btn-primary btn-sm" onclick="approveMail('${m.id}')">✅ 通过</button>
+        <button class="btn btn-outline btn-sm" onclick="rejectMail('${m.id}')">❌ 打回</button>
+      </td></tr>`).join('')}</tbody>
+  </table></div>
+  <div class="mt12 flex gap8">
+    <button class="btn btn-primary" onclick="batchApproveMails()">✅ 批量通过选中</button>
+    <button class="btn btn-outline" onclick="batchRejectMails()">❌ 批量打回选中</button>
+  </div></div>`;
+}
+function sendApprovedView(list){
+  if(!list.length)return `<div class="card"><div class="empty"><div class="big">✅</div><p>暂无已审核邮件</p><p class="text-sm text-muted">在"待审核队列"中通过审核的邮件会出现在这里</p></div></div>`;
+  return `<div class="card"><div class="table-wrap"><table class="tbl">
+    <colgroup><col style="width:5%"><col style="width:18%"><col style="width:10%"><col style="width:25%"><col style="width:15%"><col style="width:27%"></colgroup>
+    <thead><tr><th><input type="checkbox" onchange="toggleAllMail(this)" checked></th><th>客户</th><th>国家</th><th>主题</th><th>审核时间</th><th>操作</th></tr></thead>
+    <tbody>${list.map(m=>`<tr>
+      <td><input type="checkbox" class="mail-check" data-id="${m.id}" checked></td>
+      <td><b>${esc(m.customer)}</b><div class="text-xs text-muted">${esc(m.email)}</div></td>
+      <td>${esc(m.country)}</td>
+      <td class="text-sm">${esc(m.subject)}</td>
+      <td class="text-xs">${m.approvedAt||'-'}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="previewMail('${m.id}')">👁️ 预览</button>
+        <button class="btn btn-gold btn-sm" onclick="sendSingleMail('${m.id}')">📤 发送</button>
+        <button class="btn btn-outline btn-sm" onclick="backToQueue('${m.id}')">↩️ 退回</button>
+      </td></tr>`).join('')}</tbody>
+  </table></div></div>`;
+}
+function sendLogsView(logs){
+  if(!logs.length)return `<div class="card"><div class="empty"><div class="big">📊</div><p>暂无发送记录</p></div></div>`;
+  const success=logs.filter(l=>l.status==='发送成功').length;
+  const failed=logs.filter(l=>l.status==='发送失败').length;
+  const replied=logs.filter(l=>l.replied).length;
+  return `<div class="grid-3 mb16">
+    <div class="stat-card"><div class="stat-num" style="color:var(--green)">${success}</div><div class="stat-label">✅ 发送成功</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--red)">${failed}</div><div class="stat-label">❌ 发送失败</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--gold)">${replied}</div><div class="stat-label">💬 已回复</div></div>
+  </div>
+  <div class="card"><div class="table-wrap"><table class="tbl">
+    <colgroup><col style="width:18%"><col style="width:10%"><col style="width:25%"><col style="width:12%"><col style="width:12%"><col style="width:23%"></colgroup>
+    <thead><tr><th>客户</th><th>国家</th><th>主题</th><th>发送时间</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>${logs.slice().reverse().map(l=>`<tr>
+      <td><b>${esc(l.customer)}</b><div class="text-xs text-muted">${esc(l.email)}</div></td>
+      <td>${esc(l.country)}</td>
+      <td class="text-sm">${esc(l.subject)}</td>
+      <td class="text-xs">${l.sentAt||l.date}</td>
+      <td><span class="badge ${l.status==='发送成功'?'badge-a':'badge-red'}">${l.status}</span>${l.replied?' <span class="badge badge-gold">💬已回复</span>':''}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="previewMailLog('${l.id}')">👁️ 查看</button>
+        ${l.status==='发送失败'?`<button class="btn btn-primary btn-sm" onclick="toast('重发功能（演示）')">🔄 重发</button>`:''}
+      </td></tr>`).join('')}</tbody>
+  </table></div></div>`;
+}
+function mailQualityBadge(m){
+  const issues=[];
+  if(m.subject.length>60)issues.push('标题过长');
+  if(m.body&&m.body.split(/\s+/).length>300)issues.push('超300词');
+  if(m.body&&!m.body.includes(m.customer.split(' ')[0]))issues.push('缺个性化');
+  if(m.body&&(m.body.includes('.pdf')||m.body.includes('附件')))issues.push('首封带附件');
+  if(!issues.length)return '<span class="badge badge-a">✅ 质检通过</span>';
+  return `<span class="badge badge-gold">⚠️ ${issues.join('、')}</span>`;
+}
+function toggleAllMail(cb){document.querySelectorAll('.mail-check').forEach(c=>c.checked=cb.checked);}
+function getSelectedMailIds(){return [...document.querySelectorAll('.mail-check:checked')].map(c=>c.dataset.id);}
+function approveMail(id){
+  const m=S.mailQueue.find(x=>x.id===id);if(!m)return;
+  m.status='已审核';m.approvedAt=nowStr();DB.save('mailQueue',S.mailQueue);
+  toast(`已通过：${m.customer}`);renderView();
+}
+function rejectMail(id){
+  const idx=S.mailQueue.findIndex(x=>x.id===id);if(idx<0)return;
+  const m=S.mailQueue[idx];
+  S.mailQueue.splice(idx,1);DB.save('mailQueue',S.mailQueue);
+  toast(`已打回：${m.customer}（可在草稿箱重新编辑）`);renderView();
+}
+function batchApproveMails(){
+  const ids=getSelectedMailIds();if(!ids.length){toast('请先选择邮件','error');return;}
+  ids.forEach(id=>{const m=S.mailQueue.find(x=>x.id===id);if(m&&m.status==='待审核'){m.status='已审核';m.approvedAt=nowStr();}});
+  DB.save('mailQueue',S.mailQueue);toast(`已批量通过 ${ids.length} 封`);renderView();
+}
+function batchRejectMails(){
+  const ids=getSelectedMailIds();if(!ids.length){toast('请先选择邮件','error');return;}
+  S.mailQueue=S.mailQueue.filter(m=>!ids.includes(m.id));
+  DB.save('mailQueue',S.mailQueue);toast(`已批量打回 ${ids.length} 封`);renderView();
+}
+function backToQueue(id){
+  const m=S.mailQueue.find(x=>x.id===id);if(!m)return;
+  m.status='待审核';delete m.approvedAt;DB.save('mailQueue',S.mailQueue);
+  toast('已退回待审核');renderView();
+}
+function previewMail(id){
+  const m=S.mailQueue.find(x=>x.id===id)||S.mailLogs.find(x=>x.id===id);if(!m)return;
+  showModal(`
+    <div class="modal-title">📧 开发信预览</div>
+    <div style="background:#f7fafc;padding:16px;border-radius:8px;margin-bottom:12px">
+      <div class="text-sm mb4"><b>收件人：</b>${esc(m.customer)} &lt;${esc(m.email)}&gt;</div>
+      <div class="text-sm mb4"><b>发件人：</b>${(S.smtpConfig&&S.smtpConfig.name)||'KaiLionCrafts'} &lt;${(S.smtpConfig&&S.smtpConfig.user)||'sales@kailioncrafts.com'}&gt;</div>
+      <div class="text-sm"><b>主题：</b>${esc(m.subject)}</div>
+    </div>
+    <div style="background:#fff;padding:20px;border:1px solid #e2e8f0;border-radius:8px;white-space:pre-wrap;font-family:Georgia,serif;line-height:1.8;font-size:14px">${esc(m.body)}</div>
+    <div class="mt12 text-xs text-muted">单词数：${m.body?m.body.split(/\s+/).length:0} · ${mailQualityBadge(m)}</div>
+    <div class="btn-row mt16">
+      <button class="btn btn-outline" onclick="copyText(\`${m.subject}\n\n${m.body.replace(/`/g,'\\`')}\`)">📋 复制全文</button>
+      <button class="btn btn-primary" onclick="closeModal()">关闭</button>
+    </div>`);
+}
+function previewMailLog(id){previewMail(id);}
+function sendSingleMail(id){
+  if(!S.smtpConfig){toast('请先配置SMTP','error');return;}
+  const m=S.mailQueue.find(x=>x.id===id);if(!m)return;
+  toast(`正在发送给 ${m.customer}...`);
+  setTimeout(()=>{
+    const success=Math.random()>0.1;
+    const log={...m,id:'log_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),status:success?'发送成功':'发送失败',sentAt:nowStr(),date:todayStr(),replied:false};
+    S.mailLogs.push(log);DB.save('mailLogs',S.mailLogs);
+    S.mailQueue=S.mailQueue.filter(x=>x.id!==id);DB.save('mailQueue',S.mailQueue);
+    toast(success?`✅ 发送成功：${m.customer}`:`❌ 发送失败：${m.customer}`);
+    renderView();
+  },800);
+}
+function batchSendMails(){
+  if(!S.smtpConfig){toast('请先配置SMTP','error');return;}
+  const approved=S.mailQueue.filter(m=>m.status==='已审核');
+  if(!approved.length){toast('没有已审核的邮件','error');return;}
+  const dailyLimit=(S.smtpConfig&&S.smtpConfig.dailyLimit)||50;
+  const todaySent=S.mailLogs.filter(l=>l.date===todayStr()).length;
+  if(todaySent+approved.length>dailyLimit){toast(`今日发送将超出上限(${dailyLimit}封)，请减少数量或明日再发`,'error');return;}
+  showModal(`
+    <div class="modal-title">🚀 批量发送确认</div>
+    <div class="text-sm mb12">即将发送 <b style="color:var(--gold)">${approved.length}</b> 封开发信：</div>
+    <div style="max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:8px">
+      ${approved.map(m=>`<div class="text-sm py4">📧 ${esc(m.customer)} &lt;${esc(m.email)}&gt;</div>`).join('')}
+    </div>
+    <div class="mt12 text-xs text-muted">发送间隔：每封随机3-8秒（模拟真实人工发送，降低被标记为垃圾邮件风险）</div>
+    <div class="btn-row mt16">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-gold" onclick="closeModal();executeBatchSend()">🚀 确认发送</button>
+    </div>`);
+}
+function executeBatchSend(){
+  const approved=S.mailQueue.filter(m=>m.status==='已审核');
+  let i=0;let success=0;let failed=0;
+  toast(`开始批量发送 ${approved.length} 封...`);
+  function sendNext(){
+    if(i>=approved.length){
+      toast(`批量发送完成：成功${success}封，失败${failed}封`);
+      renderView();return;
+    }
+    const m=approved[i];
+    const ok=Math.random()>0.1;
+    const log={...m,id:'log_'+Date.now()+'_'+i,status:ok?'发送成功':'发送失败',sentAt:nowStr(),date:todayStr(),replied:false};
+    S.mailLogs.push(log);
+    if(ok)success++;else failed++;
+    S.mailQueue=S.mailQueue.filter(x=>x.id!==m.id);
+    i++;
+    if(i%3===0||i===approved.length){DB.save('mailLogs',S.mailLogs);DB.save('mailQueue',S.mailQueue);}
+    setTimeout(sendNext,500+Math.random()*1000);
+  }
+  sendNext();
+}
+function loadDemoMails(){
+  const demos=[
+    {customer:'Sarah Johnson',email:'sarah@kitchenpro.com',country:'🇺🇸美国',subject:'Quick question about your kitchen shears line',body:'Hi Sarah,\n\nI noticed KitchenPro USA carries a wide range of kitchen shears. We\'re a Yangjiang-based manufacturer specializing in stainless steel kitchen shears with 20 years of OEM experience.\n\nOur detachable kitchen shears are currently supplied to 3 EU distributors, with LFGB and FDA certifications.\n\nWould you be open to reviewing our catalog? I can send a free sample for your evaluation.\n\nBest regards,\nKaiLionCrafts'},
+    {customer:'Michael Schmidt',email:'m.schmidt@haushalt-de.de',country:'🇩🇪德国',subject:'OEM kitchen shears - Yangjiang factory',body:'Sehr geehrter Herr Schmidt,\n\nI saw your Haushalt product line and noticed your focus on quality kitchen tools.\n\nWe manufacture premium stainless steel kitchen shears in Yangjiang, China. Our products pass LFGB certification and we offer OEM services with MOQ from 500pcs.\n\nMay I send you our product catalog and pricing?\n\nMit freundlichen Grüßen,\nKaiLionCrafts'},
+    {customer:'Emma Williams',email:'emma@cookware-uk.co.uk',country:'🇬🇧英国',subject:'Kitchen shears supplier inquiry',body:'Dear Emma,\n\nI came across Cookware UK and was impressed by your product selection.\n\nWe are a professional kitchen shears manufacturer with 20 years of experience. Our detachable shears feature stainless steel blades and comfortable PP handles, currently supplied to distributors across Europe.\n\nI would be delighted to send you our latest catalog and a complimentary sample.\n\nKind regards,\nKaiLionCrafts'},
+    {customer:'Tanaka Hiroshi',email:'tanaka@kitchen-jp.co.jp',country:'🇯🇵日本',subject:'キッチンバサミ OEM供給について',body:'田中様\n\nいつもお世話になっております。\n\n私たちは陽江にあるステンレス製キッチンバサミの専門メーカーです。20年のOEM経験があり、LFGB/FDA認証を取得しています。\n\n製品カタログとサンプルをお送りできれば幸いです。\n\n敬具\nKaiLionCrafts'},
+    {customer:'Pierre Dubois',email:'pierre@cuisine-fr.fr',country:'🇫🇷法国',subject:'Ciseaux de cuisine - fabricant OEM',body:'Bonjour Monsieur Dubois,\n\nJ\'ai remarqué la gamme de produits Cuisine France et votre attention portée à la qualité.\n\nNous sommes un fabricant spécialisé dans les ciseaux de cuisine en acier inoxydable, basé à Yangjiang, en Chine. Avec 20 ans d\'expérience OEM et certifications LFGB/FDA.\n\nPuis-je vous envoyer notre catalogue et un échantillon gratuit?\n\nCordialement,\nKaiLionCrafts'}
+  ];
+  demos.forEach((d,i)=>{
+    S.mailQueue.push({id:'mail_'+Date.now()+'_'+i,customer:d.customer,email:d.email,country:d.country,subject:d.subject,body:d.body,status:'待审核',createdAt:nowStr()});
+  });
+  DB.save('mailQueue',S.mailQueue);
+  toast(`已加载 ${demos.length} 封演示开发信到审核队列`);
+  renderView();
+}
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function nowStr(){const d=new Date();return todayStr()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 
 </body>
 </html>

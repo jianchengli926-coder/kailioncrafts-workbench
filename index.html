@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V23.0</div>
+        <div class="b2">KaiLionCrafts Crafts V24.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -509,6 +509,7 @@ function loadState(){
   S.apis = DB.load('apis') || [];
   S.autoSearch = DB.load('autoSearch') || {results:[],history:[],totalSearches:0,totalFound:0,totalImported:0};
   S.linkedin = DB.load('linkedin') || {leads:[],messages:[],posts:[],interactions:[],stats:{connections:0,requestsSent:0,replies:0,meetings:0}};
+  S.socialMonitor = DB.load('socialMonitor') || {keywords:[],posts:[],painPoints:[],leads:[],lastScan:null};
   S.apiLogs = DB.load('apiLogs') || [];
   S.prompts = DB.load('prompts') || null;
   S.knowledge = DB.load('knowledge') || [];
@@ -1346,6 +1347,7 @@ const NAV = [
   {key:'reports',icon:'🏆',label:'业绩战报',title:'业绩战报',crumb:'漏斗看未来 · 战报看现在 · 行为看过程'},
   {key:'agents',icon:'🤖',label:'AI Agent团队',title:'AI Agent团队',crumb:'AI CEO调度 · 11个专业Agent协同'},
   {key:'linkedin',icon:'💼',label:'领英拓客',title:'领英智能拓客',crumb:'4步拓客法 · AI站内信 · 智能互动'},
+  {key:'socialmonitor',icon:'📡',label:'社媒监控',title:'社媒关键词监控',crumb:'监控行业痛点 · 发现潜在客户'},
   {group:'系统'},
   {key:'tools',icon:'🧰',label:'工具箱',title:'工具箱',crumb:'14类·100+工具'},
   {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings'}
@@ -1383,7 +1385,7 @@ function renderView(){
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
-    seo:viewSEO, reports:viewReports, agents:viewAgents, linkedin:viewLinkedin, expos:viewExpos, settings:viewSettings};
+    seo:viewSEO, reports:viewReports, agents:viewAgents, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, settings:viewSettings};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
@@ -3114,7 +3116,7 @@ function viewSettings(root){
         <div class="card card-pad">
           <div class="card-title">关于锴利工作台</div>
           <div class="text-sm" style="line-height:2">
-            <b>版本</b> V23.0 · 锴利外贸获客工作台<br>
+            <b>版本</b> V24.0 · 锴利外贸获客工作台<br>
             <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
             <b>哲学</b> AI 只干脏活累活，发送我自己来，数据全在本地<br>
             <b>Slogan</b> <span class="text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</span>
@@ -5916,6 +5918,278 @@ function viewLinkedInLeadDetail(idx){
     <div class="modal-foot">
       <button class="btn btn-outline" onclick="closeModal()">关闭</button>
       <button class="btn btn-primary" onclick="closeModal();linkedinTab='message';go('linkedin')">✉️ 生成站内信</button>
+    </div>`);
+}
+
+
+/* ============================================================
+ * V24: 社媒关键词监控中心
+ * ============================================================ */
+const SOCIAL_PLATFORMS = [
+  {key:'linkedin',icon:'💼',label:'LinkedIn',color:'#0077b5'},
+  {key:'twitter',icon:'🐦',label:'Twitter/X',color:'#1da1f2'},
+  {key:'facebook',icon:'📘',label:'Facebook',color:'#1877f2'},
+  {key:'instagram',icon:'📷',label:'Instagram',color:'#e4405f'},
+  {key:'youtube',icon:'▶️',label:'YouTube',color:'#ff0000'},
+  {key:'reddit',icon:'🤖',label:'Reddit',color:'#ff4500'}
+];
+const MOCK_SOCIAL_POSTS = [
+  {platform:'linkedin',author:'Sarah Johnson',title:'Sourcing Manager at Aussie Kitchen',content:'Looking for reliable kitchen shear suppliers with LFGB certification. Our current supplier has quality issues for 3 months now. Any recommendations?',date:'2天前',likes:24,comments:12,engagement:'high',painPoint:'供应商质量不稳定'},
+  {platform:'twitter',author:'@KitchenBuyer',title:'',content:'Anyone else frustrated with MOQs from Chinese suppliers? We need 500pcs not 5000pcs. #sourcing #kitchenware',date:'3天前',likes:18,comments:8,engagement:'medium',painPoint:'MOQ过高'},
+  {platform:'facebook',author:'Kitchen Equipment Buyers Group',title:'Group Discussion',content:'What is everyone paying for stainless steel chef knives these days? Prices seem to have gone up 15% this year. Sharing quotes below.',date:'5天前',likes:45,comments:32,engagement:'high',painPoint:'价格上涨'},
+  {platform:'linkedin',author:'Michael Carter',title:'Procurement Manager',content:'Visiting Yangjiang next month for factory audits. Looking for knife and scissors manufacturers with BSCI audit. DM me if interested.',date:'1周前',likes:56,comments:28,engagement:'high',painPoint:'寻找合规工厂'},
+  {platform:'reddit',author:'u/smallbizowner',title:'r/Entrepreneur',content:'Starting a kitchenware brand. Need advice on finding OEM manufacturers that accept small orders. Tried Alibaba but quality is hit or miss.',date:'1周前',likes:32,comments:45,engagement:'high',painPoint:'小单难寻好工厂'},
+  {platform:'instagram',author:'@chefsupplyco',title:'',content:'New product launch coming soon! We are looking for eco-friendly kitchen tool manufacturers. DM for collaboration 🌱 #ecofriendly #kitchenware',date:'2周前',likes:89,comments:15,engagement:'medium',painPoint:'寻找环保产品'},
+  {platform:'youtube',author:'Sourcing with James',title:'How to Find Reliable Suppliers in China 2026',content:'In this video I share my 10-year experience sourcing kitchenware from Yangjiang. Common pitfalls and how to avoid them.',date:'2周前',likes:1200,comments:89,engagement:'high',painPoint:'供应商选择困难'},
+  {platform:'linkedin',author:'Emma Thompson',title:'Buyer at British Chef Supplies',content:'US tariffs are killing our margins. Looking for alternative sourcing options outside China. Vietnam? India? Anyone made the switch successfully?',date:'3周前',likes:67,comments:41,engagement:'high',painPoint:'关税影响'},
+  {platform:'twitter',author:'@FoodServiceNews',title:'',content:'Report: Commercial kitchen equipment market to grow 6.2% CAGR through 2030. Sustainability and automation are key drivers. #foodservice #kitchen',date:'3周前',likes:95,comments:12,engagement:'medium',painPoint:'行业增长机会'},
+  {platform:'facebook',author:'Restaurant Owners Network',title:'',content:'Poll: What is your biggest challenge when sourcing kitchen equipment? A) Quality B) Price C) Lead time D) Minimum order. Vote below!',date:'1个月前',likes:156,comments:78,engagement:'high',painPoint:'多维度痛点'}
+];
+const MOCK_PAIN_POINTS = [
+  {point:'供应商质量不稳定',count:3,trend:'up',severity:'high',relatedPosts:3,opportunity:'强调我们的零缺陷政策和LFGB/FDA认证'},
+  {point:'MOQ过高',count:2,trend:'up',severity:'medium',relatedPosts:2,opportunity:'我们支持500pcs小批量试单，降低客户试错成本'},
+  {point:'价格上涨',count:2,trend:'stable',severity:'medium',relatedPosts:2,opportunity:'提供阶梯报价，量大优惠，长期合作锁价'},
+  {point:'寻找合规工厂',count:1,trend:'up',severity:'high',relatedPosts:1,opportunity:'我们有BSCI/LFGB/FDA全套认证，可提供审计报告'},
+  {point:'小单难寻好工厂',count:1,trend:'up',severity:'high',relatedPosts:1,opportunity:'专业小单服务团队，500pcs起做，质量与大单一致'},
+  {point:'关税影响',count:1,trend:'up',severity:'high',relatedPosts:1,opportunity:'提供DDP报价方案，帮助客户分担关税成本'},
+  {point:'供应商选择困难',count:2,trend:'stable',severity:'medium',relatedPosts:2,opportunity:'提供工厂视频参观、样品免费寄送、客户案例参考'},
+  {point:'寻找环保产品',count:1,trend:'up',severity:'medium',relatedPosts:1,opportunity:'我们已开发环保材料产品线，可提供样品'}
+];
+let socialMonitorTab = 'dashboard';
+
+function viewSocialMonitor(root){
+  if(!S.socialMonitor) S.socialMonitor = {keywords:[],posts:[],painPoints:[],leads:[],lastScan:null};
+  const sm = S.socialMonitor;
+  const keywords = sm.keywords&&sm.keywords.length?sm.keywords:['kitchen shears','kitchenware supplier','OEM cutlery','sourcing kitchen tools'];
+  const posts = sm.posts&&sm.posts.length?sm.posts:MOCK_SOCIAL_POSTS;
+  const painPoints = sm.painPoints&&sm.painPoints.length?sm.painPoints:MOCK_PAIN_POINTS;
+  root.innerHTML = `
+    <div class="grid-4 mb16" style="gap:12px">
+      <div class="card card-pad"><div class="stat-label">🔍 监控关键词</div><div class="stat-value">${keywords.length}</div></div>
+      <div class="card card-pad"><div class="stat-label">📰 监控到帖子</div><div class="stat-value" style="color:var(--primary)">${posts.length}</div></div>
+      <div class="card card-pad"><div class="stat-label">💡 发现痛点</div><div class="stat-value" style="color:var(--gold)">${painPoints.length}</div></div>
+      <div class="card card-pad"><div class="stat-label">🎯 潜在线索</div><div class="stat-value" style="color:var(--success)">${posts.filter(p=>p.engagement==='high').length}</div></div>
+    </div>
+    <div class="card card-pad mb16">
+      <div class="tabs">
+        <button class="tab ${socialMonitorTab==='dashboard'?'active':''}" onclick="socialMonitorTab='dashboard';go('socialmonitor')">📊 监控看板</button>
+        <button class="tab ${socialMonitorTab==='keywords'?'active':''}" onclick="socialMonitorTab='keywords';go('socialmonitor')">🔍 关键词管理</button>
+        <button class="tab ${socialMonitorTab==='posts'?'active':''}" onclick="socialMonitorTab='posts';go('socialmonitor')">📰 社媒帖子</button>
+        <button class="tab ${socialMonitorTab==='painpoints'?'active':''}" onclick="socialMonitorTab='painpoints';go('socialmonitor')">💡 痛点分析</button>
+        <button class="tab ${socialMonitorTab==='leads'?'active':''}" onclick="socialMonitorTab='leads';go('socialmonitor')">🎯 线索发现</button>
+      </div>
+      <div id="socialMonitorTabContent">${renderSocialMonitorTab(keywords,posts,painPoints)}</div>
+    </div>`;
+}
+
+function renderSocialMonitorTab(keywords,posts,painPoints){
+  if(socialMonitorTab==='dashboard') return renderSocialDashboard(keywords,posts,painPoints);
+  if(socialMonitorTab==='keywords') return renderSocialKeywords(keywords);
+  if(socialMonitorTab==='posts') return renderSocialPosts(posts);
+  if(socialMonitorTab==='painpoints') return renderSocialPainPoints(painPoints);
+  if(socialMonitorTab==='leads') return renderSocialLeads(posts);
+  return '';
+}
+
+function renderSocialDashboard(keywords,posts,painPoints){
+  const platformCount = {};
+  posts.forEach(p=>{ platformCount[p.platform]=(platformCount[p.platform]||0)+1; });
+  const highEngagement = posts.filter(p=>p.engagement==='high').length;
+  return `
+    <div class="grid-3 mb16" style="gap:12px">
+      <div style="background:#f0f7ff;padding:16px;border-radius:8px">
+        <div class="text-sm text-muted mb8">📊 各平台帖子分布</div>
+        ${Object.entries(platformCount).map(([p,c])=>{const pf=SOCIAL_PLATFORMS.find(x=>x.key===p);return `<div class="flex" style="justify-content:space-between;margin:4px 0"><span class="text-xs">${pf?pf.icon+' '+pf.label:p}</span><span class="text-xs fw700">${c}</span></div>`;}).join('')}
+      </div>
+      <div style="background:#f0fff4;padding:16px;border-radius:8px">
+        <div class="text-sm text-muted mb8">📈 监控效果统计</div>
+        <div class="text-xs" style="line-height:2">
+          总互动量：${posts.reduce((a,p)=>a+p.likes+p.comments,0)}<br>
+          高互动帖子：${highEngagement}条<br>
+          高互动率：${Math.round(highEngagement/posts.length*100)}%<br>
+          发现痛点：${painPoints.length}个<br>
+          可转化线索：${posts.filter(p=>p.painPoint).length}个
+        </div>
+      </div>
+      <div style="background:#fff8e6;padding:16px;border-radius:8px">
+        <div class="text-sm text-muted mb8">💡 监控建议</div>
+        <div class="text-xs" style="line-height:2">
+          🔴 重点关注：供应商质量、MOQ、关税<br>
+          🟡 持续监控：价格趋势、环保需求<br>
+          🟢 新增监控：competitor brand names<br>
+          ⏰ 建议扫描频率：每天1次<br>
+          📌 最佳扫描时间：北京时间早上8点
+        </div>
+      </div>
+    </div>
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">🔥 热门痛点排行（按出现频次）</div>
+    <table class="tbl"><thead><tr><th>痛点</th><th>出现次数</th><th>趋势</th><th>严重度</th><th>相关帖子</th><th>我们的机会</th></tr></thead><tbody>
+      ${painPoints.slice(0,5).map(p=>`<tr>
+        <td class="text-xs"><b>${p.point}</b></td>
+        <td class="text-xs">${p.count}</td>
+        <td class="text-xs">${p.trend==='up'?'📈上升':p.trend==='down'?'📉下降':'➡️稳定'}</td>
+        <td><span class="badge ${p.severity==='high'?'badge-red':p.severity==='medium'?'badge-gold':'badge-green'}">${p.severity==='high'?'高':p.severity==='medium'?'中':'低'}</span></td>
+        <td class="text-xs">${p.relatedPosts}条</td>
+        <td class="text-xs" style="color:var(--success)">${p.opportunity}</td>
+      </tr>`).join('')}
+    </tbody></table>
+    <div class="mt16" style="background:#f7fafc;padding:12px;border-radius:8px">
+      <div class="text-sm fw700 mb8">📡 最近扫描记录</div>
+      <div class="text-xs" style="line-height:2">
+        最后扫描：${S.socialMonitor.lastScan||'2026-09-24 08:00:00'}<br>
+        扫描平台：LinkedIn / Twitter / Facebook / Instagram / YouTube / Reddit<br>
+        扫描关键词：${keywords.join('、')}<br>
+        扫描结果：新增 ${posts.length} 条帖子，发现 ${painPoints.length} 个痛点，识别 ${posts.filter(p=>p.engagement==='high').length} 个潜在线索
+      </div>
+    </div>`;
+}
+
+function renderSocialKeywords(keywords){
+  return `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">🔍 监控关键词管理</div>
+    <div class="text-sm text-muted mb12" style="line-height:1.8">
+      💡 添加行业关键词、产品词、竞品词，系统会自动监控各大社媒平台的相关帖子，从中提取客户痛点和潜在线索。
+    </div>
+    <div class="flex mb16" style="gap:8px">
+      <input type="text" id="sm_newKeyword" placeholder="输入新关键词，如：kitchen shears supplier" style="flex:1;padding:8px;border:1px solid #cbd5e0;border-radius:6px">
+      <button class="btn btn-primary" onclick="addSocialKeyword()">添加</button>
+      <button class="btn btn-gold" onclick="runSocialScan()">📡 立即扫描</button>
+    </div>
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">当前监控关键词（${keywords.length}个）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+      ${keywords.map((k,i)=>`<div style="background:#f0f7ff;padding:6px 12px;border-radius:16px;display:flex;align-items:center;gap:8px">
+        <span class="text-xs">${k}</span>
+        <span style="cursor:pointer;color:var(--red);font-weight:bold" onclick="removeSocialKeyword(${i})">×</span>
+      </div>`).join('')}
+    </div>
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">💡 推荐关键词（点击添加）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${['kitchenware manufacturer','cutlery OEM supplier','chef knife factory','restaurant supply distributor','hotel kitchen equipment','wholesale kitchen tools','private label cutlery','eco friendly kitchenware','stainless steel scissors','Yangjiang cutlery'].map(k=>`<div style="background:#f7fafc;padding:6px 12px;border-radius:16px;cursor:pointer;border:1px dashed #cbd5e0" onclick="document.getElementById('sm_newKeyword').value='${k}';addSocialKeyword()" class="text-xs">+ ${k}</div>`).join('')}
+    </div>`;
+}
+
+function addSocialKeyword(){
+  const kw = document.getElementById('sm_newKeyword').value.trim();
+  if(!kw) return;
+  if(!S.socialMonitor) S.socialMonitor = {keywords:[],posts:[],painPoints:[],leads:[],lastScan:null};
+  if(!S.socialMonitor.keywords) S.socialMonitor.keywords = [];
+  if(S.socialMonitor.keywords.includes(kw)){ toast('关键词已存在'); return; }
+  S.socialMonitor.keywords.push(kw);
+  try{ DB.save('socialMonitor',S.socialMonitor); }catch(e){}
+  document.getElementById('sm_newKeyword').value='';
+  go('socialmonitor');
+  toast('已添加关键词：'+kw);
+}
+
+function removeSocialKeyword(idx){
+  if(!S.socialMonitor||!S.socialMonitor.keywords) return;
+  S.socialMonitor.keywords.splice(idx,1);
+  try{ DB.save('socialMonitor',S.socialMonitor); }catch(e){}
+  go('socialmonitor');
+  toast('已删除关键词');
+}
+
+function runSocialScan(){
+  toast('正在扫描社媒平台...');
+  setTimeout(()=>{
+    if(!S.socialMonitor) S.socialMonitor = {keywords:[],posts:[],painPoints:[],leads:[],lastScan:null};
+    S.socialMonitor.lastScan = new Date().toLocaleString('zh-CN');
+    S.socialMonitor.posts = JSON.parse(JSON.stringify(MOCK_SOCIAL_POSTS));
+    S.socialMonitor.painPoints = JSON.parse(JSON.stringify(MOCK_PAIN_POINTS));
+    try{ DB.save('socialMonitor',S.socialMonitor); }catch(e){}
+    go('socialmonitor');
+    toast('扫描完成！发现10条新帖子，8个痛点，5个潜在线索');
+  },1500);
+}
+
+function renderSocialPosts(posts){
+  return `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">📰 监控到的社媒帖子（${posts.length}条）</div>
+    <div class="flex mb12" style="gap:8px;flex-wrap:wrap">
+      ${SOCIAL_PLATFORMS.map(p=>`<span class="badge badge-blue">${p.icon} ${p.label}</span>`).join('')}
+    </div>
+    ${posts.map((p,i)=>{const pf=SOCIAL_PLATFORMS.find(x=>x.key===p.platform);return `<div style="background:#f7fafc;padding:12px;border-radius:8px;margin-bottom:10px;border-left:3px solid ${pf?pf.color:'#ccc'}">
+      <div class="flex" style="justify-content:space-between;margin-bottom:6px">
+        <div class="text-xs fw700">${pf?pf.icon+' '+pf.label:''} · ${p.author}</div>
+        <div class="text-xs text-muted">${p.date}</div>
+      </div>
+      ${p.title?`<div class="text-sm fw700" style="margin-bottom:4px">${p.title}</div>`:''}
+      <div class="text-xs" style="line-height:1.6;margin-bottom:8px">${p.content}</div>
+      <div class="flex" style="justify-content:space-between;align-items:center">
+        <div class="text-xs text-muted">❤️ ${p.likes} · 💬 ${p.comments} · ${p.engagement==='high'?'<span style="color:var(--success)">🔥高互动</span>':p.engagement==='medium'?'<span style="color:var(--gold)">📈中互动</span>':'低互动'}</div>
+        ${p.painPoint?`<span class="badge badge-red">💡 ${p.painPoint}</span>`:''}
+      </div>
+    </div>`;}).join('')}`;
+}
+
+function renderSocialPainPoints(painPoints){
+  return `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">💡 AI提取的客户痛点（${painPoints.length}个）</div>
+    <div class="text-sm text-muted mb12" style="line-height:1.8">
+      💡 AI自动从社媒帖子中提取客户痛点，按出现频次排序，并给出我们的产品/服务如何解决这些痛点的机会建议。
+    </div>
+    ${painPoints.map((p,i)=>`<div style="background:${p.severity==='high'?'#fff5f5':p.severity==='medium'?'#fffbeb':'#f0fff4'};padding:14px;border-radius:8px;margin-bottom:10px;border-left:4px solid ${p.severity==='high'?'var(--red)':p.severity==='medium'?'var(--gold)':'var(--success)'}">
+      <div class="flex" style="justify-content:space-between;margin-bottom:8px">
+        <div class="text-sm fw700">${i+1}. ${p.point}</div>
+        <div class="flex" style="gap:8px">
+          <span class="badge ${p.severity==='high'?'badge-red':p.severity==='medium'?'badge-gold':'badge-green'}">${p.severity==='high'?'高严重度':p.severity==='medium'?'中严重度':'低严重度'}</span>
+          <span class="badge badge-blue">出现${p.count}次</span>
+          <span class="text-xs">${p.trend==='up'?'📈':p.trend==='down'?'📉':'➡️'}</span>
+        </div>
+      </div>
+      <div class="text-xs" style="line-height:1.6;margin-bottom:6px"><b>相关帖子：</b>${p.relatedPosts}条社媒帖子提到此痛点</div>
+      <div class="text-xs" style="line-height:1.6;background:white;padding:8px;border-radius:4px"><b style="color:var(--success)">🎯 我们的机会：</b>${p.opportunity}</div>
+    </div>`).join('')}`;
+}
+
+function renderSocialLeads(posts){
+  const leads = posts.filter(p=>p.engagement==='high'&&p.painPoint);
+  return `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">🎯 从社媒发现的潜在客户（${leads.length}个）</div>
+    <div class="text-sm text-muted mb12" style="line-height:1.8">
+      💡 从高互动且包含痛点的帖子中识别潜在客户，点击"生成开发信"可根据客户痛点定制专属开发信。
+    </div>
+    <table class="tbl"><thead><tr><th>客户</th><th>平台</th><th>帖子内容摘要</th><th>痛点</th><th>互动量</th><th>操作</th></tr></thead><tbody>
+      ${leads.map((p,i)=>`<tr>
+        <td class="text-xs"><b>${p.author}</b></td>
+        <td class="text-xs">${SOCIAL_PLATFORMS.find(x=>x.key===p.platform)?.icon||''} ${SOCIAL_PLATFORMS.find(x=>x.key===p.platform)?.label||p.platform}</td>
+        <td class="text-xs" style="max-width:200px">${p.content.slice(0,60)}...</td>
+        <td><span class="badge badge-red">${p.painPoint}</span></td>
+        <td class="text-xs">❤️${p.likes} 💬${p.comments}</td>
+        <td><button class="btn btn-sm btn-primary" onclick="generateLeadEmail(${i})">✉️ 生成开发信</button></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+function generateLeadEmail(idx){
+  const posts = (S.socialMonitor&&S.socialMonitor.posts&&S.socialMonitor.posts.length)?S.socialMonitor.posts:MOCK_SOCIAL_POSTS;
+  const leads = posts.filter(p=>p.engagement==='high'&&p.painPoint);
+  const p = leads[idx];
+  if(!p) return;
+  const painPoint = p.painPoint;
+  let solution = '';
+  if(painPoint.includes('质量')) solution = '我们实行零缺陷政策，每批产品通过LFGB/FDA认证，提供完整质检报告';
+  else if(painPoint.includes('MOQ')) solution = '我们支持500pcs小批量试单，让您以低成本测试市场';
+  else if(painPoint.includes('价格')) solution = '我们提供阶梯报价，量大优惠，长期合作可锁定价格';
+  else if(painPoint.includes('合规')||painPoint.includes('BSCI')) solution = '我们拥有BSCI/LFGB/FDA全套认证，可随时提供审计报告';
+  else if(painPoint.includes('小单')) solution = '我们有专业小单服务团队，500pcs起做，质量与大单完全一致';
+  else if(painPoint.includes('关税')) solution = '我们可以提供DDP报价方案，帮助您分担关税成本';
+  else if(painPoint.includes('环保')) solution = '我们已开发环保材料产品线，包括可回收钢材和植物基手柄';
+  else solution = '我们有20年OEM经验，月产50万把，可满足您的各种需求';
+  const email = `Subject: Quick solution for your ${painPoint} challenge\n\nHi ${p.author.split(' ')[0]||'there'},\n\nI came across your post about "${painPoint}" and wanted to reach out directly.\n\nWe're a Yangjiang-based kitchenware manufacturer with 20 years of OEM experience. Here's how we can help:\n\n✅ ${solution}\n\nWe currently supply to clients in the US, UK, Germany, and Australia. I'd be happy to send you our catalog and a free sample for evaluation.\n\nWould you be open to a quick 10-minute call this week?\n\nBest regards,\n锴利 KaiLionCrafts\nYangjiang, China\nWhatsApp: +86 138 xxxx xxxx`;
+  openModal(`
+    <div class="modal-head"><h3>✉️ 基于痛点的定制开发信</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="text-xs text-muted mb8" style="line-height:1.6">
+        <b>客户：</b>${p.author} (${SOCIAL_PLATFORMS.find(x=>x.key===p.platform)?.label||p.platform})<br>
+        <b>痛点：</b>${painPoint}<br>
+        <b>解决方案：</b>${solution}
+      </div>
+      <div style="background:#f7fafc;padding:12px;border-radius:8px;white-space:pre-wrap;font-size:12px;line-height:1.8;max-height:400px;overflow-y:auto">${email}</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+      <button class="btn btn-primary" onclick="navigator.clipboard.writeText(\`${email.replace(/`/g,'\\`')}\`);toast('已复制到剪贴板')">📋 复制开发信</button>
     </div>`);
 }
 

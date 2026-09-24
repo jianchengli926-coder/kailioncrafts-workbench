@@ -307,7 +307,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">方舟获客工作台</div>
-        <div class="b2">KaiLionCrafts Ark V5.0</div>
+        <div class="b2">KaiLionCrafts Ark V6.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -399,6 +399,8 @@ function loadState(){
   S.contents = DB.load('contents') || null;
   S.backlinks = DB.load('backlinks') || null;
   S.agentLogs = DB.load('agentLogs') || [];
+  S.exhibitions = DB.load('exhibitions') || null;
+  S.negotiations = DB.load('negotiations') || [];
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -409,6 +411,7 @@ function persist(){
   DB.save('ar',S.ar); DB.save('monitors',S.monitors); DB.save('monitorLogs',S.monitorLogs);
   DB.save('emailStats',S.emailStats); DB.save('abTests',S.abTests); DB.save('socialRecords',S.socialRecords);
   DB.save('keywords',S.keywords); DB.save('contents',S.contents); DB.save('backlinks',S.backlinks); DB.save('agentLogs',S.agentLogs);
+  DB.save('exhibitions',S.exhibitions); DB.save('negotiations',S.negotiations);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
@@ -839,7 +842,27 @@ function defaultKnowledge(){
     {id:uid(),title:'跟进节奏SOP',cat:'SOP知识库',tags:'跟进,SOP',content:'第1封→3天第2封→7天第3封→14天第4封；超3封未回复进入冷却30天，再发一封失联唤醒。',createdAt:daysAgo(6)},
     {id:uid(),title:'成功案例：英国BritChef',cat:'客户案例库',tags:'英国,案例',content:'2025年成交，年订单$120K，DDP条款，从首次开发信到首单47天。关键：用DDP解决脱欧清关痛点。',createdAt:daysAgo(8)},
     {id:uid(),title:'成功案例：德国Messerei Schmidt',cat:'客户案例库',tags:'德国,案例',content:'OEM户外刀品牌，2026年签年度框架$30K/季度。关键：完整CE/GS技术文件+BSCI验厂报告。',createdAt:daysAgo(8)},
-    {id:uid(),title:'Q4阳江原材料行情',cat:'行业资讯',tags:'行情,不锈钢',content:'Q4 430不锈钢价格稳定，5Cr15Mov微涨2%；交期恢复至30天，是下单窗口。',createdAt:daysAgo(2)}
+    {id:uid(),title:'Q4阳江原材料行情',cat:'行业资讯',tags:'行情,不锈钢',content:'Q4 430不锈钢价格稳定，5Cr15Mov微涨2%；交期恢复至30天，是下单窗口。',createdAt:daysAgo(2)},
+    // V6 谈判话术
+    {id:uid(),title:'1. 价值重塑法',cat:'谈判话术',tags:'压价,价值',content:'场景：客户嫌贵。话术：Our price is 5% higher, but our defect rate is 0.3% vs industry 2%, saving you returns and rework. 要点：用数据量化价值差异。',createdAt:daysAgo(1)},
+    {id:uid(),title:'2. 筹码交换法',cat:'谈判话术',tags:'压价,交换',content:'场景：客户要求降价。话术：I can reduce 3% if you increase MOQ to 5000pcs or pay 50% deposit upfront. 要点：永远不无条件降价。',createdAt:daysAgo(1)},
+    {id:uid(),title:'3. 长期合作绑定法',cat:'谈判话术',tags:'压价,长期',content:'场景：首次报价后。话术：If annual volume reaches 20K pcs, I can apply for distributor pricing at $1.50. 要点：把单次谈判变长期合作。',createdAt:daysAgo(1)},
+    {id:uid(),title:'4. 最后通牒心理战',cat:'谈判话术',tags:'压价,底线',content:'场景：客户反复砍价。话术：This is our best price for this spec. If it doesn\'t fit, no hard feelings. 要点：说完就停，等客户反应。',createdAt:daysAgo(1)},
+    {id:uid(),title:'5. 减配法',cat:'谈判话术',tags:'压价,降配',content:'场景：客户预算不够。话术：We can meet your price by switching to 3Cr13 steel and standard polybag packaging. 要点：让客户选价格还是品质。',createdAt:daysAgo(1)},
+    {id:uid(),title:'6. 挂钩法（阶梯价）',cat:'谈判话术',tags:'压价,阶梯',content:'话术：The $1.65 price applies at 10K pcs. At your current 2K, it\'s $1.85. 要点：用阶梯价引导客户增量。',createdAt:daysAgo(1)},
+    {id:uid(),title:'7. 价值置换法',cat:'谈判话术',tags:'涨价,加值',content:'场景：需要涨价。话术：Price goes up 3%, but we\'ll include free laser logo and upgrade to color gift box. 要点：涨价同时给获得感。',createdAt:daysAgo(1)},
+    {id:uid(),title:'8. 拆分报价法',cat:'谈判话术',tags:'报价,透明',content:'话术：Product $1.85 + Logo $0.08 + Color box $0.12 + DDP $0.35 = $2.40. 要点：透明感降低价格敏感度。',createdAt:daysAgo(1)},
+    {id:uid(),title:'9. 竞品对比法',cat:'谈判话术',tags:'竞品,性价比',content:'话术：Competitor A is $1.70 but 30-day lead and no BSCI. We\'re $1.85 with 20-day lead and BSCI/ISO. 要点：用数据证明性价比。',createdAt:daysAgo(1)},
+    // V6 展会SOP
+    {id:uid(),title:'展会开场白2套',cat:'展会SOP',tags:'开场白,拦截',content:'1) 直接问需求：Hi, what products are you looking for? We specialize in kitchen knives from Yangjiang. 2) 主动抛卖点：Hi, we just launched this shear with bottle opener. Want to feel the quality?',createdAt:daysAgo(1)},
+    {id:uid(),title:'"我再想想"应对',cat:'展会SOP',tags:'应对,犹豫',content:'话术：Of course! May I ask what\'s holding you back — price, quality, or lead time? I can address it right now. 要点：把模糊拒绝变成具体问题。',createdAt:daysAgo(1)},
+    {id:uid(),title:'展会价话术',cat:'展会SOP',tags:'展会价,有效期',content:'话术：This show price is valid only until [展会结束日]. After that, it goes back to regular pricing. 要点：制造紧迫感，但别过度承诺。',createdAt:daysAgo(1)},
+    {id:uid(),title:'展后黄金24h SOP',cat:'展会SOP',tags:'展后,跟进',content:'24h：记忆点邮件（展位号+产品+实拍图）；72h：他问过款的港口价；一周后：专属落地页链接；2h内加WhatsApp。',createdAt:daysAgo(1)},
+    // V6 报价核算
+    {id:uid(),title:'三档报价法',cat:'报价核算',tags:'报价,三档',content:'高端（5Cr15Mov+礼盒+免费Logo）、中端（3Cr13+彩盒，主推）、基础（2Cr13+白盒）。锚定高端让中端显得划算。',createdAt:daysAgo(1)},
+    {id:uid(),title:'阶梯报价模板',cat:'报价核算',tags:'报价,阶梯',content:'500pcs $2.10 / 1000pcs $1.85 / 5000pcs $1.60 / 10000pcs $1.45。用量引导客户增量。',createdAt:daysAgo(1)},
+    {id:uid(),title:'价格让步SOP',cat:'报价核算',tags:'让步,条件',content:'让步幅度递减：第一次5%→第二次3%→第三次1%。每分钱让利换回条件（数量/付款方式/交期）。守住底线价。',createdAt:daysAgo(1)},
+    {id:uid(),title:'谈判前准备清单',cat:'报价核算',tags:'准备,清单',content:'摸清三件事：客户采购量、预算、决策能力。竞品价格调研。设定底线价和目标价。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1742,6 +1765,35 @@ function openCustomerDetail(cid){
         </div>
       </div>
       <div class="card card-pad mb16">
+        <div class="card-title">🤝 谈判记录
+          <button class="btn btn-outline btn-sm" onclick="toast('新增谈判记录（演示）')">＋ 记录</button></div>
+        <table class="tbl"><thead><tr><th>日期</th><th>方式</th><th>要点</th><th>客户关注点</th><th>让步</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr><td class="text-sm">${fmtDay(daysAgo(5))}</td><td><span class="badge badge-blue">邮件</span></td>
+            <td class="text-sm">首次报价 $1.85 FOB</td><td class="text-sm">价格高，要求 $1.60</td>
+            <td class="text-sm">未让步</td><td><span class="badge badge-gold">议价中</span></td></tr>
+          <tr><td class="text-sm">${fmtDay(daysAgo(2))}</td><td><span class="badge badge-a">WhatsApp</span></td>
+            <td class="text-sm">用筹码交换法：MOQ 5000可 $1.70</td><td class="text-sm">MOQ偏高</td>
+            <td class="text-sm">-8% 换数量</td><td><span class="badge badge-blue">等待回复</span></td></tr>
+        </tbody></table>
+        <div class="text-sm mt8">价格敏感度：<span class="badge badge-gold">🟡 中</span></div>
+      </div>
+
+      <div class="card card-pad mb16">
+        <div class="card-title">💬 社媒互动
+          <button class="btn btn-outline btn-sm" onclick="toast('新增社媒互动（演示）')">＋ 新增</button></div>
+        ${(()=>{
+          const recs = (S.socialRecords||[]).filter(r=>r.customerId===c.id);
+          if(!recs.length) return '<div class="text-sm text-muted">暂无社媒互动记录</div>';
+          return `<table class="tbl"><thead><tr><th>平台</th><th>日期</th><th>类型</th><th>内容</th><th>下次行动</th></tr></thead>
+            <tbody>${recs.map(r=>`<tr>
+              <td><b>${r.platform==='LinkedIn'?'💼':r.platform==='WhatsApp'?'💬':r.platform==='Facebook'?'📘':'📷'}</b> ${r.platform}</td>
+              <td class="text-sm">${fmtDay(r.date)}</td><td><span class="badge badge-blue">${r.type}</span></td>
+              <td class="text-sm">${esc(r.note)}</td><td class="text-sm text-muted">${esc(r.next)}</td></tr>`).join('')}</tbody></table>`;
+        })()}
+      </div>
+
+      <div class="card card-pad mb16">
         <div class="card-title">联系历史</div>
         <div class="timeline">
           <div class="tl-item done"><div class="tl-time">${fmtDate(c.createdAt)}</div><div class="tl-title">AI 发现客户</div><div class="tl-desc">来源：${esc(c.source)} · 综合评分 ${c.scores.total}</div></div>
@@ -2447,10 +2499,11 @@ let orderTab = 'quotes';
 function viewOrders(root){
   root.innerHTML = `
     <div class="flex gap8 mb16">
-      ${[['quotes','📄 报价单'],['contracts','📋 合同'],['orders','🚚 订单执行']].map(([k,l])=>
+      ${[['quotes','📄 报价单'],['contracts','📋 合同'],['orders','🚚 订单执行'],['calc','🧮 计算器']].map(([k,l])=>
         `<button class="btn ${orderTab===k?'btn-gold':'btn-outline'}" onclick="orderTab='${k}';renderView()">${l}</button>`).join('')}
     </div>
-    ${orderTab==='quotes'?orderQuotes():orderTab==='contracts'?orderContracts():orderOrders()}`;
+    ${orderTab==='quotes'?orderQuotes():orderTab==='contracts'?orderContracts():orderTab==='calc'?quoteCalc():orderOrders()}`;
+  if(orderTab==='calc') setTimeout(calcQuote,50);
 }
 function orderQuotes(){
   return `<div class="flex-between mb16">
@@ -2996,6 +3049,88 @@ function runAgents(){
       if(i===msgs.length-1 && out){ out.innerHTML += '<div style="margin-top:12px;color:var(--green);font-weight:700">✅ 获客任务完成：发现 12 家精准客户，生成 12 封开发信</div>'; agentRunning=false; }
     }, i*800);
   });
+}
+
+/* V6 展会管理 */
+function viewExpos(root){
+  if(!S.exhibitions || !S.exhibitions.length) S.exhibitions = [
+    {id:uid(),name:'芝加哥国际家居用品展',date:'2026-03-15',place:'芝加哥',booth:'S1234',budget:8000,status:'已结束',leads:45,deals:3,
+      preInvite:[{c:'Kitchen Universe Inc.',st:'已确认'},{c:'Toronto Cutlery',st:'已邀请'},{c:'Nordisk Kjokken',st:'已拒绝'}],
+      visitors:[{company:'ABC Home',country:'美国',grade:'A',product:'厨房剪刀',note:'要样品'},{company:'XYZ Ltd',country:'加拿大',grade:'B',product:'厨师刀',note:'要目录'}]},
+    {id:uid(),name:'法兰克福春季消费品展',date:'2026-09-15',place:'法兰克福',booth:'D23',budget:12000,status:'进行中',leads:28,deals:0,
+      preInvite:[],visitors:[]},
+    {id:uid(),name:'广交会三期',date:'2026-10-25',place:'广州',booth:'14.2C35',budget:3000,status:'筹备中',leads:0,deals:0,preInvite:[],visitors:[]}
+  ];
+  root.innerHTML = `
+  <div class="page-head"><h2>🎪 展会管理</h2><p class="sub">展前邀约 · 展中分级 · 展后黄金24h跟进</p>
+    <button class="btn btn-primary" onclick="toast('新增展会（演示）')">＋ 新增展会</button></div>
+  <div class="grid-3">
+  ${S.exhibitions.map(e=>{
+    const roi=e.deals? Math.round((e.deals*15000-e.budget)/e.budget*100):0;
+    return `<div class="card card-pad">
+      <b style="font-size:15px">${esc(e.name)}</b>
+      <div class="text-sm text-muted mt8">${fmtDay(e.date)} · ${esc(e.place)} · 展位 ${esc(e.booth)}</div>
+      <div class="mt8"><span class="badge ${e.status==='进行中'?'badge-a':e.status==='筹备中'?'badge-gold':'badge-gray'}">${e.status}</span></div>
+      <div class="divider"></div>
+      <div class="text-sm" style="line-height:2">
+        预算 $${e.budget.toLocaleString()} · 获客 ${e.leads} 家 · 成交 ${e.deals} 单<br>
+        ROI <b style="color:${roi>=0?'var(--green)':'var(--red)'}">${roi>=0?'+':''}${roi}%</b>
+      </div>
+      <div class="mt16"><button class="btn btn-outline btn-sm" onclick="toast('展会详情（演示）')">查看详情 →</button></div>
+    </div>`;}).join('')}
+  </div>
+  <div class="card card-pad mt16">
+    <div class="card-title">📋 展后跟进SOP（黄金24h）</div>
+    <table class="tbl"><thead><tr><th>时间</th><th>动作</th><th>要点</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge badge-red">24h内</span></td><td>第一封邮件</td><td class="text-sm">记忆点：展位号+现场聊过的产品+实拍图，不发大附件</td></tr>
+      <tr><td><span class="badge badge-gold">72h内</span></td><td>第二封邮件</td><td class="text-sm">复刻他问过的款的近期港口交货价</td></tr>
+      <tr><td><span class="badge badge-blue">一周后</span></td><td>第三封邮件</td><td class="text-sm">专属产品落地页链接</td></tr>
+      <tr><td><span class="badge badge-a">同时</span></td><td>加WhatsApp/LinkedIn</td><td class="text-sm">发完邮件2小时内加好友</td></tr>
+    </tbody></table>
+  </div>`;
+}
+
+/* V6 报价计算器 */
+function quoteCalc(){
+  return `<div class="card card-pad">
+    <div class="card-title">🧮 贸易术语报价计算器</div>
+    <div class="grid-2">
+      <div>
+        <b class="text-sm">成本明细（USD/件）</b>
+        ${[['原材料',1.20],['人工',0.35],['包装损耗',0.10],['质检',0.05],['仓储',0.03],['国内运费',0.08],['报关单证',0.02],['拖车港杂',0.04],['利润率%',15]].map(([l,v],i)=>
+          `<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0;font-size:13px">
+            <span>${l}</span><input id="c${i}" type="number" step="0.01" value="${v}" style="width:90px;padding:4px 8px;border:1px solid var(--border);border-radius:6px" oninput="calcQuote()"></div>`).join('')}
+      </div>
+      <div>
+        <b class="text-sm">贸易术语报价（实时计算）</b>
+        <div id="calcOut"></div>
+        <div class="divider"></div>
+        <b class="text-sm">三档报价</b>
+        <div id="tierOut" class="mt8"></div>
+      </div>
+    </div>
+  </div>`;
+}
+function calcQuote(){
+  const g=id=>parseFloat(document.getElementById(id).value)||0;
+  const cost=g(0)+g(1)+g(2)+g(3)+g(4)+g(5)+g(6)+g(7);
+  const margin=g(8)/100;
+  const exw=cost/(1-margin);
+  const fob=exw+0.15;
+  const cif=fob+0.35;
+  const ddp=cif+0.55;
+  document.getElementById('calcOut').innerHTML =
+    '<div style="line-height:2.2;font-size:13.5px">'+
+    '<div>EXW（出厂价）：<b style="color:var(--primary)">$'+exw.toFixed(2)+'</b></div>'+
+    '<div>FOB（离岸价）：<b style="color:var(--gold)">$'+fob.toFixed(2)+'</b></div>'+
+    '<div>CIF（到岸价）：<b style="color:#ed8936">$'+cif.toFixed(2)+'</b></div>'+
+    '<div>DDP（完税后）：<b style="color:var(--green)">$'+ddp.toFixed(2)+'</b></div></div>';
+  document.getElementById('tierOut').innerHTML =
+    '<table class="tbl"><thead><tr><th>档位</th><th>FOB价</th><th>定位</th></tr></thead><tbody>'+
+    '<tr><td><span class="badge badge-a">高端</span></td><td>$'+(fob*1.15).toFixed(2)+'</td><td class="text-sm">5Cr15Mov+礼盒+免费激光Logo</td></tr>'+
+    '<tr><td><span class="badge badge-gold">中端</span></td><td>$'+fob.toFixed(2)+'</td><td class="text-sm">3Cr13+彩盒+性价比</td></tr>'+
+    '<tr><td><span class="badge badge-gray">基础</span></td><td>$'+(fob*0.85).toFixed(2)+'</td><td class="text-sm">2Cr13+白盒</td></tr></tbody></table>';
 }
 
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }

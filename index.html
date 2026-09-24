@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V16.0</div>
+        <div class="b2">KaiLionCrafts Crafts V17.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -542,6 +542,7 @@ function loadState(){
   S.finance = DB.load('finance') || null;
   S.catalog = DB.load('catalog') || null;
   S.team = DB.load('team') || null;
+  S.workflows = DB.load('workflows') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -1108,7 +1109,13 @@ function defaultKnowledge(){
     // V16 客户分层管理
     {id:uid(),title:'ABCD五级分层',cat:'客户分层管理',tags:'分级,跟进',content:'🏆S级每日/A级2天/B级3天/C级7天/D级14天。S/A超60天无互动=流失预警；B级问报价要样品→建议升A。',createdAt:daysAgo(1)},
     // V16 询盘质量评估
-    {id:uid(),title:'询盘4看1分级',cat:'询盘质量评估',tags:'询盘,分级',content:'看需求具体/看愿补充/看身份可验证/看除价格外关注点。A级24h方案→B级48h培养→C级模板回复入公海。',createdAt:daysAgo(1)}
+    {id:uid(),title:'询盘4看1分级',cat:'询盘质量评估',tags:'询盘,分级',content:'看需求具体/看愿补充/看身份可验证/看除价格外关注点。A级24h方案→B级48h培养→C级模板回复入公海。',createdAt:daysAgo(1)},
+    // V17 AI CEO与11Agent
+    {id:uid(),title:'AI CEO指挥流程',cat:'AI CEO与11Agent架构',tags:'CEO,调度',content:'自然语言指令→CEO拆解→分配11个专业Agent→执行→返回CEO汇总。11个Agent：产品分析/市场研究/客户画像/找公司/背调/评分/联系人/信号/开发信/社媒/内容。',createdAt:daysAgo(1)},
+    // V17 可视化工作流
+    {id:uid(),title:'6个预设工作流',cat:'可视化工作流',tags:'工作流,模板',content:'客户开发全流程/官网深度分析/社媒自动化/邮件自动跟进/询盘自动处理/客户流失预警。节点类型：触发器/AI/搜索/邮件/社媒/数据/条件分支/延迟/审批/通知。',createdAt:daysAgo(1)},
+    // V17 客户官网深度分析
+    {id:uid(),title:'官网分析7步',cat:'客户官网深度分析',tags:'官网,分析',content:'输入URL→分析主营→判断市场→抓社媒→分析广告→分析供应链→生成背调报告+开发信。每步1秒，实时日志。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1639,6 +1646,12 @@ function viewDashboard(root){
       <div class="card card-pad"><div class="stat-label">🔔 升降级预警</div><div class="stat-value" style="color:var(--gold)">3</div><div class="text-sm text-muted">升级1·降级1·流失1</div></div>
       <div class="card card-pad"><div class="stat-label">💬 询盘质量</div><div class="stat-value">A2·B3·C1</div><div class="text-sm text-muted">A级待处理2</div></div>
       <div class="card card-pad"><div class="stat-label">📈 开发计划</div><div class="stat-value">1🔄·1✅</div><div class="text-sm text-muted">执行中/已完成</div></div>
+    </div>
+    <div class="grid-4 mb16">
+      <div class="card card-pad" style="border-top:3px solid var(--gold)"><div class="stat-label">🤖 AI CEO</div><div class="stat-value" style="color:var(--gold)">2</div><div class="text-sm text-muted">执行中·待审批5</div></div>
+      <div class="card card-pad"><div class="stat-label">⚡ 工作流</div><div class="stat-value">92%</div><div class="text-sm text-muted">今日执行12次</div></div>
+      <div class="card card-pad"><div class="stat-label">📱 社媒发布</div><div class="stat-value">3</div><div class="text-sm text-muted">本周12条·互动86</div></div>
+      <div class="card card-pad"><div class="stat-label">🔍 官网分析</div><div class="stat-value">56</div><div class="text-sm text-muted">累计分析数</div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -4628,6 +4641,89 @@ function runAIFlow(){
         showScoreCard();
       } else next();
     },1000);
+  }
+  next();
+}
+
+/* V17 可视化工作流 */
+let wfEdit=false, wfRunStep=0;
+const WF_NODES=[
+  ['🚀','定时触发','trigger'],['🔍','搜索客户','search'],['🏢','客户背调(AI)','ai'],
+  ['⭐','6维评分(AI)','ai'],['✉️','写开发信(AI)','ai'],['📋','人工审批','approve'],
+  ['📧','发送邮件','email'],['📊','同步CRM','data']
+];
+function viewWorkflow(root){
+  if(wfEdit) return viewWfEditor(root);
+  const wfs=[
+    ['客户开发全流程','定时→找客户→背调→评分→写开发信→审批→发送→同步CRM','✅ 启用','2026-09-24','128次','92%'],
+    ['官网深度分析','输入网址→分析主营→抓社媒→分析广告→背调报告→开发信','✅ 启用','2026-09-23','56次','96%'],
+    ['社媒自动化','定时→AI文案→图片组合→多平台发布→记录','✅ 启用','2026-09-24','45次','88%'],
+    ['邮件自动跟进','邮件触发→AI分类→高意向提醒→低意向回复→更新CRM','✅ 启用','2026-09-22','203次','94%'],
+    ['询盘自动处理','询盘触发→4看评估→分级→A级通知人工→B/C自动回复','⏸ 禁用','2026-09-20','89次','91%'],
+    ['客户流失预警','定时→扫描→超期→AI挽回邮件→审批→发送','✅ 启用','2026-09-21','34次','85%']
+  ];
+  root.innerHTML=`
+  <div class="page-head"><h2>⚡ 可视化工作流</h2><p class="sub">6个预设模板·节点拖拽·自动执行</p>
+    <button class="btn btn-primary" onclick="toast('新建工作流（演示）')">＋ 新建工作流</button></div>
+  <div class="card card-pad mb16"><div class="card-title">📦 预设模板库（一键导入）</div>
+    <div class="grid-3">
+      ${wfs.map(w=>`<div class="card" style="padding:14px;cursor:pointer" onclick="toast('导入模板：${w[0]}')">
+        <b style="font-size:13px">${w[0]}</b>
+        <div class="text-sm text-muted mt8" style="font-size:11px;line-height:1.6">${w[1]}</div></div>`).join('')}
+    </div></div>
+  <div class="card card-pad"><div class="card-title">📋 我的工作流</div>
+    <table class="tbl"><thead><tr><th>名称</th><th>状态</th><th>最近执行</th><th>执行次数</th><th>成功率</th></tr></thead>
+    <tbody>${wfs.map(w=>`<tr style="cursor:pointer" onclick="wfEdit=true;renderView()"><td><b>${w[0]}</b><div class="text-sm text-muted" style="font-size:11px">${w[1]}</div></td>
+      <td><span class="badge ${w[2].includes('启用')?'badge-a':'badge-gray'}">${w[2]}</span></td>
+      <td>${w[3]}</td><td>${w[4]}</td><td style="color:var(--green)">${w[5]}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function viewWfEditor(root){
+  root.innerHTML=`
+  <div class="flex gap8 mb16">
+    <button class="btn btn-outline" onclick="wfEdit=false;renderView()">← 返回工作流列表</button>
+    <h2 style="margin:0">⚡ 客户开发全流程（编辑器）</h2>
+    <button class="btn btn-gold" style="margin-left:auto" onclick="runWf()">▶ 运行</button>
+  </div>
+  <div style="display:flex;gap:16px">
+    <div style="width:180px" class="card card-pad">
+      <b class="text-sm">节点面板</b>
+      <div class="text-sm mt8" style="line-height:2.4">
+        🚀 触发器<br>🤖 AI节点<br>🔍 搜索<br>📧 邮件<br>📱 社媒<br>📊 数据<br>🔀 条件分支<br>⏳ 延迟<br>📋 审批<br>🔔 通知
+      </div>
+    </div>
+    <div style="flex:1" class="card card-pad" id="wfCanvas">
+      <div style="position:relative;min-height:400px">
+        ${WF_NODES.map((n,i)=>`<div id="wfnode-${i}" style="position:relative;z-index:2;background:#fff;border:2px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:24px;max-width:280px" onclick="toast('配置节点：${n[1]}')">
+          <span style="font-size:18px">${n[0]}</span> <b style="font-size:13px">${n[1]}</b>
+          <div class="text-sm text-muted" style="font-size:11px">${n[2]==='ai'?'AI节点':n[2]==='approve'?'人工节点':'自动节点'}</div>
+        </div>`).join('')}
+        <svg style="position:absolute;top:0;left:120px;height:100%;width:2px;z-index:0">
+          ${WF_NODES.map((_,i)=>`<line x1="0" y1="${30+i*72}" x2="0" y2="${30+(i+1)*72}" stroke="#cbd5e0" stroke-width="2"/>`).join('')}
+        </svg>
+      </div>
+    </div>
+    <div style="width:200px" class="card card-pad">
+      <b class="text-sm">属性面板</b>
+      <div class="text-sm mt8">点击左侧节点配置参数</div>
+    </div>
+  </div>
+  <div class="card card-pad mt16"><b class="text-sm">执行日志</b>
+    <div id="wfLog" style="max-height:150px;overflow-y:auto;font-family:monospace;font-size:12px;color:var(--muted);margin-top:8px"><span style="opacity:.5">等待运行...</span></div>
+  </div>`;
+}
+function runWf(){
+  wfRunStep=0;
+  const log=document.getElementById('wfLog');
+  function next(){
+    if(wfRunStep>=WF_NODES.length) return;
+    const node=document.getElementById('wfnode-'+wfRunStep);
+    if(node) node.style.borderColor='var(--gold)', node.style.background='#f7efdd';
+    if(log) log.innerHTML+=`<div>🔄 ${WF_NODES[wfRunStep][1]} 执行中...</div>`;
+    setTimeout(()=>{
+      if(node) node.style.borderColor='var(--green)', node.style.background='#f0fff4';
+      if(log){ log.innerHTML+=`<div style="color:var(--green)">✅ ${WF_NODES[wfRunStep][1]} 完成</div>`; log.scrollTop=log.scrollHeight; }
+      wfRunStep++; next();
+    },800);
   }
   next();
 }

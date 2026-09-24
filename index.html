@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KaiLionCrafts 方舟外贸获客工作台</title>
+<title>KaiLionCrafts 锴利外贸获客工作台</title>
 <style>
 /* ============ 设计变量 ============ */
 :root{
@@ -368,7 +368,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
   <div class="lock-company">
     <div class="name">KaiLionCrafts</div>
     <div class="sub">YANGJIANG HARDWARE</div>
-    <div class="slogan">方舟外贸获客工作台 · 数据安全 · 本地存储</div>
+    <div class="slogan">锴利外贸获客工作台 · 数据安全 · 本地存储</div>
   </div>
   <form class="lock-form" onsubmit="return checkLock(event)">
     <div class="lock-input-wrap">
@@ -393,8 +393,8 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
     <div class="brand">
       <div class="brand-logo">K</div>
       <div class="brand-text">
-        <div class="b1">方舟获客工作台</div>
-        <div class="b2">KaiLionCrafts Ark V9.0</div>
+        <div class="b1">锴利获客工作台</div>
+        <div class="b2">KaiLionCrafts Crafts V10.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -470,7 +470,7 @@ function toggleLockPw(){
 })();
 
 /* ============================================================
- * KaiLionCrafts 方舟外贸获客工作台
+ * KaiLionCrafts 锴利外贸获客工作台
  * 核心哲学：AI只干脏活累活，发送我自己来，数据全在本地
  * ============================================================ */
 const PREFIX = 'kailion_ark_';
@@ -532,6 +532,9 @@ function loadState(){
   S.payments = DB.load('payments') || null;
   S.certifications = DB.load('certifications') || null;
   S.whatsapp = DB.load('whatsapp') || null;
+  S.rfm = DB.load('rfm') || null;
+  S.landingpages = DB.load('landingpages') || null;
+  S.competitors = DB.load('competitors') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -547,6 +550,7 @@ function persist(){
   DB.save('referrals',S.referrals); DB.save('maintenance',S.maintenance);
   DB.save('tiktok',S.tiktok); DB.save('b2b',S.b2b); DB.save('googleads',S.googleads);
   DB.save('payments',S.payments); DB.save('certifications',S.certifications); DB.save('whatsapp',S.whatsapp);
+  DB.save('rfm',S.rfm); DB.save('landingpages',S.landingpages); DB.save('competitors',S.competitors);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
@@ -1040,7 +1044,17 @@ function defaultKnowledge(){
     // V9 产品认证与合规
     {id:uid(),title:'全球认证速查表',cat:'产品认证与合规',tags:'CE,RoHS,FCC',content:'欧盟CE/RoHS/REACH；美国FCC/FDA/CPC；英国UKCA；日本PSE；韩国KC；俄罗斯EAC；锂电池UN38.3。出货前按目的国核对。',createdAt:daysAgo(1)},
     {id:uid(),title:'RoHS 10项有害物质',cat:'产品认证与合规',tags:'RoHS,限值',content:'铅Pb/镉Cd(≤0.01%)/汞Hg/六价铬Cr6+/PBB/PBDE/DEHP/BBP/DBP/DIBP，其他≤0.1%。',createdAt:daysAgo(1)},
-    {id:uid(),title:'PPWR包装新规',cat:'产品认证与合规',tags:'PPWR,2026',content:'2026-08-12强制：纸箱/胶带/塑封/标签测铅汞铬六价铬四项重金属；食品包装加测PFAS。',createdAt:daysAgo(1)}
+    {id:uid(),title:'PPWR包装新规',cat:'产品认证与合规',tags:'PPWR,2026',content:'2026-08-12强制：纸箱/胶带/塑封/标签测铅汞铬六价铬四项重金属；食品包装加测PFAS。',createdAt:daysAgo(1)},
+    // V10 RFM客户分层
+    {id:uid(),title:'RFM三维模型',cat:'RFM客户分层',tags:'RFM,模型',content:'R最近采购(<60天好)、F采购频次(越高越忠诚)、M累计金额(越高贡献越大)。交叉分5层：高价值/潜力/新客/沉睡/流失风险。',createdAt:daysAgo(1)},
+    {id:uid(),title:'ABCD跟进频率',cat:'RFM客户分层',tags:'ABCD,分级',content:'A类需求真实+高匹配→每天跟进；B类有需求但周期长→每周2-3次；C类只问低价→每周1次；D类风险高→轻跟进或放弃。',createdAt:daysAgo(1)},
+    // V10 独立站转化优化
+    {id:uid(),title:'落地页设计原则',cat:'独立站转化优化',tags:'落地页,CRO',content:'一个页面对应一个人群+一个需求+一个CTA。必含：首屏价值主张/信任背书/产品详情/案例/表单/FAQ。',createdAt:daysAgo(1)},
+    {id:uid(),title:'询盘表单优化',cat:'独立站转化优化',tags:'表单,A/B',content:'字段3-5项最稳；按钮Submit改Get Free Quote(转化率+87%)；首屏右侧+产品底部+全站浮动WhatsApp。',createdAt:daysAgo(1)},
+    {id:uid(),title:'转化漏斗分析',cat:'独立站转化优化',tags:'漏斗,CRO',content:'访问→停留>30s→浏览产品→点击询盘→提交表单→回复→报价→成交。最大流失通常在"浏览产品→点击询盘"。',createdAt:daysAgo(1)},
+    // V10 自动化SOP
+    {id:uid(),title:'AI获客SOP',cat:'自动化SOP',tags:'AI,流程',content:'关键词→AI抓客户→读官网社媒→客户画像→ABC分级→A类优先→AI写千邮千面→每天50-2000封→CRM状态流转。',createdAt:daysAgo(1)},
+    {id:uid(),title:'展会名片OCR导入',cat:'自动化SOP',tags:'OCR,展会',content:'展会名片批量OCR识别：公司名/联系人/职位/邮箱/电话/网址→人工确认→自动打展会标签导入CRM。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1495,6 +1509,23 @@ function viewDashboard(root){
       <div class="stat-card"><div class="stat-label">🏪 B2B 询盘</div><div class="stat-value">28</div><div class="stat-trend up">阿里 18</div></div>
       <div class="stat-card"><div class="stat-label">🔍 Google Ads</div><div class="stat-value">$275</div><div class="stat-trend down">CPA $39</div></div>
       <div class="stat-card"><div class="stat-label">💰 全渠道 ROI</div><div class="stat-value" style="color:var(--green)">4.2x</div><div class="stat-trend up">+0.8</div></div>
+    </div>
+    <div class="grid-2 mb16">
+      <div class="card card-pad"><div class="card-title">🌟 高价值客户 TOP5</div>
+        <table class="tbl"><tbody>
+          <tr><td>1. Messerei Schmidt</td><td style="text-align:right">$42K</td></tr>
+          <tr><td>2. BritChef Ltd</td><td style="text-align:right">$28K</td></tr>
+          <tr><td>3. Kitchen Universe</td><td style="text-align:right">$18K</td></tr>
+          <tr><td>4. ABC Home GmbH</td><td style="text-align:right">$12K</td></tr>
+          <tr><td>5. Aussie Cutlery</td><td style="text-align:right">$8K</td></tr>
+        </tbody></table></div>
+      <div class="card card-pad"><div class="card-title">🌐 落地页效果 TOP3</div>
+        <table class="tbl"><thead><tr><th>页面</th><th>转化率</th></tr></thead><tbody>
+          <tr><td>kitchen-scissors-oem</td><td style="color:var(--green)"><b>1.5%</b></td></tr>
+          <tr><td>chef-knife-wholesale</td><td>1.0%</td></tr>
+          <tr><td>new-2026-peeler</td><td style="color:var(--red)">0.4%</td></tr>
+        </tbody></table>
+        <div class="text-sm text-muted mt8">独立站询盘转化率：<b>0.54%</b>（访问→表单）</div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -1993,6 +2024,15 @@ function openCustomerDetail(cid){
           📄 下载了《OEM Cutlery Catalog 2026》PDF<br>
           🌐 访问了 /products/kitchen-scissors — 第3次访问<br>
           🌐 停留时长 12分45秒 · 浏览 5 个页面
+        </div>
+      </div>
+      <div class="card card-pad mb16">
+        <div class="card-title">🏷 客户画像</div>
+        <div class="text-sm" style="line-height:2">
+          客户类型：<span class="badge badge-blue">批发商</span>
+          生命周期：<span class="badge badge-a">活跃客户</span><br>
+          决策人角色：<b>Purchasing Manager</b> · 预算范围：$20K-50K/年 · 决策周期：4-8周<br>
+          <span class="text-muted">报价策略：经销商量大价低，谈年度框架协议；零售商量小价高，谈MOQ阶梯。</span>
         </div>
       </div>
       <div class="card card-pad mb16" style="border-left:3px solid ${c.riskLevel==='high'?'var(--red)':c.riskLevel==='medium'?'#ed8936':'var(--green)'}">
@@ -2712,7 +2752,7 @@ function viewSettings(root){
           <div class="form-hint mt8">所有数据保存在浏览器 localStorage（key 前缀 kailion_ark_），不上云、不外发。</div>
         </div>
         <div class="card card-pad">
-          <div class="card-title">关于方舟工作台</div>
+          <div class="card-title">关于锴利工作台</div>
           <div class="text-sm" style="line-height:2">
             <b>版本</b> v6.0 · KaiLionCrafts Ark<br>
             <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
@@ -3303,6 +3343,40 @@ function viewAgents(root){
   <div class="card card-pad mt16" id="agentLogCard" style="display:none">
     <div class="card-title">📋 Agent 工作日志</div>
     <div id="agentLog" style="font-size:12.5px;line-height:1.9;max-height:240px;overflow-y:auto"></div>
+  </div>
+
+  <div class="card card-pad mt16">
+    <div class="card-title">⚡ 自动化 SOP</div>
+    <div class="grid-2" style="gap:16px">
+      <div>
+        <b class="text-sm">🤖 AI获客SOP流程</b>
+        <div class="text-sm mt8" style="line-height:2">
+          关键词+客户画像 → AI抓取 → 读官网社媒 → 客户画像 → ABC分级 → AI写开发信 → 批量外发 → CRM流转<br>
+          <span class="text-muted">状态：新线索→已背调→已发信→已回复→跟进中→已成交</span>
+        </div>
+        <div class="text-sm mt8">每日发送量：<b>500</b> 封（可调 50-2000）</div>
+        <button class="btn btn-gold mt8" onclick="toast('✅ 已开始执行AI获客SOP，预计30分钟完成')">▶ 开始执行</button>
+      </div>
+      <div>
+        <b class="text-sm">🪪 展会名片OCR识别</b>
+        <div class="text-sm mt8" style="line-height:1.8">
+          预置识别结果：<b>ABC Home GmbH</b> · Hans Müller · Purchasing Manager<br>
+          hans@abchome.de · +49 30 123456 · Berlin, Germany
+        </div>
+        <button class="btn btn-primary mt8" onclick="toast('已导入客户台账，自动打展会标签')">📥 导入客户台账</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-pad mt16">
+    <div class="card-title">🥊 竞品监控</div>
+    <table class="tbl"><thead><tr><th>竞品</th><th>国家</th><th>价格区间</th><th>优势</th><th>劣势</th></tr></thead>
+    <tbody>
+      <tr><td><b>Victorinox</b></td><td>瑞士</td><td>$8-25</td><td>品牌强</td><td>价格高/MOQ大</td></tr>
+      <tr><td><b>Zwilling</b></td><td>德国</td><td>$10-40</td><td>品质标杆</td><td>交期长</td></tr>
+      <tr><td><b>张小泉</b></td><td>中国</td><td>$1-5</td><td>国内渠道强</td><td>海外弱</td></tr>
+      <tr><td><b>义乌某厂</b></td><td>中国</td><td>$0.5-2</td><td>极低价</td><td>品质差/无认证</td></tr>
+    </tbody></table>
   </div>`;
 }
 function runAgents(){
@@ -3521,6 +3595,25 @@ function retCare(){
       <tr><td>发货后90天</td><td class="text-sm">客户收货后</td><td class="text-sm">复购提醒</td></tr>
       <tr><td>国家节日</td><td class="text-sm">圣诞/感恩节/新年</td><td class="text-sm">节日问候邮件</td></tr>
     </tbody></table></div>`;
+}
+function retRFM(){
+  return `<div class="grid-5 mb16" style="grid-template-columns:repeat(5,1fr);gap:12px">
+    <div class="card card-pad" style="border-top:3px solid var(--gold)"><b>🌟 高价值</b><div class="stat-value" style="color:var(--gold)">2</div><div class="text-sm text-muted">周跟进 · 65%金额</div></div>
+    <div class="card card-pad"><b>⭐ 潜力</b><div class="stat-value">5</div><div class="text-sm text-muted">月推新品</div></div>
+    <div class="card card-pad"><b>🆕 新客户</b><div class="stat-value">8</div><div class="text-sm text-muted">7/30/90回访</div></div>
+    <div class="card card-pad"><b>💤 沉睡</b><div class="stat-value" style="color:var(--muted)">14</div><div class="text-sm text-muted">优惠唤醒</div></div>
+    <div class="card card-pad" style="border-top:3px solid var(--red)"><b>⚠️ 流失风险</b><div class="stat-value" style="color:var(--red)">3</div><div class="text-sm text-muted">紧急挽回</div></div>
+  </div>
+  <div class="card card-pad"><div class="card-title">RFM 三维说明</div>
+    <div class="text-sm" style="line-height:2">
+      <b>R（最近采购）：</b>&lt;60天好，&gt;60天差<br>
+      <b>F（采购频次）：</b>越高越忠诚<br>
+      <b>M（累计金额）：</b>越高贡献越大
+    </div>
+    <div class="divider"></div>
+    <b class="text-sm">ABCD 跟进频率分级</b>
+    <div class="text-sm mt8">A类每天跟进 · B类每周2-3次 · C类每周1次 · D类轻跟进或放弃</div>
+  </div>`;
 }
 function retWA(){
   return `<div class="grid-2 mb16">
@@ -3878,6 +3971,67 @@ function certPre(){
       ○ 说明书英文版本<br>
       ○ 可回收标识打印
     </div></div>`;
+}
+
+/* V10 独立站优化 */
+let siteTab='lp';
+function viewSite(root){
+  root.innerHTML=`
+  <div class="page-head"><h2>🌐 独立站优化</h2><p class="sub">落地页·表单·性能·转化漏斗</p></div>
+  <div class="btn-row mb16">
+    ${[['lp','📄 落地页'],['form','📝 询盘表单'],['perf','⚡ 性能'],['funnel','📊 转化漏斗']].map(([k,l])=>
+      `<button class="btn ${siteTab===k?'btn-gold':'btn-outline'}" onclick="siteTab='${k}';renderView()">${l}</button>`).join('')}
+  </div>
+  ${siteTab==='lp'?siteLP():siteTab==='form'?siteForm():siteTab==='perf'?sitePerf():siteFunnel()}`;
+}
+function siteLP(){
+  return `<div class="card card-pad"><div class="card-title">落地页列表</div>
+    <table class="tbl"><thead><tr><th>页面</th><th>类型</th><th>访问量</th><th>询盘</th><th>转化率</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>kitchen-scissors-oem</td><td>OEM服务</td><td>3,200</td><td>48</td><td style="color:var(--green)"><b>1.5%</b></td><td><span class="badge badge-a">已上线</span></td></tr>
+      <tr><td>chef-knife-wholesale</td><td>产品推广</td><td>1,800</td><td>18</td><td>1.0%</td><td><span class="badge badge-a">已上线</span></td></tr>
+      <tr><td>new-2026-peeler</td><td>新品发布</td><td>450</td><td>2</td><td>0.4%</td><td><span class="badge badge-gold">优化中</span></td></tr>
+    </tbody></table>
+    <div class="divider"></div>
+    <b class="text-sm">📋 落地页要素检查</b>
+    <div class="text-sm mt8" style="line-height:2">首屏价值主张 ✅ · 信任背书(BSCI/ISO) ✅ · 产品详情 ✅ · 案例展示 ✅ · 询盘表单 ✅ · FAQ ✅</div>
+  </div>`;
+}
+function siteForm(){
+  return `<div class="card card-pad mb16"><div class="card-title">📝 表单优化</div>
+    <div class="text-sm" style="line-height:2">
+      <b>字段精简：</b>3-5项最稳（姓名/邮箱/公司名/需求/采购量）<br>
+      <b>按钮文案：</b>Submit → <b style="color:var(--gold)">Get Free Quote</b> / Request Quote<br>
+      <b>位置：</b>首屏右侧 + 产品页底部 + 全站浮动 WhatsApp 🔵
+    </div></div>
+  <div class="card card-pad"><div class="card-title">🧪 A/B 测试</div>
+    <table class="tbl"><thead><tr><th>版本</th><th>按钮文案</th><th>转化率</th></tr></thead>
+    <tbody>
+      <tr><td>A</td><td>Submit</td><td>0.8%</td></tr>
+      <tr><td>B</td><td><b>Get Free Quote</b></td><td style="color:var(--green)"><b>1.5% ↑</b></td></tr>
+    </tbody></table></div>`;
+}
+function sitePerf(){
+  return `<div class="card card-pad"><div class="card-title">⚡ 网站性能</div>
+    <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat-card"><div class="stat-label">加载速度</div><div class="stat-value" style="color:var(--green)">1.8s</div></div>
+      <div class="stat-card"><div class="stat-label">CDN</div><div class="stat-value" style="color:var(--green)">已开</div></div>
+      <div class="stat-card"><div class="stat-label">图片压缩</div><div class="stat-value">WebP</div></div>
+      <div class="stat-card"><div class="stat-label">移动端</div><div class="stat-value" style="color:var(--green)">适配</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="text-sm">目标 &lt;3秒 · 当前 1.8s ✅</div></div>`;
+}
+function siteFunnel(){
+  return `<div class="card card-pad"><div class="card-title">📊 独立站转化漏斗</div>
+    <div class="text-sm" style="line-height:2.4">
+      访问 <b>12,500</b> → 停留&gt;30s <b>8,200</b>(66%) → 浏览产品 <b>5,400</b>(43%)<br>
+      → 点击询盘 <b>320</b>(2.6%) → 提交表单 <b>68</b>(0.54%) → 回复 <b>42</b>(62%)<br>
+      → 报价 <b>28</b> → 成交 <b>7</b>
+    </div>
+    <div class="divider"></div>
+    <div class="text-sm" style="color:var(--red)">⚠️ 最大流失：浏览产品→点击询盘（43%→2.6%），优化产品页CTA和WhatsApp浮动按钮。</div>
+  </div>`;
 }
 
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }

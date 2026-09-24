@@ -1,0 +1,2590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaiLionCrafts 方舟外贸获客工作台</title>
+<style>
+/* ============ 设计变量 ============ */
+:root{
+  --primary:#1a365d;
+  --primary-dark:#14294a;
+  --primary-darker:#0f2240;
+  --accent:#c9a961;
+  --accent-dark:#b08d44;
+  --bg:#f3f5f9;
+  --card:#ffffff;
+  --border:#e3e8f0;
+  --border-strong:#cbd5e0;
+  --text:#1a202c;
+  --text-2:#4a5568;
+  --text-3:#8a96a8;
+  --success:#2f855a;
+  --success-bg:#e6f4ec;
+  --warning:#c05621;
+  --warning-bg:#fdf0e4;
+  --danger:#c53030;
+  --danger-bg:#fbeaea;
+  --info:#2b6cb0;
+  --info-bg:#e8f0fa;
+  --gray:#718096;
+  --gray-bg:#eef1f5;
+  --sidebar-w:232px;
+  --sidebar-w-collapsed:64px;
+  --topbar-h:58px;
+  --radius:10px;
+  --shadow:0 1px 3px rgba(20,41,74,.06),0 1px 2px rgba(20,41,74,.04);
+  --shadow-md:0 4px 14px rgba(20,41,74,.09);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.55;overflow:hidden;
+}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;font-size:inherit}
+input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;outline:none}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#c8d0dc;border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ============ 布局骨架 ============ */
+.app{display:flex;height:100vh;width:100vw}
+.sidebar{
+  width:var(--sidebar-w);background:linear-gradient(180deg,var(--primary) 0%,var(--primary-darker) 100%);
+  color:#d8e0ee;display:flex;flex-direction:column;flex-shrink:0;transition:width .25s ease;overflow:hidden;
+}
+.app.collapsed .sidebar{width:var(--sidebar-w-collapsed)}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+
+/* ============ 侧边栏 ============ */
+.brand{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid rgba(255,255,255,.08);height:var(--topbar-h);flex-shrink:0}
+.brand-logo{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#e0c489);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--primary-darker);font-size:16px;flex-shrink:0}
+.brand-text{white-space:nowrap;overflow:hidden}
+.brand-text .b1{font-size:14px;font-weight:700;color:#fff;letter-spacing:.3px}
+.brand-text .b2{font-size:11px;color:var(--accent);margin-top:1px}
+.app.collapsed .brand-text{display:none}
+.nav{flex:1;overflow-y:auto;padding:10px 0}
+.nav-group{font-size:11px;color:rgba(255,255,255,.4);padding:14px 18px 6px;letter-spacing:1px;white-space:nowrap}
+.app.collapsed .nav-group{display:none}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 18px;color:#c2cde0;cursor:pointer;white-space:nowrap;border-left:3px solid transparent;transition:all .15s;position:relative}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:rgba(201,169,97,.15);color:#fff;border-left-color:var(--accent)}
+.nav-item .icon{width:20px;height:20px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px}
+.nav-item .label{font-size:13.5px}
+.app.collapsed .nav-item .label{display:none}
+.app.collapsed .nav-item{justify-content:center;padding:10px 0}
+.nav-badge{margin-left:auto;background:var(--accent);color:var(--primary-darker);font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.app.collapsed .nav-badge{display:none}
+.sidebar-foot{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap}
+.app.collapsed .sidebar-foot{display:none}
+
+/* ============ 顶栏 ============ */
+.topbar{height:var(--topbar-h);background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:16px;flex-shrink:0;z-index:10}
+.topbar h1{font-size:17px;font-weight:700;color:var(--primary)}
+.topbar .crumb{font-size:12px;color:var(--text-3);margin-top:1px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 12px;width:260px}
+.search-box input{border:none;background:transparent;flex:1;font-size:13px}
+.icon-btn{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-2);position:relative;cursor:pointer;transition:background .15s}
+.icon-btn:hover{background:var(--gray-bg)}
+.notif-dot{position:absolute;top:6px;right:6px;min-width:16px;height:16px;border-radius:8px;background:var(--danger);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#2c5282);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;cursor:pointer}
+.collapse-btn{color:var(--text-2)}
+
+/* ============ 内容区 ============ */
+.content{flex:1;overflow-y:auto;padding:22px;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ============ 卡片 ============ */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-pad{padding:18px 20px}
+.card-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.card-title .sub{font-size:12px;color:var(--text-3);font-weight:400}
+
+/* 统计卡片 */
+.stat-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:18px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--primary)}
+.stat-card.gold::before{background:var(--accent)}
+.stat-card.green::before{background:var(--success)}
+.stat-card.orange::before{background:var(--warning)}
+.stat-label{font-size:12.5px;color:var(--text-3);margin-bottom:8px}
+.stat-value{font-size:28px;font-weight:800;color:var(--primary);line-height:1.1}
+.stat-trend{font-size:12px;margin-top:8px;display:flex;align-items:center;gap:4px}
+.stat-trend.up{color:var(--success)}
+.stat-trend.down{color:var(--danger)}
+.stat-icon{position:absolute;right:16px;top:16px;font-size:22px;opacity:.25}
+
+/* 网格布局 */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.grid-3-2{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
+.grid-12{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* ============ 表格 ============ */
+.table-wrap{overflow-x:auto}
+table.tbl{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}
+table.tbl th{background:#f7f9fc;text-align:left;padding:11px 14px;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);font-size:12.5px;white-space:nowrap}
+table.tbl td{padding:11px 14px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.tbl tr:hover td{background:#f9fafc}
+table.tbl .actions{display:flex;gap:6px}
+
+/* ============ 徽章/标签 ============ */
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:11px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.badge-a{background:var(--success-bg);color:var(--success)}
+.badge-b{background:var(--warning-bg);color:var(--warning)}
+.badge-c{background:var(--gray-bg);color:var(--gray)}
+.badge-blue{background:var(--info-bg);color:var(--info)}
+.badge-gold{background:#f7efdd;color:var(--accent-dark)}
+.badge-red{background:var(--danger-bg);color:var(--danger)}
+.badge-gray{background:var(--gray-bg);color:var(--gray)}
+.tag{display:inline-block;background:var(--gray-bg);color:var(--text-2);border-radius:5px;padding:2px 8px;font-size:11.5px;margin:2px 4px 2px 0}
+.tag-gold{background:#f7efdd;color:var(--accent-dark)}
+
+/* ============ 按钮 ============ */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;transition:all .15s;border:1px solid transparent;white-space:nowrap}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-dark)}
+.btn-gold{background:var(--accent);color:#fff}
+.btn-gold:hover{background:var(--accent-dark)}
+.btn-outline{background:#fff;border-color:var(--border-strong);color:var(--text-2)}
+.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-sm{padding:5px 11px;font-size:12px;border-radius:6px}
+.btn-success{background:var(--success);color:#fff}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ============ 进度条 ============ */
+.progress{height:7px;background:var(--gray-bg);border-radius:4px;overflow:hidden}
+.progress-bar{height:100%;border-radius:4px;background:var(--primary);width:0;transition:width .8s ease}
+.progress-bar.gold{background:var(--accent)}
+.progress-bar.green{background:var(--success)}
+.progress-bar.orange{background:var(--warning)}
+.progress-bar.gray{background:var(--gray)}
+
+/* 评分条 */
+.score-row{margin-bottom:10px}
+.score-row .lbl{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;color:var(--text-2)}
+.score-row .lbl b{color:var(--text)}
+
+/* ============ 表单 ============ */
+.form-group{margin-bottom:15px}
+.form-group label{display:block;font-size:12.5px;font-weight:600;color:var(--text-2);margin-bottom:6px}
+.form-group .req{color:var(--danger)}
+.form-control{width:100%;padding:9px 12px;border:1px solid var(--border-strong);border-radius:8px;background:#fff;font-size:13.5px;transition:border .15s}
+.form-control:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,54,93,.08)}
+textarea.form-control{resize:vertical;min-height:90px}
+select.form-control{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23718096' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-hint{font-size:11.5px;color:var(--text-3);margin-top:4px}
+
+/* ============ 弹窗 ============ */
+.modal-mask{position:fixed;inset:0;background:rgba(15,34,64,.5);z-index:100;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;animation:fadeIn .2s}
+.modal{background:#fff;border-radius:12px;width:100%;max-width:640px;box-shadow:0 20px 60px rgba(0,0,0,.2);animation:slideUp .25s}
+.modal.lg{max-width:860px}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:between}
+.modal-head h3{font-size:16px;color:var(--primary)}
+.modal-close{margin-left:auto;font-size:22px;color:var(--text-3);cursor:pointer;line-height:1;padding:4px}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:22px;max-height:70vh;overflow-y:auto}
+.modal-foot{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:#fafbfd;border-radius:0 0 12px 12px}
+@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
+
+/* 步骤条 */
+.steps{display:flex;align-items:center;margin-bottom:22px}
+.step{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-3)}
+.step .num{width:26px;height:26px;border-radius:50%;background:var(--gray-bg);color:var(--text-3);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px}
+.step.done .num{background:var(--success);color:#fff}
+.step.active .num{background:var(--primary);color:#fff}
+.step.active{color:var(--text);font-weight:600}
+.step-line{flex:1;height:2px;background:var(--border);margin:0 10px}
+.step-line.done{background:var(--success)}
+
+/* ============ 抽屉 ============ */
+.drawer-mask{position:fixed;inset:0;background:rgba(15,34,64,.4);z-index:90;animation:fadeIn .2s}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:640px;max-width:95vw;background:#fff;z-index:95;box-shadow:-8px 0 30px rgba(0,0,0,.15);display:flex;flex-direction:column;animation:slideRight .25s}
+@keyframes slideRight{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+.drawer-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.drawer-body{flex:1;overflow-y:auto;padding:22px}
+
+/* ============ 时间线 ============ */
+.timeline{position:relative;padding-left:22px}
+.timeline::before{content:'';position:absolute;left:7px;top:4px;bottom:4px;width:2px;background:var(--border)}
+.tl-item{position:relative;padding-bottom:18px}
+.tl-item::before{content:'';position:absolute;left:-19px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--primary);border:2px solid #fff;box-shadow:0 0 0 2px var(--border)}
+.tl-item.done::before{background:var(--success)}
+.tl-time{font-size:11.5px;color:var(--text-3)}
+.tl-title{font-size:13.5px;font-weight:600;margin:2px 0}
+.tl-desc{font-size:12.5px;color:var(--text-2)}
+
+/* AI 日志 */
+.log-box{background:#0f2240;color:#c8d8f0;border-radius:8px;padding:14px 16px;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12.5px;line-height:1.9;max-height:320px;overflow-y:auto}
+.log-line{opacity:0;animation:logIn .3s forwards}
+@keyframes logIn{to{opacity:1}}
+.log-line .ts{color:var(--accent);margin-right:8px}
+
+/* ============ 空状态 ============ */
+.empty{text-align:center;padding:50px 20px;color:var(--text-3)}
+.empty .big{font-size:40px;margin-bottom:10px;opacity:.5}
+.empty p{margin-bottom:14px;font-size:13.5px}
+
+/* ============ Toast ============ */
+.toast{position:fixed;top:74px;right:22px;background:var(--primary);color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;box-shadow:var(--shadow-md);z-index:200;animation:slideIn .25s;display:flex;align-items:center;gap:8px}
+.toast.ok{background:var(--success)}
+.toast.err{background:var(--danger)}
+@keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:none;opacity:1}}
+
+/* ============ 分页 ============ */
+.pager{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:12px 4px;font-size:12.5px;color:var(--text-2)}
+.pager button{min-width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer}
+.pager button.cur{background:var(--primary);color:#fff;border-color:var(--primary)}
+.pager button:disabled{opacity:.4;cursor:not-allowed}
+
+/* ============ 工具类 ============ */
+.mt8{margin-top:8px}.mt16{margin-top:16px}.mt24{margin-top:24px}
+.mb8{margin-bottom:8px}.mb16{margin-bottom:16px}.mb24{margin-bottom:24px}
+.flex{display:flex;align-items:center}
+.flex-between{display:flex;align-items:center;justify-content:space-between}
+.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}
+.text-muted{color:var(--text-3)}
+.text-sm{font-size:12.5px}
+.text-gold{color:var(--accent-dark)}
+.fw700{font-weight:700}
+.wfull{width:100%}
+.mono{font-family:Menlo,Consolas,monospace}
+.divider{height:1px;background:var(--border);margin:16px 0}
+
+/* 开关 */
+.switch{position:relative;width:38px;height:21px;background:var(--border-strong);border-radius:11px;cursor:pointer;transition:background .2s;flex-shrink:0}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.switch.on{background:var(--primary)}
+.switch.on::after{left:19px}
+
+/* 标签输入 */
+.tag-input-wrap{border:1px solid var(--border-strong);border-radius:8px;padding:5px;display:flex;flex-wrap:wrap;gap:5px;cursor:text}
+.tag-input-wrap input{border:none;flex:1;min-width:120px;padding:4px 6px;font-size:13px}
+.chip{background:var(--primary);color:#fff;border-radius:5px;padding:3px 9px;font-size:12px;display:inline-flex;align-items:center;gap:5px}
+.chip span.x{cursor:pointer;opacity:.8}
+.chip span.x:hover{opacity:1}
+
+/* 多选国家网格 */
+.country-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.country-item{border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:7px;transition:all .15s}
+.country-item:hover{border-color:var(--primary)}
+.country-item.sel{border-color:var(--primary);background:var(--info-bg);color:var(--primary);font-weight:600}
+.country-item input{accent-color:var(--primary)}
+
+/* 响应式 */
+@media (max-width:1100px){
+  .stat-grid{grid-template-columns:repeat(3,1fr)}
+  .grid-3-2,.grid-2{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .stat-grid{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .search-box{display:none}
+  .country-grid{grid-template-columns:1fr 1fr}
+  .drawer{width:100vw}
+}
+
+body.dark{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--text-2:#cbd5e1;--text-3:#94a3b8;--gray-bg:#334155}
+body.dark .topbar,body.dark .card{background:var(--card);border-color:var(--border)}
+body.dark .topbar{color:var(--text)}
+body.dark table.tbl th{background:#0f172a;color:var(--text-2)}
+body.dark .search-box{background:#0f172a;border-color:var(--border)}
+body.dark .form-control{background:#0f172a;color:var(--text)}
+@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+</style>
+</head>
+<body>
+<!-- APP_ROOT -->
+<div class="app" id="app">
+  <!-- ===== 侧边栏 ===== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">K</div>
+      <div class="brand-text">
+        <div class="b1">方舟获客工作台</div>
+        <div class="b2">KaiLionCrafts Ark V3.0</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
+    <div class="sidebar-foot">Crafted in Yangjiang,<br>Trusted Worldwide © 2026</div>
+  </aside>
+
+  <!-- ===== 主区 ===== -->
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn collapse-btn" onclick="toggleSidebar()" title="折叠侧栏">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+      <div>
+        <h1 id="pageTitle">数据总览</h1>
+        <div class="crumb" id="pageCrumb">Dashboard</div>
+      </div>
+      <div class="topbar-right">
+        <div class="search-box">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a96a8" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          <input placeholder="搜索客户 / 公司 / 邮箱…" onkeydown="if(event.key==='Enter')globalSearch(this.value)">
+        </div>
+        <button class="icon-btn" onclick="toggleTheme()" title="切换深浅主题">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <button class="icon-btn" onclick="go('customers')" title="待跟进">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M10 21a2 2 0 004 0"/></svg>
+          <span class="notif-dot" id="notifDot">0</span>
+        </button>
+        <div class="avatar" title="锴利业务">KL</div>
+      </div>
+    </header>
+    <main class="content" id="mainContent"><!-- 渲染视图 --></main>
+  </div>
+</div>
+
+<!-- 弹窗 / 抽屉 / Toast 根节点 -->
+<div id="modalRoot"></div>
+<div id="drawerRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+/* ============================================================
+ * KaiLionCrafts 方舟外贸获客工作台
+ * 核心哲学：AI只干脏活累活，发送我自己来，数据全在本地
+ * ============================================================ */
+const PREFIX = 'kailion_ark_';
+const DB = {
+  load(k){ try{ const v = localStorage.getItem(PREFIX+k); return v?JSON.parse(v):null; }catch(e){ return null; } },
+  save(k,v){ localStorage.setItem(PREFIX+k, JSON.stringify(v)); },
+  remove(k){ localStorage.removeItem(PREFIX+k); }
+};
+
+/* ---------- 工具函数 ---------- */
+const uid = ()=> 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const now = ()=> new Date().toISOString();
+const todayStr = ()=> new Date().toISOString().slice(0,10);
+function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString(); }
+function daysLater(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString(); }
+function fmtDate(iso){ if(!iso) return '-'; const d=new Date(iso); return (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function fmtDay(iso){ if(!iso) return '-'; const d=new Date(iso); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toast(msg,type){ type=type||'ok'; const root=document.getElementById('toastRoot'); const t=document.createElement('div'); t.className='toast '+type; t.innerHTML=(type==='ok'?'✓ ':type==='err'?'✕ ':'ℹ ')+esc(msg); root.appendChild(t); setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},2200); }
+
+/* ---------- 全局状态 ---------- */
+let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null };
+function loadState(){
+  S.customers = DB.load('customers') || [];
+  S.plans = DB.load('plans') || [];
+  S.drafts = DB.load('drafts') || [];
+  S.inquiries = DB.load('inquiries') || [];
+  S.quotes = DB.load('quotes') || [];
+  S.contracts = DB.load('contracts') || [];
+  S.followups = DB.load('followups') || [];
+  S.inbox = DB.load('inbox') || [];
+  S.tasks = DB.load('tasks') || [];
+  S.products = DB.load('products') || [];
+  S.samples = DB.load('samples') || [];
+  S.settings = DB.load('settings') || null;
+  S.apis = DB.load('apis') || [];
+  S.prompts = DB.load('prompts') || null;
+  S.knowledge = DB.load('knowledge') || [];
+  S.ar = DB.load('ar') || [];
+  S.monitors = DB.load('monitors') || [];
+  S.monitorLogs = DB.load('monitorLogs') || [];
+}
+function persist(){
+  DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
+  DB.save('inquiries',S.inquiries); DB.save('quotes',S.quotes); DB.save('contracts',S.contracts);
+  DB.save('followups',S.followups); DB.save('inbox',S.inbox); DB.save('tasks',S.tasks);
+  DB.save('products',S.products); DB.save('samples',S.samples); DB.save('settings',S.settings);
+  DB.save('apis',S.apis); DB.save('prompts',S.prompts); DB.save('knowledge',S.knowledge);
+  DB.save('ar',S.ar); DB.save('monitors',S.monitors); DB.save('monitorLogs',S.monitorLogs);
+}
+function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
+const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
+function gradeBadge(g){ const n=GRADE_NAME[g]||g; return `<span class="badge badge-${g.toLowerCase()}" title="${n}">${n}</span>`; }
+
+/* ============================================================
+ * 演示种子数据
+ * ============================================================ */
+function seedData(){
+  const mk = (o)=>Object.assign({
+    id:uid(),status:'待跟进',createdAt:daysAgo(Math.floor(Math.random()*25)+1),followUpHistory:[],nextFollowUp:daysLater(2),
+    tags:[], addresses:[], companySize:'', foundedYear:null, registerStatus:'在营', owner:'Leo',
+    customs:{lastPurchase:null,frequency:'',suppliers:[],trend:'稳定'}
+  },o);
+  // 4维评分加权
+  const sc = (p,ct,ps,cq)=>({product:p,companyType:ct,purchaseSignal:ps,contactQuality:cq,
+    total:Math.round(p*0.35+ct*0.2+ps*0.3+cq*0.15), grade:null});
+  const fin = (s)=>{ s.grade = s.total>=80?'A':(s.total>=60?'B':'C'); return s; };
+
+  /* ===== 12 家精编客户（详细画像） ===== */
+  S.customers = [
+    mk({company:'Kitchen Universe Inc.',website:'www.kitchenuniverse.com',country:'美国',customerType:'进口商',source:'AI搜索',
+      contact:{name:'Michael Carter',title:'Procurement Manager',email:'m.carter@kitchenuniverse.com',whatsapp:'+1-312-555-0147',linkedin:'linkedin.com/in/michaelcarter',phone:'+1 312 555 0147'},
+      products:'厨房剪、多用刀、削皮器',
+      profile:{business:'全美连锁厨具零售商，300+门店',productLine:'厨刀套装、厨房剪刀、小工具组',needs:'高碳钢厨房剪OEM，要求BSCI验厂',painPoints:'现有供应商交期不稳',angle:'阳江产业带 + 稳定交期'},
+      scores:fin(sc(88,90,85,95)),
+      matchReasons:['官网产品页明确列出 Kitchen Scissors 分类','LinkedIn 职位为采购经理，有决策权','近30天在测评频道上架新品厨刀'],
+      nextFollowUp:daysLater(0),status:'跟进中'}),
+    mk({company:'Messerei Schmidt GmbH',website:'www.messerei-schmidt.de',country:'德国',customerType:'品牌商',source:'海关数据',
+      contact:{name:'Lukas Schmidt',title:'Geschäftsführer',email:'l.schmidt@messerei-schmidt.de',whatsapp:'+49-170-5552211',linkedin:'linkedin.com/in/lukasschmidt',phone:'+49 170 555 2211'},
+      products:'户外折叠刀、主厨刀',
+      profile:{business:'德国家族刀具品牌，1987年创立',productLine:'户外刀、主厨刀、折叠刀',needs:'OEM补充中端产品线',painPoints:'CE/GS 合规要求高',angle:'BSCI/ISO + 完整CE技术文件'},
+      scores:fin(sc(82,78,70,88)),
+      matchReasons:['海关数据显示近6个月从中国进口3批刀具','About页强调寻找OEM互补','德语区对品质要求与阳江工艺匹配'],
+      nextFollowUp:daysLater(2),status:'待跟进'}),
+    mk({company:'BritChef Supplies Ltd',website:'www.britchef.co.uk',country:'英国',customerType:'分销商',source:'AI搜索',
+      contact:{name:'Emma Thompson',title:'Buyer',email:'emma@britchef.co.uk',whatsapp:'+44-7911-555203',linkedin:'linkedin.com/in/emmathompsonbuyer',phone:'+44 7911 555 203'},
+      products:'厨房配件、剪刀套装',
+      profile:{business:'英国餐饮B2B分销商',productLine:'厨师工具、厨房剪',needs:'扩充性价比产品线',painPoints:'脱欧后清关复杂',angle:'DDP条款解决清关痛点'},
+      scores:fin(sc(75,72,68,80)),
+      matchReasons:['LinkedIn 动态发布"寻找新刀具供应商"','博客讨论脱欧后供应链调整'],
+      nextFollowUp:daysLater(4),status:'待跟进'}),
+    mk({company:'Aussie Kitchenware Co.',website:'www.aussiekitchen.com.au',country:'澳大利亚',customerType:'电商卖家',source:'AI搜索',
+      contact:{name:'James Wilson',title:'Founder',email:'james@aussiekitchen.com.au',whatsapp:'+61-4-5555-0198',linkedin:'',phone:'+61 4 5555 0198'},
+      products:'厨房剪、陶瓷刀套装',
+      profile:{business:'Shopify+Amazon AU 卖家，月销800单',productLine:'网红厨房小工具',needs:'低MOQ试单测款',painPoints:'希望小批量起订',angle:'MOQ低至500把'},
+      scores:fin(sc(80,65,90,70)),
+      matchReasons:['官网Contact页直接询盘 wholesale kitchen shears','Amazon评论显示剪刀复购率高'],
+      nextFollowUp:daysLater(1),status:'已回复'}),
+    mk({company:'Toronto Cutlery Distributors',website:'www.torontocutlery.ca',country:'加拿大',customerType:'批发商',source:'海关数据',
+      contact:{name:'David Kim',title:'Sales Director',email:'dkim@torontocutlery.ca',whatsapp:'+1-416-555-0172',linkedin:'linkedin.com/in/davidkim',phone:'+1 416 555 0172'},
+      products:'全系列刀具、剪刀',
+      profile:{business:'多伦多餐饮批发，服务300+餐厅',productLine:'厨师刀、剪刀、磨刀器',needs:'年度框架采购季度返单',painPoints:'希望减少供应商数量',angle:'展示工厂产能与北美经验'},
+      scores:fin(sc(83,88,75,82)),
+      matchReasons:['海关数据显示从多家中国供应商采购','展会交换名片'],
+      nextFollowUp:daysLater(1),status:'跟进中'}),
+    mk({company:'Tokyo Kitchen Works',website:'www.tokyokitchen.jp',country:'日本',customerType:'品牌商',source:'AI搜索',
+      contact:{name:'佐藤健一',title:'バイヤー',email:'sato@tokyokitchen.jp',whatsapp:'+81-90-5555-0146',linkedin:'',phone:'+81 90 5555 0146'},
+      products:'三德刀、刺身刀、厨房剪',
+      profile:{business:'东京高端厨具买手店',productLine:'日式/西式厨刀',needs:'有研磨工艺的合作工厂',painPoints:'对锋利度与包装苛刻',angle:'手工开刃工艺 + 样品刀'},
+      scores:fin(sc(68,70,55,75)),
+      matchReasons:['搜索词 Yangjiang kitchen knife OEM Japan','东京买手店对品质要求高'],
+      nextFollowUp:daysLater(6),status:'待跟进'}),
+    mk({company:'Gulf Premier Trading',website:'www.gulfpremier.ae',country:'阿联酋',customerType:'进口商',source:'AI搜索',
+      contact:{name:'Omar Al-Rashid',title:'General Manager',email:'omar@gulfpremier.ae',whatsapp:'+971-50-555-0188',linkedin:'linkedin.com/in/omarrashid',phone:'+971 50 555 0188'},
+      products:'户外刀、阿拉伯风格厨房剪',
+      profile:{business:'迪拜综合贸易商，覆盖海湾六国',productLine:'户外工具、礼品刀',needs:'斋月礼品批量采购',painPoints:'需要阿语包装',angle:'定制包装与多语言标签'},
+      scores:fin(sc(60,75,62,78)),
+      matchReasons:['Instagram 发布斋月礼品采购帖','加入 Gulf Hardware Importers 群组'],
+      nextFollowUp:daysLater(3),status:'待跟进'}),
+    mk({company:'Casa Forte Importadora',website:'www.casaforte.com.br',country:'巴西',customerType:'进口商',source:'海关数据',
+      contact:{name:'Carlos Silva',title:'Comprador',email:'carlos@casaforte.com.br',whatsapp:'+55-11-5555-0199',linkedin:'',phone:'+55 11 5555 0199'},
+      products:'家用剪刀、厨房刀',
+      profile:{business:'圣保罗家居进口商',productLine:'厨房工具',needs:'性价比大众产品线',painPoints:'巴西关税高',angle:'有竞争力FOB价'},
+      scores:fin(sc(58,65,50,60)),
+      matchReasons:['海关数据显示进口过中国家用剪刀','官网规模中等匹配一般'],
+      nextFollowUp:daysLater(9),status:'待跟进'}),
+    mk({company:'Outdoor Pro Gear',website:'www.outdoorprogear.com',country:'美国',customerType:'电商卖家',source:'AI搜索',
+      contact:{name:'Jessica Brown',title:'Owner',email:'jessica@outdoorprogear.com',whatsapp:'+1-303-555-0165',linkedin:'linkedin.com/in/jessicabrown',phone:'+1 303 555 0165'},
+      products:'户外折刀、露营刀',
+      profile:{business:'Amazon户外装备卖家，年GMV 150万',productLine:'户外刀、求生工具',needs:'FDA食品级户外刀',painPoints:'美国刀具运输法规',angle:'合规包装与FBA prep'},
+      scores:fin(sc(78,70,72,85)),
+      matchReasons:['Google搜索 OEM pocket knife manufacturer China','About页显示年采购50万美金'],
+      nextFollowUp:daysLater(0),status:'跟进中'}),
+    mk({company:'Sydney Outdoor Supply',website:'www.sydneyoutdoor.com.au',country:'澳大利亚',customerType:'分销商',source:'AI搜索',
+      contact:{name:"Steve O'Connor",title:'Procurement',email:'steve@sydneyoutdoor.com.au',whatsapp:'+61-2-5555-0123',linkedin:'',phone:'+61 2 5555 0123'},
+      products:'猎刀、户外工具',
+      profile:{business:'澳洲户外连锁12店',productLine:'狩猎刀、露营装备',needs:'高性价比户外刀线',painPoints:'澳洲刀刃长度限制',angle:'符合AU标准刀长'},
+      scores:fin(sc(65,68,58,70)),
+      matchReasons:['LinkedIn 发帖 new outdoor knife suppliers wanted'],
+      nextFollowUp:daysLater(5),status:'待跟进'}),
+    mk({company:'Nail Pro Distributors',website:'www.nailpro.com',country:'美国',customerType:'批发商',source:'AI搜索',
+      contact:{name:'Angela Martinez',title:'Buyer',email:'angie@nailpro.com',whatsapp:'+1-212-555-0144',linkedin:'linkedin.com/in/angelamartinez',phone:'+1 212 555 0144'},
+      products:'美容剪、指甲剪套装',
+      profile:{business:'北美美甲工具批发商',productLine:'指甲剪、美容剪',needs:'不锈钢美甲工具OEM',painPoints:'镜面抛光防锈要求高',angle:'430/3Cr13工艺'},
+      scores:fin(sc(72,60,65,80)),
+      matchReasons:['主营美容剪，与剪刀工艺协同'],
+      nextFollowUp:daysLater(7),status:'待跟进'}),
+    mk({company:'UK Chef Collective',website:'www.ukchefcollective.co.uk',country:'英国',customerType:'品牌商',source:'AI搜索',
+      contact:{name:'Oliver Davies',title:'Co-founder',email:'oliver@ukchefcollective.co.uk',whatsapp:'+44-20-5555-0177',linkedin:'',phone:'+44 20 5555 0177'},
+      products:'厨师刀套装',
+      profile:{business:'伦敦KOL厨师品牌',productLine:'主厨刀套装',needs:'小批量定制LOGO',painPoints:'预算有限重设计',angle:'激光刻LOGO + MOQ200'},
+      scores:fin(sc(85,60,88,82)),
+      matchReasons:['网站询盘 private label chef knife set MOQ 200','Instagram 5万粉KOL属性'],
+      nextFollowUp:daysLater(1),status:'已回复'})
+  ];
+
+  /* ===== 程序化再生成 27 家客户，凑足 39 家 ===== */
+  const pool = [
+    ['AmeriChef Wholesale','美国','进口商','海关数据','厨房剪','kitchen shears importer'],
+    ['Pacific Cutlery Co.','美国','品牌商','AI搜索','主厨刀','chef knife brand'],
+    ['Rocky Mountain Knives','美国','电商卖家','AI搜索','猎刀','hunting knife amazon'],
+    ['Texas Tool Distributors','美国','批发商','海关数据','多用剪刀','shears wholesale TX'],
+    ['EuroKnife GmbH','德国','进口商','海关数据','厨房刀','Küchenmesser Import'],
+    ['Alpen Outdoor GmbH','德国','品牌商','AI搜索','户外折刀','Outdoor Messer Marke'],
+    ['London Kitchen Supply','英国','分销商','海关数据','厨房配件','kitchen utensils UK'],
+    ['Scottish Cutlery Co.','英国','进口商','AI搜索','剪刀','scissors importer Scotland'],
+    ['Nordisk Kjøkken AS','挪威','品牌商','AI搜索','主厨刀','kjøkkenkniver Norge'],
+    ['Holländische Großhandel','荷兰','批发商','海关数据','厨房剪','keukenscharen groothandel'],
+    ['Madrid Hogar Import','西班牙','进口商','海关数据','家用剪刀','tijeras hogar España'],
+    ['Casa Cucina Italia','意大利','品牌商','AI搜索','厨刀','coltelli cucina Italia'],
+    ['Toronto Home Goods','加拿大','分销商','AI搜索','厨房小工具','kitchen gadgets Canada'],
+    ['Vancouver Chef Store','加拿大','电商卖家','AI搜索','厨师刀','chef knives Vancouver'],
+    ['Melbourne Kitchen Co.','澳大利亚','进口商','海关数据','厨房剪','kitchen shears Melbourne'],
+    ['Auckland Chef Supply','新西兰','分销商','AI搜索','刀具套装','knife sets NZ'],
+    ['Dubai Hardware Trading','阿联酋','批发商','海关数据','五金刀剪','hardware cutlery UAE'],
+    ['Riyadh Kitchen Supplies','沙特','进口商','AI搜索','厨房用品','kitware Saudi'],
+    ['Tokyo Barber & Cut','日本','品牌商','AI搜索','美容剪','美容ハサミ OEM'],
+    ['Seoul Kitchen Market','韩国','分销商','海关数据','厨刀','주방칼 한국'],
+    ['Singapore Culinary Co.','新加坡','进口商','AI搜索','主厨刀','chef knife Singapore'],
+    ['Mexico City Hogar','墨西哥','进口商','海关数据','家用刀剪','cuchillos hogar Mexico'],
+    ['Buenos Aires Utensilios','阿根廷','分销商','AI搜索','厨房剪','tijeras cocina Argentina'],
+    ['Cape Town Kitchen Co.','南非','进口商','海关数据','刀具','cutlery South Africa'],
+    ['Moscow Home Trade','俄罗斯','批发商','海关数据','剪刀','ножницы оптом'],
+    ['Nairobi Chef Supply','肯尼亚','分销商','AI搜索','厨房刀','kitchen knives Kenya'],
+    ['Sydney Gift Ware','澳大利亚','品牌商','AI搜索','礼品刀','gift knife set AU']
+  ];
+  pool.forEach((p,i)=>{
+    const [company,country,ctype,source,products,kw] = p;
+    const productScore = 55 + ((i*17)%40);
+    const ctScore = 55 + ((i*23)%40);
+    const psScore = 45 + ((i*11)%45);
+    const cqScore = 55 + ((i*29)%40);
+    S.customers.push(mk({company,website:'www.'+company.toLowerCase().replace(/[^a-z]/g,'')+'.com',country,customerType:ctype,source,
+      contact:{name:['Alex','Sam','Chris','Lee','Pat','Robin'][i%6]+' '+['Morgan','Lee','Wang','Garcia','Muller','Brown'][i%6],
+        title:['Buyer','Procurement','Owner','Manager','Director'][i%5],
+        email:['info','sales','purchase','buy'][i%4]+'@'+company.toLowerCase().replace(/[^a-z]/g,'')+'.com',
+        whatsapp:'+00-0000-'+String(1000+i),linkedin:'',phone:''},
+      products,
+      profile:{business:country+ctype+'，主营'+products,productLine:products,needs:'寻找中国OEM供应',painPoints:'交期与质量稳定性',angle:'阳江产业带直供'},
+      scores:fin(sc(productScore,ctScore,psScore,cqScore)),
+      matchReasons:['AI搜索公开网页命中关键词「'+kw+'」','官网产品页在售'+products+(source==='海关数据'?'；海关数据显示近6个月有进口记录':'')],
+      nextFollowUp:daysLater((i%10)+1),status: i%5===0?'已回复':(i%3===0?'跟进中':'待跟进')
+    }));
+  });
+
+  /* ===== 开发任务（计划） ===== */
+  S.plans = [
+    {id:uid(),name:'北美厨房剪精准获客',industry:'厨房用品',keywords:['kitchen scissors','poultry shears'],countries:['美国','加拿大'],customerTypes:['进口商','分销商','电商卖家'],dataSource:'AI搜索',status:'running',progress:68,foundCount:18,aCount:6,bCount:8,cCount:4,draftCount:14,
+      logs:[
+        {t:daysAgo(0)+'T09:12:00',level:'info',msg:'初始化任务：kitchen scissors importers USA & Canada'},
+        {t:daysAgo(0)+'T09:12:05',level:'info',msg:'🔍 搜索公开网页: "kitchen scissors importers USA"'},
+        {t:daysAgo(0)+'T09:12:18',level:'ok',msg:'✅ 42 个候选网站，去重初筛'},
+        {t:daysAgo(0)+'T09:13:02',level:'info',msg:'📊 核证据: kitchenuniverse.com'},
+        {t:daysAgo(0)+'T09:13:09',level:'ok',msg:'✅ 找到决策人邮箱 m.carter@kitchenuniverse.com'},
+        {t:daysAgo(0)+'T09:14:22',level:'ok',msg:'⭐ 评分 89 (优先联系) — Kitchen Universe'},
+        {t:daysAgo(0)+'T09:14:40',level:'info',msg:'📝 已生成开发信草稿（英语）'},
+        {t:daysAgo(0)+'T09:15:30',level:'run',msg:'⏳ 正在分析第 12 个网站...'}
+      ],createdAt:daysAgo(1),startedAt:daysAgo(0),finishedAt:null},
+    {id:uid(),name:'欧洲户外刀品牌OEM',industry:'户外工具',keywords:['outdoor knife','hunting knife OEM'],countries:['德国','英国','法国'],customerTypes:['品牌商','进口商'],dataSource:'海关数据',status:'running',progress:42,foundCount:11,aCount:4,bCount:5,cCount:2,draftCount:8,
+      logs:[
+        {t:daysAgo(1)+'T14:00:00',level:'info',msg:'初始化：outdoor knife OEM brands Europe（海关数据导入）'},
+        {t:daysAgo(1)+'T14:01:20',level:'ok',msg:'✅ Messerei Schmidt 评分 83（优先联系）'},
+        {t:daysAgo(1)+'T14:02:00',level:'run',msg:'⏳ 分析下一个候选...'}
+      ],createdAt:daysAgo(2),startedAt:daysAgo(1),finishedAt:null},
+    {id:uid(),name:'中东五金礼品季前采购',industry:'厨房用品',keywords:['cutlery gift set'],countries:['阿联酋','沙特'],customerTypes:['进口商','批发商'],dataSource:'AI搜索',status:'paused',progress:20,foundCount:5,aCount:1,bCount:2,cCount:2,draftCount:2,
+      logs:[{t:daysAgo(3)+'T10:00:00',level:'info',msg:'初始化：cutlery gift set Middle East'},
+        {t:daysAgo(3)+'T10:01:00',level:'ok',msg:'✅ Gulf Premier Trading 评分 66（待验证）'},
+        {t:daysAgo(3)+'T10:01:30',level:'warn',msg:'⏸ 手动暂停'}],
+      createdAt:daysAgo(4),startedAt:daysAgo(3),finishedAt:null},
+    {id:uid(),name:'日本高端厨刀买手店',industry:'厨房用品',keywords:['kitchen knife OEM'],countries:['日本'],customerTypes:['品牌商','分销商'],dataSource:'AI搜索',status:'done',progress:100,foundCount:5,aCount:1,bCount:3,cCount:1,draftCount:4,
+      logs:[{t:daysAgo(5)+'T09:00:00',level:'info',msg:'初始化：kitchen knife OEM Japan'},
+        {t:daysAgo(5)+'T09:30:00',level:'ok',msg:'✅ 完成：5 客户，1 优先联系'}],
+      createdAt:daysAgo(6),startedAt:daysAgo(5),finishedAt:daysAgo(5)}
+  ];
+
+  /* ===== 42 封开发信草稿 ===== */
+  const cust = S.customers;
+  const draftStatus = ['待检查','待检查','已修改','已发送','待检查','已发送'];
+  S.drafts = [];
+  // 前 12 家写较详细草稿
+  const handDrafts = [
+    ['Cutlery Supply from Yangjiang — 10-Year OEM Partner for Kitchen Universe','Dear Michael,\n\nI noticed Kitchen Universe expanded its kitchen scissors line across 300+ stores. I am Leo from KaiLionCrafts, Yangjiang-based cutlery manufacturer with 10+ years supplying US retail chains.\n\n• MOQ from 1,000 pcs\n• BSCI & FDA-certified\n• 30-day lead time\n\nOpen to a 15-min call next week? Free sample box first.\n\nBest,\nLeo','引用官网产品页 Kitchen Scissors 分类；引用 LinkedIn 采购经理职位；英语'],
+    ['OEM-Messer aus Yangjiang – BSCI-zertifiziert','Sehr geehrter Herr Schmidt,\n\nwir schlagen eine OEM-Partnerschaft vor.\n\n• CE- und GS-konforme Dokumente\n• 1.000 Stück MOQ, 35 Tage Lieferzeit\n• Logo, Verpackung, Schliff\n\nDarf ich ein kostenloses Muster senden?\n\nMit freundlichen Grüßen,\nLeo','德语；引用 About 页家族品牌；强调 CE/GS'],
+    ['Kitchen Shears Supply for BritChef — DDP Available','Hi Emma,\n\nSaw your post about looking for new cutlery suppliers. We can offer DDP shipping to solve post-Brexit customs.\n\n• 1,000 pcs MOQ\n• DDP London\n• 30-day lead time\n\nBest,\nLeo','引用 LinkedIn 招聘供应商动态；DDP 解决清关痛点'],
+    ['Wholesale Kitchen Shears — Low MOQ Trial','Hi James,\n\nThanks for your inquiry. For trial orders:\n• 500 pcs MOQ\n• Private label\n• Express air freight\n\nShare your target retail price? I will quote within 24h.\n\nCheers,\nLeo','独立站询盘回复；低 MOQ 测款'],
+    ['Stable Cutlery Supply — Chicago Show Follow-up','Hi David,\n\nGreat meeting you in Chicago. We supply 3 North American distributors on quarterly framework agreements.\n\n• Chef knives, shears, sharpeners\n• 40,000 pcs / quarter\n\nShall I prepare a framework offer?\n\nBest,\nLeo','展会名片；年度框架协议'],
+    ['FDA-Compliant Outdoor Knives','Hi Jessica,\n\nNoticed your Amazon bushcraft reviews. We support:\n• Food-grade blade options\n• Compliant blister packaging\n• FBA prep\n\nWant a sample of our folding hunter?\n\nLeo','Amazon 评论；美国运输合规'],
+    ['Private Label Chef Knife Set — MOQ 200','Hi Oliver,\n\nYes, we can do MOQ 200:\n• Laser-engraved logo\n• Minimalist black gift box\n• 40-day lead time\n\nCan I send a mockup this week?\n\nLeo','询盘 MOQ200；KOL 品牌']
+  ];
+  handDrafts.forEach((d,i)=>{
+    const c = cust[i];
+    S.drafts.push({id:uid(),customerId:c.id,customerName:c.company,country:c.country,
+      language: c.country==='德国'?'德语':c.country==='日本'?'日语':c.country==['英国','澳大利亚','美国','加拿大'].includes(c.country)?'英语':'英语',
+      subject:d[0],body:d[1],aiNotes:d[2].split('；'),
+      status: draftStatus[i%draftStatus.length], createdAt:daysAgo(i%4), sentAt: i%4===3?daysAgo(i%3+1):null});
+  });
+  // 其余 30 封从客户列表批量生成模板草稿
+  for(let i=12;i<39;i++){
+    const c = cust[i];
+    if(c.scores.grade==='C') continue; // 暂不联系的不生成草稿
+    S.drafts.push({id:uid(),customerId:c.id,customerName:c.company,country:c.country,
+      language: c.country==='德国'?'德语':c.country==='日本'?'日语':c.country==['法国','西班牙','意大利']?c.country==='德国'?'德语':c.country==='日本'?'日语':'英语':'英语',
+      subject: 'Cutlery Supply from Yangjiang — '+c.company,
+      body: 'Dear '+c.contact.name+',\n\nWe noticed '+c.company+' works with '+c.products+'. KaiLionCrafts is a Yangjiang-based OEM manufacturer of kitchen knives and scissors.\n\n• BSCI / ISO certified\n• MOQ 1,000 pcs\n• 30-day lead time\n\nWould you be open to receiving a free sample?\n\nBest regards,\nLeo\nKaiLionCrafts Industrial Co., Ltd.',
+      aiNotes:['AI 基于官网产品页「'+c.products+'」生成','根据 '+c.country+' 市场选择语言','切入角度：'+c.profile.angle],
+      status: ['待检查','待检查','已修改','已发送'][i%4], createdAt:daysAgo(i%10), sentAt: i%4===3?daysAgo(i%5+1):null});
+  }
+
+  /* ===== AI 收件箱（客户回复） ===== */
+  S.inbox = [
+    {id:uid(),customerId:cust[3].id,customerName:cust[3].company,country:'澳大利亚',subject:'Re: Wholesale Kitchen Shears — pricing request',
+      body:'Hi Leo,\n\nThanks for the quick reply. We are interested in the 500 pcs trial order. Can you send the FOB price and the sample cost? Also do you support custom logo on the handle?\n\nJames',
+      receivedAt:daysAgo(0),status:'未读',
+      aiSummary:{intent:'索要报价与样品费用',product:'厨房剪',question:'FOB价格、样品费、手柄定制LOGO',urgency:'高'},
+      aiReply:'Hi James,\n\nGreat news! FOB Shenzhen price: $1.85/pc for 500 pcs. Sample: $15 incl. shipping. Custom laser logo on handle: +$0.15/pc setup fee.\n\nShall I send the sample today?\n\nLeo'},
+    {id:uid(),customerId:cust[11].id,customerName:cust[11].company,country:'英国',subject:'Re: Private Label Chef Knife Set',
+      body:'Hi Leo,\n\nThe mockup looks good. What would be the price for 300 sets? And can you do black G10 handles?\n\nOliver',
+      receivedAt:daysAgo(1),status:'已读',
+      aiSummary:{intent:'询问300套价格与G10手柄',product:'厨师刀套装',question:'300套阶梯价、G10手柄可行性',urgency:'中'},
+      aiReply:'Hi Oliver,\n\n300 sets: $6.20/set FOB. Black G10 handles available at +$0.40/set. Lead time 40 days.\n\nShall I send a formal quotation?\n\nLeo'},
+    {id:uid(),customerId:cust[0].id,customerName:cust[0].company,country:'美国',subject:'Re: Cutlery Supply from Yangjiang',
+      body:'Hi Leo,\n\nThanks for reaching out. We currently have 3 suppliers. What makes your scissors different? Can you send specs?\n\nMichael',
+      receivedAt:daysAgo(2),status:'已回复',
+      aiSummary:{intent:'询问差异化优势与规格',product:'厨房剪',question:'与现有供应商差异、规格书',urgency:'中'},
+      aiReply:'Hi Michael,\n\nOur shears use 3Cr13 stainless with a detachable pivot, dishwasher-safe. I have attached the spec sheet and a case study of a US retailer who cut costs 18%.\n\nLeo'},
+    {id:uid(),customerId:cust[4].id,customerName:cust[4].company,country:'加拿大',subject:'Re: Stable Cutlery Supply',
+      body:'Leo,\n\nSend me your best price for 5000 chef knives and 5000 shears. We order quarterly.\n\nDavid',
+      receivedAt:daysAgo(0),status:'未读',
+      aiSummary:{intent:'索要季度框架报价',product:'主厨刀+厨房剪',question:'5000+5000 批量价',urgency:'高'},
+      aiReply:'Hi David,\n\nQuarterly framework offer: Chef knife 8" $4.20, shears $1.95 (FOB). 30/70 T/T. I will send the formal quotation today.\n\nLeo'}
+  ];
+
+  /* ===== 跟进日程（待办） ===== */
+  S.tasks = [];
+  S.customers.forEach((c,i)=>{
+    if(c.status==='已回复' || c.status==='跟进中'){
+      S.tasks.push({id:uid(),customerId:c.id,customerName:c.company,country:c.country,
+        due:c.nextFollowUp, result:null, note: i%3===0?'客户已回复报价，等待确认数量':'',
+        createdAt:daysAgo(1)});
+    }
+  });
+
+  /* ===== 跟进序列 ===== */
+  S.followups = [
+    {id:uid(),customerId:cust[3].id,draftId:S.drafts[2].id,sequence:1,dayOffset:0,subject:'Wholesale Kitchen Shears',status:'sent',scheduledAt:daysAgo(2),sentAt:daysAgo(1)},
+    {id:uid(),customerId:cust[3].id,draftId:null,sequence:2,dayOffset:3,subject:'Re: Wholesale — 跟进1',status:'scheduled',scheduledAt:daysLater(1),sentAt:null},
+    {id:uid(),customerId:cust[3].id,draftId:null,sequence:3,dayOffset:7,subject:'Re: Wholesale — 跟进2',status:'pending',scheduledAt:daysLater(5),sentAt:null}
+  ];
+
+  /* ===== 询盘 ===== */
+  S.inquiries = [
+    {id:uid(),customerId:cust[3].id,customerName:cust[3].company,source:'独立站',product:'厨房剪',description:'Wholesale kitchen shears, private label, MOQ 500. Best FOB price?',status:'已报价',priority:'高',
+      aiSuggestions:['24h内回复阶梯价','询问目标零售价','提供样品盒'],history:[{t:daysAgo(2),desc:'官网询盘到达'},{t:daysAgo(1),desc:'开发信人工审核后发送'},{t:daysAgo(0),desc:'已发报价 KL20260920-001'}],createdAt:daysAgo(2)},
+    {id:uid(),customerId:cust[11].id,customerName:cust[11].company,source:'独立站',product:'厨师刀套装',description:'Private label chef knife set, MOQ 200, gift box.',status:'跟进中',priority:'高',
+      aiSuggestions:['发设计mockup','问预算','两种包装对比'],history:[{t:daysAgo(3),desc:'询盘到达'},{t:daysAgo(2),desc:'已发开发信，客户回复感兴趣'}],createdAt:daysAgo(3)},
+    {id:uid(),customerId:cust[0].id,customerName:cust[0].company,source:'邮件',product:'厨房剪',description:'（开发信已发送，等待回复）',status:'待处理',priority:'中',
+      aiSuggestions:['3天后跟进','附案例PDF','免费样品'],history:[{t:daysAgo(0),desc:'草稿待检查'}],createdAt:daysAgo(0)}
+  ];
+
+  /* ===== 报价单 ===== */
+  S.quotes = [
+    {id:uid(),quoteNo:'KL20260920-001',customerId:cust[3].id,customerName:cust[3].company,
+      items:[{name:'不锈钢厨房剪',spec:'8" 430不锈钢',qty:1000,unitPrice:1.85,moq:500},{name:'礼盒包装',spec:'彩盒',qty:1000,unitPrice:0.45,moq:500}],
+      total:2300,status:'已发送',createdAt:daysAgo(1),validUntil:daysLater(20)},
+    {id:uid(),quoteNo:'KL20260918-002',customerId:cust[4].id,customerName:cust[4].company,
+      items:[{name:'主厨刀 8"',spec:'5Cr15Mov G10柄',qty:5000,unitPrice:4.20,moq:1000},{name:'厨房剪',spec:'8.5"',qty:5000,unitPrice:1.95,moq:1000}],
+      total:30750,status:'已接受',createdAt:daysAgo(6),validUntil:daysLater(9)},
+    {id:uid(),quoteNo:'KL20260910-003',customerId:cust[5].id,customerName:cust[5].company,
+      items:[{name:'三德刀',spec:'7" 日式',qty:1000,unitPrice:5.60,moq:300}],
+      total:5600,status:'草稿',createdAt:daysAgo(14),validUntil:daysLater(16)}
+  ];
+
+  /* ===== 合同 ===== */
+  S.contracts = [
+    {id:uid(),contractNo:'HT2026-0042',customerId:cust[4].id,customerName:cust[4].company,
+      products:'主厨刀8"×5000 + 厨房剪×5000',amount:30750,signDate:daysAgo(3),status:'执行中',reorderCount:2,
+      history:[{t:daysAgo(6),desc:'报价 KL20260918-002 接受'},{t:daysAgo(4),desc:'条款确认 30% T/T'},{t:daysAgo(3),desc:'合同签订，首付到账'},{t:daysAgo(0),desc:'排产中，预计10月5日交货'}],createdAt:daysAgo(4)},
+    {id:uid(),contractNo:'HT2026-0038',customerId:cust[0].id,customerName:cust[0].company,
+      products:'高碳钢厨房剪×10000',amount:18500,signDate:daysAgo(45),status:'已完成',reorderCount:1,
+      history:[{t:daysAgo(48),desc:'首单签订'},{t:daysAgo(30),desc:'出运'},{t:daysAgo(15),desc:'客户签收，反馈良好'}],createdAt:daysAgo(50)},
+    {id:uid(),contractNo:'HT2025-0127',customerId:cust[4].id,customerName:cust[4].company,
+      products:'厨师刀套装×3000',amount:12600,signDate:daysAgo(120),status:'已完成',reorderCount:0,
+      history:[{t:daysAgo(120),desc:'首单签订'},{t:daysAgo(90),desc:'交货完成'}],createdAt:daysAgo(125)}
+  ];
+
+  /* ===== 产品库（KaiLionCrafts 真实产品） ===== */
+  S.products = [
+    {id:uid(),name:'不锈钢厨房剪刀',emoji:'✂️',category:'剪刀',spec:'8.5" / 3Cr13不锈钢',cost:0.95,price:1.85,stock:12000,keywords:'kitchen scissors,poultry shears'},
+    {id:uid(),name:'高碳钢厨房剪',emoji:'✂️',category:'剪刀',spec:'9" / 5Cr15Mov',cost:1.40,price:2.60,stock:8000,keywords:'heavy duty shears'},
+    {id:uid(),name:'多功能厨房剪（开瓶器）',emoji:'🔪',category:'剪刀',spec:'8" 多用途',cost:1.10,price:2.10,stock:5000,keywords:'multifunction kitchen shears'},
+    {id:uid(),name:'主厨刀 8英寸',emoji:'🔪',category:'厨房刀',spec:'8" / 5Cr15Mov / G10柄',cost:3.20,price:6.80,stock:6000,keywords:'chef knife,kitchen knife'},
+    {id:uid(),name:'三德刀 7英寸',emoji:'🔪',category:'厨房刀',spec:'7" 日式',cost:3.80,price:7.50,stock:3000,keywords:'gyuto,santoku'},
+    {id:uid(),name:'削皮器',emoji:'🥕',category:'厨房配件',spec:'不锈钢/Y型',cost:0.35,price:0.85,stock:20000,keywords:'peeler,vegetable peeler'},
+    {id:uid(),name:'户外折叠刀',emoji:'🔪',category:'户外刀',spec:'3.5" / 440C',cost:2.80,price:5.60,stock:4000,keywords:'folding knife,pocket knife'},
+    {id:uid(),name:'露营猎刀',emoji:'🏕️',category:'户外刀',spec:'4" fixed blade',cost:3.50,price:7.20,stock:2500,keywords:'hunting knife,camping knife'},
+    {id:uid(),name:'美容剪',emoji:'💅',category:'剪刀',spec:'3.5" 镜面抛光',cost:0.80,price:1.60,stock:10000,keywords:'grooming scissors,beauty shears'},
+    {id:uid(),name:'指甲剪套装',emoji:'💅',category:'剪刀',spec:'5件套',cost:1.20,price:2.80,stock:7000,keywords:'nail clipper set'},
+    {id:uid(),name:'磨刀器',emoji:'🪨',category:'厨房配件',spec:'双槽 tungsten',cost:1.50,price:3.20,stock:6000,keywords:'knife sharpener'},
+    {id:uid(),name:'厨刀礼盒（3件套）',emoji:'🎁',category:'厨房刀',spec:'主厨刀+多用刀+剪刀',cost:8.50,price:16.00,stock:1500,keywords:'knife gift set,housewarming'}
+  ];
+  /* ===== 样品寄送记录 ===== */
+  S.samples = [
+    {id:uid(),customerId:cust[0].id,customerName:cust[0].company,product:'不锈钢厨房剪刀',sentAt:daysAgo(2),tracking:'DHL 9547 1122 330',status:'已签收',feedback:'质量不错，等待正式报价'},
+    {id:uid(),customerId:cust[3].id,customerName:cust[3].company,product:'不锈钢厨房剪刀',sentAt:daysAgo(1),tracking:'DHL 9547 1122 401',status:'运输中',feedback:''},
+    {id:uid(),customerId:cust[4].id,customerName:cust[4].company,product:'主厨刀 8英寸',sentAt:daysAgo(5),tracking:'DHL 9547 1099 215',status:'客户已测试',feedback:'手感好，要求G10手柄'},
+    {id:uid(),customerId:cust[9].id,customerName:cust[9].company,product:'户外折叠刀',sentAt:daysAgo(8),tracking:'DHL 9547 1088 771',status:'已签收',feedback:''},
+    {id:uid(),customerId:cust[1].id,customerName:cust[1].company,product:'主厨刀 8英寸',sentAt:daysAgo(12),tracking:'FedEx 8801 2233',status:'已签收',feedback:'刀刃锋利，包装OK'},
+    {id:uid(),customerId:cust[2].id,customerName:cust[2].company,product:'削皮器',sentAt:daysAgo(3),tracking:'UPS 1Z99 8877',status:'在途',feedback:''},
+    {id:uid(),customerId:cust[5].id,customerName:cust[5].company,product:'三德刀',sentAt:daysAgo(15),tracking:'DHL 9547 1000 111',status:'客户已测试',feedback:'待反馈'}
+  ];
+  S.settings = {
+    company:{nameCn:'阳江市锴利国际贸易有限公司',nameEn:'KaiLionCrafts Industrial Co., Ltd.',
+      address:'中国广东省阳江市阳东区永兴南路',email:'leo@kailioncrafts.com',phone:'+86 662-XXXXXXX',
+      whatsapp:'+86 138-XXXX-XXXX',website:'www.kailioncrafts.com',linkedin:'linkedin.com/company/kailioncrafts',
+      signature:'Best regards,\nLeo Wang\nKaiLionCrafts Industrial Co., Ltd.\nCrafted in Yangjiang, Trusted Worldwide'},
+    ai:{scoreThreshold:60,followupDays:[1,3,7,14],langStrategy:'auto'},
+    templates:[
+      {id:uid(),name:'首封开发信（建立联系）',scene:'首次陌生开发',lang:'英语',
+        subject:'Cutlery OEM from Yangjiang — {{product}} supply for {{company}}',
+        body:'Hi {{customer_name}},\n\nI noticed {{company}} carries {{product}}. We are KaiLionCrafts, a Yangjiang-based OEM manufacturer with 10+ years supplying US/EU retail chains.\n\n• MOQ from 1,000 pcs\n• BSCI & FDA-certified\n• 30-day lead time\n\nWould you be open to a free sample box?\n\nBest,\nLeo'},
+      {id:uid(),name:'主推产品+核心优势',scene:'产品推荐',lang:'英语',
+        subject:'{{product}} — Our Best-Seller for Retailers',
+        body:'Hi {{customer_name}},\n\nOur {{product}} is one of our top sellers. Key advantages:\n\n• 5Cr15Mov high-carbon steel, razor edge retention\n• G10 non-slip handle, ergonomic\n• Private label, custom packaging\n\nWe currently supply 3 North American distributors on quarterly frameworks.\n\nOpen to a quote?\n\nLeo'},
+      {id:uid(),name:'报价试探信',scene:'测试价格敏感度',lang:'英语',
+        subject:'Trial Order Quote — {{product}} (Two Options)',
+        body:'Hi {{customer_name}},\n\nPer your interest in {{product}}, two options:\n\nOption A (Economy): $1.20/pc, MOQ 1,000\nOption B (Premium): $1.95/pc, MOQ 500\n\nWhich direction fits your market better?\n\nLeo'},
+      {id:uid(),name:'行业动态切入',scene:'行情分享',lang:'英语',
+        subject:'Yangjiang Cutlery Market Update — Q4 2026',
+        body:'Hi {{customer_name}},\n\nThought this might be useful: raw material prices in Yangjiang have stabilized after Q3, and lead times are back to 30 days.\n\nIf you are planning Q4 orders, now is a good window.\n\nHappy to share our latest price list.\n\nLeo'},
+      {id:uid(),name:'同区域出货案例',scene:'案例证明',lang:'英语',
+        subject:'We Just Shipped 20,000 pcs to Your Region',
+        body:'Hi {{customer_name}},\n\nWe recently completed a 20,000-pc shipment to a distributor in {{country}} — same product category as {{product}}.\n\nFramework agreement, quarterly reorders. Would you like a reference?\n\nLeo'},
+      {id:uid(),name:'温和提醒',scene:'跟进未回复',lang:'英语',
+        subject:'Following Up — Any Update on {{product}}?',
+        body:'Hi {{customer_name}},\n\nJust checking in. No rush — but if you have a moment, could you share your purchasing plan for {{product}} this quarter?\n\nIf now is not the right time, no problem at all.\n\nLeo'},
+      {id:uid(),name:'样品签收跟进',scene:'样品后3天',lang:'英语',
+        subject:'Did You Receive Our Sample of {{product}}?',
+        body:'Hi {{customer_name}},\n\nTracking shows the sample box was delivered. Could you confirm receipt?\n\nIf you have time for a quick test, let me know your testing cycle — I will schedule a follow-up.\n\nLeo'},
+      {id:uid(),name:'测试到期跟进',scene:'样品后14天',lang:'英语',
+        subject:'Test Feedback on {{product}}?',
+        body:'Hi {{customer_name}},\n\nIt has been about two weeks since the {{product}} sample arrived. How did the test go?\n\nHappy to address any concerns — edge geometry, packaging, pricing.\n\nLeo'},
+      {id:uid(),name:'长期失联唤醒',scene:'>30天未回',lang:'英语',
+        subject:'Quick Note — New Capacity & Pricing Update',
+        body:'Hi {{customer_name}},\n\nWe have expanded production capacity and updated our {{product}} pricing for Q4.\n\nIf you are still sourcing, we can offer a slightly better rate for committed volumes.\n\nWorth a quick call?\n\nLeo'},
+      {id:uid(),name:'客户来访跟进',scene:'展会/会面后',lang:'英语',
+        subject:'Nice Meeting You — Next Steps for {{product}}',
+        body:'Hi {{customer_name}},\n\nGreat meeting you. As discussed: \n\n• Specs: {{product}} 8", 5Cr15Mov\n• MOQ: 1,000 pcs\n• Target lead time: 30 days\n\nI will send the formal quote within 48h. Anything else to add?\n\nLeo'}
+    ]
+  };
+
+  /* ===== V2：批量补全背调字段 ===== */
+  const SIZE=['1-10人','10-50人','50-200人','200-500人','500人以上'];
+  const TAGS_POOL=['高意向','价格敏感','品质优先','需验厂','返单客户','待激活'];
+  S.customers.forEach((c,i)=>{
+    if(!c.tags || !c.tags.length){
+      c.tags = [];
+      if(c.scores.grade==='A') c.tags.push('高意向');
+      if(i%3===0) c.tags.push('价格敏感');
+      if(i%4===0) c.tags.push('品质优先');
+      if(i%5===0) c.tags.push('待激活');
+    }
+    if(!c.addresses || !c.addresses.length){
+      c.addresses=[
+        {label:'总部',addr:c.country+' '+(['Chicago','Berlin','London','Sydney','Toronto','Tokyo','Sao Paulo','Dubai'][i%8])+' Industrial Park'},
+        {label:'仓库',addr:c.country+' Distribution Center '+(i%5+1)}
+      ];
+    }
+    if(!c.companySize) c.companySize=SIZE[i%SIZE.length];
+    if(!c.foundedYear) c.foundedYear=1980+(i%40);
+    if(!c.customs.lastPurchase){
+      c.customs={lastPurchase:daysAgo((i*3)%90),frequency:'月均'+(1+(i%3))+'批',
+        suppliers:['Shanghai Yangjiang','Yangjiang Wintech','Guangdong Cutlery Co.'].slice(0,1+(i%3)),
+        trend:['上升','稳定','下降'][i%3]};
+    }
+    // 有合同记录的标记为老客户
+    c.isOld = S.contracts.some(ct=>ct.customerId===c.id);
+  });
+  persist();
+}
+
+/* ============================================================
+ * V3.0 统一 AI 调用层（OpenAI 兼容协议）
+ * ============================================================ */
+function b64enc(t){ return btoa(unescape(encodeURIComponent(t||''))); }
+function b64dec(t){ try{ return decodeURIComponent(escape(atob(t||''))); }catch(e){ return t||''; } }
+function defaultApis(){
+  return [
+    {id:uid(), name:'OpenAI中转站(wawapi)', type:'openai', baseURL:'https://wawapi.top/v1',
+     apiKey:b64enc('sk-74dec54a4361af5ba4d4416e6583219b2a1eac2502829d0d1e37c9ce59d19265'),
+     model:'gpt-4o-mini', temperature:0.7, enabled:false, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'智谱 GLM-4-Flash', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
+     apiKey:b64enc('ce5df9d38c5342c5993fef25bd7403b8.EwA0H7uNGYBUSLm5'),
+     model:'glm-4-flash-250414', temperature:0.1, enabled:false, isDefault:true,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'本地 Ollama', type:'ollama', baseURL:'http://localhost:11434/v1',
+     apiKey:b64enc(''), model:'qwen2.5', temperature:0.7, enabled:false, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}}
+  ];
+}
+function defaultPrompts(){
+  return {
+    lead:'你是外贸客户背调专家。根据客户公司名、官网、国家、客户类型、主营产品，生成背调报告。返回JSON：{"business":"核心业务","productLine":"主要产品线","needs":"潜在采购需求","painPoints":"供应链痛点","angle":"最佳切入角度"}。每项1-2句中文。',
+    score:'你是外贸客户评估专家。从4维度打分(0-100)：product产品关系匹配度、companyType公司类型匹配、contactQuality联系人角色匹配、purchaseSignal潜在采购信号。返回JSON：{"product":85,"companyType":80,"purchaseSignal":75,"contactQuality":90,"explanations":{"product":"...","companyType":"...","purchaseSignal":"...","contactQuality":"..."}}',
+    draft:'你是外贸开发信写作专家。写一封300英文词以内、个性化、引用客户真实信息的开发信。返回JSON：{"subject":"主题","body":"正文"}。署名Leo, KaiLionCrafts(阳江五金刀剪工厂)。',
+    reply:'你是外贸客服专家。根据客户邮件+历史沟通，写专业英文回复，200词以内。',
+    quote:'你是外贸报价专员。根据客户需求+产品库，给出报价建议和3条回复策略。',
+    assistant:'你是外贸获客工作台助手，用中文简洁回答用户关于外贸、CRM、开发信的问题。'
+  };
+}
+function defaultKnowledge(){
+  return [
+    {id:uid(),title:'KaiLionCrafts 公司介绍',cat:'产品知识库',tags:'公司,介绍',content:'阳江10年五金刀剪OEM工厂，主营厨房剪、主厨刀、削皮器、户外刀。BSCI/ISO/FDA认证，MOQ 1000把，交期30天。',createdAt:daysAgo(5)},
+    {id:uid(),title:'厨房剪刀产品规格',cat:'产品知识库',tags:'厨房剪,规格',content:'8.5寸，3Cr13/5Cr15Mov不锈钢，刀片硬度54-56HRC，可拆剪、开瓶器、核桃夹。FOB $1.85/pc，MOQ 1000。',createdAt:daysAgo(4)},
+    {id:uid(),title:'主厨刀规格',cat:'产品知识库',tags:'主厨刀,规格',content:'8寸主厨刀，5Cr15Mov，G10手柄，激光刻Logo可选。FOB $6.80/pc，MOQ 500。',createdAt:daysAgo(4)},
+    {id:uid(),title:'开发信写作SOP',cat:'SOP知识库',tags:'开发信,SOP',content:'首封不超过120词，主题带公司名+产品；第一句引用客户公开信息；结尾给一个低门槛动作(免费样品/15分钟通话)。',createdAt:daysAgo(6)},
+    {id:uid(),title:'跟进节奏SOP',cat:'SOP知识库',tags:'跟进,SOP',content:'第1封→3天第2封→7天第3封→14天第4封；超3封未回复进入冷却30天，再发一封失联唤醒。',createdAt:daysAgo(6)},
+    {id:uid(),title:'成功案例：英国BritChef',cat:'客户案例库',tags:'英国,案例',content:'2025年成交，年订单$120K，DDP条款，从首次开发信到首单47天。关键：用DDP解决脱欧清关痛点。',createdAt:daysAgo(8)},
+    {id:uid(),title:'成功案例：德国Messerei Schmidt',cat:'客户案例库',tags:'德国,案例',content:'OEM户外刀品牌，2026年签年度框架$30K/季度。关键：完整CE/GS技术文件+BSCI验厂报告。',createdAt:daysAgo(8)},
+    {id:uid(),title:'Q4阳江原材料行情',cat:'行业资讯',tags:'行情,不锈钢',content:'Q4 430不锈钢价格稳定，5Cr15Mov微涨2%；交期恢复至30天，是下单窗口。',createdAt:daysAgo(2)}
+  ];
+}
+function defaultAR(){
+  return [
+    {id:uid(),customerId:'old',customerName:'Messerei Schmidt GmbH',total:30750,received:15375,
+     records:[{date:daysAgo(3),amount:15375,method:'T/T',note:'30%首付'}]},
+    {id:uid(),customerId:'old',customerName:'Toronto Cutlery Distributors',total:18500,received:18500,
+     records:[{date:daysAgo(45),amount:18500,method:'T/T',note:'全款'}]}
+  ];
+}
+async function callAI(messages, opts={}){
+  opts = opts||{};
+  const cfgs = (S.apis||[]).filter(a=>a.enabled);
+  if(!cfgs.length){ return {content:null, usage:{}, error:null, mock:true, model:'模拟模式'}; }
+  let cfg = cfgs.find(a=>a.isDefault) || cfgs[0];
+  if(opts.modelConfigId) cfg = cfgs.find(a=>a.id===opts.modelConfigId)||cfg;
+  const t0 = performance.now();
+  try{
+    const headers = {'Content-Type':'application/json'};
+    if(cfg.type!=='ollama' || b64dec(cfg.apiKey)) headers['Authorization']='Bearer '+b64dec(cfg.apiKey);
+    const body = { model:cfg.model, messages, temperature: opts.temperature!=null?opts.temperature:cfg.temperature, stream:false };
+    const r = await fetch(cfg.baseURL.replace(/\s+$/,'').replace(/\/$/,'')+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body)});
+    if(!r.ok){ const txt = await r.text(); return {content:null,usage:{},error:'HTTP '+r.status+' '+txt.slice(0,200),model:cfg.model}; }
+    const j = await r.json();
+    return { content: j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'',
+      usage: j.usage||{}, latency:Math.round(performance.now()-t0), error:null, mock:false, model:cfg.model };
+  }catch(e){
+    return {content:null,usage:{},error:'网络/CORS错误: '+e.message, mock:false, model:cfg.model};
+  }
+}
+function aiUsage(u){ return u&&u.total_tokens?`消耗 tokens: prompt ${u.prompt_tokens||'?'} + completion ${u.completion_tokens||'?'} = ${u.total_tokens}`:''; }
+function seedExtra(){
+  if(!S.apis || !S.apis.length) S.apis = defaultApis();
+  if(!S.prompts) S.prompts = defaultPrompts();
+  if(!S.knowledge || !S.knowledge.length) S.knowledge = defaultKnowledge();
+  if(!S.monitors || !S.monitors.length) S.monitors = [
+    {id:uid(),keyword:'Kitchen Universe',type:'客户'},{id:uid(),keyword:'Victorinox',type:'竞对'},
+    {id:uid(),keyword:'kitchen shears wholesale',type:'产品词'},{id:uid(),keyword:'Yangjiang cutlery',type:'行业'},
+    {id:uid(),keyword:'Messerei Schmidt',type:'客户'},{id:uid(),keyword:'Chicago Housewares Show',type:'行业媒体'}
+  ];
+  if(!S.monitorLogs || !S.monitorLogs.length) S.monitorLogs = [
+    {id:uid(),t:daysAgo(0),kw:'kitchen shears wholesale',summary:'Amazon 美国站厨房剪刀 Best Seller 更新，前20中3个为中国卖家',src:'amazon.com'},
+    {id:uid(),t:daysAgo(1),kw:'Victorinox',summary:'Victorinox 发布新款厨房剪，主打可拆卸清洗',src:'victorinox.com'},
+    {id:uid(),t:daysAgo(2),kw:'Kitchen Universe',summary:'Kitchen Universe 在 LinkedIn 发布秋季新品招聘采购经理',src:'linkedin.com'},
+    {id:uid(),t:daysAgo(3),kw:'Yangjiang cutlery',summary:'阳江五金刀剪行业协会发布Q3出口数据，同比+8%',src:'yj.gov.cn'},
+    {id:uid(),t:daysAgo(5),kw:'Chicago Housewares Show',summary:'2026芝加哥家居用品展展位开放预订',src:'americasmart.com'},
+    {id:uid(),t:daysAgo(7),kw:'Messerei Schmidt',summary:'客户官网展示新户外刀系列，可能需要补充OEM',src:'messerei-schmidt.de'}
+  ];
+  if(!S.ar || !S.ar.length){
+    const c1 = S.customers.find(c=>c.company==='Messerei Schmidt GmbH');
+    const c2 = S.customers.find(c=>c.company==='Toronto Cutlery Distributors');
+    S.ar = [
+      {id:uid(),customerId:c1?c1.id:'old',customerName:'Messerei Schmidt GmbH',total:30750,received:15375,
+       records:[{date:daysAgo(3),amount:15375,method:'T/T',note:'30%首付'}]},
+      {id:uid(),customerId:c2?c2.id:'old',customerName:'Toronto Cutlery Distributors',total:18500,received:18500,
+       records:[{date:daysAgo(45),amount:18500,method:'T/T',note:'全款'}]}
+    ];
+  }
+  // 公海池：把第 20-23 个客户 owner 设为 null
+  S.customers.forEach((c,i)=>{ if(i>=20 && i<=23 && !c.isOld) c.owner=null; });
+}
+
+
+/* ============================================================
+ * 路由与导航
+ * ============================================================ */
+const NAV = [
+  {group:'核心流程'},
+  {key:'dashboard',icon:'📊',label:'数据看板',title:'数据看板',crumb:'每天先联系谁？'},
+  {key:'plans',icon:'🎯',label:'开发任务',title:'AI 开发任务',crumb:'搜索 → 核证据 → 写草稿'},
+  {key:'customers',icon:'👥',label:'客户台账',title:'客户台账',crumb:'39 家线索 · 按优先级分层'},
+  {key:'drafts',icon:'✉️',label:'开发信',title:'开发信管理',crumb:'AI 草稿 · 人工发送'},
+  {group:'沟通与跟进'},
+  {key:'inbox',icon:'📥',label:'AI 收件箱',title:'AI 收件箱',crumb:'客户回复 · AI 提炼重点'},
+  {key:'schedule',icon:'📅',label:'跟进日程',title:'跟进日程',crumb:'今天/明天/本周要联系谁'},
+  {group:'交易与产品'},
+  {key:'inquiry',icon:'💬',label:'询盘管理',title:'询盘管理',crumb:'Inquiries'},
+  {key:'orders',icon:'💰',label:'报价与订单',title:'报价与订单',crumb:'Quotations · Contracts · Orders'},
+  {key:'products',icon:'📦',label:'产品与样品',title:'产品与样品',crumb:'Product Catalog · Samples'},
+  {key:'knowledge',icon:'📚',label:'知识库',title:'企业知识库',crumb:'Products · SOP · Cases · News'},
+  {group:'系统'},
+  {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings'}
+];
+let currentView = 'dashboard';
+let routeParams = {};
+
+function renderNav(){
+  const el = document.getElementById('nav');
+  let html = '';
+  NAV.forEach(n=>{
+    if(n.group){ html += `<div class="nav-group">${n.group}</div>`; return; }
+    let badge = '';
+    if(n.key==='customers'){ const n = S.customers.filter(c=>c.nextFollowUp && new Date(c.nextFollowUp)<=new Date() && c.status!=='已回复').length; if(n>0) badge=`<span class="nav-badge">${n}</span>`; }
+    if(n.key==='drafts'){ const n = S.drafts.filter(d=>d.status==='待审核').length; if(n>0) badge=`<span class="nav-badge">${n}</span>`; }
+    html += `<div class="nav-item ${currentView===n.key?'active':''}" onclick="go('${n.key}')">
+      <span class="icon">${n.icon}</span><span class="label">${n.label}</span>${badge}</div>`;
+  });
+  el.innerHTML = html;
+}
+function toggleSidebar(){ document.getElementById('app').classList.toggle('collapsed'); }
+
+function go(view, params){
+  currentView = view; routeParams = params||{};
+  const meta = NAV.find(n=>n.key===view);
+  document.getElementById('pageTitle').textContent = meta?meta.title:'';
+  document.getElementById('pageCrumb').textContent = meta?meta.crumb:'';
+  renderNav();
+  renderView();
+  document.getElementById('mainContent').scrollTop = 0;
+}
+function renderView(){
+  const c = document.getElementById('mainContent');
+  c.style.animation='none'; c.offsetHeight; c.style.animation='';
+  const map = {dashboard:viewDashboard, plans:viewPlans, planDetail:viewPlanDetail,
+    customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
+    inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge, settings:viewSettings};
+  (map[currentView]||viewDashboard)(c);
+  // 更新通知角标
+  const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
+  document.getElementById('notifDot').textContent = todo;
+}
+
+/* ---------- 通用：弹窗 / 抽屉 ---------- */
+function openModal(html, wide){
+  document.getElementById('modalRoot').innerHTML = `<div class="modal-mask" onclick="if(event.target===this)closeModal()"><div class="modal ${wide?'lg':''}">${html}</div></div>`;
+}
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+function openDrawer(html){
+  document.getElementById('drawerRoot').innerHTML = `<div class="drawer-mask" onclick="closeDrawer()"></div><div class="drawer">${html}</div>`;
+}
+function closeDrawer(){ document.getElementById('drawerRoot').innerHTML=''; }
+
+/* ---------- 通用：确认弹窗 ---------- */
+function confirmDlg(msg, onYes){
+  openModal(`
+    <div class="modal-head"><h3>确认操作</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body"><p style="font-size:14px">${msg}</p></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger" id="confirmYes">确认</button>
+    </div>`);
+  document.getElementById('confirmYes').onclick = ()=>{ closeModal(); onYes(); };
+}
+
+/* ---------- 通用：分页 ---------- */
+function pager(total, page, pageSize, onGo){
+  const pages = Math.max(1, Math.ceil(total/pageSize));
+  if(pages<=1) return '';
+  let h = `<div class="pager"><span class="text-muted" style="margin-right:10px">共 ${total} 条 · 第 ${page}/${pages} 页</span>`;
+  h += `<button ${page<=1?'disabled':''} onclick="${onGo}(${page-1})">‹</button>`;
+  const s = Math.max(1,page-2), e = Math.min(pages, page+2);
+  for(let i=s;i<=e;i++) h += `<button class="${i===page?'cur':''}" onclick="${onGo}(${i})">${i}</button>`;
+  h += `<button ${page>=pages?'disabled':''} onclick="${onGo}(${page+1})">›</button></div>`;
+  return h;
+}
+
+/* ---------- 全局搜索 ---------- */
+function globalSearch(q){
+  if(!q.trim()) return;
+  routeParams = {q:q.trim()}; currentView='customers'; go('customers',{q:q.trim()});
+}
+
+/* ============================================================
+ * SVG 图表库（纯手绘，零依赖）
+ * ============================================================ */
+// 横向条形图：[{label, value, color?}]
+function hBarChart(data, maxVal){
+  const max = maxVal || Math.max(...data.map(d=>d.value));
+  let rows = data.map((d,i)=>{
+    const w = Math.round(d.value/max*100);
+    const color = d.color || '#1a365d';
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+        <span style="color:var(--text-2)">${esc(d.label)}</span><b>${d.value}</b></div>
+      <div style="background:var(--gray-bg);border-radius:4px;height:14px;overflow:hidden">
+        <div style="width:${w}%;height:100%;background:${color};border-radius:4px;transition:width .8s"></div>
+      </div></div>`;
+  }).join('');
+  return rows;
+}
+// 环形图：[{label, value, color}]
+function donutChart(data, size){
+  size = size || 180;
+  const total = data.reduce((a,b)=>a+b.value,0);
+  const r = size/2 - 16, cx = size/2, cy = size/2;
+  let circ = 2*Math.PI*r, offset = 0;
+  let arcs = data.map(d=>{
+    const frac = d.value/total;
+    const len = frac*circ;
+    const seg = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="22"
+      stroke-dasharray="${len} ${circ-len}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset += len;
+    return seg;
+  }).join('');
+  let legend = data.map(d=>`<div style="display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:6px">
+    <span style="width:11px;height:11px;border-radius:3px;background:${d.color}"></span>
+    <span style="flex:1;color:var(--text-2)">${esc(d.label)}</span><b>${d.value}</b></div>`).join('');
+  return `<div style="display:flex;align-items:center;gap:20px">
+    <svg width="${size}" height="${size}">${arcs}
+      <text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="22" font-weight="800" fill="#1a365d">${total}</text>
+      <text x="${cx}" y="${cy+16}" text-anchor="middle" font-size="11" fill="#8a96a8">总客户</text>
+    </svg><div style="flex:1">${legend}</div></div>`;
+}
+// 折线图：近30天 [{label, value}]
+function lineChart(data, w, h){
+  w = w||520; h = h||180;
+  const max = Math.max(...data.map(d=>d.value),5);
+  const pad = {l:30,r:10,t:14,b:22};
+  const iw = w-pad.l-pad.r, ih = h-pad.t-pad.b;
+  const pts = data.map((d,i)=>({x:pad.l+iw*i/(data.length-1), y:pad.t+ih-(d.value/max)*ih, v:d.value, l:d.label}));
+  const path = pts.map((p,i)=>(i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');
+  const area = path + ` L ${pts[pts.length-1].x} ${pad.t+ih} L ${pts[0].x} ${pad.t+ih} Z`;
+  let grid = '';
+  for(let i=0;i<=3;i++){ const y = pad.t+ih*i/3; grid += `<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#eef1f5"/><text x="${pad.l-5}" y="${y+3}" text-anchor="end" font-size="9" fill="#a0aec0">${Math.round(max*(3-i)/3)}</text>`; }
+  let dots = pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="2.5" fill="#c9a961"/>`).join('');
+  let xlabels = '';
+  [0,7,14,21,29].forEach(i=>{ if(pts[i]) xlabels += `<text x="${pts[i].x}" y="${h-6}" text-anchor="middle" font-size="9" fill="#a0aec0">${pts[i].l}</text>`; });
+  return `<svg width="100%" viewBox="0 0 ${w} ${h}" style="max-width:100%">${grid}<path d="${area}" fill="rgba(201,169,97,.12)"/><path d="${path}" fill="none" stroke="#c9a961" stroke-width="2"/>${dots}${xlabels}</svg>`;
+}
+// 雷达图：5维度
+function radarChart(scores, size){
+  size = size||220;
+  const cx = size/2, cy = size/2, R = size/2 - 30;
+  const dims = [
+    {label:'产品匹配', v:scores.product},
+    {label:'客户类型', v:scores.companyType},
+    {label:'采购信号', v:scores.purchaseSignal},
+    {label:'联系质量', v:scores.contactQuality}
+  ];
+  const n = dims.length;
+  const pt = (i,r)=>{ const ang = -Math.PI/2 + i*2*Math.PI/n; return [cx+r*Math.cos(ang), cy+r*Math.sin(ang)]; };
+  let rings = '';
+  [0.33,0.66,1].forEach(f=>{
+    let p = dims.map((_,i)=>pt(i,R*f).join(',')).join(' ');
+    rings += `<polygon points="${p}" fill="none" stroke="#e3e8f0"/>`;
+  });
+  let axes = dims.map((d,i)=>{ const [x,y]=pt(i,R); return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#e3e8f0"/>`; }).join('');
+  let valPts = dims.map((d,i)=>pt(i,R*d.v/100).join(',')).join(' ');
+  let labels = dims.map((d,i)=>{ const [x,y]=pt(i,R+16); return `<text x="${x}" y="${y+3}" text-anchor="middle" font-size="10" fill="#4a5568">${d.label} ${d.v}</text>`; }).join('');
+  return `<svg width="${size}" height="${size}" style="display:block;margin:0 auto">${rings}${axes}
+    <polygon points="${valPts}" fill="rgba(26,54,93,.18)" stroke="#1a365d" stroke-width="1.5"/>
+    ${dims.map((d,i)=>{const[x,y]=pt(i,R*d.v/100);return `<circle cx="${x}" cy="${y}" r="3" fill="#c9a961"/>`;}).join('')}
+    ${labels}</svg>`;
+}
+
+/* ============================================================
+ * 视图 1：数据总览 Dashboard
+ * ============================================================ */
+function viewDashboard(root){
+  const total = S.customers.length;
+  const plansRunning = S.plans.filter(p=>p.status==='running').length;
+  const today = new Date().toISOString().slice(0,10);
+  const todayDay = new Date().toDateString();
+  const followDue = S.customers.filter(c=>c.nextFollowUp && new Date(c.nextFollowUp).toDateString()<=todayDay && c.status!=='已回复').length;
+  const replied = S.customers.filter(c=>c.status==='已回复').length;
+  const pendingDrafts = S.drafts.filter(d=>d.status==='待检查').length;
+  const unreadInbox = (S.inbox||[]).filter(i=>i.status==='未读').length;
+
+  // 今天要联系谁（按 nextFollowUp 排序，优先 A 级）
+  const todays = S.customers.filter(c=>c.nextFollowUp && new Date(c.nextFollowUp).toDateString()<=todayDay && c.status!=='已回复')
+    .sort((a,b)=>({A:0,B:1,C:2}[a.scores.grade]-{A:0,B:1,C:2}[b.scores.grade])).slice(0,6);
+
+  const cc = {}; S.customers.forEach(c=>cc[c.country]=(cc[c.country]||0)+1);
+  const countryData = Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>({label:k,value:v}));
+  const src = {}; S.customers.forEach(c=>src[c.source]=(src[c.source]||0)+1);
+  const srcColors = {'AI搜索':'#1a365d','海关数据':'#c9a961'};
+  const srcData = Object.entries(src).map(([k,v])=>({label:k,value:v,color:srcColors[k]||'#718096'}));
+
+  const days=[]; for(let i=29;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const key=d.toISOString().slice(0,10);
+    days.push({label:(d.getMonth()+1)+'/'+d.getDate(), value:S.customers.filter(c=>c.createdAt.slice(0,10)===key).length}); }
+  const runningPlans = S.plans.filter(p=>p.status==='running');
+  const recentLogs = S.plans.flatMap(p=>p.logs.map(l=>({plan:p.name,...l}))).sort((a,b)=>new Date(b.t)-new Date(a.t)).slice(0,6);
+
+  root.innerHTML = `
+    <div style="background:linear-gradient(120deg,var(--primary),#2c5282);color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:16px;display:flex;align-items:center;gap:14px">
+      <div style="font-size:22px">🎯</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:15px">外贸获客不是找名单，而是判断谁值得联系</div>
+        <div style="font-size:12.5px;opacity:.85;margin-top:3px">AI 干脏活累活（搜索·核证据·写草稿），你做关键决策（检查·发送·跟进）。数据全部保存在本地。</div>
+      </div>
+      ${unreadInbox?`<span class="badge badge-gold" style="cursor:pointer" onclick="go('inbox')">${unreadInbox} 封客户回复待处理</span>`:''}
+    </div>
+
+    <div class="card card-pad mb16" style="border-left:3px solid var(--warning)">
+      <div class="fw700 mb8" style="color:var(--warning)">⚠️ 预警提醒</div>
+      <div class="flex gap16" style="flex-wrap:wrap">
+        <span class="text-sm">📥 <b>${(S.inbox||[]).filter(i=>i.status==='未读').length}</b> 封客户回复未处理</span>
+        <span class="text-sm">⏰ <b>${S.quotes.filter(q=>q.status==='已发送' && (new Date(q.validUntil)-new Date())<7*86400000).length}</b> 张报价7天内到期</span>
+        <span class="text-sm">📦 <b>${(S.samples||[]).filter(x=>x.status==='已签收' && !x.feedback).length}</b> 个样品已签收未反馈</span>
+        <span class="text-sm">📝 <b>${S.contracts.filter(c=>c.status==='待签').length}</b> 份合同待签署</span>
+        <span class="text-sm">🚚 <b>${S.contracts.filter(c=>c.status==='执行中').length}</b> 个订单在生产中</span>
+        <span class="text-sm text-gold">📌 客户不是找不到，很多时候是跟丢了</span>
+      </div>
+    </div>
+    <div class="card card-pad mb16" style="padding:10px 16px;background:#0f172a;color:#fff;overflow:hidden">
+      <div style="display:flex;gap:32px;white-space:nowrap;animation:ticker 20s linear infinite">
+        <span>🆕 今日新线索 <b>${S.customers.length?12:0}</b></span>
+        <span>⏰ 超时未回邮件 <b>5</b> 封</span>
+        <span>🤝 待移交客户 <b>2</b></span>
+        <span>📈 本周新增客户 <b>${S.customers.length?12:0}</b></span>
+        <span>💰 本月成交金额 <b>$${(S.contracts.reduce((a,c)=>a+c.amount,0)/10000).toFixed(1)}K</b></span>
+        <span>✂️ 样品在途 <b>${(S.samples||[]).filter(x=>x.status==='运输中'||x.status==='在途').length}</b></span>
+      </div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><span class="stat-icon">👥</span>
+        <div class="stat-label">客户台账</div><div class="stat-value">${total}</div>
+        <div class="stat-trend up">优先联系 ${S.customers.filter(c=>c.scores.grade==='A').length} · 待验证 ${S.customers.filter(c=>c.scores.grade==='B').length}</div></div>
+      <div class="stat-card gold"><span class="stat-icon">🎯</span>
+        <div class="stat-label">开发任务</div><div class="stat-value">${S.plans.length}</div>
+        <div class="stat-trend up">${plansRunning} 个运行中</div></div>
+      <div class="stat-card orange"><span class="stat-icon">📌</span>
+        <div class="stat-label">今日待跟进</div><div class="stat-value">${followDue}</div>
+        <div class="stat-trend ${followDue>0?'down':'up'}">${followDue>0?'▼ 打开电脑先联系这些':'✓ 全部清空'}</div></div>
+      <div class="stat-card green"><span class="stat-icon">✅</span>
+        <div class="stat-label">已回复客户</div><div class="stat-value">${replied}</div>
+        <div class="stat-trend up">草稿待检查 ${pendingDrafts} 封</div></div>
+      <div class="stat-card"><span class="stat-icon">💬</span>
+        <div class="stat-label">询盘数</div><div class="stat-value">${S.inquiries.length}</div>
+        <div class="stat-trend up">待处理 ${S.inquiries.filter(i=>i.status==='待处理').length}</div></div>
+      <div class="stat-card gold"><span class="stat-icon">🎯</span>
+        <div class="stat-label">商机数</div><div class="stat-value">${S.customers.filter(c=>c.scores.grade==='A').length}</div>
+        <div class="stat-trend up">A级优先跟进</div></div>
+    </div>
+
+    <div class="grid-3-2">
+      <div class="card card-pad">
+        <div class="card-title">🔥 今天先联系谁？ <span class="sub">按优先级排序</span>
+          <button class="btn btn-primary btn-sm" onclick="go('schedule')">跟进日程 →</button></div>
+        ${todays.length? todays.map(c=>`
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openCustomerDetail('${c.id}')">
+            <div style="width:34px;height:34px;border-radius:50%;background:${c.scores.grade==='A'?'var(--success-bg)':c.scores.grade==='B'?'var(--warning-bg)':'var(--gray-bg)'};color:${c.scores.grade==='A'?'var(--success)':c.scores.grade==='B'?'var(--warning)':'var(--gray)'};display:flex;align-items:center;justify-content:center;font-weight:700">${c.scores.grade}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:13.5px">${esc(c.company)}</div>
+              <div class="text-sm text-muted">${esc(c.country)} · ${esc(c.products)}</div>
+            </div>
+            <div class="text-sm text-muted">${fmtDay(c.nextFollowUp)}</div>
+            ${gradeBadge(c.scores.grade)}
+          </div>`).join('')
+        : '<div class="empty" style="padding:24px"><p>今日暂无待跟进，去开发任务找新客户吧</p></div>'}
+      </div>
+      <div>
+        <div class="card card-pad mb16">
+          <div class="card-title">客户来源（两路）</div>
+          ${donutChart(srcData, 160)}
+        </div>
+        <div class="card card-pad">
+          <div class="card-title">运行中任务</div>
+          ${runningPlans.map(p=>`
+            <div style="margin-bottom:10px">
+              <div class="flex-between mb8"><b style="font-size:12.5px">${esc(p.name)}</b><span class="text-sm text-muted">${p.progress}%</span></div>
+              <div class="progress"><div class="progress-bar gold" style="width:${p.progress}%"></div></div>
+            </div>`).join('')||'<div class="text-sm text-muted">暂无</div>'}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card card-pad">
+        <div class="card-title">近30天新增客户</div>
+        ${lineChart(days)}
+      </div>
+      <div class="card card-pad">
+        <div class="card-title">客户国家分布 <span class="sub">Top 8</span></div>
+        ${hBarChart(countryData)}
+      </div>
+    </div>
+
+    <div class="card card-pad mt16">
+      <div class="card-title">最近 AI 活动 <span class="sub">搜索 → 核证据 → 写草稿</span></div>
+      <div class="timeline">
+        ${recentLogs.map(l=>`
+          <div class="tl-item ${l.level==='ok'?'done':''}">
+            <div class="tl-time">${fmtDate(l.t)} · ${esc(l.plan)}</div>
+            <div class="tl-title" style="font-weight:500;font-size:13px">${esc(l.msg)}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+/* ============================================================
+ * 视图 2：AI 获客系统
+ * ============================================================ */
+const PLAN_STATUS = {running:['运行中','badge-blue'],paused:['已暂停','badge-gold'],done:['已完成','badge-a'],stopped:['已停止','badge-c']};
+function viewPlans(root){
+  root.innerHTML = `
+    <div class="flex-between mb16">
+      <div>
+        <div style="font-size:13px;color:var(--text-2)">AI 自动执行 <b>找客户 → 核证据 → 写草稿</b> 三步脏活；发送由你人工完成。</div>
+      </div>
+      <button class="btn btn-gold" onclick="openNewPlan()">＋ 新建开发计划</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table class="tbl">
+        <colgroup><col style="width:22%"><col style="width:12%"><col style="width:18%"><col style="width:14%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:6%"></colgroup>
+        <thead><tr><th>计划名称</th><th>目标行业</th><th>产品关键词</th><th>目标国家</th><th>状态</th><th>已发现</th><th>创建时间</th><th>操作</th></tr></thead>
+        <tbody>
+        ${S.plans.length? S.plans.map(p=>{
+          const [st,cls] = PLAN_STATUS[p.status]||['未知','badge-gray'];
+          return `<tr>
+            <td><b>${esc(p.name)}</b></td>
+            <td>${esc(p.industry)}</td>
+            <td>${p.keywords.slice(0,2).map(k=>`<span class="tag">${esc(k)}</span>`).join('')}</td>
+            <td>${p.countries.join(' / ')}</td>
+            <td><span class="badge ${cls}">${st}</span></td>
+            <td><b>${p.foundCount}</b></td>
+            <td class="text-muted">${fmtDate(p.createdAt)}</td>
+            <td><button class="btn btn-outline btn-sm" onclick="go('planDetail',{id:'${p.id}'})">详情</button></td>
+          </tr>`;
+        }).join('') : `<tr><td colspan="8"><div class="empty"><div class="big">🤖</div><p>还没有获客计划</p><button class="btn btn-gold" onclick="openNewPlan()">创建第一个计划</button></div></td></tr>`}
+        </tbody>
+      </table></div>
+    </div>`;
+}
+
+/* ---------- 新建计划：三步表单 ---------- */
+let np = {step:1, name:'', industry:'厨房用品', keywords:[], countries:[], customerTypes:[], perRound:20, threshold:60, autoDraft:true};
+const QUICK_COUNTRIES = ['美国','德国','英国','澳大利亚','加拿大','日本','阿联酋','巴西','法国','荷兰','西班牙','意大利'];
+const CUSTOMER_TYPES = ['进口商','分销商','品牌商','电商卖家','批发商'];
+function openNewPlan(){
+  np = {step:1, name:'', industry:'厨房用品', keywords:[], countries:['美国'], customerTypes:['进口商'], perRound:20, threshold:60, autoDraft:true};
+  renderNewPlan();
+}
+function renderNewPlan(){
+  openModal(`
+    <div class="modal-head"><h3>新建 AI 开发计划</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="steps">
+        <div class="step ${np.step>=1?'active':''} ${np.step>1?'done':''}"><div class="num">1</div>基本信息</div>
+        <div class="step-line ${np.step>1?'done':''}"></div>
+        <div class="step ${np.step===2?'active':''} ${np.step>2?'done':''}"><div class="num">2</div>目标市场</div>
+        <div class="step-line ${np.step>2?'done':''}"></div>
+        <div class="step ${np.step===3?'active':''}"><div class="num">3</div>AI 参数</div>
+      </div>
+      <div id="npBody">${np.step===1?npStep1():np.step===2?npStep2():npStep3()}</div>
+    </div>
+    <div class="modal-foot">
+      ${np.step>1?'<button class="btn btn-outline" onclick="np.step--;renderNewPlan()">上一步</button>':''}
+      ${np.step<3?`<button class="btn btn-primary" onclick="npNext()">下一步</button>`
+                :`<button class="btn btn-gold" onclick="submitPlan()">🚀 创建并运行</button>`}
+    </div>`);
+}
+function npStep1(){
+  return `<div class="form-group"><label>计划名称 <span class="req">*</span></label>
+    <input class="form-control" id="npName" value="${esc(np.name)}" placeholder="例：北美厨房剪精准获客"></div>
+  <div class="form-group"><label>目标行业</label>
+    <select class="form-control" id="npIndustry">
+      ${['厨房用品','户外工具','美容美甲','工业刀具','其他'].map(i=>`<option ${np.industry===i?'selected':''}>${i}</option>`).join('')}
+    </select></div>
+  <div class="form-group"><label>产品关键词（回车添加）</label>
+    <div class="tag-input-wrap" onclick="this.querySelector('input').focus()">
+      ${np.keywords.map((k,i)=>`<span class="chip">${esc(k)}<span class="x" onclick="np.keywords.splice(${i},1);renderNewPlan()">×</span></span>`).join('')}
+      <input id="npKw" placeholder="输入关键词后回车，如 kitchen scissors" onkeydown="if(event.key==='Enter'){event.preventDefault();const v=this.value.trim();if(v){np.keywords.push(v);this.value='';renderNewPlan();}}">
+    </div>
+    <div class="form-hint">英文关键词效果更佳，AI 会自动组合成搜索 query</div></div>`;
+}
+function npStep2(){
+  return `<div class="form-group"><label>目标国家 / 地区（多选）</label>
+    <div class="country-grid">
+      ${QUICK_COUNTRIES.map(c=>`<div class="country-item ${np.countries.includes(c)?'sel':''}" onclick="toggleCountry('${c}',this)">
+        <input type="checkbox" ${np.countries.includes(c)?'checked':''}> ${c}</div>`).join('')}
+    </div></div>
+  <div class="form-group"><label>客户类型（多选）</label>
+    <div class="country-grid" style="grid-template-columns:repeat(2,1fr)">
+      ${CUSTOMER_TYPES.map(c=>`<div class="country-item ${np.customerTypes.includes(c)?'sel':''}" onclick="toggleCustType('${c}',this)">
+        <input type="checkbox" ${np.customerTypes.includes(c)?'checked':''}> ${c}</div>`).join('')}
+    </div></div>`;
+}
+function npStep3(){
+  return `<div class="form-group"><label>每轮搜索客户数</label>
+    <select class="form-control" id="npPerRound">
+      ${[10,20,30,50].map(n=>`<option value="${n}" ${np.perRound===n?'selected':''}>${n} 个 / 轮</option>`).join('')}
+    </select></div>
+  <div class="form-group"><label>评分阈值：仅保留 ≥ <b id="thrVal">${np.threshold}</b> 分的客户</label>
+    <input type="range" min="50" max="90" value="${np.threshold}" id="npThr" style="width:100%" oninput="document.getElementById('thrVal').textContent=this.value"></div>
+  <div class="form-group flex" style="justify-content:space-between">
+    <div><b>自动生成开发信草稿</b><div class="form-hint">核证据通过后，AI 自动写千邮千面草稿</div></div>
+    <div class="switch ${np.autoDraft?'on':''}" onclick="np.autoDraft=!np.autoDraft;this.classList.toggle('on')"></div>
+  </div>
+  <div class="divider"></div>
+  <div style="background:var(--info-bg);padding:12px 14px;border-radius:8px;font-size:12.5px;color:var(--info)">
+    💡 提示：AI 只会<b>搜索、分析、写草稿</b>。所有开发信都需要你人工审核后手动发送，数据全部保存在本地浏览器。
+  </div>`;
+}
+function toggleCountry(c,el){ el.classList.toggle('sel'); const i=np.countries.indexOf(c); if(i>=0)np.countries.splice(i,1); else np.countries.push(c); }
+function toggleCustType(c,el){ el.classList.toggle('sel'); const i=np.customerTypes.indexOf(c); if(i>=0)np.customerTypes.splice(i,1); else np.customerTypes.push(c); }
+function npNext(){
+  if(np.step===1){
+    np.name = document.getElementById('npName').value.trim();
+    np.industry = document.getElementById('npIndustry').value;
+    if(!np.name){ toast('请填写计划名称','err'); return; }
+    if(!np.keywords.length){ toast('请至少添加一个产品关键词','err'); return; }
+  }
+  if(np.step===2 && !np.countries.length){ toast('请至少选择一个目标国家','err'); return; }
+  np.step++; renderNewPlan();
+}
+function submitPlan(){
+  np.perRound = parseInt(document.getElementById('npPerRound').value);
+  np.threshold = parseInt(document.getElementById('npThr').value);
+  const plan = {id:uid(), name:np.name, industry:np.industry, keywords:np.keywords, countries:np.countries,
+    customerTypes:np.customerTypes, status:'running', progress:5, foundCount:0,aCount:0,bCount:0,cCount:0,draftCount:0,
+    logs:[{t:now(),level:'info',msg:`初始化搜索任务：${np.keywords.join(' ')} in ${np.countries.join(', ')}`}],
+    createdAt:now(), startedAt:now(), finishedAt:null};
+  S.plans.unshift(plan); persist(); closeModal(); toast('计划已创建，AI 开始运行');
+  go('planDetail',{id:plan.id});
+  // 模拟 AI 跑起来后追加几条日志
+  setTimeout(()=>pushLog(plan.id,'🔍 Google 搜索: "'+np.keywords[0]+' importers '+np.countries[0]+'"'),800);
+  setTimeout(()=>pushLog(plan.id,'✅ 找到候选网站，开始去重初筛'),2000);
+  setTimeout(()=>pushLog(plan.id,'⏳ 正在分析第 1 个网站...'),3200);
+}
+function pushLog(pid,msg,level){
+  const p = S.plans.find(x=>x.id===pid); if(!p) return;
+  level = level||'info';
+  p.logs.push({t:now(),level,msg});
+  if(p.progress<95) p.progress += 8;
+  persist();
+  if(currentView==='planDetail' && routeParams.id===pid){ renderView(); }
+}
+
+/* ---------- 计划详情 ---------- */
+function viewPlanDetail(root){
+  const p = S.plans.find(x=>x.id===routeParams.id);
+  if(!p){ root.innerHTML = '<div class="empty">计划不存在 <button class="btn btn-primary" onclick="go(\'plans\')">返回</button></div>'; return; }
+  root.innerHTML = `
+    <button class="btn btn-outline btn-sm mb16" onclick="go('plans')">← 返回计划列表</button>
+    <div class="card card-pad mb16">
+      <div class="flex-between">
+        <div>
+          <h2 style="font-size:18px;color:var(--primary)">${esc(p.name)}</h2>
+          <div class="text-sm text-muted mt8">行业：${esc(p.industry)} · 国家：${p.countries.join(' / ')} · 关键词：${p.keywords.map(k=>`<span class="tag tag-gold">${esc(k)}</span>`).join('')}</div>
+        </div>
+        <div class="btn-row">
+          ${p.status==='running'?'<button class="btn btn-outline" onclick="planCtrl(\''+p.id+'\',\'paused\')">⏸ 暂停</button>':''}
+          ${p.status==='paused'?'<button class="btn btn-primary" onclick="planCtrl(\''+p.id+'\',\'running\')">▶ 继续</button>':''}
+          ${p.status!=='done'?'<button class="btn btn-danger" onclick="planCtrl(\''+p.id+'\',\'stopped\')">■ 停止</button>':''}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="progress" style="height:10px"><div class="progress-bar gold" style="width:${p.progress}%"></div></div>
+      <div class="flex-between mt8 text-sm"><span>进度 ${p.progress}%</span><span class="text-muted">开始于 ${fmtDate(p.startedAt)}</span></div>
+    </div>
+
+    <div class="grid-3-2">
+      <div class="card card-pad">
+        <div class="card-title">AI 工作日志（实时）</div>
+        <div class="log-box" id="logBox">
+          ${p.logs.map((l,i)=>`<div class="log-line" style="animation-delay:${i*0.05}s"><span class="ts">${fmtDate(l.t)}</span>${esc(l.msg)}</div>`).join('')}
+        </div>
+      </div>
+      <div class="card card-pad">
+        <div class="card-title">结果汇总</div>
+        <div class="mb16"><div class="stat-label">发现客户</div><div class="stat-value" style="font-size:24px">${p.foundCount}</div></div>
+        <div class="score-row"><div class="lbl"><span>A 级商机</span><b style="color:var(--success)">${p.aCount}</b></div><div class="progress"><div class="progress-bar green" style="width:${p.foundCount?Math.round(p.aCount/p.foundCount*100):0}%"></div></div></div>
+        <div class="score-row"><div class="lbl"><span>B 级</span><b style="color:var(--warning)">${p.bCount}</b></div><div class="progress"><div class="progress-bar orange" style="width:${p.foundCount?Math.round(p.bCount/p.foundCount*100):0}%"></div></div></div>
+        <div class="score-row"><div class="lbl"><span>C 级</span><b style="color:var(--gray)">${p.cCount}</b></div><div class="progress"><div class="progress-bar gray" style="width:${p.foundCount?Math.round(p.cCount/p.foundCount*100):0}%"></div></div></div>
+        <div class="divider"></div>
+        <div class="flex-between"><span>已生成开发信草稿</span><b class="text-gold">${p.draftCount} 封</b></div>
+      </div>
+    </div>`;
+  const lb = document.getElementById('logBox');
+  if(lb) lb.scrollTop = lb.scrollHeight;
+}
+function planCtrl(pid, status){
+  const p = S.plans.find(x=>x.id===pid); if(!p) return;
+  p.status = status;
+  if(status==='stopped'){ p.finishedAt = now(); p.progress = 100; p.logs.push({t:now(),level:'warn',msg:'■ 计划已手动停止'}); }
+  if(status==='running'){ p.logs.push({t:now(),level:'ok',msg:'▶ 计划已继续运行'}); }
+  if(status==='paused'){ p.logs.push({t:now(),level:'warn',msg:'⏸ 计划已暂停'}); }
+  persist(); toast(status==='running'?'已继续':status==='paused'?'已暂停':'已停止'); renderView();
+}
+
+/* ============================================================
+ * 视图 3：客户库 CRM
+ * ============================================================ */
+let custFilter = {grade:'', country:'', source:'', status:'', q:'', page:1, view:'all', selected:[]};
+const CUST_PAGE = 10;
+function viewCustomers(root){
+  custFilter.q = routeParams.q || custFilter.q || '';
+  let list = S.customers.slice();
+  if(custFilter.grade) list = list.filter(c=>c.scores.grade===custFilter.grade);
+  if(custFilter.country) list = list.filter(c=>c.country===custFilter.country);
+  if(custFilter.source) list = list.filter(c=>c.source===custFilter.source);
+  if(custFilter.status) list = list.filter(c=>c.status===custFilter.status);
+  if(custFilter.view==='new') list = list.filter(c=>!c.isOld);
+  if(custFilter.view==='old') list = list.filter(c=>c.isOld);
+  if(custFilter.q){ const q=custFilter.q.toLowerCase(); list = list.filter(c=>(c.company+c.contact.email+c.products).toLowerCase().includes(q)); }
+  const pages = Math.max(1, Math.ceil(list.length/CUST_PAGE));
+  if(custFilter.page>pages) custFilter.page = pages;
+  const pageList = list.slice((custFilter.page-1)*CUST_PAGE, custFilter.page*CUST_PAGE);
+  const countries = [...new Set(S.customers.map(c=>c.country))];
+  const sources = [...new Set(S.customers.map(c=>c.source))];
+
+  root.innerHTML = `
+    <div class="flex gap8 mb16">
+      ${[['all','全部客户'],['new','新开发客户'],['old','老客户（已成交）']].map(([k,l])=>
+        `<button class="btn ${custFilter.view===k?'btn-gold':'btn-outline'}" onclick="custFilter.view='${k}';custFilter.page=1;renderView()">${l}</button>`).join('')}
+      <button class="btn btn-primary" style="margin-left:auto" onclick="aiBatchCheck()">🤖 AI 批量背调（${custFilter.selected.length} 已选）</button>
+    </div>
+    <div class="flex-between mb16">
+      <div class="flex gap12">
+        <select class="form-control" style="width:110px" onchange="custFilter.grade=this.value;custFilter.page=1;renderView()">
+          <option value="">全部等级</option><option value="A" ${custFilter.grade==='A'?'selected':''}>A 级</option>
+          <option value="B" ${custFilter.grade==='B'?'selected':''}>B 级</option><option value="C" ${custFilter.grade==='C'?'selected':''}>C 级</option>
+        </select>
+        <select class="form-control" style="width:130px" onchange="custFilter.country=this.value;custFilter.page=1;renderView()">
+          <option value="">全部国家</option>${countries.map(c=>`<option ${custFilter.country===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+        <select class="form-control" style="width:130px" onchange="custFilter.source=this.value;custFilter.page=1;renderView()">
+          <option value="">全部来源</option>${sources.map(c=>`<option ${custFilter.source===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="openCustomerForm()">＋ 添加客户</button>
+    </div>
+    ${custFilter.q?`<div class="mb16 text-sm">搜索 “<b>${esc(custFilter.q)}</b>” 共 ${list.length} 条 <a class="text-gold" style="cursor:pointer" onclick="custFilter.q='';routeParams.q='';renderView()">清除</a></div>`:''}
+    <div class="card">
+      <div class="table-wrap"><table class="tbl">
+        <colgroup><col style="width:4%"><col style="width:22%"><col style="width:8%"><col style="width:6%"><col style="width:17%"><col style="width:19%"><col style="width:12%"><col style="width:12%"></colgroup>
+        <thead><th><input type="checkbox" onchange="toggleAllCust(this.checked)"></th><th>公司</th><th>国家</th><th>等级</th><th>主营产品</th><th>决策人邮箱</th><th>下次跟进</th><th>状态</th></tr></thead>
+        <tbody>
+        ${pageList.length? pageList.map(c=>`
+          <tr style="cursor:pointer" onclick="openCustomerDetail('${c.id}')">
+            <td onclick="event.stopPropagation()"><input type="checkbox" ${custFilter.selected.includes(c.id)?'checked':''} onchange="toggleCustSel('${c.id}',this.checked)"></td>
+            <td><b>${esc(c.company)}</b><div class="text-sm text-muted">${esc(c.website)}</div></td>
+            <td>${esc(c.country)}</td>
+            <td>${gradeBadge(c.scores.grade)} <span class="text-sm text-muted">${c.scores.total}</span></td>
+            <td class="text-sm">${esc(c.products)}</td>
+            <td class="text-sm mono">${esc(c.contact.email)}</td>
+            <td class="text-sm">${fmtDay(c.nextFollowUp)}</td>
+            <td><span class="badge ${c.status==='已回复'?'badge-a':c.status==='跟进中'?'badge-blue':c.status==='待跟进'?'badge-gold':'badge-gray'}">${esc(c.status)}</span>${!c.owner?'<button class="btn btn-gold btn-sm" style="margin-left:6px" onclick="event.stopPropagation();claimCust(\''+c.id+'\')">领取</button>':''}</td>
+          </tr>`).join('')
+        : `<tr><td colspan="8"><div class="empty"><div class="big">🔍</div><p>没有符合条件的客户</p></div></td></tr>`}
+        </tbody>
+      </table></div>
+      ${pager(list.length, custFilter.page, CUST_PAGE, 'gotoCustPage')}
+    </div>`;
+}
+function gotoCustPage(p){ custFilter.page=p; renderView(); }
+function toggleCustSel(id,on){ if(on){ if(!custFilter.selected.includes(id))custFilter.selected.push(id); } else { custFilter.selected=custFilter.selected.filter(x=>x!==id); } }
+function toggleAllCust(on){ if(on){ pageList.forEach(c=>{ if(!custFilter.selected.includes(c.id))custFilter.selected.push(c.id); }); } else { custFilter.selected=[]; } renderView(); }
+function aiBatchCheck(){
+  const ids = custFilter.selected.length? custFilter.selected : S.customers.filter(c=>!c.isOld).slice(0,8).map(c=>c.id);
+  if(!ids.length){ toast('请先勾选客户','err'); return; }
+  openModal(`<div class="modal-head"><h3>🤖 AI 批量背调</h3></div>
+    <div class="modal-body"><div id="batchLog" style="font-family:monospace;font-size:12px;max-height:260px;overflow:auto"></div>
+    <div class="progress mt12"><div class="progress-bar blue" id="batchBar" style="width:0%"></div></div>
+    <div class="text-sm text-muted mt8" id="batchPct">准备中...</div></div>`);
+  const log=document.getElementById('batchLog'); let i=0;
+  const tick=()=>{
+    if(i>=ids.length){
+      document.getElementById('batchBar').style.width='100%';
+      document.getElementById('batchPct').textContent='完成！';
+      ids.forEach(id=>{ const c=S.customers.find(x=>x.id===id); if(c){ c.companySize=c.companySize||'50-200人'; c.foundedYear=c.foundedYear||1995; } });
+      persist(); confetti(); setTimeout(()=>{closeModal(); toast('已完成 '+ids.length+' 家客户背调','ok'); renderView();},800); return;
+    }
+    const c=S.customers.find(x=>x.id===ids[i]);
+    log.innerHTML+=`<div>🔍 正在核查 ${c.company} 的海关进口记录...</div><div style="color:var(--green)">  ✓ ${c.companySize||'50-200人'} · 成立${c.foundedYear||1990}年</div>`;
+    log.scrollTop=log.scrollHeight;
+    document.getElementById('batchBar').style.width=Math.round((i+1)/ids.length*100)+'%';
+    document.getElementById('batchPct').textContent=`已完成 ${i+1}/${ids.length}`;
+    i++; setTimeout(tick,700);
+  };
+  tick();
+}
+
+/* ---------- 客户详情抽屉 ---------- */
+/* ---------- V2 全局辅助 ---------- */
+function copyText(t){
+  if(navigator.clipboard){ navigator.clipboard.writeText(t).then(()=>toast('已复制：'+t)).catch(()=>toast('已复制','ok')); }
+  else { const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('已复制：'+t); }
+}
+function confetti(){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column';
+  wrap.id='confettiWrap';
+  wrap.innerHTML='<div style="font-size:80px;animation:pop .5s">✅</div><div style="color:#fff;font-size:22px;font-weight:700;margin-top:12px">任务完成！</div>';
+  for(let i=0;i<40;i++){
+    const p=document.createElement('div');
+    const colors=['#c9a961','#1a365d','#48bb78','#ed8936','#e53e3e','#4299e1'];
+    p.style.cssText=`position:absolute;left:${Math.random()*100}%;top:-10px;width:10px;height:10px;border-radius:2px;background:${colors[i%6]};animation:fall ${1+Math.random()*1.5}s linear forwards`;
+    wrap.appendChild(p);
+  }
+  document.body.appendChild(wrap);
+  setTimeout(()=>wrap.remove(),1600);
+}
+const CONFETTI_CSS='@keyframes pop{0%{transform:scale(0)}60%{transform:scale(1.2)}100%{transform:scale(1)}}@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}';
+if(!document.getElementById('confettiCss')){
+  const st=document.createElement('style'); st.id='confettiCss'; st.textContent=CONFETTI_CSS;
+  document.head.appendChild(st);
+}
+function bgCheck(tool){
+  toast('正在通过「'+tool+'」背调...');
+  setTimeout(()=>toast(tool+'：已获取公开信息并更新档案','ok'),900);
+}
+function transferCustomer(cid){
+  openModal(`
+    <div class="modal-head"><h3>移交客户</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:10px">将客户移交给其他业务员跟进：</p>
+      <select id="transferTo" class="form-control">
+        <option value="Leo">Leo（我）</option><option value="Tom">Tom</option>
+        <option value="Sarah">Sarah</option><option value="Mike">Mike</option>
+      </select>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="doTransfer('${cid}')">确认移交</button>
+    </div>`);
+}
+function doTransfer(cid){
+  const to=document.getElementById('transferTo').value;
+  const c=S.customers.find(x=>x.id===cid);
+  c.followUpHistory.push({t:daysAgo(0),desc:'移交给业务员 '+to});
+  c.owner=to; persist(); closeModal(); toast('已移交给 '+to);
+}
+
+function openCustomerDetail(cid){
+  const c = S.customers.find(x=>x.id===cid); if(!c) return;
+  const drafts = S.drafts.filter(d=>d.customerId===cid);
+  openDrawer(`
+    <div class="drawer-head">
+      <div><h2 style="font-size:17px;color:var(--primary)">${esc(c.company)}</h2>
+      <div class="text-sm text-muted">${esc(c.website)} · ${esc(c.country)} · ${esc(c.customerType)} · 来源：${esc(c.source)}</div></div>
+      <span class="modal-close" onclick="closeDrawer()">×</span>
+    </div>
+    <div class="drawer-body">
+      <div class="flex gap8 mb16" style="flex-wrap:wrap">${gradeBadge(c.scores.grade)}
+        <span class="badge badge-gray">综合 ${c.scores.total} 分</span>
+        <span class="badge ${c.status==='已回复'?'badge-a':c.status==='跟进中'?'badge-blue':'badge-gold'}">${esc(c.status)}</span>
+        ${(c.tags||[]).map(t=>`<span class="badge badge-gold" style="cursor:pointer" onclick="copyText('${t}')">${esc(t)}</span>`).join('')}
+        <span class="text-sm text-muted">业务员：${esc(c.owner||'Leo')}${c.isOld?' · <b style="color:var(--gold)">老客户</b>':''}</span>
+      </div>
+
+      <div class="card card-pad mb16">
+        <div class="card-title">🏢 公司背调</div>
+        <div class="text-sm" style="line-height:2">
+          <div>👥 规模：<b>${esc(c.companySize||'—')} 人</b> · 年营收估算 <b>$5M-$20M</b></div>
+          <div>📅 成立：<b>${c.foundedYear||'—'} 年</b> · 注册状态：<span class="badge badge-a">${esc(c.registerStatus||'在营')}</span></div>
+          <div>🗺️ 地址：${(c.addresses||[]).map(a=>esc(a.label+':'+a.addr)).join('；')||'—'}</div>
+          <button class="btn btn-outline btn-sm mt8" onclick="toast('正在打开谷歌地图...')">📍 谷歌地图实景</button>
+        </div>
+      </div>
+
+      <div class="card card-pad mb16">
+        <div class="card-title">📦 海关采购记录</div>
+        <div class="text-sm" style="line-height:2">
+          <div>最近采购：<b>${c.customs&&c.customs.lastPurchase?fmtDay(c.customs.lastPurchase):'—'}</b></div>
+          <div>采购频次：${esc(c.customs?c.customs.frequency:'—')}</div>
+          <div>主要供应商：${(c.customs?c.customs.suppliers:[]).map(x=>esc(x)).join('、')||'—'}</div>
+          <div>采购趋势：<b style="color:${c.customs&&c.customs.trend==='上升'?'var(--green)':c.customs&&c.customs.trend==='下降'?'var(--red)':'var(--text-2)'}">${c.customs&&c.customs.trend==='上升'?'↑ 上升':c.customs&&c.customs.trend==='下降'?'↓ 下降':'→ 稳定'}</b></div>
+        </div>
+      </div>
+
+      <div class="card card-pad mb16">
+        <div class="card-title">🔍 九大背调入口</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+          ${[['🚢','海关数据'],['🔎','谷歌搜索'],['🗺️','谷歌地图'],['💼','领英'],['📘','Facebook'],['🌐','公司官网'],['🌐','WHOIS'],['📚','行业目录'],['™️','商标专利']]
+            .map(([ic,n])=>`<button class="btn btn-outline" style="font-size:11px;padding:8px 4px" onclick="bgCheck('${n}')">${ic}<br>${n}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="card card-pad mb16">
+        <div class="card-title">AI 客户画像</div>
+        <div class="text-sm" style="line-height:1.9">
+          <div><b style="color:var(--primary)">核心业务：</b>${esc(c.profile.business)}</div>
+          <div><b style="color:var(--primary)">产品线：</b>${esc(c.profile.productLine)}</div>
+          <div><b style="color:var(--primary)">采购需求：</b>${esc(c.profile.needs)}</div>
+          <div><b style="color:var(--primary)">供应链痛点：</b>${esc(c.profile.painPoints)}</div>
+          <div><b style="color:var(--accent-dark)">🎯 最佳切入：</b>${esc(c.profile.angle)}</div>
+        </div>
+      </div>
+
+      <div class="card card-pad mb16">
+        <div class="card-title">五维评分（核证据）</div>
+        ${radarChart(c.scores)}
+        <div class="divider"></div>
+        ${[['产品匹配度',c.scores.product,35],['客户类型匹配',c.scores.companyType,20],['真实采购信号',c.scores.purchaseSignal,30],['联系信息质量',c.scores.contactQuality,15]]
+          .map(([l,v,w])=>`<div class="score-row"><div class="lbl"><span>${l} <span class="text-muted">(权重${w}%)</span></span><b>${v}</b></div>
+          <div class="progress"><div class="progress-bar ${c.scores.grade==='A'?'green':c.scores.grade==='B'?'orange':'gray'}" style="width:${v}%"></div></div></div>`).join('')}
+      </div>
+
+      <div class="card card-pad mb16">
+        <div class="card-title">AI 匹配理由</div>
+        <ul style="padding-left:18px;font-size:13px;line-height:1.9">
+          ${c.matchReasons.map(r=>`<li>${esc(r)}</li>`).join('')}
+        </ul>
+      </div>
+
+      <div class="card card-pad mb16">
+        <div class="card-title">联系方式</div>
+        <div class="text-sm" style="line-height:2">
+          <div>👤 <b>${esc(c.contact.name)}</b> · ${esc(c.contact.title)}</div>
+          <div>✉️ <span class="mono">${esc(c.contact.email)}</span>
+          <button class="btn btn-outline btn-sm" onclick="copyText('${c.contact.email}')">📧 复制</button></div>
+        <div>📱 WhatsApp: ${esc(c.contact.whatsapp||'-')}
+          <button class="btn btn-outline btn-sm" onclick="copyText('${c.contact.whatsapp||''}')">📱 复制</button></div>
+        <div>💼 LinkedIn: ${esc(c.contact.linkedin||'-')}</div>
+        </div>
+      </div>
+
+      <div class="card card-pad mb16">
+        <div class="card-title">💰 应收账款</div>
+        ${(()=>{
+          const ar = (S.ar||[]).find(a=>a.customerId===c.id) || (S.ar||[]).find(a=>a.customerName===c.company);
+          if(!ar) return '<div class="text-sm text-muted">暂无应收记录（成交后自动生成）</div>';
+          const owe = ar.total - ar.received;
+          return `<div class="grid-3 mb12">
+            <div class="stat-card"><div class="stat-label">应收总额</div><div class="stat-value" style="font-size:18px">$${ar.total.toLocaleString()}</div></div>
+            <div class="stat-card"><div class="stat-label">已收</div><div class="stat-value" style="font-size:18px;color:var(--green)">$${ar.received.toLocaleString()}</div></div>
+            <div class="stat-card"><div class="stat-label">欠款</div><div class="stat-value" style="font-size:18px;color:${owe>0?'var(--red)':'var(--green)'}">$${owe.toLocaleString()}</div></div>
+          </div>
+          <table class="tbl"><thead><tr><th>日期</th><th>金额</th><th>方式</th><th>备注</th></tr></thead>
+          <tbody>${ar.records.map(r=>`<tr><td>${fmtDay(r.date)}</td><td>$${r.amount.toLocaleString()}</td><td><span class="badge badge-blue">${r.method}</span></td><td>${esc(r.note||'')}</td></tr>`).join('')}</tbody></table>`;
+        })()}
+      </div>
+
+      <div class="card card-pad mb16">
+        <div class="card-title">联系历史</div>
+        <div class="timeline">
+          <div class="tl-item done"><div class="tl-time">${fmtDate(c.createdAt)}</div><div class="tl-title">AI 发现客户</div><div class="tl-desc">来源：${esc(c.source)} · 综合评分 ${c.scores.total}</div></div>
+          ${drafts.map(d=>`<div class="tl-item ${d.status==='已发送'?'done':''}"><div class="tl-time">${fmtDate(d.sentAt||d.createdAt)}</div>
+            <div class="tl-title">开发信 ${d.status==='已发送'?'已发送':'草稿：'+d.status}</div>
+            <div class="tl-desc">${esc(d.subject)}</div></div>`).join('')}
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-gold" onclick="go('drafts');closeDrawer();editDraftForCustomer('${c.id}')">✉️ 生成开发信</button>
+        <button class="btn btn-primary" onclick="recordFollowUp('${c.id}')">📌 记录跟进</button>
+        <button class="btn btn-outline" onclick="openCustomerForm('${c.id}')">✏️ 编辑</button>
+        <button class="btn btn-outline" onclick="transferCustomer('${c.id}')">🔄 移交</button>
+      </div>
+    </div>`);
+}
+
+/* ---------- 添加 / 编辑客户 ---------- */
+function openCustomerForm(cid){
+  const c = cid ? S.customers.find(x=>x.id===cid) : null;
+  const v = c || {company:'',website:'',country:'美国',customerType:'进口商',source:'谷歌搜索',products:'',contact:{name:'',title:'',email:'',whatsapp:'',phone:''}};
+  openModal(`
+    <div class="modal-head"><h3>${c?'编辑客户':'添加客户'}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>公司名称 <span class="req">*</span></label><input class="form-control" id="cf_company" value="${esc(v.company)}"></div>
+        <div class="form-group"><label>官网</label><input class="form-control" id="cf_website" value="${esc(v.website)}" placeholder="www.example.com"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>国家</label>
+          <select class="form-control" id="cf_country">${['美国','德国','英国','澳大利亚','加拿大','日本','阿联酋','巴西','法国','其他'].map(x=>`<option ${v.country===x?'selected':''}>${x}</option>`).join('')}</select></div>
+        <div class="form-group"><label>客户类型</label>
+          <select class="form-control" id="cf_type">${CUSTOMER_TYPES.map(x=>`<option ${v.customerType===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>决策人姓名</label><input class="form-control" id="cf_name" value="${esc(v.contact.name||'')}"></div>
+        <div class="form-group"><label>职位</label><input class="form-control" id="cf_title" value="${esc(v.contact.title||'')}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>邮箱</label><input class="form-control" id="cf_email" value="${esc(v.contact.email||'')}"></div>
+        <div class="form-group"><label>WhatsApp</label><input class="form-control" id="cf_wa" value="${esc(v.contact.whatsapp||'')}"></div>
+      </div>
+      <div class="form-group"><label>主营产品</label><input class="form-control" id="cf_products" value="${esc(v.products||'')}" placeholder="如：厨房剪、多用刀"></div>
+    </div>
+    <div class="modal-foot">
+      ${c?`<button class="btn btn-danger" onclick="delCustomer('${c.id}')">删除</button>`:''}
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveCustomer('${cid||''}')">保存</button>
+    </div>`);
+}
+function saveCustomer(cid){
+  const company = document.getElementById('cf_company').value.trim();
+  if(!company){ toast('公司名必填','err'); return; }
+  const data = {
+    company, website:document.getElementById('cf_website').value.trim(),
+    country:document.getElementById('cf_country').value, customerType:document.getElementById('cf_type').value,
+    products:document.getElementById('cf_products').value.trim(),
+    contact:{name:document.getElementById('cf_name').value.trim(), title:document.getElementById('cf_title').value.trim(),
+      email:document.getElementById('cf_email').value.trim(), whatsapp:document.getElementById('cf_wa').value.trim(), linkedin:'', phone:''}
+  };
+  if(cid){ Object.assign(S.customers.find(x=>x.id===cid), data); toast('已更新客户'); }
+  else {
+    S.customers.push(Object.assign({id:uid(), source:'手动添加', scores:{industry:60,product:60,companyType:60,purchaseSignal:50,contactQuality:70,total:60,grade:'B'},
+      profile:{business:'',productLine:'',needs:'',painPoints:'',angle:''}, matchReasons:[], status:'待跟进', nextFollowUp:daysLater(3), createdAt:now(), followUpHistory:[]}, data));
+    toast('客户已添加');
+  }
+  persist(); closeModal(); renderView();
+}
+function delCustomer(cid){
+  confirmDlg('确定删除该客户？此操作不可恢复。', ()=>{
+    S.customers = S.customers.filter(x=>x.id!==cid); persist(); closeModal(); toast('已删除'); renderView();
+  });
+}
+function recordFollowUp(cid){
+  openModal(`
+    <div class="modal-head"><h3>记录跟进</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="form-group"><label>跟进状况</label><textarea class="form-control" id="fu_note" placeholder="本次沟通要点 / 客户反馈..."></textarea></div>
+      <div class="form-group"><label>跟进方式</label>
+        <select class="form-control" id="fu_channel">
+          <option>📧 邮件</option><option>📞 电话</option><option>🎙️ 语音邮件</option>
+          <option>💼 LinkedIn</option><option>💬 WhatsApp</option><option>📘 Facebook</option>
+        </select></div>
+      <div class="form-group"><label>下次跟进时间</label><input type="date" class="form-control" id="fu_next" value="${todayStr()}"></div>
+      <div class="form-group"><label>下次跟进目的</label><input class="form-control" id="fu_purpose" placeholder="如：追问样品测试反馈"></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveFollowUp('${cid}')">保存并完成 ✅</button></div>`);
+}
+function saveFollowUp(cid){
+  const c = S.customers.find(x=>x.id===cid); if(!c) return;
+  const ch = document.getElementById('fu_channel').value;
+  const note = document.getElementById('fu_note').value;
+  const purpose = document.getElementById('fu_purpose').value;
+  c.followUpHistory.push({t:now(), note:ch+'｜'+note+(purpose?('｜下次：'+purpose):'')});
+  c.nextFollowUp = document.getElementById('fu_next').value;
+  c.status = '跟进中';
+  persist(); closeDrawer(); closeModal(); confetti(); toast('跟进已记录，任务完成！'); renderView();
+}
+
+/* ============================================================
+ * 视图 4：开发信管理
+ * ============================================================ */
+let draftTab = 'list';
+const DRAFT_STATUS = {'待检查':['badge-gold','待检查'],'已修改':['badge-blue','已修改'],'已发送':['badge-a','已人工发送']};
+function viewDrafts(root){
+  root.innerHTML = `
+    <div class="flex gap8 mb16">
+      ${[['list','📋 草稿箱'],['seq','🔁 跟进序列'],['tpl','📚 模板库']].map(([k,l])=>
+        `<button class="btn ${draftTab===k?'btn-gold':'btn-outline'}" onclick="draftTab='${k}';renderView()">${l}</button>`).join('')}
+    </div>
+    ${draftTab==='list'?draftList():draftTab==='seq'?draftSeq():draftTpl()}`;
+}
+function draftList(){
+  const list = S.drafts;
+  return `<div class="card"><div class="table-wrap"><table class="tbl">
+    <colgroup><col style="width:26%"><col style="width:10%"><col style="width:8%"><col style="width:30%"><col style="width:12%"><col style="width:14%"></colgroup>
+    <thead><tr><th>客户</th><th>国家</th><th>语言</th><th>主题</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>${list.length? list.map(d=>{
+      const [cls,label] = DRAFT_STATUS[d.status]||['badge-gray',d.status];
+      return `<tr style="cursor:pointer" onclick="openDraftEditor('${d.id}')">
+        <td><b>${esc(d.customerName)}</b></td><td>${esc(d.country)}</td><td>${esc(d.language)}</td>
+        <td class="text-sm">${esc(d.subject)}</td>
+        <td><span class="badge ${cls}">${label}</span></td>
+        <td><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openDraftEditor('${d.id}')">编辑</button></td></tr>`;
+    }).join('') : `<tr><td colspan="6"><div class="empty"><div class="big">✉️</div><p>暂无草稿</p></div></td></tr>`}</tbody>
+  </table></div></div>`;
+}
+function draftSeq(){
+  // 按客户分组展示跟进序列
+  const customers = [...new Set(S.followups.map(f=>f.customerId))];
+  const seqs = customers.map(cid=>{
+    const c = S.customers.find(x=>x.id===cid);
+    const items = S.followups.filter(f=>f.customerId===cid).sort((a,b)=>a.sequence-b.sequence);
+    return {c, items};
+  }).filter(s=>s.c);
+  return `<div class="grid-12">
+    ${seqs.length? seqs.map(s=>`
+      <div class="card card-pad">
+        <div class="card-title">${esc(s.c.company)} ${gradeBadge(s.c.scores.grade)}</div>
+        <div style="display:flex;justify-content:space-between;position:relative">
+          ${s.items.map((f,i)=>`
+            <div style="flex:1;text-align:center;position:relative">
+              ${i<s.items.length-1?'<div style="position:absolute;top:13px;left:55%;width:90%;height:2px;background:'+(f.status==='sent'?'var(--success)':'var(--border)')+'"></div>':''}
+              <div style="width:26px;height:26px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;background:${f.status==='sent'?'var(--success)':f.status==='scheduled'?'var(--primary)':'var(--border-strong)'}">${f.sequence}</div>
+              <div class="text-sm fw700 mt8">第${f.dayOffset}天</div>
+              <div class="text-sm text-muted">${f.status==='sent'?'已发送':f.status==='scheduled'?'待发送':'排队中'}</div>
+              <div class="text-sm text-muted" style="font-size:11px">${fmtDay(f.scheduledAt)}</div>
+            </div>`).join('')}
+        </div>
+      </div>`).join('')
+    : '<div class="card card-pad empty">暂无跟进序列</div>'}
+  </div>
+  <div class="card card-pad mt16 text-sm text-muted">
+    💡 跟进节奏：第 1 天开发信 → 第 3 天跟进 1 → 第 7 天跟进 2 → 第 14 天跟进 3。客户回复后自动停止后续序列。
+  </div>`;
+}
+const TEMPLATES = [
+  {name:'开场破冰型', desc:'首次触达，建立联系', subject:'{product} Supply from Yangjiang, China — {year}'},
+  {name:'产品推荐型', desc:'针对客户产品线推荐', subject:'New {product} Line for {company} — Factory Direct'},
+  {name:'案例分享型', desc:'用同行业案例背书', subject:'How a US Retailer Cut Cutlery Costs 18% with Us'},
+  {name:'节日问候型', desc:'节日 / 展会前触达', subject:'{holiday} Greetings from KaiLionCrafts'},
+  {name:'竞品替代型', desc:'针对现有供应商痛点', subject:'Tired of Delayed Cutlery Shipments? We Can Help'},
+  {name:'样品邀约型', desc:'免费样品促进回复', subject:'Free {product} Sample Box for {company} — No Cost'}
+];
+function draftTpl(){
+  return `<div class="grid-12">
+    ${TEMPLATES.map(t=>`
+      <div class="card card-pad">
+        <div class="flex-between"><b style="color:var(--primary)">${t.name}</b><span class="text-sm text-muted">${t.desc}</span></div>
+        <div class="divider"></div>
+        <div class="text-sm text-muted mono" style="background:var(--gray-bg);padding:8px 10px;border-radius:6px">Re: ${t.subject}</div>
+        <div class="mt16 btn-row"><button class="btn btn-outline btn-sm" onclick="toast('模板预览（演示）')">预览</button>
+        <button class="btn btn-gold btn-sm" onclick="toast('请在客户详情中点击「生成开发信」应用模板')">应用到客户</button></div>
+      </div>`).join('')}
+  </div>`;
+}
+
+/* ---------- 开发信编辑器（抽屉） ---------- */
+function editDraftForCustomer(cid){
+  const c = S.customers.find(x=>x.id===cid); if(!c) return;
+  const d = S.drafts.find(x=>x.customerId===cid) || {
+    id:uid(), customerId:cid, customerName:c.company, country:c.country, language: c.country==='德国'?'德语':c.country==='日本'?'日语':'英语',
+    subject:'', body:'', aiNotes:[], status:'待审核', createdAt:now(), sentAt:null};
+  openDraftEditor(d.id, true);
+}
+function openDraftEditor(did, isNew){
+  let d = S.drafts.find(x=>x.id===did);
+  if(!d && isNew){ S.drafts.unshift(d); d = S.drafts[0]; }
+  if(!d) return;
+  const c = S.customers.find(x=>x.id===d.customerId);
+  openDrawer(`
+    <div class="drawer-head">
+      <div><h2 style="font-size:16px;color:var(--primary)">开发信编辑器</h2>
+      <div class="text-sm text-muted">${esc(d.customerName)} · ${esc(d.country)} · ${esc(d.language)} · ${gradeBadge(d.scores?.grade||(c&&c.scores.grade))}</div></div>
+      <span class="modal-close" onclick="closeDrawer()">×</span>
+    </div>
+    <div class="drawer-body">
+      <div style="background:#f7efdd;padding:12px 14px;border-radius:8px;margin-bottom:16px">
+        <b class="text-gold">🤖 AI 已引用以下客户真实信息：</b>
+        <ul style="margin:6px 0 0 18px;font-size:12.5px;line-height:1.8">${d.aiNotes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>
+      </div>
+      <div class="form-group"><label>收件人</label><input class="form-control" id="dr_email" value="${c?esc(c.contact.email):''}"></div>
+      <div class="form-group"><label>主题</label><input class="form-control" id="dr_subject" value="${esc(d.subject)}"></div>
+      <div class="form-group"><label>正文（AI 生成草稿，发送前请人工审核修改）</label>
+        <textarea class="form-control" id="dr_body" style="min-height:260px;font-family:Menlo,monospace;font-size:12.5px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${esc(d.body)}</textarea></div>
+      <div class="divider"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveDraft('${d.id}')">💾 保存草稿</button>
+        <button class="btn btn-success" onclick="markSent('${d.id}')">✅ 标记已人工发送</button>
+        <button class="btn btn-outline" onclick="regenDraft('${d.id}')">🔄 AI 重新生成</button>
+        <button class="btn btn-outline" onclick="copyDraft('${d.id}')">📋 复制</button>
+      </div>
+      <div class="mt16 text-sm text-muted">⚠️ 工作台哲学：AI 只生成草稿，<b>发送动作由你手动完成</b>。这里的"标记已发送"只是记录状态。</div>
+    </div>`);
+  setTimeout(()=>{const b=document.getElementById('dr_body'); if(b)b.style.height=b.scrollHeight+'px';},50);
+}
+function saveDraft(did){
+  const d = S.drafts.find(x=>x.id===did); if(!d) return;
+  d.subject = document.getElementById('dr_subject').value;
+  d.body = document.getElementById('dr_body').value;
+  d.status = '已修改';
+  persist(); toast('草稿已保存');
+}
+function markSent(did){
+  const d = S.drafts.find(x=>x.id===did); if(!d) return;
+  d.subject = document.getElementById('dr_subject').value;
+  d.body = document.getElementById('dr_body').value;
+  d.status = '已发送'; d.sentAt = now();
+  const c = S.customers.find(x=>x.id===d.customerId);
+  if(c){ c.status = '已回复'; c.nextFollowUp = daysLater(3); }
+  persist(); toast('已标记发送，跟进序列已启动'); closeDrawer(); renderView();
+}
+function regenDraft(did){
+  const d = S.drafts.find(x=>x.id===did); if(!d) return;
+  toast('AI 正在重新生成...');
+  setTimeout(()=>{
+    d.body = d.body + '\n\n[AI 重写补充：] Based on our latest analysis of '+d.customerName+', we would like to emphasize our low MOQ and fast lead time. Reply this email for a revised offer.';
+    d.aiNotes.push('已根据最新社媒动态重写');
+    persist(); openDraftEditor(d.id); toast('已重新生成');
+  },900);
+}
+function copyDraft(did){
+  const d = S.drafts.find(x=>x.id===did); if(!d) return;
+  const text = 'Subject: '+d.subject+'\n\n'+d.body;
+  navigator.clipboard?.writeText(text).then(()=>toast('已复制到剪贴板')).catch(()=>toast('复制失败，请手动选择','err'));
+}
+
+/* ============================================================
+ * 视图：AI 收件箱（客户回复汇总）
+ * ============================================================ */
+let inboxFilter = '全部';
+function viewInbox(root){
+  const list = (S.inbox||[]).filter(i=> inboxFilter==='全部' || i.status===inboxFilter);
+  root.innerHTML = `
+    <div class="flex gap8 mb16">
+      ${['全部','未读','已读','已回复'].map(s=>`<button class="btn ${inboxFilter===s?'btn-gold':'btn-outline'}" onclick="inboxFilter='${s}';renderView()">${s}${s==='未读'?' ('+(S.inbox||[]).filter(i=>i.status==='未读').length+')':''}</button>`).join('')}
+    </div>
+    <div class="grid-2">
+      ${list.length? list.map(i=>`
+        <div class="card card-pad" style="${i.status==='未读'?'border-left:3px solid var(--accent)':''}">
+          <div class="flex-between mb8">
+            <div><b style="color:var(--primary)">${esc(i.customerName)}</b> <span class="text-sm text-muted">· ${esc(i.country)}</span></div>
+            <span class="badge ${i.status==='未读'?'badge-red':i.status==='已回复'?'badge-a':'badge-gray'}">${i.status}</span>
+          </div>
+          <div class="text-sm fw700 mb8">${esc(i.subject)}</div>
+          <div class="text-sm" style="background:var(--gray-bg);padding:10px;border-radius:6px;line-height:1.7;white-space:pre-wrap">${esc(i.body)}</div>
+          <div class="divider"></div>
+          <div style="background:#f7efdd;padding:10px 12px;border-radius:6px;font-size:12.5px;line-height:1.9">
+            <b class="text-gold">🤖 AI 提炼：</b><br>
+            客户意图：${esc(i.aiSummary.intent)}<br>
+            关注产品：${esc(i.aiSummary.product)}<br>
+            关键问题：${esc(i.aiSummary.question)}<br>
+            紧急程度：<span class="badge ${i.aiSummary.urgency==='高'?'badge-red':'badge-gold'}">${i.aiSummary.urgency}</span>
+          </div>
+          <div class="divider"></div>
+          <div class="text-sm fw700 mb8">AI 回复草稿（发送前请人工检查）：</div>
+          <div class="text-sm" style="background:var(--info-bg);padding:10px;border-radius:6px;line-height:1.7;white-space:pre-wrap">${esc(i.aiReply)}</div>
+          <div class="btn-row mt16">
+            <button class="btn btn-success btn-sm" onclick="replyInbox('${i.id}')">✅ 已据此回复</button>
+            <button class="btn btn-outline btn-sm" onclick="openCustomerDetail('${i.customerId}');closeDrawer()">查看客户</button>
+            <button class="btn btn-outline btn-sm" onclick="toast('已设置跟进提醒')">⏰ 设置跟进提醒</button>
+          </div>
+        </div>`).join('')
+      : '<div class="card"><div class="empty"><div class="big">📥</div><p>收件箱为空，客户回复会自动出现在这里</p></div></div>'}
+    </div>`;
+}
+function replyInbox(iid){
+  const i = (S.inbox||[]).find(x=>x.id===iid); if(!i) return;
+  i.status='已回复'; persist(); toast('已标记回复'); renderView();
+}
+
+/* ============================================================
+ * 视图：跟进日程
+ * ============================================================ */
+function viewSchedule(root){
+  const tasks = (S.tasks||[]).slice().sort((a,b)=>new Date(a.due)-new Date(b.due));
+  const today = new Date(new Date().toDateString()).getTime();
+  const groups = {逾期:[],今天:[],明天:[],本周:[],以后:[]};
+  tasks.forEach(t=>{
+    const d = new Date(t.due).getTime();
+    const diff = Math.ceil((d-today)/86400000);
+    if(diff<0) groups['逾期'].push(t);
+    else if(diff===0) groups['今天'].push(t);
+    else if(diff===1) groups['明天'].push(t);
+    else if(diff<=7) groups['本周'].push(t);
+    else groups['以后'].push(t);
+  });
+  root.innerHTML = `
+    <div class="card card-pad mb16" style="background:#f7efdd">
+      <b class="text-gold">💡 多渠道跟进提示：</b><span class="text-sm">电话+邮件组合跟进，回复率可提高 <b>3.24 倍</b>。</span>
+      <div class="flex gap16 mt8" style="flex-wrap:wrap">
+        ${[['📧 邮件',28,'12%'],['📞 电话',15,'35%'],['💬 WhatsApp',20,'28%'],['💼 LinkedIn',10,'18%']]
+          .map(([ch,n,rate])=>`<span class="text-sm">${ch} 跟进 <b>${n}</b> 次 · 回复率 <b>${rate}</b></span>`).join('')}
+      </div>
+    </div>
+    <div class="flex-between mb16">
+      <div class="text-muted text-sm">联系记录 → 下次时间 → 跟进结果，形成闭环</div>
+      <button class="btn btn-primary" onclick="toast('手动添加待办（演示）')">＋ 添加待办</button>
+    </div>
+    ${['逾期','今天','明天','本周','以后'].map(g=>`
+      <div class="card card-pad mb16">
+        <div class="card-title">${g} <span class="badge ${g==='逾期'?'badge-red':g==='今天'?'badge-gold':'badge-gray'}">${groups[g].length}</span></div>
+        ${groups[g].length? groups[g].map(t=>{
+          const c = S.customers.find(x=>x.id===t.customerId);
+          return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <div style="flex:1;cursor:pointer" onclick="openCustomerDetail('${t.customerId}')">
+              <b style="font-size:13.5px">${esc(t.customerName)}</b>
+              <span class="text-sm text-muted"> · ${esc(t.country)}</span>
+              ${c?gradeBadge(c.scores.grade):''}
+              <div class="text-sm text-muted">${t.note||'待联系'} · 计划 ${fmtDay(t.due)}</div>
+            </div>
+            ${c?`<button class="btn btn-outline btn-sm" title="复制邮箱" onclick="event.stopPropagation();copyText('${c.contact.email}')">📧</button>
+            <button class="btn btn-outline btn-sm" title="复制电话" onclick="event.stopPropagation();copyText('${c.contact.whatsapp||c.contact.phone||''}')">📱</button>`:''}
+            <button class="btn btn-outline btn-sm" onclick="recordFollowUp('${t.customerId}')">记录跟进</button>
+            <select class="form-control" style="width:110px;padding:5px 8px;font-size:12px" onchange="taskResult('${t.id}',this.value)">
+              <option value="">结果</option><option>已回复</option><option>未回复</option><option>已成交</option><option>已流失</option><option>暂缓</option>
+            </select>
+          </div>`;}).join('')
+        : '<div class="text-sm text-muted" style="padding:8px 0">无</div>'}
+      </div>`).join('')}`;
+}
+function taskResult(tid, res){
+  const t = (S.tasks||[]).find(x=>x.id===tid); if(!t) return;
+  t.result = res; persist();
+  if(res==='已回复'||res==='已成交') confetti();
+  toast('已记录：'+res); renderView();
+}
+
+/* ============================================================
+ * 视图：询盘管理
+ * ============================================================ */
+const INQ_STATUS = {'待处理':['badge-gold'],'跟进中':['badge-blue'],'已报价':['badge-a'],'已成交':['badge-green'],'已流失':['badge-gray']};
+function viewInquiries(root){
+  root.innerHTML = `
+    <div class="flex-between mb16">
+      <div class="flex gap12">
+        ${Object.keys(INQ_STATUS).map(s=>`<span class="badge ${INQ_STATUS[s][0]}">${s} ${S.inquiries.filter(i=>i.status===s).length}</span>`).join('')}
+      </div>
+      <button class="btn btn-primary" onclick="toast('手动录入询盘（演示）')">＋ 新建询盘</button>
+    </div>
+    <div class="card"><div class="table-wrap"><table class="tbl">
+      <colgroup><col style="width:10%"><col style="width:22%"><col style="width:18%"><col style="width:28%"><col style="width:10%"><col style="width:12%"></colgroup>
+      <thead><tr><th>来源</th><th>客户</th><th>产品</th><th>描述</th><th>优先级</th><th>状态</th></tr></thead>
+      <tbody>${S.inquiries.length? S.inquiries.map(i=>`
+        <tr style="cursor:pointer" onclick="openInqDetail('${i.id}')">
+          <td>${esc(i.source)}</td><td><b>${esc(i.customerName)}</b></td><td>${esc(i.product)}</td>
+          <td class="text-sm text-muted">${esc(i.description)}</td>
+          <td><span class="badge ${i.priority==='高'?'badge-red':i.priority==='中'?'badge-gold':'badge-gray'}">${i.priority}</span></td>
+          <td><span class="badge ${INQ_STATUS[i.status][0]}">${i.status}</span></td>
+        </tr>`).join('')
+      : `<tr><td colspan="6"><div class="empty"><div class="big">📥</div><p>暂无询盘</p></div></td></tr>`}</tbody>
+    </table></div></div>`;
+}
+function openInqDetail(iid){
+  const i = S.inquiries.find(x=>x.id===iid); if(!i) return;
+  openDrawer(`
+    <div class="drawer-head"><div><h2 style="font-size:16px;color:var(--primary)">询盘详情</h2>
+      <div class="text-sm text-muted">${esc(i.customerName)} · ${esc(i.product)} · ${esc(i.source)}</div></div>
+      <span class="modal-close" onclick="closeDrawer()">×</span></div>
+    <div class="drawer-body">
+      <div class="card card-pad mb16"><div class="card-title">需求描述</div><p style="font-size:13.5px;line-height:1.8">${esc(i.description)}</p></div>
+      <div class="card card-pad mb16"><div class="card-title">🤖 AI 回复建议</div>
+        <ul style="padding-left:18px;line-height:2;font-size:13.5px">${i.aiSuggestions.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>
+      <div class="card card-pad mb16"><div class="card-title">处理记录</div>
+        <div class="timeline">${i.history.map(h=>`<div class="tl-item done"><div class="tl-time">${fmtDate(h.t)}</div><div class="tl-title" style="font-weight:500;font-size:13px">${esc(h.desc)}</div></div>`).join('')}</div></div>
+      <div class="btn-row">
+        <button class="btn btn-gold" onclick="toast('已生成报价单草稿')">📄 转报价单</button>
+        <button class="btn btn-primary" onclick="toast('状态更新为跟进中')">标记跟进中</button>
+      </div>
+    </div>`);
+}
+
+/* ============================================================
+ * 视图：报价单
+ * ============================================================ */
+const QUOTE_STATUS = {'草稿':['badge-gray'],'已发送':['badge-blue'],'已接受':['badge-a'],'已拒绝':['badge-red'],'已过期':['badge-c']};
+function viewQuotes(root){
+  root.innerHTML = `
+    <div class="flex-between mb16">
+      <div class="text-muted text-sm">共 ${S.quotes.length} 张 · 总金额 $${S.quotes.reduce((a,q)=>a+q.total,0).toLocaleString()}</div>
+      <button class="btn btn-gold" onclick="openQuoteForm()">＋ 新建报价单</button>
+    </div>
+    <div class="card"><div class="table-wrap"><table class="tbl">
+      <colgroup><col style="width:18%"><col style="width:24%"><col style="width:24%"><col style="width:12%"><col style="width:12%"><col style="width:10%"></colgroup>
+      <thead><tr><th>报价单号</th><th>客户</th><th>产品</th><th>金额(USD)</th><th>有效期至</th><th>状态</th></tr></thead>
+      <tbody>${S.quotes.map(q=>`
+        <tr style="cursor:pointer" onclick="previewQuote('${q.id}')">
+          <td class="mono">${esc(q.quoteNo)}</td><td>${esc(q.customerName)}</td>
+          <td class="text-sm">${q.items.map(it=>esc(it.name)+'×'+it.qty).join('，')}</td>
+          <td><b>$${q.total.toLocaleString()}</b></td><td>${fmtDay(q.validUntil)}</td>
+          <td><span class="badge ${QUOTE_STATUS[q.status][0]}">${q.status}</span></td>
+        </tr>`).join('')}</tbody>
+    </table></div></div>`;
+}
+function openQuoteForm(){
+  const qno = 'KL'+todayStr().replace(/-/g,'')+'-'+String(S.quotes.length+1).padStart(3,'0');
+  openModal(`
+    <div class="modal-head"><h3>新建报价单</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>报价单号</label><input class="form-control" value="${qno}" readonly></div>
+        <div class="form-group"><label>客户</label>
+          <select class="form-control" id="qf_customer">${S.customers.map(c=>`<option value="${c.id}">${esc(c.company)}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-group"><label>产品名称</label><input class="form-control" id="qf_name" value="不锈钢厨房剪"></div>
+      <div class="form-row">
+        <div class="form-group"><label>规格</label><input class="form-control" id="qf_spec" value='8.5" / 430不锈钢'></div>
+        <div class="form-group"><label>数量</label><input class="form-control" id="qf_qty" type="number" value="1000"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>单价 (USD)</label><input class="form-control" id="qf_price" type="number" step="0.01" value="1.85"></div>
+        <div class="form-group"><label>MOQ</label><input class="form-control" id="qf_moq" type="number" value="500"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-gold" onclick="saveQuote('${qno}')">生成报价单</button>
+    </div>`);
+}
+function saveQuote(qno){
+  const cid = document.getElementById('qf_customer').value;
+  const c = S.customers.find(x=>x.id===cid);
+  const qty = parseFloat(document.getElementById('qf_qty').value);
+  const price = parseFloat(document.getElementById('qf_price').value);
+  S.quotes.push({id:uid(),quoteNo:qno,customerId:cid,customerName:c.company,
+    items:[{name:document.getElementById('qf_name').value,spec:document.getElementById('qf_spec').value,qty,unitPrice:price,moq:parseInt(document.getElementById('qf_moq').value)}],
+    total:qty*price,status:'草稿',createdAt:now(),validUntil:daysLater(30)});
+  persist(); closeModal(); toast('报价单已生成'); renderView();
+}
+function previewQuote(qid){
+  const q = S.quotes.find(x=>x.id===qid); if(!q) return;
+  const s = S.settings.company;
+  openDrawer(`
+    <div class="drawer-head"><div><h2 style="font-size:16px;color:var(--primary)">报价单预览</h2><div class="text-sm text-muted">${q.quoteNo}</div></div>
+      <span class="modal-close" onclick="closeDrawer()">×</span></div>
+    <div class="drawer-body">
+      <div style="background:#fff;border:1px solid var(--border);padding:28px;border-radius:8px">
+        <div class="flex-between mb16">
+          <div><div style="font-size:18px;font-weight:800;color:var(--primary)">${esc(s.nameEn)}</div>
+          <div class="text-sm text-muted">${esc(s.nameCn)}</div><div class="text-sm text-muted">${esc(s.address)}</div></div>
+          <div style="text-align:right"><div style="font-size:20px;font-weight:800;color:var(--accent-dark)">QUOTATION</div>
+          <div class="text-sm">No. ${esc(q.quoteNo)}</div><div class="text-sm">Date: ${fmtDay(q.createdAt)}</div></div>
+        </div>
+        <div class="divider"></div>
+        <div class="form-row mb16"><div><b>To:</b> ${esc(q.customerName)}</div><div><b>Valid:</b> ${fmtDay(q.validUntil)}</div></div>
+        <table class="tbl"><colgroup><col style="width:8%"><col style="width:30%"><col style="width:22%"><col style="width:12%"><col style="width:14%"><col style="width:14%"></colgroup>
+          <thead><tr><th>#</th><th>Product</th><th>Spec</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead>
+          <tbody>${q.items.map((it,i)=>`<tr><td>${i+1}</td><td>${esc(it.name)}</td><td>${esc(it.spec)}</td><td>${it.qty}</td><td>$${it.unitPrice.toFixed(2)}</td><td>$${(it.qty*it.unitPrice).toFixed(2)}</td></tr>`).join('')}</tbody></table>
+        <div class="flex-between mt16"><b>Total (FOB Guangzhou):</b><b style="font-size:18px;color:var(--primary)">$${q.total.toLocaleString()}</b></div>
+        <div class="divider"></div>
+        <div class="text-sm text-muted" style="line-height:2">
+          <div><b>Payment:</b> 30% T/T deposit, balance against B/L copy</div>
+          <div><b>Lead Time:</b> 30-35 days</div>
+          <div><b>Contact:</b> ${esc(s.email)} · ${esc(s.whatsapp)}</div>
+        </div>
+        <div class="mt16 text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</div>
+      </div>
+      <div class="mt16 btn-row">
+        <button class="btn btn-success" onclick="markQuoteSent('${q.id}')">标记已发送</button>
+        <button class="btn btn-outline" onclick="toast('已导出为文本')">导出文本</button>
+      </div>
+    </div>`);
+}
+function markQuoteSent(qid){ const q=S.quotes.find(x=>x.id===qid); q.status='已发送'; persist(); closeDrawer(); toast('已标记发送'); renderView(); }
+
+/* ============================================================
+ * 视图：合同订单
+ * ============================================================ */
+const CONTRACT_STATUS = {'待签':['badge-gold'],'执行中':['badge-blue'],'已完成':['badge-a'],'已取消':['badge-gray']};
+function viewContracts(root){
+  root.innerHTML = `
+    <div class="flex-between mb16">
+      <div class="text-muted text-sm">共 ${S.contracts.length} 份合同 · 返单客户 ${new Set(S.contracts.map(c=>c.customerId)).size} 家</div>
+      <button class="btn btn-primary" onclick="toast('从报价单转化新建合同（演示）')">＋ 新建合同</button>
+    </div>
+    <div class="card"><div class="table-wrap"><table class="tbl">
+      <colgroup><col style="width:16%"><col style="width:22%"><col style="width:26%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>
+      <thead><tr><th>合同号</th><th>客户</th><th>产品</th><th>金额(USD)</th><th>签订日期</th><th>状态</th></tr></thead>
+      <tbody>${S.contracts.map(c=>`
+        <tr style="cursor:pointer" onclick="openContractDetail('${c.id}')">
+          <td class="mono">${esc(c.contractNo)}</td><td>${esc(c.customerName)}</td>
+          <td class="text-sm">${esc(c.products)}</td><td><b>$${c.amount.toLocaleString()}</b></td>
+          <td>${fmtDay(c.signDate)}</td><td><span class="badge ${CONTRACT_STATUS[c.status][0]}">${c.status}</span></td>
+        </tr>`).join('')}</tbody>
+    </table></div></div>`;
+}
+function openContractDetail(cid){
+  const c = S.contracts.find(x=>x.id===cid); if(!c) return;
+  const history = S.contracts.filter(x=>x.customerId===c.customerId).sort((a,b)=>new Date(a.signDate)-new Date(b.signDate));
+  openDrawer(`
+    <div class="drawer-head"><div><h2 style="font-size:16px;color:var(--primary)">${esc(c.contractNo)}</h2>
+      <div class="text-sm text-muted">${esc(c.customerName)} · ${c.reorderCount} 次返单</div></div>
+      <span class="modal-close" onclick="closeDrawer()">×</span></div>
+    <div class="drawer-body">
+      <div class="card card-pad mb16">
+        <div class="flex-between"><span>合同金额</span><b style="font-size:20px;color:var(--primary)">$${c.amount.toLocaleString()}</b></div>
+        <div class="divider"></div>
+        <div class="text-sm" style="line-height:2">
+          <div>产品：${esc(c.products)}</div><div>签订：${fmtDay(c.signDate)}</div>
+          <div>付款：30% T/T 预付，见提单副本付尾款</div><div>交货期：签订后 35 天</div>
+        </div>
+      </div>
+      <div class="card card-pad mb16"><div class="card-title">订单时间线</div>
+        <div class="timeline">${c.history.map(h=>`<div class="tl-item done"><div class="tl-time">${fmtDate(h.t)}</div><div class="tl-title" style="font-weight:500;font-size:13px">${esc(h.desc)}</div></div>`).join('')}</div></div>
+      <div class="card card-pad"><div class="card-title">该客户历史返单（${history.length} 次）</div>
+        <table class="tbl"><colgroup><col style="width:30%"><col style="width:40%"><col style="width:15%"><col style="width:15%"></colgroup>
+        <thead><tr><th>合同号</th><th>产品</th><th>金额</th><th>日期</th></tr></thead>
+        <tbody>${history.map(h=>`<tr><td class="mono">${esc(h.contractNo)}</td><td class="text-sm">${esc(h.products)}</td><td>$${h.amount.toLocaleString()}</td><td>${fmtDay(h.signDate)}</td></tr>`).join('')}</tbody></table></div>
+    </div>`);
+}
+
+/* ============================================================
+ * 视图：设置
+ * ============================================================ */
+function viewSettings(root){
+  const s = S.settings.company;
+  root.innerHTML = `
+    ${renderApiSettings()}
+    ${renderMonitorSettings()}
+    <div class="card card-pad mb16"><div class="card-title">📤 数据导出</div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="exportCustomersCSV">导出客户 CSV</button>
+        <button class="btn btn-outline" onclick="exportDrafts">导出开发信</button>
+        <button class="btn btn-outline" onclick="exportFollowups">导出跟进记录</button>
+        <button class="btn btn-gold" onclick="exportBackup">全量备份 JSON</button>
+      </div></div>
+    <div class="grid-2">
+      <div class="card card-pad">
+        <div class="card-title">公司信息（用于开发信签名 / 报价单）</div>
+        <div class="form-group"><label>公司中文名</label><input class="form-control" id="set_cn" value="${esc(s.nameCn)}"></div>
+        <div class="form-group"><label>公司英文名</label><input class="form-control" id="set_en" value="${esc(s.nameEn)}"></div>
+        <div class="form-group"><label>地址</label><input class="form-control" id="set_addr" value="${esc(s.address)}"></div>
+        <div class="form-row">
+          <div class="form-group"><label>邮箱</label><input class="form-control" id="set_email" value="${esc(s.email)}"></div>
+          <div class="form-group"><label>WhatsApp</label><input class="form-control" id="set_wa" value="${esc(s.whatsapp)}"></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">保存公司信息</button>
+      </div>
+      <div>
+        <div class="card card-pad mb16">
+          <div class="card-title">AI 参数</div>
+          <div class="form-group"><label>默认评分阈值：≥ <b id="thrV">${S.settings.ai.scoreThreshold}</b> 分才进入客户台账</label>
+            <input type="range" min="50" max="90" value="${S.settings.ai.scoreThreshold}" id="set_thr" style="width:100%" oninput="document.getElementById('thrV').textContent=this.value"></div>
+          <div class="form-group"><label>跟进间隔（天）</label>
+            <input class="form-control" value="${S.settings.ai.followupDays.join(' / ')}" readonly></div>
+        </div>
+        <div class="card card-pad mb16">
+          <div class="card-title">数据管理</div>
+          <div class="btn-row">
+            <button class="btn btn-outline" onclick="exportData()">导出全部数据 (JSON)</button>
+            <button class="btn btn-outline" onclick="toast('请选择 JSON 文件导入')">导入数据</button>
+            <button class="btn btn-danger" onclick="resetData()">重置演示数据</button>
+          </div>
+          <div class="form-hint mt8">所有数据保存在浏览器 localStorage（key 前缀 kailion_ark_），不上云、不外发。</div>
+        </div>
+        <div class="card card-pad">
+          <div class="card-title">关于方舟工作台</div>
+          <div class="text-sm" style="line-height:2">
+            <b>版本</b> v1.0 · KaiLionCrafts Ark<br>
+            <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
+            <b>哲学</b> AI 只干脏活累活，发送我自己来，数据全在本地<br>
+            <b>Slogan</b> <span class="text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+function saveSettings(){
+  S.settings.company.nameCn = document.getElementById('set_cn').value;
+  S.settings.company.nameEn = document.getElementById('set_en').value;
+  S.settings.company.address = document.getElementById('set_addr').value;
+  S.settings.company.email = document.getElementById('set_email').value;
+  S.settings.company.whatsapp = document.getElementById('set_wa').value;
+  persist(); toast('公司信息已保存');
+}
+function exportData(){
+  const data = {};
+  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings'].forEach(k=>data[k]=S[k]);
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'kailion-ark-backup-'+todayStr()+'.json'; a.click();
+  toast('已导出 JSON');
+}
+function resetData(){
+  confirmDlg('将清空所有本地数据并重新注入演示数据，确定？', ()=>{
+    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings'].forEach(k=>DB.remove(k));
+    loadState(); seedData(); go('dashboard'); toast('已重置为演示数据');
+  });
+}
+
+/* ============================================================
+ * 视图：报价与订单（合并 报价单 + 合同 + 订单）
+ * ============================================================ */
+let orderTab = 'quotes';
+function viewOrders(root){
+  root.innerHTML = `
+    <div class="flex gap8 mb16">
+      ${[['quotes','📄 报价单'],['contracts','📋 合同'],['orders','🚚 订单执行']].map(([k,l])=>
+        `<button class="btn ${orderTab===k?'btn-gold':'btn-outline'}" onclick="orderTab='${k}';renderView()">${l}</button>`).join('')}
+    </div>
+    ${orderTab==='quotes'?orderQuotes():orderTab==='contracts'?orderContracts():orderOrders()}`;
+}
+function orderQuotes(){
+  return `<div class="flex-between mb16">
+      <div class="text-muted text-sm">共 ${S.quotes.length} 张 · $${S.quotes.reduce((a,q)=>a+q.total,0).toLocaleString()}</div>
+      <button class="btn btn-gold" onclick="openQuoteForm()">＋ 新建报价单</button>
+    </div>
+    <div class="card"><div class="table-wrap"><table class="tbl">
+      <colgroup><col style="width:18%"><col style="width:24%"><col style="width:24%"><col style="width:12%"><col style="width:12%"><col style="width:10%"></colgroup>
+      <thead><tr><th>报价单号</th><th>客户</th><th>产品</th><th>金额(USD)</th><th>有效期至</th><th>状态</th></tr></thead>
+      <tbody>${S.quotes.map(q=>`
+        <tr style="cursor:pointer" onclick="previewQuote('${q.id}')">
+          <td class="mono">${esc(q.quoteNo)}</td><td>${esc(q.customerName)}</td>
+          <td class="text-sm">${q.items.map(it=>esc(it.name)+'×'+it.qty).join('，')}</td>
+          <td><b>$${q.total.toLocaleString()}</b></td><td>${fmtDay(q.validUntil)}</td>
+          <td><span class="badge ${QUOTE_STATUS[q.status][0]}">${q.status}</span></td></tr>`).join('')}</tbody>
+    </table></div></div>`;
+}
+function orderContracts(){
+  return `<div class="text-muted text-sm mb16">合同签订后自动进入订单执行</div>
+    <div class="card"><div class="table-wrap"><table class="tbl">
+      <colgroup><col style="width:16%"><col style="width:22%"><col style="width:26%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>
+      <thead><tr><th>合同号</th><th>客户</th><th>产品</th><th>金额(USD)</th><th>签订日期</th><th>状态</th></tr></thead>
+      <tbody>${S.contracts.map(c=>`
+        <tr style="cursor:pointer" onclick="openContractDetail('${c.id}')">
+          <td class="mono">${esc(c.contractNo)}</td><td>${esc(c.customerName)}</td>
+          <td class="text-sm">${esc(c.products)}</td><td><b>$${c.amount.toLocaleString()}</b></td>
+          <td>${fmtDay(c.signDate)}</td><td><span class="badge ${CONTRACT_STATUS[c.status][0]}">${c.status}</span></td></tr>`).join('')}</tbody>
+    </table></div></div>`;
+}
+function orderOrders(){
+  // 从执行中合同生成订单视图
+  const rows = S.contracts.filter(c=>c.status==='执行中'||c.status==='已完成');
+  return `<div class="card"><div class="table-wrap"><table class="tbl">
+    <colgroup><col style="width:16%"><col style="width:22%"><col style="width:24%"><col style="width:12%"><col style="width:13%"><col style="width:13%"></colgroup>
+    <thead><tr><th>合同号</th><th>客户</th><th>产品</th><th>金额</th><th>交付期</th><th>订单状态</th></tr></thead>
+    <tbody>${rows.map(c=>`
+      <tr><td class="mono">${esc(c.contractNo)}</td><td>${esc(c.customerName)}</td>
+      <td class="text-sm">${esc(c.products)}</td><td>$${c.amount.toLocaleString()}</td>
+      <td>${fmtDay(daysLater(12))}</td>
+      <td><span class="badge ${c.status==='执行中'?'badge-blue':'badge-a'}">${c.status==='执行中'?'生产中':'已交付'}</span></td></tr>`).join('')}</tbody>
+    </table></div></div>`;
+}
+
+/* ============================================================
+ * 视图：产品与样品
+ * ============================================================ */
+let prodCat = '全部';
+function viewProducts(root){
+  const cats = ['全部',...new Set(S.products.map(p=>p.category))];
+  const list = prodCat==='全部'?S.products:S.products.filter(p=>p.category===prodCat);
+  root.innerHTML = `
+    <div class="flex gap8 mb16">
+      ${cats.map(c=>`<button class="btn ${prodCat===c?'btn-gold':'btn-outline'}" onclick="prodCat='${c}';renderView()">${c}</button>`).join('')}
+      <button class="btn btn-primary" style="margin-left:auto" onclick="toast('新建产品（演示）')">＋ 新品</button>
+    </div>
+    <div class="grid-12 mb16">
+      ${list.map(p=>`
+        <div class="card card-pad">
+          <div style="font-size:34px;text-align:center;margin-bottom:8px">${p.emoji}</div>
+          <div class="fw700" style="text-align:center">${esc(p.name)}</div>
+          <div class="text-sm text-muted" style="text-align:center">${esc(p.spec)}</div>
+          <div class="divider"></div>
+          <div class="flex-between text-sm"><span>成本</span><b>$${p.cost.toFixed(2)}</b></div>
+          <div class="flex-between text-sm"><span>建议售价</span><b class="text-gold">$${p.price.toFixed(2)}</b></div>
+          <div class="flex-between text-sm"><span>库存</span><span class="badge ${p.stock<3000?'badge-red':'badge-a'}">${p.stock} pcs</span></div>
+          <div class="text-sm text-muted mt8" style="font-size:11px">关键词：${esc(p.keywords)}</div>
+        </div>`).join('')}
+    </div>
+    <div class="card card-pad">
+      <div class="card-title">📦 样品寄送记录
+        <button class="btn btn-primary btn-sm" onclick="toast('登记新样品（演示）')">＋ 寄样品</button></div>
+      <table class="tbl">
+        <colgroup><col style="width:18%"><col style="width:18%"><col style="width:11%"><col style="width:14%"><col style="width:9%"><col style="width:11%"><col style="width:19%"></colgroup>
+        <thead><tr><th>客户</th><th>产品</th><th>寄送日期</th><th>快递单号</th><th>状态</th><th>测试结果</th><th>反馈详情</th></tr></thead>
+        <tbody>${(S.samples||[]).map(s=>`
+          <tr><td>${esc(s.customerName)}</td><td>${esc(s.product)}</td><td>${fmtDay(s.sentAt)}</td>
+          <td class="mono text-sm">${esc(s.tracking)}</td>
+          <td><span class="badge ${s.status==='已签收'?'badge-a':s.status==='客户已测试'?'badge-gold':'badge-blue'}">${s.status}</span></td>
+          <td><span class="badge ${s.feedback==='通过'?'badge-a':s.feedback==='不通过'?'badge-red':s.feedback?'badge-gold':'badge-gray'}">${s.feedback==='通过'?'通过':s.feedback==='不通过'?'不通过':'待反馈'}</span></td>
+          <td class="text-sm text-muted">${esc(s.feedback||'—')}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+
+let aiHistory=[];
+function toggleAIPanel(){ const p=document.getElementById('aiPanel'); p.style.display=p.style.display==='none'?'flex':'none'; renderAI(); }
+function renderAI(){
+  const c=document.getElementById('aiChat');
+  if(!aiHistory.length){ c.innerHTML='<div style="color:#888;text-align:center;margin-top:40px">👋 你好！我是Leo的AI助手\n可以帮你写开发信、分析客户、回答外贸问题。</div>'; return; }
+  c.innerHTML=aiHistory.map(m=>`<div style="margin-bottom:10px;${m.role==='user'?'text-align:right':''}">
+    <span style="display:inline-block;padding:8px 12px;border-radius:10px;max-width:85%;background:${m.role==='user'?'#1a365d;color:#fff':'#e2e8f0'};white-space:pre-wrap">${esc(m.content)}</span></div>`).join('');
+  c.scrollTop=c.scrollHeight;
+}
+async function aiAsk(){
+  const inp=document.getElementById('aiInput'); const q=inp.value.trim(); if(!q) return;
+  aiHistory.push({role:'user',content:q}); inp.value=''; renderAI();
+  const cfg=(S.apis||[]).find(a=>a.enabled&&a.isDefault)||(S.apis||[]).find(a=>a.enabled);
+  document.getElementById('aiModelTag').textContent = cfg?('正在调用 '+cfg.model+'...'):'模拟模式...';
+  const msgs=[{role:'system',content:(S.prompts&&S.prompts.assistant)||'你是外贸助手'}];
+  aiHistory.slice(-10).forEach(m=>msgs.push(m));
+  const r = await callAI(msgs);
+  let reply;
+  if(r.mock){ reply='【模拟回复】你好！这是一个演示回答。请到「设置 → API 配置」启用智谱GLM或OpenAI中转站后，我就能真正回答你的问题。'; }
+  else if(r.error){ reply='⚠️ 调用失败：'+r.error; }
+  else { reply=r.content; }
+  aiHistory.push({role:'assistant',content:reply});
+  document.getElementById('aiModelTag').textContent = r.model+(r.usage&&r.usage.total_tokens?' · tokens '+r.usage.total_tokens:'')+(r.latency?' · '+r.latency+'ms':'');
+  renderAI();
+}
+
+/* ============================================================
+ * V3 视图：企业知识库
+ * ============================================================ */
+let knowCat='全部', knowQ='';
+function viewKnowledge(root){
+  const cats=['全部','产品知识库','SOP知识库','客户案例库','行业资讯'];
+  let list = S.knowledge||[];
+  if(knowCat!=='全部') list=list.filter(k=>k.cat===knowCat);
+  if(knowQ){ const q=knowQ.toLowerCase(); list=list.filter(k=>(k.title+k.content+k.tags).toLowerCase().includes(q)); }
+  root.innerHTML=`
+    <div class="flex gap8 mb16">
+      ${cats.map(c=>`<button class="btn ${knowCat===c?'btn-gold':'btn-outline'}" onclick="knowCat='${c}';renderView()">${c}</button>`).join('')}
+      <input class="form-control" style="width:200px;margin-left:auto" placeholder="搜索知识库..." value="${esc(knowQ)}" oninput="knowQ=this.value;renderView()">
+      <button class="btn btn-primary" onclick="openKnowForm()">＋ 新增</button>
+    </div>
+    <div class="grid-12">
+      ${list.map(k=>`
+        <div class="card card-pad">
+          <span class="badge badge-blue">${esc(k.cat)}</span>
+          <div class="fw700 mt8">${esc(k.title)}</div>
+          <div class="text-sm text-muted" style="font-size:11px">${esc(k.tags)||''} · ${fmtDay(k.createdAt)}</div>
+          <div class="text-sm mt8" style="line-height:1.7">${esc(k.content)}</div>
+          <div class="flex gap8 mt12">
+            <button class="btn btn-outline btn-sm" onclick="openKnowForm('${k.id}')">编辑</button>
+            <button class="btn btn-outline btn-sm" onclick="delKnow('${k.id}')">删除</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+function openKnowForm(kid){
+  const k = kid? S.knowledge.find(x=>x.id===kid):null;
+  openModal(`
+    <div class="modal-head"><h3>${k?'编辑':'新增'}知识</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="form-group"><label>标题</label><input class="form-control" id="kf_title" value="${k?esc(k.title):''}"></div>
+      <div class="form-group"><label>分类</label><select class="form-control" id="kf_cat">
+        ${['产品知识库','SOP知识库','客户案例库','行业资讯'].map(c=>`<option ${k&&k.cat===c?'selected':''}>${c}</option>`).join('')}
+      </select></div>
+      <div class="form-group"><label>标签（逗号分隔）</label><input class="form-control" id="kf_tags" value="${k?esc(k.tags):''}"></div>
+      <div class="form-group"><label>内容</label><textarea class="form-control" id="kf_content" style="min-height:120px">${k?esc(k.content):''}</textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveKnow('${kid||''}')">保存</button></div>`);
+}
+function saveKnow(kid){
+  const data={title:document.getElementById('kf_title').value,cat:document.getElementById('kf_cat').value,
+    tags:document.getElementById('kf_tags').value,content:document.getElementById('kf_content').value};
+  if(kid){ Object.assign(S.knowledge.find(x=>x.id===kid),data); }
+  else { S.knowledge.unshift({id:uid(),createdAt:daysAgo(0),...data}); }
+  persist(); closeModal(); toast('已保存'); renderView();
+}
+function delKnow(kid){ confirmDlg('删除该知识条目？',()=>{ S.knowledge=S.knowledge.filter(x=>x.id!==kid); persist(); renderView(); }); }
+
+/* ============================================================
+ * V3 视图：API 配置中心（渲染在设置里）
+ * ============================================================ */
+function apiStatus(a){ return a.enabled?'<span class="badge badge-a">启用中</span>':'<span class="badge badge-gray">已禁用</span>'; }
+function renderApiSettings(){
+  const list = S.apis||[];
+  return `
+  <div class="card card-pad mb16">
+    <div class="card-title">🔌 API 模型配置
+      <button class="btn btn-primary btn-sm" onclick="openApiForm()">＋ 新增配置</button></div>
+    <div class="table-wrap"><table class="tbl">
+      <colgroup><col style="width:20%"><col style="width:12%"><col style="width:18%"><col style="width:12%"><col style="width:14%"><col style="width:24%"></colgroup>
+      <thead><tr><th>名称</th><th>类型</th><th>Base URL</th><th>模型</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${list.map(a=>`
+        <tr>
+          <td><b>${a.isDefault?'⭐ ':''}${esc(a.name)}</b></td>
+          <td><span class="badge badge-blue">${a.type==='openai'?'OpenAI':a.type==='zhipu'?'智谱':'Ollama'}</span></td>
+          <td class="mono text-sm">${esc(a.baseURL)}</td>
+          <td class="mono text-sm">${esc(a.model)}</td>
+          <td>${apiStatus(a)}</td>
+          <td>
+            <button class="btn btn-outline btn-sm" onclick="testApi('${a.id}')">测试</button>
+            <button class="btn btn-outline btn-sm" onclick="openApiForm('${a.id}')">编辑</button>
+            <button class="btn btn-outline btn-sm" onclick="toggleApi('${a.id}')">${a.enabled?'禁用':'启用'}</button>
+            ${a.isDefault?'':'<button class="btn btn-outline btn-sm" onclick="setDefaultApi(\''+a.id+'\')">设默认</button>'}
+          </td>
+        </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+function openApiForm(aid){
+  const a = aid? S.apis.find(x=>x.id===aid):{name:'',type:'openai',baseURL:'https://wawapi.top/v1',apiKey:'',model:'gpt-4o-mini',temperature:0.7};
+  const show = aid? b64dec(a.apiKey):'';
+  openModal(`
+    <div class="modal-head"><h3>API 配置</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="form-group"><label>配置名称</label><input class="form-control" id="ap_name" value="${esc(a.name)}"></div>
+      <div class="form-group"><label>类型</label><select class="form-control" id="ap_type">
+        <option value="openai" ${a.type==='openai'?'selected':''}>OpenAI兼容中转站</option>
+        <option value="zhipu" ${a.type==='zhipu'?'selected':''}>智谱 GLM</option>
+        <option value="ollama" ${a.type==='ollama'?'selected':''}>本地 Ollama</option>
+      </select></div>
+      <div class="form-group"><label>Base URL</label><input class="form-control mono" id="ap_base" value="${esc(a.baseURL)}"></div>
+      <div class="form-group"><label>API Key（密码掩码）</label>
+        <div style="display:flex;gap:8px"><input type="password" class="form-control" id="ap_key" value="${esc(show)}" style="flex:1">
+        <button class="btn btn-outline" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'">👁</button></div></div>
+      <div class="form-group"><label>模型名称</label><input class="form-control mono" id="ap_model" value="${esc(a.model)}"></div>
+      <div class="form-group"><label>温度 (0-1)</label><input type="number" step="0.1" min="0" max="1" class="form-control" id="ap_temp" value="${a.temperature}"></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveApi('${aid||''}')">保存</button></div>`);
+}
+function saveApi(aid){
+  const data={name:document.getElementById('ap_name').value,type:document.getElementById('ap_type').value,
+    baseURL:document.getElementById('ap_base').value,apiKey:b64enc(document.getElementById('ap_key').value),
+    model:document.getElementById('ap_model').value,temperature:parseFloat(document.getElementById('ap_temp').value)};
+  if(aid){ Object.assign(S.apis.find(x=>x.id===aid),data); }
+  else { S.apis.push({id:uid(),...data,enabled:false,isDefault:!S.apis.length,caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}}); }
+  persist(); closeModal(); toast('已保存'); renderView();
+}
+function toggleApi(aid){ const a=S.apis.find(x=>x.id===aid); a.enabled=!a.enabled; persist(); toast(a.enabled?'已启用':'已禁用'); renderView(); }
+function setDefaultApi(aid){ S.apis.forEach(a=>a.isDefault=a.id===aid); persist(); toast('已设为默认'); renderView(); }
+async function testApi(aid){
+  const a=S.apis.find(x=>x.id===aid);
+  toast('正在测试 '+a.name+'...');
+  const r = await callAI([{role:'user',content:'你好，请回复OK'}],{modelConfigId:aid});
+  if(r.mock) toast('未启用该配置，先点启用','err');
+  else if(r.error) toast('失败：'+r.error,'err');
+  else toast('✓ 成功！'+(r.latency||'?')+'ms，tokens: '+((r.usage&&r.usage.total_tokens)||'?'));
+}
+
+
+/* V3.1 市场监控 + 数据导出 */
+function renderMonitorSettings(){
+  return `
+  <div class="card card-pad mb16">
+    <div class="card-title">📡 市场监控（Google Alerts 式）
+      <button class="btn btn-primary btn-sm" onclick="addMonitor()">＋ 加关键词</button></div>
+    <div class="flex gap8 mb16" style="flex-wrap:wrap">
+      ${(S.monitors||[]).map(m=>`<span class="badge badge-blue" style="cursor:pointer" onclick="delMonitor('${m.id}')">${esc(m.keyword)} ×</span>`).join('')||'<span class="text-sm text-muted">暂无关键词</span>'}
+    </div>
+    <table class="tbl"><thead><tr><th>时间</th><th>关键词</th><th>摘要</th><th>来源</th></tr></thead>
+    <tbody>${(S.monitorLogs||[]).map(l=>`<tr><td class="text-sm">${fmtDay(l.t)}</td><td class="text-sm">${esc(l.kw)}</td>
+      <td class="text-sm">${esc(l.summary)}</td><td class="mono text-sm">${esc(l.src)}</td></tr>`).join('')}</tbody></table>
+  </div>`;
+}
+function addMonitor(){
+  const kw=prompt('监控关键词：'); if(!kw) return;
+  S.monitors.push({id:uid(),keyword:kw,type:'手动'}); persist(); toast('已添加'); renderView();
+}
+function delMonitor(mid){ S.monitors=S.monitors.filter(x=>x.id!==mid); persist(); renderView(); }
+
+function downloadFile(name, content, type){
+  const blob=new Blob(['﻿'+content],{type:type||'text/plain;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function exportCustomersCSV(){
+  const head='公司名,国家,客户类型,来源,邮箱,电话,评分,等级,负责人';
+  const rows=S.customers.map(c=>[c.company,c.country,c.customerType,c.source,c.contact.email,c.contact.phone||'',c.scores.total,c.scores.grade,c.owner||'公海'].join(','));
+  downloadFile('kailion_customers_'+todayStr()+'.csv',head+'\\n'+rows.join('\\n'),'text/csv;charset=utf-8');
+  toast('已导出客户CSV');
+}
+function exportDrafts(){
+  const rows=S.drafts.map(d=>[d.customerName,d.country,d.subject,d.status,d.sentAt||''].join(' | '));
+  downloadFile('kailion_drafts_'+todayStr()+'.txt','开发信草稿\\n'+'='.repeat(40)+'\\n'+rows.join('\\n'));
+  toast('已导出开发信');
+}
+function exportFollowups(){
+  const rows=S.customers.flatMap(c=>(c.followUpHistory||[]).map(h=>[c.company,fmtDay(h.t||h.createdAt),h.note||h.desc||''].join(',')));
+  downloadFile('kailion_followups_'+todayStr()+'.csv','公司,时间,记录\\n'+rows.join('\\n'),'text/csv;charset=utf-8');
+  toast('已导出跟进记录');
+}
+function exportBackup(){
+  const all={customers:S.customers,plans:S.plans,drafts:S.drafts,inquiries:S.inquiries,quotes:S.quotes,
+    contracts:S.contracts,followups:S.followups,inbox:S.inbox,products:S.products,samples:S.samples,
+    knowledge:S.knowledge,apis:S.apis,settings:S.settings,exportedAt:new Date().toISOString()};
+  downloadFile('kailion_backup_'+todayStr()+'.json',JSON.stringify(all,null,2),'application/json');
+  toast('已导出全量备份');
+}
+
+function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }
+
+/* ============================================================
+ * 启动
+ * ============================================================ */
+(function init(){
+  loadState();
+  seedExtra();
+  if(DB.load('theme')==='dark') document.body.classList.add('dark');
+  if(!S.customers || !S.customers.length){ seedData(); }
+  go('dashboard');
+})();
+
+</script>
+
+<!-- V3.0 AI 助手悬浮按钮 -->
+<div id="aiFab" onclick="toggleAIPanel()" style="position:fixed;right:24px;bottom:24px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1a365d,#c9a961);color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.3);z-index:9998">💬</div>
+<div id="aiPanel" style="position:fixed;right:24px;bottom:96px;width:380px;height:520px;background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);z-index:9998;display:none;flex-direction:column;overflow:hidden">
+  <div style="background:#1a365d;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+    <b>🤖 AI 助手</b><span style="cursor:pointer" onclick="toggleAIPanel()">×</span></div>
+  <div id="aiChat" style="flex:1;overflow-y:auto;padding:12px;font-size:13px;line-height:1.6;background:#f7f9fc"></div>
+  <div style="padding:10px;border-top:1px solid #e2e8f0;display:flex;gap:8px">
+    <input id="aiInput" class="form-control" placeholder="问我外贸/CRM问题..." style="flex:1">
+    <button class="btn btn-primary" onclick="aiAsk()">发送</button>
+  </div>
+  <div style="padding:6px 12px;font-size:11px;color:#888;border-top:1px solid #e2e8f0">
+    <span id="aiModelTag">未启用API · 模拟模式</span> · <a style="color:#c9a961;cursor:pointer" onclick="go('settings');toggleAIPanel()">配置API</a>
+  </div>
+</div>
+
+
+</body>
+</html>

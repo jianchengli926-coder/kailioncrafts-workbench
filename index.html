@@ -951,6 +951,10 @@ function defaultApis(){
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'智谱 GLM-4-Flash', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
      apiKey:b64enc('ce5df9d38c5342c5993fef25bd7403b8.EwA0H7uNGYBUSLm5'),
+     model:'glm-4-flash', temperature:0.1, enabled:false, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'leo工作台(智谱)', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
+     apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
      model:'glm-4-flash', temperature:0.1, enabled:false, isDefault:true,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'本地 Qwen2.5-7B(文本)', type:'ollama', baseURL:'http://localhost:11434/v1',
@@ -1057,7 +1061,9 @@ async function callAI(messages, opts={}){
   try{
     const headers = {'Content-Type':'application/json'};
     if(cfg.type!=='ollama' || b64dec(cfg.apiKey)) headers['Authorization']='Bearer '+b64dec(cfg.apiKey);
-    const body = { model:cfg.model, messages, temperature: opts.temperature!=null?opts.temperature:cfg.temperature, stream:false };
+    // 兼容字符串消息和数组消息
+    const msgs = typeof messages==='string' ? [{role:'user',content:messages}] : messages;
+    const body = { model:cfg.model, messages:msgs, temperature: opts.temperature!=null?opts.temperature:cfg.temperature, stream:false };
     const controller = new AbortController();
     const timeoutId = setTimeout(()=>controller.abort(), 60000);
     const r = await fetch(cfg.baseURL.replace(/\s+$/,'').replace(/\/$/,'')+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});

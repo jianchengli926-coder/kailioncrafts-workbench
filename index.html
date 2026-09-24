@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V18.0</div>
+        <div class="b2">KaiLionCrafts Crafts V19.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -1122,7 +1122,13 @@ function defaultKnowledge(){
     // V18 邮箱挖掘与验证
     {id:uid(),title:'邮箱健康度评分',cat:'邮箱挖掘与验证',tags:'邮箱,验证',content:'决策人+40/部门+25/通用+10/已验证+30/MX有效+15/命名规则+15。挖掘：info@/sales@通用 + first.last@决策人猜测。',createdAt:daysAgo(1)},
     // V18 领英决策人定位
-    {id:uid(),title:'领英3步定位法',cat:'领英决策人定位',tags:'领英,决策人',content:'①公司全称+Purchasing/Buyer搜 ②公司主页People排查 ③谷歌"公司名"+职位双引号。优先级：核心采购→最终决策人→技术评估内线→运营影响时间线。',createdAt:daysAgo(1)}
+    {id:uid(),title:'领英3步定位法',cat:'领英决策人定位',tags:'领英,决策人',content:'①公司全称+Purchasing/Buyer搜 ②公司主页People排查 ③谷歌"公司名"+职位双引号。优先级：核心采购→最终决策人→技术评估内线→运营影响时间线。',createdAt:daysAgo(1)},
+    // V19 AI先拆客户
+    {id:uid(),title:'AI先拆客户6问',cat:'AI先拆客户',tags:'拆解,画像',content:'Q1做什么的/Q2适合什么客户/Q3和同行特点/Q4决策链/Q5采购信号/Q6我为什么能切入。基于拆解写开发信须引用≥2个专属信息。',createdAt:daysAgo(1)},
+    // V19 B2B决策链
+    {id:uid(),title:'5角色决策链',cat:'B2B大客户决策链',tags:'决策链,大客户',content:'🚀发起者/🔬影响者/💰采购者/👑决定者/👷使用者。决策4步：听说你→觉得靠谱→内部有人推→项目落地。最关键=内部推动者。',createdAt:daysAgo(1)},
+    // V19 供应商评分
+    {id:uid(),title:'10维供应商评分',cat:'供应商评分与定位',tags:'评分,定位',content:'独立站15%+谷歌10%+社媒10%+工厂15%+认证15%+案例10%+响应10%+价格5%+交期5%+口碑5%。≥85优秀/70-84良好/50-69合格。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1666,6 +1672,12 @@ function viewDashboard(root){
       <div class="card card-pad"><div class="stat-label">📋 跟进完成度</div><div class="stat-value">4/8</div><div class="text-sm text-muted">50%</div></div>
       <div class="card card-pad"><div class="stat-label">📧 邮箱挖掘</div><div class="stat-value">23</div><div class="text-sm text-muted">有效率78%·决策人5</div></div>
       <div class="card card-pad"><div class="stat-label">👤 决策人定位</div><div class="stat-value">12</div><div class="text-sm text-muted">已找到/未找到8</div></div>
+    </div>
+    <div class="grid-4 mb16">
+      <div class="card card-pad"><div class="stat-label">🎯 AI拆解完成度</div><div class="stat-value">28/39</div><div class="text-sm text-muted">72%客户已拆解</div></div>
+      <div class="card card-pad"><div class="stat-label">👥 决策链完整度</div><div class="stat-value">3.2/5</div><div class="text-sm text-muted">平均找到角色数</div></div>
+      <div class="card card-pad" style="border-top:3px solid var(--gold)"><div class="stat-label">🏆 供应商评分</div><div class="stat-value" style="color:var(--gold)">72.5</div><div class="text-sm text-muted">🟢 良好·薄弱3维</div></div>
+      <div class="card card-pad"><div class="stat-label">🚀 大客户攻略</div><div class="stat-value">5</div><div class="text-sm text-muted">在跟·2家试单中</div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -2929,6 +2941,39 @@ function viewSettings(root){
         <tr><td>KL-004 户外折叠刀</td><td>440C+木柄</td><td>户外品牌</td><td>$2.40-2.90</td></tr>
         <tr><td>KL-005 多用剪刀</td><td>多用功能</td><td>零售商</td><td>$2.10-2.50</td></tr>
       </tbody></table></div>
+
+    <div class="card card-pad mb16"><div class="card-title">🔍 AI深度拆解客户（Messerei Schmidt GmbH）</div>
+      <button class="btn btn-gold btn-sm" onclick="runDecompose()">▶ 开始AI拆解</button>
+      <div id="decomposeLog" style="margin-top:12px"></div></div>
+
+    <div class="card card-pad mb16"><div class="card-title">👥 B2B决策链图谱（5角色）</div>
+      <svg width="100%" height="280" viewBox="0 0 600 280">
+        <circle cx="300" cy="140" r="50" fill="#f7efdd" stroke="#c9a961" stroke-width="2"/>
+        <text x="300" y="135" text-anchor="middle" font-size="12" font-weight="bold">Messerei</text>
+        <text x="300" y="155" text-anchor="middle" font-size="10">Schmidt</text>
+        <line x1="300" y1="90" x2="300" y2="50" stroke="#cbd5e0" stroke-width="1.5"/>
+        <circle cx="300" cy="35" r="28" fill="#fff" stroke="#e2e8f0" stroke-width="1.5"/>
+        <text x="300" y="32" text-anchor="middle" font-size="14">🚀</text>
+        <text x="300" y="75" text-anchor="middle" font-size="9">发起者·已找到</text>
+        <line x1="250" y1="120" x2="120" y2="90" stroke="#c9a961" stroke-width="2"/>
+        <circle cx="100" cy="80" r="28" fill="#f7efdd" stroke="#c9a961" stroke-width="2"/>
+        <text x="100" y="77" text-anchor="middle" font-size="14">🔬</text>
+        <text x="100" y="125" text-anchor="middle" font-size="9">影响者·已找到</text>
+        <line x1="350" y1="120" x2="480" y2="90" stroke="#cbd5e0" stroke-width="1.5"/>
+        <circle cx="500" cy="80" r="28" fill="#fff" stroke="#e2e8f0" stroke-width="1.5"/>
+        <text x="500" y="77" text-anchor="middle" font-size="14">💰</text>
+        <text x="500" y="125" text-anchor="middle" font-size="9">采购者·已找到</text>
+        <line x1="260" y1="170" x2="150" y2="220" stroke="#c9a961" stroke-width="2"/>
+        <circle cx="130" cy="235" r="28" fill="#f7efdd" stroke="#c9a961" stroke-width="2"/>
+        <text x="130" y="232" text-anchor="middle" font-size="14">👑</text>
+        <text x="130" y="278" text-anchor="middle" font-size="9">决定者·已找到</text>
+        <line x1="340" y1="170" x2="450" y2="220" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4"/>
+        <circle cx="470" cy="235" r="28" fill="#f8f9fa" stroke="#e2e8f0" stroke-width="1.5" stroke-dasharray="3"/>
+        <text x="470" y="232" text-anchor="middle" font-size="14">👷</text>
+        <text x="470" y="278" text-anchor="middle" font-size="9">使用者·未找到</text>
+      </svg>
+      <div class="text-sm mt8">决策链完整度：<b style="color:var(--gold)">4/5</b> · 当前处于第3步"内部有人愿意推你"，下一步：培养技术经理为推动者</div></div>
+
     ${renderApiSettings()}
     ${renderMonitorSettings()}
     ${renderEmailHealth()}
@@ -3711,6 +3756,37 @@ function showScoreCard(){
     <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e0d5b8">综合得分：<b style="font-size:16px;color:var(--gold)">${total.toFixed(1)}</b> → ${grade}</div>
     <div class="text-sm mt8">🎯 切入点：客户在售专业厨房剪，我方有可拆卸升级款；CE认证已具备</div>
   </div>`;
+}
+function showSupplierScore(){
+  const root=document.getElementById('flowLog'); if(!root) return;
+  const dims=[['独立站专业度',75,0.15],['谷歌可见度',60,0.10],['社媒活跃度',55,0.10],['工厂实力',85,0.15],['认证资质',90,0.15],['客户案例',65,0.10],['响应速度',80,0.10],['价格竞争力',70,0.05],['交期稳定',75,0.05],['行业口碑',60,0.05]];
+  const total=dims.reduce((a,[,sc,w])=>a+sc*w,0);
+  const grade=total>=85?'🏆 优秀':total>=70?'🟢 良好':total>=50?'🟡 合格':'🔴 需改进';
+  root.innerHTML+=`<div style="background:#f7efdd;padding:12px;border-radius:6px;margin-top:12px">
+    <b>🏆 供应商评分（真实10维加权）：</b>
+    ${dims.map(([n,sc,w])=>`<div style="font-size:12px;margin-top:3px">${n} <b>${sc}</b> ×${w} = ${(sc*w).toFixed(1)}</div>`).join('')}
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e0d5b8">综合得分：<b style="font-size:16px;color:var(--gold)">${total.toFixed(1)}</b> → ${grade}</div>
+    <div class="text-sm mt8">⚠️ 薄弱维度：谷歌可见度(60)/社媒活跃度(55)/行业口碑(60)——优先加强</div>
+  </div>`;
+}
+function runDecompose(){
+  const log=document.getElementById('decomposeLog'); if(!log) return;
+  log.innerHTML='';
+  const qs=[
+    ['Q1 这家公司做什么的？','德国专业厨具批发商，主营高端厨房刀具和剪刀，服务德国餐饮行业30年'],
+    ['Q2 它适合什么客户？','B端餐饮连锁+高端厨具零售店，年采购额>€500K'],
+    ['Q3 和同行比有什么特点？','定位高端精品，注重认证和质量，价格敏感度低'],
+    ['Q4 采购决策链是什么？','技术经理发起→采购经理比价→CEO审批→厨师使用'],
+    ['Q5 现在有什么采购信号？','官网新上"professional series"系列，在招sourcing manager'],
+    ['Q6 我为什么能切入？','CE/BSCI认证齐全，可拆卸剪刀正好补其产品线缺口']
+  ];
+  let i=0;
+  function next(){
+    if(i>=qs.length) return;
+    log.innerHTML+=`<div style="padding:8px;margin:4px 0;background:#f7efdd;border-radius:4px"><b>${qs[i][0]}</b><div class="text-sm mt8">${qs[i][1]}</div></div>`;
+    i++; setTimeout(next,1000);
+  }
+  next();
 }
 function runAgents(){
   if(agentRunning) return; agentRunning=true;

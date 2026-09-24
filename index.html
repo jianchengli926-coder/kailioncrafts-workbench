@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V10.0</div>
+        <div class="b2">KaiLionCrafts Crafts V11.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -535,6 +535,8 @@ function loadState(){
   S.rfm = DB.load('rfm') || null;
   S.landingpages = DB.load('landingpages') || null;
   S.competitors = DB.load('competitors') || null;
+  S.productmedia = DB.load('productmedia') || null;
+  S.aisales = DB.load('aisales') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -551,6 +553,7 @@ function persist(){
   DB.save('tiktok',S.tiktok); DB.save('b2b',S.b2b); DB.save('googleads',S.googleads);
   DB.save('payments',S.payments); DB.save('certifications',S.certifications); DB.save('whatsapp',S.whatsapp);
   DB.save('rfm',S.rfm); DB.save('landingpages',S.landingpages); DB.save('competitors',S.competitors);
+  DB.save('productmedia',S.productmedia); DB.save('aisales',S.aisales);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
@@ -1054,7 +1057,17 @@ function defaultKnowledge(){
     {id:uid(),title:'转化漏斗分析',cat:'独立站转化优化',tags:'漏斗,CRO',content:'访问→停留>30s→浏览产品→点击询盘→提交表单→回复→报价→成交。最大流失通常在"浏览产品→点击询盘"。',createdAt:daysAgo(1)},
     // V10 自动化SOP
     {id:uid(),title:'AI获客SOP',cat:'自动化SOP',tags:'AI,流程',content:'关键词→AI抓客户→读官网社媒→客户画像→ABC分级→A类优先→AI写千邮千面→每天50-2000封→CRM状态流转。',createdAt:daysAgo(1)},
-    {id:uid(),title:'展会名片OCR导入',cat:'自动化SOP',tags:'OCR,展会',content:'展会名片批量OCR识别：公司名/联系人/职位/邮箱/电话/网址→人工确认→自动打展会标签导入CRM。',createdAt:daysAgo(1)}
+    {id:uid(),title:'展会名片OCR导入',cat:'自动化SOP',tags:'OCR,展会',content:'展会名片批量OCR识别：公司名/联系人/职位/邮箱/电话/网址→人工确认→自动打展会标签导入CRM。',createdAt:daysAgo(1)},
+    // V11 产品素材管理
+    {id:uid(),title:'产品素材规范',cat:'产品素材管理',tags:'图片,参数',content:'主图白底1:1+场景图+尺寸图+包装图；参数表必须填材质/尺寸/重量/包装/MOQ/FOB；缺失参数红色提醒。',createdAt:daysAgo(1)},
+    // V11 AI业务员自动化
+    {id:uid(),title:'AI业务员审批线',cat:'AI业务员自动化',tags:'审批,人工',content:'AI生成开发信先dry run预览→人工确认"已审批可发送"→才允许发送。设最低价/最高折扣/最低采购量红线。',createdAt:daysAgo(1)},
+    // V11 客户背调深化
+    {id:uid(),title:'海关数据面板',cat:'客户背调深化',tags:'海关,采购',content:'看采购记录(产品/供应商/数量/金额/日期)、近三年TOP3进口产品、交易频次、淡旺季、现有供应商。旺季前2个月联系最佳。',createdAt:daysAgo(1)},
+    {id:uid(),title:'决策人挖掘指南',cat:'客户背调深化',tags:'LinkedIn,邮箱',content:'LinkedIn搜CEO/Purchasing/Procurement/Sourcing；邮箱格式first.last@domain或first@domain；职位分决策人/影响者/使用者/守门人。',createdAt:daysAgo(1)},
+    // V11 开发信高回复率
+    {id:uid(),title:'高回复率标题公式',cat:'开发信高回复率',tags:'标题,公式',content:'优势数字+客户行业关键词+互动提问。例："Cut packaging damage from 5% to 1% — for [Client] kitchen tools?"正文3句：痛点→方案→回复理由。',createdAt:daysAgo(1)},
+    {id:uid(),title:'4阶段跟进序列',cat:'开发信高回复率',tags:'跟进,序列',content:'Day0建立联系→Day3同区域案例→Day7最后跟进给台阶→Day14新品/原料变动。报价后不回复：1-2天确认收到→3-5天追问→7天行业动态→14天价格到期。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1526,6 +1539,12 @@ function viewDashboard(root){
           <tr><td>new-2026-peeler</td><td style="color:var(--red)">0.4%</td></tr>
         </tbody></table>
         <div class="text-sm text-muted mt8">独立站询盘转化率：<b>0.54%</b>（访问→表单）</div></div>
+    </div>
+    <div class="grid-4 mb16">
+      <div class="card card-pad" style="border-top:3px solid var(--gold)"><div class="stat-label">🤖 待审批开发信</div><div class="stat-value" style="color:var(--gold)">5</div><div class="text-sm text-muted">挖掘28/背调15/写信12</div></div>
+      <div class="card card-pad"><div class="stat-label">📦 素材完整度</div><div class="stat-value">92%</div><div class="text-sm text-muted" style="color:var(--red)">1个参数缺失</div></div>
+      <div class="card card-pad"><div class="stat-label">🔍 背调完成率</div><div class="stat-value">72%</div><div class="text-sm text-muted">28/39 客户</div></div>
+      <div class="card card-pad"><div class="stat-label">📈 开发信回复率</div><div class="stat-value" style="color:var(--green)">21%</div><div class="stat-trend up">+3%</div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -2913,7 +2932,9 @@ async function aiAsk(){
  * V3 视图：企业知识库
  * ============================================================ */
 let knowCat='全部', knowQ='';
+let knowBrain=false;
 function viewKnowledge(root){
+  if(knowBrain) return viewKnowBrain(root);
   const cats=['全部',...new Set((S.knowledge||[]).map(k=>k.cat))];
   let list = S.knowledge||[];
   if(knowCat!=='全部') list=list.filter(k=>k.cat===knowCat);
@@ -2922,6 +2943,7 @@ function viewKnowledge(root){
     <div class="flex gap8 mb16">
       ${cats.map(c=>`<button class="btn ${knowCat===c?'btn-gold':'btn-outline'}" onclick="knowCat='${c}';renderView()">${c}</button>`).join('')}
       <input class="form-control" style="width:200px;margin-left:auto" placeholder="搜索知识库..." value="${esc(knowQ)}" oninput="knowQ=this.value;renderView()">
+      <button class="btn btn-gold" onclick="knowBrain=true;renderView()">🧠 业务大脑</button>
       <button class="btn btn-primary" onclick="openKnowForm()">＋ 新增</button>
     </div>
     <div class="grid-12">
@@ -2936,6 +2958,54 @@ function viewKnowledge(root){
             <button class="btn btn-outline btn-sm" onclick="delKnow('${k.id}')">删除</button>
           </div>
         </div>`).join('')}
+    </div>`;
+}
+function viewKnowBrain(root){
+  root.innerHTML=`
+    <div class="flex gap8 mb16">
+      <button class="btn btn-outline" onclick="knowBrain=false;renderView()">← 返回知识库</button>
+      <h2 style="margin:0">🧠 AI业务大脑</h2>
+    </div>
+    <div class="grid-2 mb16">
+      <div class="card card-pad"><div class="card-title">🏆 成交案例库</div>
+        <table class="tbl"><thead><tr><th>客户</th><th>行业</th><th>年采购</th><th>成交过程</th></tr></thead>
+        <tbody>
+          <tr><td>Messerei Schmidt</td><td>德国/批发商</td><td>$42K</td><td>BSCI验厂通过→首单</td></tr>
+          <tr><td>BritChef Ltd</td><td>英国/品牌商</td><td>$28K</td><td>样品测试3轮→复购</td></tr>
+          <tr><td>Kitchen Universe</td><td>美国/电商</td><td>$18K</td><td>独立站SEO询盘→成交</td></tr>
+        </tbody></table>
+        <div class="text-sm mt8" style="background:#f7efdd;padding:10px;border-radius:6px">
+          <b>AI分析共同特点：</b>德国/英国批发商 · 年采购>$20K · 关注CE/BSCI认证 · 决策周期60-90天
+        </div></div>
+      <div class="card card-pad"><div class="card-title">🎯 理想客户画像</div>
+        <div class="text-sm" style="line-height:2.2">
+          <b>行业：</b>五金刀剪进口/分销<br>
+          <b>规模：</b>10-200人<br>
+          <b>年采购：</b>$10K-$100K<br>
+          <b>决策周期：</b>30-90天<br>
+          <b>认证要求：</b>CE / BSCI / ISO
+        </div></div>
+    </div>
+    <div class="card card-pad mb16"><div class="card-title">💬 话术库</div>
+      <div class="grid-2" style="gap:16px">
+        <div><b class="text-sm">谈判</b><div class="text-sm mt8" style="line-height:1.9">
+          压价：不比价格比价值（0.3%不良率 vs 行业2%）<br>
+          MOQ：5000pcs可申请阶梯价$1.60<br>
+          付款：新客户30%T/T+70%见提单
+        </div></div>
+        <div><b class="text-sm">异议处理</b><div class="text-sm mt8" style="line-height:1.9">
+          价格高：发减配方案（3Cr13+简包）<br>
+          已有供应商：先发样品试销不抢量<br>
+          不需要：行业资讯保持联系
+        </div></div>
+      </div></div>
+    <div class="card card-pad"><div class="card-title">🤖 AI业务问答</div>
+      <div class="flex gap8 mb16">
+        <button class="btn btn-outline btn-sm" onclick="toast('Q: 德国客户一般接受什么付款方式？\nA: 新客户30%前T/T+70%见提单副本；老客户可即期L/C；不接受O/A。')">德国客户付款方式？</button>
+        <button class="btn btn-outline btn-sm" onclick="toast('Q: 厨房剪刀CE认证要求？\nA: 按通用机械指令2006/42/EC+食品接触材料LFGB；CE标志+英文说明书。')">CE认证要求？</button>
+        <button class="btn btn-outline btn-sm" onclick="toast('Q: 客户说价格太高怎么回？\nA: 价值重塑法——我们不良率0.3%vs行业2%，退货损失远超差价。或减配法换3Cr13。')">价格太高怎么回？</button>
+      </div>
+      <div class="text-sm text-muted">💡 接入API后可基于全部知识库回答任意业务问题</div>
     </div>`;
 }
 function openKnowForm(kid){
@@ -3377,6 +3447,25 @@ function viewAgents(root){
       <tr><td><b>张小泉</b></td><td>中国</td><td>$1-5</td><td>国内渠道强</td><td>海外弱</td></tr>
       <tr><td><b>义乌某厂</b></td><td>中国</td><td>$0.5-2</td><td>极低价</td><td>品质差/无认证</td></tr>
     </tbody></table>
+  </div>
+
+  <div class="card card-pad mt16">
+    <div class="card-title">🤖 AI业务员自动化</div>
+    <div class="grid-3" style="gap:12px">
+      <div><b class="text-sm">产品关键词</b><div class="text-sm text-muted mt8">kitchen shears</div></div>
+      <div><b class="text-sm">目标市场</b><div class="text-sm text-muted mt8">🇺🇸🇩🇪🇬🇧🇦🇺</div></div>
+      <div><b class="text-sm">客户类型</b><div class="text-sm text-muted mt8">批发商/品牌商/电商卖家</div></div>
+    </div>
+    <button class="btn btn-gold mt16" onclick="toast('▶ AI业务员已启动：搜索→背调→写信→待审批')">▶ 启动AI业务员</button>
+    <div class="divider"></div>
+    <div class="stat-grid" style="grid-template-columns:repeat(5,1fr)">
+      <div class="stat-card"><div class="stat-label">🔍 今日挖掘</div><div class="stat-value">28</div></div>
+      <div class="stat-card"><div class="stat-label">📋 背调完成</div><div class="stat-value">15</div></div>
+      <div class="stat-card"><div class="stat-label">✍️ 生成开发信</div><div class="stat-value">12</div></div>
+      <div class="stat-card"><div class="stat-label">📞 跟进中</div><div class="stat-value">8</div></div>
+      <div class="stat-card" style="border-top:3px solid var(--gold)"><div class="stat-label">🗂 待审批</div><div class="stat-value" style="color:var(--gold)">5</div></div>
+    </div>
+    <div class="text-sm text-muted mt8">💡 AI先dry run预览，人工确认后标记"已审批可发送"。设置最低价$1.40、最高折扣15%。</div>
   </div>`;
 }
 function runAgents(){
@@ -4033,6 +4122,59 @@ function siteFunnel(){
     <div class="text-sm" style="color:var(--red)">⚠️ 最大流失：浏览产品→点击询盘（43%→2.6%），优化产品页CTA和WhatsApp浮动按钮。</div>
   </div>`;
 }
+
+/* V11 产品素材中心 */
+let mediaTab='img';
+function viewMedia(root){
+  root.innerHTML=`
+  <div class="page-head"><h2>🖼 产品素材中心</h2><p class="sub">图片库·参数表·证书库·工厂报价</p>
+    <button class="btn btn-primary" onclick="toast('上传素材（演示）')">＋ 上传素材</button></div>
+  <div class="btn-row mb16">
+    ${[['img','🖼 图片库'],['spec','📋 参数表'],['cert','📜 证书库'],['quote','💰 报价整理']].map(([k,l])=>
+      `<button class="btn ${mediaTab===k?'btn-gold':'btn-outline'}" onclick="mediaTab='${k}';renderView()">${l}</button>`).join('')}
+  </div>
+  ${mediaTab==='img'?mediaImg():mediaTab==='spec'?mediaSpec():mediaTab==='cert'?mediaCert():mediaQuote()}`;
+}
+function mediaImg(){
+  const imgs=[['KL-001','厨房剪刀 8.5寸','厨房剪刀'],['KL-002','主厨刀 8寸','厨房刀'],['KL-003','削皮器 Y型','厨房配件'],['KL-004','户外折叠刀','户外刀'],['KL-005','多用剪刀','厨房剪刀'],['KL-006','水果刀','厨房刀'],['KL-007','剪刀套装','定制款'],['KL-008','牛排刀','厨房刀']];
+  return `<div class="grid-4" style="grid-template-columns:repeat(4,1fr);gap:12px">
+    ${imgs.map(([id,name,cat])=>`<div class="card card-pad" style="text-align:center;cursor:pointer" onclick="toast('查看 ${id}')">
+      <div style="height:80px;background:linear-gradient(135deg,#1a365d,#2c5282);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:32px">🔪</div>
+      <div class="text-sm mt8"><b>${id}</b></div>
+      <div class="text-sm text-muted">${name}</div>
+      <div class="mt8"><span class="badge badge-blue">${cat}</span></div>
+    </div>`).join('')}</div>`;
+}
+function mediaSpec(){
+  return `<div class="card card-pad"><div class="card-title">📋 产品参数表</div>
+    <table class="tbl"><thead><tr><th>编号</th><th>名称</th><th>材质</th><th>尺寸</th><th>装箱量</th><th>MOQ</th><th>FOB价</th></tr></thead>
+    <tbody>
+      <tr><td>KL-001</td><td>厨房剪刀</td><td>5Cr15Mov</td><td>8.5寸</td><td>120pcs</td><td>1000</td><td>$1.85</td></tr>
+      <tr><td>KL-002</td><td>主厨刀</td><td>7Cr17Mov</td><td>8寸</td><td>60pcs</td><td>500</td><td>$6.80</td></tr>
+      <tr><td>KL-003</td><td>削皮器</td><td>420J2+ABS</td><td>Y型</td><td>500pcs</td><td>5000</td><td class="text-red">⚠️缺失</td></tr>
+      <tr><td>KL-004</td><td>户外折叠刀</td><td>3Cr13</td><td>3.5寸</td><td>200pcs</td><td>1000</td><td>$3.20</td></tr>
+    </tbody></table></div>`;
+}
+function mediaCert(){
+  return `<div class="card card-pad"><div class="card-title">📜 证书库</div>
+    <table class="tbl"><thead><tr><th>证书</th><th>机构</th><th>有效期</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>CE</td><td>SGS</td><td>2027-03</td><td><span class="badge badge-a">✅ 有效</span></td></tr>
+      <tr><td>ISO 9001</td><td>TUV</td><td>2027-06</td><td><span class="badge badge-a">✅ 有效</span></td></tr>
+      <tr><td>BSCI</td><td>SLCP</td><td>2026-12</td><td><span class="badge badge-gold">⚠️ 剩68天</span></td></tr>
+      <tr><td>RoHS</td><td>Intertek</td><td>2026-10</td><td><span class="badge badge-red">🔴 剩21天</span></td></tr>
+    </tbody></table></div>`;
+}
+function mediaQuote(){
+  return `<div class="card card-pad"><div class="card-title">💰 阶梯报价（KL-001 厨房剪刀）</div>
+    <table class="tbl"><thead><tr><th>数量</th><th>500pcs</th><th>1000pcs</th><th>5000pcs</th><th>10000pcs</th></tr></thead>
+    <tbody><tr><td><b>FOB单价</b></td><td>$2.10</td><td>$1.85</td><td>$1.60</td><td>$1.45</td></tr></tbody></table>
+    <div class="divider"></div>
+    <b class="text-sm">成本拆解</b>
+    <div class="text-sm mt8" style="line-height:2">原材料 $0.95 + 加工 $0.40 + 包装 $0.12 + 内陆运 $0.08 + 利润 $0.30 = <b>$1.85</b></div></div>`;
+}
+
+/* V11 AI业务员（AI Agent模块追加区块） */
 
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }
 

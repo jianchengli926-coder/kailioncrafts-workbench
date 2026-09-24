@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V14.0</div>
+        <div class="b2">KaiLionCrafts Crafts V15.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -1096,7 +1096,13 @@ function defaultKnowledge(){
     {id:uid(),title:'4个常驻Agent',cat:'多Agent协作',tags:'常驻,调度',content:'🔍找客户(每周)/📱社媒(每日)/📝内容(每周)/🛠️运维(每日)。每个独立开关+频率+参数。',createdAt:daysAgo(1)},
     // V14 CRM AI大脑
     {id:uid(),title:'成交概率预测',cat:'CRM AI大脑',tags:'概率,预测',content:'基于最近跟进/报价次数/样品/回复频率计算。🟢>70%高/🟡40-70中/🟠<40低。高概率优先跟进。',createdAt:daysAgo(1)},
-    {id:uid(),title:'4种决策风格',cat:'CRM AI大脑',tags:'决策风格,话术',content:'🎯结果导向(直接给数据)/🤝关系导向(先建立信任)/🔬分析导向(给详细参数)/🎨创新导向(给差异化卖点)。',createdAt:daysAgo(1)}
+    {id:uid(),title:'4种决策风格',cat:'CRM AI大脑',tags:'决策风格,话术',content:'🎯结果导向(直接给数据)/🤝关系导向(先建立信任)/🔬分析导向(给详细参数)/🎨创新导向(给差异化卖点)。',createdAt:daysAgo(1)},
+    // V15 种子客户画像拆解法
+    {id:uid(),title:'种子画像7步拆解',cat:'种子客户画像拆解法',tags:'种子,画像',content:'输入2个已成交客户→AI拆解：客户类型/采购规模/价格带/主营产品/决策人/采购偏好→按画像搜50家相似客户→逐个官网初筛分级🟢🟡🔴。',createdAt:daysAgo(1)},
+    // V15 强相关产品匹配
+    {id:uid(),title:'强相关产品比对',cat:'强相关产品匹配',tags:'匹配,产品',content:'拿我方主推产品跟客户官网比对：品类/材质/规格/用途/价格带。🔥强相关(有对应产品)/⚡弱相关(可替代)/❌不相关。开发信必须引用强相关信息。',createdAt:daysAgo(1)},
+    // V15 各国买家性格
+    {id:uid(),title:'10国买家性格表',cat:'各国买家性格',tags:'买家,性格',content:'🇩🇪德国严谨重数据报实价；🇯🇵日本重细节样品完美；🇺🇸美国直接重时效；🇬🇧英国传统重礼仪；🇫🇷法国重设计；🇮🇳印度顶级砍价高开低走；东南亚重关系；🇧🇷巴西热情注意付款风险；🇦🇺澳洲直接务实；🇷🇺俄罗斯谨慎重认证。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1615,6 +1621,12 @@ function viewDashboard(root){
       <div class="card card-pad"><div class="stat-label">🛡️ 线索过滤</div><div class="stat-value">65%</div><div class="text-sm text-muted">23→15通过</div></div>
       <div class="card card-pad"><div class="stat-label">🎯 高概率客户</div><div class="stat-value" style="color:var(--green)">7</div><div class="text-sm text-muted">🟢高/🟡中12/🟠低20</div></div>
       <div class="card card-pad"><div class="stat-label">📈 开发信健康度</div><div class="stat-value" style="color:var(--green)">85</div><div class="text-sm text-muted">回复率21%</div></div>
+    </div>
+    <div class="grid-4 mb16">
+      <div class="card card-pad"><div class="stat-label">🎯 种子画像完成度</div><div class="stat-value" style="color:var(--gold)">85%</div><div class="text-sm text-muted">2个种子客户已配置</div></div>
+      <div class="card card-pad"><div class="stat-label">🔥 强相关客户</div><div class="stat-value">15</div><div class="text-sm text-muted">本周新匹配</div></div>
+      <div class="card card-pad"><div class="stat-label">✂️ 短开发信</div><div class="stat-value">12<span style="font-size:14px;color:var(--muted)">/30</span></div><div class="text-sm text-muted">回复3 · 25%</div></div>
+      <div class="card card-pad" style="border-top:3px solid var(--red)"><div class="stat-label">💬 待人工介入</div><div class="stat-value" style="color:var(--red)">3</div><div class="text-sm text-muted">高意向回复</div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -2286,11 +2298,33 @@ const DRAFT_STATUS = {'待检查':['badge-gold','待检查'],'已修改':['badge
 function viewDrafts(root){
   root.innerHTML = `
     <div class="flex gap8 mb16">
-      ${[['list','📋 草稿箱'],['seq','🔁 跟进序列'],['stats','📊 效果分析'],['ab','🧪 A/B测试'],['tpl','📚 模板库']].map(([k,l])=>
+      ${[['list','📋 草稿箱'],['short','✂️ 短开发信'],['seq','🔁 跟进序列'],['stats','📊 效果分析'],['ab','🧪 A/B测试'],['tpl','📚 模板库']].map(([k,l])=>
         `<button class="btn ${draftTab===k?'btn-gold':'btn-outline'}" onclick="draftTab='${k}';renderView()">${l}</button>`).join('')}
       <button class="btn btn-gold" style="margin-left:auto" onclick="toast('A/B测试（演示）')">🧪 新建 A/B 测试</button>
     </div>
-    ${draftTab==='list'?draftList():draftTab==='seq'?draftSeq():draftTab==='stats'?draftStats():draftTab==='ab'?draftAB():draftTpl()}`;
+    ${draftTab==='list'?draftList():draftTab==='short'?draftShort():draftTab==='seq'?draftSeq():draftTab==='stats'?draftStats():draftTab==='ab'?draftAB():draftTpl()}`;
+}
+function draftShort(){
+  return `<div class="card card-pad"><div class="card-title">✂️ 短开发信（≤50词）</div>
+    <div class="text-sm text-muted mb16">核心理念：不求多，但求每封调得好。每日上限 30 封。3句话结构：引用客户官网→我方对应优势→简单行动号召。</div>
+    <div class="form-group"><label>客户国家（自动调整语气）</label>
+      <select class="form-control"><option>🇩🇪德国（严谨重数据）</option><option>🇺🇸美国（直接重时效）</option><option>🇬🇧英国（传统重礼仪）</option><option>🇯🇵日本（重细节）</option></select></div>
+    <div class="form-group"><label>邮件正文（实时单词计数）</label>
+      <textarea id="shortEmail" class="form-control" rows="4" oninput="countWords()">I saw your detachable kitchen shears collection. We make similar stainless steel shears, currently supplying 3 EU distributors. May I send a quick quote?</textarea>
+      <div class="text-sm mt8" id="wordCount">单词数：<b>28</b> / 50</div>
+    </div>
+    <div class="flex gap8">
+      <button class="btn btn-gold" onclick="toast('短开发信已保存（演示）')">💾 保存</button>
+      <button class="btn btn-primary" onclick="toast('发送前请检查收件人和内容')">📤 发送</button>
+    </div>
+    <div class="divider"></div>
+    <b class="text-sm">今日发送统计：</b><span class="text-sm">&nbsp;已发 <b>12</b> / 30 · 回复 <b style="color:var(--green)">3</b> · 回复率 <b>25%</b></span>
+  </div>`;
+}
+function countWords(){
+  const t=document.getElementById('shortEmail'); if(!t) return;
+  const n=t.value.trim().split(/\s+/).filter(Boolean).length;
+  const el=document.getElementById('wordCount'); if(el) el.innerHTML='单词数：<b style="color:'+(n>50?'var(--red)':'var(--green)')+'">'+n+'</b> / 50'+(n>50?' ⚠️ 超50词！':'');
 }
 function draftList(){
   const list = S.drafts;
@@ -2828,6 +2862,34 @@ function viewSettings(root){
       <div class="divider"></div>
       <b class="text-sm">阶梯提成：</b><span class="text-sm">&nbsp;毛利&lt;5万→5% · 5-10万→8% · 10-20万→10% · &gt;20万→12%</span>
     </div>
+    <div class="card card-pad mb16"><div class="card-title">📋 获客资料（AI写开发信时自动引用）</div>
+      <div class="grid-2">
+        <div><b class="text-sm">业务背景</b>
+          <div class="text-sm mt8" style="line-height:1.9">
+            公司：阳江市锴利国际贸易有限公司<br>
+            主营：五金刀剪（厨房剪刀/主厨刀/削皮器/户外刀）<br>
+            优势：20年工厂经验 · BSCI认证 · 月产50万把 · 3天打样<br>
+            资质：CE / ISO9001 / BSCI / FDA<br>
+            工厂：成立2005年 · 150人 · 月产50万把
+          </div></div>
+        <div><b class="text-sm">个人背景</b>
+          <div class="text-sm mt8" style="line-height:1.9">
+            Leo / 李锴 · 外贸经理<br>
+            📧 sales@kailioncrafts.com<br>
+            📱 WhatsApp +86-138-XXXX<br>
+            <span class="text-muted">签名档：Best regards, Leo · KaiLionCrafts</span>
+          </div></div>
+      </div>
+      <div class="divider"></div>
+      <b class="text-sm">🔥 主推产品库（用于强相关匹配）</b>
+      <table class="tbl mt8"><thead><tr><th>产品</th><th>核心卖点</th><th>目标客户</th><th>价格带</th></tr></thead>
+      <tbody>
+        <tr><td>KL-001 不锈钢厨房剪</td><td>可拆卸+磨刀器</td><td>批发商</td><td>$1.85-2.10</td></tr>
+        <tr><td>KL-002 主厨刀 8寸</td><td>5Cr15Mov钢</td><td>品牌商</td><td>$3.20-3.80</td></tr>
+        <tr><td>KL-003 削皮器</td><td>不锈钢+PP柄</td><td>电商</td><td>$0.65-0.85</td></tr>
+        <tr><td>KL-004 户外折叠刀</td><td>440C+木柄</td><td>户外品牌</td><td>$2.40-2.90</td></tr>
+        <tr><td>KL-005 多用剪刀</td><td>多用功能</td><td>零售商</td><td>$2.10-2.50</td></tr>
+      </tbody></table></div>
     ${renderApiSettings()}
     ${renderMonitorSettings()}
     ${renderEmailHealth()}
@@ -4496,7 +4558,11 @@ function viewAIFlow(root){
       <button class="btn btn-outline btn-sm" onclick="document.getElementById('flowCmd').value='帮我开发德国的厨具经销商，产品是不锈钢厨房剪，目标年采购>10万美金';renderView()">德国厨具经销商</button>
       <button class="btn btn-outline btn-sm" onclick="document.getElementById('flowCmd').value='帮我背调Messerei Schmidt GmbH，分析采购实力和决策人';renderView()">背调特定客户</button>
     </div>
-    <button class="btn btn-gold mt16" onclick="runAIFlow()">▶ 启动AI全流程</button>
+    <div class="flex gap8 mt16">
+      <button class="btn btn-gold" onclick="runAIFlow()">▶ 启动AI全流程</button>
+      <button class="btn btn-outline" onclick="toast('🌱 种子画像模式：输入2个已成交客户，AI自动拆解画像→搜索相似客户')">🌱 种子画像模式</button>
+    </div>
+    <div class="text-sm text-muted mt8">预置种子客户：Messerei Schmidt GmbH（德国）+ Toronto Cutlery（加拿大）</div>
   </div>
   <div class="card card-pad mb16">
     <div class="card-title">执行进度</div>

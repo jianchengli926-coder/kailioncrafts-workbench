@@ -307,7 +307,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">方舟获客工作台</div>
-        <div class="b2">KaiLionCrafts Ark V3.0</div>
+        <div class="b2">KaiLionCrafts Ark V4.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -392,6 +392,9 @@ function loadState(){
   S.ar = DB.load('ar') || [];
   S.monitors = DB.load('monitors') || [];
   S.monitorLogs = DB.load('monitorLogs') || [];
+  S.emailStats = DB.load('emailStats') || null;
+  S.abTests = DB.load('abTests') || [];
+  S.socialRecords = DB.load('socialRecords') || [];
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -400,6 +403,7 @@ function persist(){
   DB.save('products',S.products); DB.save('samples',S.samples); DB.save('settings',S.settings);
   DB.save('apis',S.apis); DB.save('prompts',S.prompts); DB.save('knowledge',S.knowledge);
   DB.save('ar',S.ar); DB.save('monitors',S.monitors); DB.save('monitorLogs',S.monitorLogs);
+  DB.save('emailStats',S.emailStats); DB.save('abTests',S.abTests); DB.save('socialRecords',S.socialRecords);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
@@ -889,8 +893,33 @@ function seedExtra(){
        records:[{date:daysAgo(45),amount:18500,method:'T/T',note:'全款'}]}
     ];
   }
+  if(!S.customers || !S.customers.length) return;
   // 公海池：把第 20-23 个客户 owner 设为 null
   S.customers.forEach((c,i)=>{ if(i>=20 && i<=23 && !c.isOld) c.owner=null; });
+  // V4：给已发送草稿分配追踪状态
+  (S.drafts||[]).forEach((d,i)=>{
+    if(d.status==='已发送' && !d.trackStatus){
+      d.trackStatus = ['已回复','已打开','已点击','已送达','已退信'][i%5];
+      d.openCount = (i%4)+1;
+      d.clickCount = i%3===0?1:0;
+      d.lastOpenAt = daysAgo(i%5);
+    }
+  });
+  if(!S.emailStats) S.emailStats = {sent:42, delivered:41, opened:28, clicked:15, replied:9, bounced:1,
+    trend:Array.from({length:14},(_,i)=>({d:daysAgo(13-i),send:2+(i*3)%5,reply:(i%3)}))};
+  if(!S.abTests || !S.abTests.length) S.abTests = [
+    {id:uid(),name:'首封主题测试：问题 vs 陈述',segments:'美国/加拿大进口商',total:40,
+     a:{subject:'Need a reliable cutlery supplier?',sent:20,opened:14,replied:3},
+     b:{subject:'Cutlery supply from Yangjiang OEM',sent:20,opened:9,replied:1},winner:'A',status:'done'},
+    {id:uid(),name:'跟进邮件 CTA 测试',segments:'已打开未回复',total:30,
+     a:{subject:'Free sample or quote?',sent:15,opened:8,replied:2},
+     b:{subject:'Following up on kitchen shears',sent:15,opened:7,replied:1},winner:'A',status:'running'}
+  ];
+  if(!S.socialRecords || !S.socialRecords.length) S.socialRecords = [
+    {id:uid(),customerId:S.customers[0].id,customerName:S.customers[0].company,platform:'LinkedIn',date:daysAgo(5),type:'加好友',note:'发送加好友附言，通用型',next:'通过后破冰'},
+    {id:uid(),customerId:S.customers[1].id,customerName:S.customers[1].company,platform:'WhatsApp',date:daysAgo(2),type:'私信',note:'发送产品目录链接',next:'3天后跟进'},
+    {id:uid(),customerId:S.customers[3].id,customerName:S.customers[3].company,platform:'LinkedIn',date:daysAgo(1),type:'评论',note:'评论客户公司新品发布帖',next:'观察互动'}
+  ];
 }
 
 
@@ -1156,6 +1185,10 @@ function viewDashboard(root){
         <div class="stat-trend up">A级优先跟进</div></div>
     </div>
 
+    <div class="card card-pad mb16">
+      <div class="card-title">📊 获客渠道效果</div>
+      ${renderChannelEffect()}
+    </div>
     <div class="grid-3-2">
       <div class="card card-pad">
         <div class="card-title">🔥 今天先联系谁？ <span class="sub">按优先级排序</span>
@@ -1756,10 +1789,11 @@ const DRAFT_STATUS = {'待检查':['badge-gold','待检查'],'已修改':['badge
 function viewDrafts(root){
   root.innerHTML = `
     <div class="flex gap8 mb16">
-      ${[['list','📋 草稿箱'],['seq','🔁 跟进序列'],['tpl','📚 模板库']].map(([k,l])=>
+      ${[['list','📋 草稿箱'],['seq','🔁 跟进序列'],['stats','📊 效果分析'],['ab','🧪 A/B测试'],['tpl','📚 模板库']].map(([k,l])=>
         `<button class="btn ${draftTab===k?'btn-gold':'btn-outline'}" onclick="draftTab='${k}';renderView()">${l}</button>`).join('')}
+      <button class="btn btn-gold" style="margin-left:auto" onclick="toast('A/B测试（演示）')">🧪 新建 A/B 测试</button>
     </div>
-    ${draftTab==='list'?draftList():draftTab==='seq'?draftSeq():draftTpl()}`;
+    ${draftTab==='list'?draftList():draftTab==='seq'?draftSeq():draftTab==='stats'?draftStats():draftTab==='ab'?draftAB():draftTpl()}`;
 }
 function draftList(){
   const list = S.drafts;
@@ -1813,8 +1847,79 @@ const TEMPLATES = [
   {name:'竞品替代型', desc:'针对现有供应商痛点', subject:'Tired of Delayed Cutlery Shipments? We Can Help'},
   {name:'样品邀约型', desc:'免费样品促进回复', subject:'Free {product} Sample Box for {company} — No Cost'}
 ];
+/* V4 邮件效果分析 */
+function pct(a,b){ return b? Math.round(a/b*100):0; }
+function draftStats(){
+  const e = S.emailStats;
+  const bars = e.trend.map((t,i)=>`<div style="display:inline-block;width:32px;text-align:center;vertical-align:bottom;margin:0 2px">
+    <div style="height:${t.send*12}px;background:#1a365d;border-radius:3px 3px 0 0"></div>
+    <div style="font-size:9px;color:#888;margin-top:2px">${t.d.slice(8,10)}</div></div>`).join('');
+  return `
+  <div class="stat-grid" style="grid-template-columns:repeat(5,1fr)">
+    <div class="stat-card"><div class="stat-label">总发送</div><div class="stat-value">${e.sent}</div></div>
+    <div class="stat-card"><div class="stat-label">已打开</div><div class="stat-value">${e.opened}</div><div class="stat-trend up">打开率 ${pct(e.opened,e.sent)}%</div></div>
+    <div class="stat-card"><div class="stat-label">已点击</div><div class="stat-value">${e.clicked}</div><div class="stat-trend up">点击率 ${pct(e.clicked,e.sent)}%</div></div>
+    <div class="stat-card"><div class="stat-label">已回复</div><div class="stat-value">${e.replied}</div><div class="stat-trend up">回复率 ${pct(e.replied,e.sent)}%</div></div>
+    <div class="stat-card"><div class="stat-label">退信</div><div class="stat-value">${e.bounced}</div><div class="stat-trend down">退信率 ${pct(e.bounced,e.sent)}%</div></div>
+  </div>
+  <div class="card card-pad mb16">
+    <div class="card-title">近14天发送量</div>
+    <div style="display:flex;align-items:flex-end;height:120px;border-bottom:1px solid #e2e8f0;padding-top:10px">${bars}</div>
+  </div>
+  <div class="grid-2">
+    <div class="card card-pad">
+      <div class="card-title">模板效果排名</div>
+      <table class="tbl"><thead><tr><th>模板</th><th>发送</th><th>打开率</th><th>回复率</th></tr></thead>
+      <tbody>
+        <tr><td>首封开发信（建立联系）</td><td>18</td><td>67%</td><td>17%</td></tr>
+        <tr><td>主推产品+核心优势</td><td>12</td><td>58%</td><td>15%</td></tr>
+        <tr><td>样品签收跟进</td><td>8</td><td>88%</td><td>38%</td></tr>
+        <tr><td>温和提醒</td><td>4</td><td>50%</td><td>0%</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card card-pad">
+      <div class="card-title">邮件营销漏斗</div>
+      ${[['发送',e.sent,'#1a365d'],['送达',e.delivered,'#2c5282'],['打开',e.opened,'#c9a961'],['点击',e.clicked,'#ed8936'],['回复',e.replied,'#48bb78']]
+        .map(([n,v,c],i,arr)=>{ const w=Math.round(v/e.sent*100); return `<div style="margin-bottom:6px">
+          <div style="font-size:12px;margin-bottom:2px">${n} <b>${v}</b> <span class="text-muted">(${pct(v,e.sent)}%)</span></div>
+          <div style="background:#f1f5f9;height:18px"><div style="width:${w}%;background:${c};height:100%"></div></div></div>`; }).join('')}
+    </div>
+  </div>`;
+}
+function draftAB(){
+  return `<div class="card card-pad mb16">
+    <div class="card-title">🧪 A/B 测试列表
+      <button class="btn btn-gold btn-sm" onclick="toast('新建A/B测试（演示）')">＋ 新建测试</button></div>
+    <table class="tbl">
+      <thead><tr><th>测试名</th><th>分组</th><th>客户数</th><th>A 打开/回复</th><th>B 打开/回复</th><th>状态</th><th>胜出</th></tr></thead>
+      <tbody>${S.abTests.map(t=>`<tr>
+        <td><b>${esc(t.name)}</b></td><td class="text-sm">${esc(t.segments)}</td><td>${t.total}</td>
+        <td class="text-sm">${pct(t.a.opened,t.a.sent)}% / ${pct(t.a.replied,t.a.sent)}%</td>
+        <td class="text-sm">${pct(t.b.opened,t.b.sent)}% / ${pct(t.b.replied,t.b.sent)}%</td>
+        <td><span class="badge ${t.status==='done'?'badge-a':'badge-blue'}">${t.status==='done'?'已完成':'进行中'}</span></td>
+        <td>${t.winner==='A'?'<span class="badge badge-a">🏆 A</span>':'<span class="badge badge-gold">🏆 B</span>'}</td>
+      </tr>`).join('')}</tbody></table>
+  </div>`;
+}
 function draftTpl(){
-  return `<div class="grid-12">
+  const LI = [
+    {n:'领英加好友-通用型',body:'Hi [Name], I noticed you are in the [industry] sector. We manufacture [product] and would love to connect!'},
+    {n:'领英加好友-同圈层型',body:'Hi [Name], we are both in [group] and I find your posts insightful. Would be great to connect!'},
+    {n:'领英加好友-痛点定向',body:'Hi [Name], saw your post about [topic]. We help [benefit]. Would love to exchange ideas!'},
+    {n:'破冰-资讯分享型',body:'Hi [Name], saw this article about [topic] and thought of you. No pitch - just thought it might be useful. Cheers!'},
+    {n:'破冰-痛点解决型',body:'Hi [Name], noticed your challenge with [topic]. We have solved it for 3 EU distributors. Open to a 15-min call?'},
+    {n:'WhatsApp-初次联系',body:'Hi [Name], Leo from KaiLionCrafts here. We make kitchen knives and scissors in Yangjiang. May I share our catalog?'},
+    {n:'WhatsApp-跟进提醒',body:'Hi [Name], just following up on [product]. Any interest in a free sample?'},
+    {n:'WhatsApp-节日问候',body:'Hi [Name], wishing you a great [holiday]! Let me know if you need cutlery supplies this season.'}
+  ];
+  return `<div class="card card-pad mb16"><div class="card-title">💬 社媒获客话术（领英 / WhatsApp）</div>
+    <div class="grid-12">${LI.map(t=>`
+      <div class="card card-pad" style="background:#f7f9fc">
+        <b class="text-sm" style="color:var(--primary)">${t.n}</b>
+        <div class="text-sm text-muted mono mt8" style="font-size:11px">${t.body}</div>
+        <button class="btn btn-outline btn-sm mt8" onclick="copyText('${t.body.replace(/'/g,"\\'")}')">📋 复制</button>
+      </div>`).join('')}</div></div>
+  <div class="grid-12">
     ${TEMPLATES.map(t=>`
       <div class="card card-pad">
         <div class="flex-between"><b style="color:var(--primary)">${t.name}</b><span class="text-sm text-muted">${t.desc}</span></div>
@@ -1855,8 +1960,17 @@ function openDraftEditor(did, isNew){
       <div class="form-group"><label>正文（AI 生成草稿，发送前请人工审核修改）</label>
         <textarea class="form-control" id="dr_body" style="min-height:260px;font-family:Menlo,monospace;font-size:12.5px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${esc(d.body)}</textarea></div>
       <div class="divider"></div>
+      <div class="card card-pad mb16" style="background:#f7efdd">
+        <b>🕐 最佳发送时间</b>
+        <div class="text-sm mt8">客户 ${esc(d.country)} 当地时间：<b id="lt">${c?localTime(c.country).str:''}</b>
+        ${c && localTime(c.country).badTime?'<span class="badge badge-red">⚠️ 客户休息时间，建议工作日 8-11 点发送</span>':''}
+        ${c && localTime(c.country).weekend?'<span class="badge badge-gold">周末，建议工作日发送</span>':''}
+        </div>
+        <button class="btn btn-outline btn-sm mt8" onclick="alert('已设置定时发送（演示）')">⏰ 定时发送</button>
+      </div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="saveDraft('${d.id}')">💾 保存草稿</button>
+        <button class="btn btn-outline" onclick="spamCheck()">🛡 检测进箱率</button>
         <button class="btn btn-success" onclick="markSent('${d.id}')">✅ 标记已人工发送</button>
         <button class="btn btn-outline" onclick="regenDraft('${d.id}')">🔄 AI 重新生成</button>
         <button class="btn btn-outline" onclick="copyDraft('${d.id}')">📋 复制</button>
@@ -2188,6 +2302,7 @@ function viewSettings(root){
   root.innerHTML = `
     ${renderApiSettings()}
     ${renderMonitorSettings()}
+    ${renderEmailHealth()}
     <div class="card card-pad mb16"><div class="card-title">📤 数据导出</div>
       <div class="flex gap8" style="flex-wrap:wrap">
         <button class="btn btn-outline" onclick="exportCustomersCSV">导出客户 CSV</button>
@@ -2555,6 +2670,107 @@ function exportBackup(){
   toast('已导出全量备份');
 }
 
+/* V4 时区 + 进箱率检测 + 社媒话术 */
+const TZ_MAP = {'美国':'America/New_York','德国':'Europe/Berlin','英国':'Europe/London','日本':'Asia/Tokyo',
+  '阿联酋':'Asia/Dubai','澳大利亚':'Australia/Sydney','巴西':'America/Sao_Paulo','加拿大':'America/Toronto',
+  '法国':'Europe/Paris','西班牙':'Europe/Madrid','意大利':'Europe/Rome','韩国':'Asia/Seoul',
+  '新加坡':'Asia/Singapore','墨西哥':'America/Mexico_City','印度':'Asia/Kolkata','俄罗斯':'Europe/Moscow'};
+function localTime(country){
+  const tz = TZ_MAP[country] || 'UTC';
+  try{
+    const f = new Intl.DateTimeFormat('zh-CN',{timeZone:tz,hour:'2-digit',minute:'2-digit',weekday:'short',hour12:false});
+    const parts = f.formatToParts();
+    const h = parseInt(parts.find(p=>p.type==='hour').value);
+    const wd = parts.find(p=>p.type==='weekday').value;
+    const min = parts.find(p=>p.type==='minute').value;
+    const weekend = ['周六','周日'].includes(wd);
+    const badTime = h<8 || h>19;
+    return {h,wd,min,weekend,badTime,str:wd+' '+h+':'+min};
+  }catch(e){ return {h:12,wd:'',min:'00',weekend:false,badTime:false,str:country}; }
+}
+function spamCheck(){
+  const body = (document.getElementById('dr_body')||{value:''}).value || '';
+  const subj = (document.getElementById('dr_subject')||{value:''}).value || '';
+  let score=100; const issues=[];
+  const bad=['免费','100%','现在行动','折扣','限时','赚钱','恭喜','点击这里','立即','特价','保证','free','discount','guarantee','act now','limited'];
+  bad.forEach(w=>{ if(body.toLowerCase().includes(w.toLowerCase())||subj.toLowerCase().includes(w.toLowerCase())){ score-=8; issues.push('敏感词：'+w); }});
+  const ex=(body.match(/!/g)||[]).length; if(ex>3){ score-=5; issues.push('感叹号过多('+ex+'个)'); }
+  const links=(body.match(/https?:\/\//g)||[]).length; if(links>3){ score-=5; issues.push('链接过多('+links+'个)'); }
+  if(subj.length<10||subj.length>70){ score-=5; issues.push('主题长度不推荐('+subj.length+'字符)'); }
+  const words=body.split(/\s+/).filter(Boolean).length; if(words<50){ score-=5; issues.push('正文太短('+words+'词)'); }
+  score=Math.max(0,Math.min(100,score));
+  const color = score>=80?'var(--green)':score>=60?'#ed8936':'var(--red)';
+  alert(`进箱率评分：${score}/100\n\n${issues.length?'问题：\n- '+issues.join('\n- '):'✓ 未发现明显垃圾邮件特征'}\n\n建议：${score>=80?'进箱率良好':'适当调整敏感词和链接数'}`);
+}
+
+/* V4 邮箱健康度 + 邮件配置指南 */
+function renderEmailHealth(){
+  const bounced = S.drafts.filter(d=>d.trackStatus==='已退信');
+  const valid = S.drafts.length - bounced.length;
+  const total = S.drafts.length||1;
+  const rate = Math.round(bounced.length/total*100);
+  return `
+  <div class="card card-pad mb16">
+    <div class="card-title">📧 邮箱健康度
+      <button class="btn btn-outline btn-sm" onclick="toast('已清理无效邮箱')">一键清理</button></div>
+    <div class="grid-3 mb16">
+      <div class="stat-card"><div class="stat-label">有效邮箱</div><div class="stat-value" style="color:var(--green)">${valid}</div></div>
+      <div class="stat-card"><div class="stat-label">无效邮箱</div><div class="stat-value" style="color:var(--red)">${bounced.length}</div></div>
+      <div class="stat-card"><div class="stat-label">退信率</div>
+        <div class="stat-value" style="color:${rate>5?'var(--red)':'var(--green)'}">${rate}%</div>
+        ${rate>5?'<div class="stat-trend down">⚠️ 退信率超过5%，需清理名单</div>':'<div class="stat-trend up">健康</div>'}
+      </div>
+    </div>
+    <div style="background:#f7efdd;padding:12px;border-radius:8px">
+      <b class="text-gold">🌱 新邮箱预热指南</b>
+      <div class="text-sm mt8" style="line-height:2">
+        第1周：每天 ≤20 封 → 第2周：每天 ≤50 封 → 第3周：每天 ≤100 封 → 第4周起：可正常发送
+      </div>
+    </div>
+    ${bounced.length?`<div class="divider"></div><table class="tbl"><thead><tr><th>公司</th><th>邮箱</th><th>操作</th></tr></thead>
+      <tbody>${bounced.map(b=>`<tr><td>${esc(b.customerName)}</td><td class="mono text-sm">${esc(b.recipient||'-')}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="toast('已标记有效')">标记有效</button></td></tr>`).join('')}</tbody></table>`:''}
+  </div>
+  <div class="card card-pad mb16">
+    <div class="card-title">📬 邮件配置指南（SPF / DKIM / DMARC）</div>
+    <div class="text-sm" style="line-height:2">
+      <div onclick="this.classList.toggle('open')" style="cursor:pointer"><b>SPF 记录</b>：v=spf1 include:_spf.yourdomain.com ~all — <span class="badge badge-a">✓ 已配置</span></div>
+      <div><b>DKIM 签名</b>：在 DNS 添加选择器+公钥 TXT 记录 — <span class="badge badge-gold">○ 待配置</span></div>
+      <div><b>DMARC 策略</b>：v=DMARC1; p=none; rua=mailto:postmaster@ — <span class="badge badge-gold">○ p=none 监控模式</span></div>
+    </div>
+    <div class="divider"></div>
+    <b>企业邮箱 vs 免费邮箱</b>
+    <table class="tbl mt8"><thead><tr><th>维度</th><th>企业邮箱</th><th>免费邮箱(gmail等)</th></tr></thead>
+      <tbody><tr><td>送达率</td><td>高</td><td>易进垃圾箱</td></tr><tr><td>品牌信誉</td><td>专业</td><td>弱</td></tr><tr><td>批量发送</td><td>可配置SPF/DKIM</td><td>有限制</td></tr></tbody></table>
+    <div class="divider"></div>
+    <b>💡 进箱率提升 10 条</b>
+    <ol style="padding-left:20px;font-size:13px;line-height:2">
+      <li>避免敏感词（免费/折扣/限时/保证）</li>
+      <li>主题个性化，带客户公司名</li>
+      <li>控制发送频率，预热新域名</li>
+      <li>及时清理退信名单</li>
+      <li>正文少于 300 词，单链接</li>
+      <li>避免全大写单词和过多感叹号</li>
+      <li>提供一键退订入口</li>
+      <li>发送前做 A/B 测试主题</li>
+      <li>监测打开/回复率迭代模板</li>
+      <li>用企业域名而非免费邮箱</li>
+    </ol>
+  </div>`;
+}
+
+function renderChannelEffect(){
+  const ch={}; S.customers.forEach(c=>{ ch[c.source]=(ch[c.source]||0)+1; });
+  return Object.entries(ch).sort((a,b)=>b[1]-a[1]).map(function(kv){
+    const k=kv[0],v=kv[1];
+    const avg=Math.round(S.customers.filter(function(c){return c.source===k;}).reduce(function(a,c){return a+c.scores.total;},0)/v);
+    const w=Math.round(v/S.customers.length*100);
+    return '<div style="margin-bottom:6px">'+
+      '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">'+
+      '<span>'+k+'</span><b>'+v+'家·均匹配'+avg+'分</b></div>'+
+      '<div style="background:#f1f5f9;height:14px"><div style="width:'+w+'%;background:#c9a961;height:100%"></div></div></div>';
+  }).join('');
+}
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }
 
 /* ============================================================

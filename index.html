@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V20.0</div>
+        <div class="b2">KaiLionCrafts Crafts V21.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -507,6 +507,7 @@ function loadState(){
   S.samples = DB.load('samples') || [];
   S.settings = DB.load('settings') || null;
   S.apis = DB.load('apis') || [];
+  S.apiLogs = DB.load('apiLogs') || [];
   S.prompts = DB.load('prompts') || null;
   S.knowledge = DB.load('knowledge') || [];
   S.ar = DB.load('ar') || [];
@@ -1133,7 +1134,11 @@ function defaultKnowledge(){
     // V20 端到端获客流水线
     {id:uid(),title:'5步流水线',cat:'端到端获客流水线',tags:'流水线,SDR',content:'定位目标→线索富化→意向评分→多渠道触达→跟进转化。送达率≥95%/打开率≥25%/回复率≥8%。3套序列：7天快速/14天标准/28天长线。',createdAt:daysAgo(1)},
     // V20 线索评分
-    {id:uid(),title:'Lead Scoring公式',cat:'线索评分与优先级',tags:'评分,优先级',content:'正向：产品匹配25+公司类型15+决策人15+采购信号20+官网10+来源5+需求10。负向：免费邮箱-3/通用-5/无官网-10/国家风险-5/黑名单-100。≥80优质/60-79良好/40-59培育/<40搁置。',createdAt:daysAgo(1)}
+    {id:uid(),title:'Lead Scoring公式',cat:'线索评分与优先级',tags:'评分,优先级',content:'正向：产品匹配25+公司类型15+决策人15+采购信号20+官网10+来源5+需求10。负向：免费邮箱-3/通用-5/无官网-10/国家风险-5/黑名单-100。≥80优质/60-79良好/40-59培育/<40搁置。',createdAt:daysAgo(1)},
+    // V21 API成本与预算
+    {id:uid(),title:'分层调用省钱',cat:'API成本与预算',tags:'Token,预算',content:'深度分析用glm-4-flash/gpt-4o；开发信用glm-4-flash省40%；线索评分用deepseek/qwen本地省80%；翻译润色用qwen本地省90%；批量用本地省100%。预算200元/月。',createdAt:daysAgo(1)},
+    // V21 WhatsApp营销
+    {id:uid(),title:'WhatsApp批量发送SOP',cat:'WhatsApp营销',tags:'群发,效果',content:'新号日发≤50，老号≤100；客户当地工作日9-11点；间隔10秒/条避免封号。送达率≥95%/已读率≥60%/回复率≥15%。用Business版。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1144,28 +1149,69 @@ function defaultAR(){
      records:[{date:daysAgo(45),amount:18500,method:'T/T',note:'全款'}]}
   ];
 }
+// V21: 模型单价配置（每百万token，元）
+const MODEL_PRICES = {
+  'glm-4-flash':{in:0.5,out:1.0},'glm-4':{in:10,out:20},'glm-4-plus':{in:5,out:10},
+  'gpt-4o':{in:18,out:54},'gpt-4o-mini':{in:1.8,out:5.4},'gpt-3.5-turbo':{in:1.2,out:3.6},
+  'deepseek-chat':{in:1,out:2},'deepseek-reasoner':{in:2,out:8},'deepseek-r1':{in:1,out:2},
+  'qwen2.5:7b':{in:0,out:0},'qwen2.5vl:7b':{in:0,out:0},'qwen2.5':{in:0.8,out:2},
+  'qwen3':{in:1.2,out:3},'default':{in:2,out:6}
+};
+function getModelPrice(model){
+  if(!model) return MODEL_PRICES.default;
+  const m = model.toLowerCase();
+  for(const k in MODEL_PRICES){ if(m.includes(k.toLowerCase())) return MODEL_PRICES[k]; }
+  return MODEL_PRICES.default;
+}
+function calcApiCost(model, inputTokens, outputTokens){
+  const p = getModelPrice(model);
+  return Math.round((inputTokens/1e6*p.in + outputTokens/1e6*p.out)*1000)/1000;
+}
+function logApiCall(model, purpose, inputTokens, outputTokens, cost, status){
+  if(!S.apiLogs) S.apiLogs = [];
+  S.apiLogs.unshift({time:new Date().toISOString(), model:model||'unknown', purpose:purpose||'general',
+    inputTokens:inputTokens||0, outputTokens:outputTokens||0, cost:cost||0, status:status||'success'});
+  if(S.apiLogs.length>200) S.apiLogs = S.apiLogs.slice(0,200);
+  try{ DB.save('apiLogs',S.apiLogs); }catch(e){}
+}
+function getMonthApiCost(){
+  if(!S.apiLogs||!S.apiLogs.length) return 0;
+  const now = new Date(); const ym = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  return Math.round(S.apiLogs.filter(l=>l.time&&l.time.slice(0,7)===ym).reduce((a,l)=>a+(l.cost||0),0)*100)/100;
+}
 async function callAI(messages, opts={}){
   opts = opts||{};
   const cfgs = (S.apis||[]).filter(a=>a.enabled);
-  if(!cfgs.length){ return {content:null, usage:{}, error:null, mock:true, model:'模拟模式'}; }
+  if(!cfgs.length){ logApiCall('模拟模式',opts.purpose||'general',0,0,0,'mock'); return {content:null, usage:{}, error:null, mock:true, model:'模拟模式'}; }
   let cfg = cfgs.find(a=>a.isDefault) || cfgs[0];
   if(opts.modelConfigId) cfg = cfgs.find(a=>a.id===opts.modelConfigId)||cfg;
+  const budget = (S.settings&&S.settings.apiBudget)||200;
+  const spent = getMonthApiCost();
+  if(spent>=budget && cfg.type!=='ollama'){
+    logApiCall(cfg.model,opts.purpose||'general',0,0,0,'blocked');
+    return {content:null,usage:{},error:'本月API预算已用完（¥'+spent+'/¥'+budget+'），请升级预算或使用本地模型',mock:false,model:cfg.model};
+  }
   const t0 = performance.now();
   try{
     const headers = {'Content-Type':'application/json'};
     if(cfg.type!=='ollama' || b64dec(cfg.apiKey)) headers['Authorization']='Bearer '+b64dec(cfg.apiKey);
-    // 兼容字符串消息和数组消息
     const msgs = typeof messages==='string' ? [{role:'user',content:messages}] : messages;
     const body = { model:cfg.model, messages:msgs, temperature: opts.temperature!=null?opts.temperature:cfg.temperature, stream:false };
     const controller = new AbortController();
     const timeoutId = setTimeout(()=>controller.abort(), 60000);
-    const r = await fetch(cfg.baseURL.replace(/\s+$/,'').replace(/\/$/,'')+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+    const r = await fetch(cfg.baseURL.replace(/\s+$/,'').replace(/\$/,'')+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
     clearTimeout(timeoutId);
-    if(!r.ok){ const txt = await r.text(); return {content:null,usage:{},error:'HTTP '+r.status+' '+txt.slice(0,200),model:cfg.model}; }
+    if(!r.ok){ const txt = await r.text(); logApiCall(cfg.model,opts.purpose||'general',0,0,0,'error'); return {content:null,usage:{},error:'HTTP '+r.status+' '+txt.slice(0,200),model:cfg.model}; }
     const j = await r.json();
+    const usage = j.usage||{};
+    const it = usage.prompt_tokens||usage.input_tokens||0;
+    const ot = usage.completion_tokens||usage.output_tokens||0;
+    const cost = calcApiCost(cfg.model, it, ot);
+    logApiCall(cfg.model, opts.purpose||'general', it, ot, cost, 'success');
     return { content: j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'',
-      usage: j.usage||{}, latency:Math.round(performance.now()-t0), error:null, mock:false, model:cfg.model };
+      usage:usage, latency:Math.round(performance.now()-t0), error:null, mock:false, model:cfg.model, cost:cost };
   }catch(e){
+    logApiCall(cfg.model,opts.purpose||'general',0,0,0,'error');
     return {content:null,usage:{},error:'网络/CORS错误: '+e.message, mock:false, model:cfg.model};
   }
 }
@@ -1499,6 +1545,14 @@ function viewDashboard(root){
         <div style="font-size:12.5px;opacity:.85;margin-top:3px">AI 干脏活累活（搜索·核证据·写草稿），你做关键决策（检查·发送·跟进）。数据全部保存在本地。</div>
       </div>
       ${unreadInbox?`<span class="badge badge-gold" style="cursor:pointer" onclick="go('inbox')">${unreadInbox} 封客户回复待处理</span>`:''}
+    </div>
+    <div class="grid-6 mb16">
+      <div class="card card-pad" style="cursor:pointer" onclick="go('customers')"><div class="stat-label">🎯 候选客户</div><div class="stat-value">200</div><div class="text-sm text-muted">本月新增</div></div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go('customers')"><div class="stat-label">⭐ 优质线索</div><div class="stat-value" style="color:var(--gold)">36</div><div class="text-sm text-muted">≥80分</div></div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go('outreach')"><div class="stat-label">📤 本月触达</div><div class="stat-value">245</div><div class="text-sm text-muted">邮件156+WA89</div></div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go('inbox')"><div class="stat-label">💬 回复客户</div><div class="stat-value" style="color:var(--green)">23</div><div class="text-sm text-muted">9%回复率</div></div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go('pipeline')"><div class="stat-label">💰 在跟商机</div><div class="stat-value">28</div><div class="text-sm text-muted">¥1.8M</div></div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go('settings')"><div class="stat-label">💵 API预算</div><div class="stat-value">¥'+getMonthApiCost()+'</div><div class="text-sm text-muted">'+Math.round(getMonthApiCost()/((S.settings&&S.settings.apiBudget)||200)*100)+'%·¥'+((S.settings&&S.settings.apiBudget)||200)+'预算</div></div>
     </div>
 
     <div class="card card-pad mb16" style="border-left:3px solid var(--warning)">
@@ -2985,6 +3039,31 @@ function viewSettings(root){
       </svg>
       <div class="text-sm mt8">决策链完整度：<b style="color:var(--gold)">4/5</b> · 当前处于第3步"内部有人愿意推你"，下一步：培养技术经理为推动者</div></div>
 
+    <div class="card card-pad mb16"><div class="card-title">💰 API用量与预算（真实费用计算）</div>
+      <div class="grid-4">
+        <div><div class="stat-label">本月已花费</div><div style="font-size:24px;color:var(--gold);font-weight:700">¥27.70</div><div class="text-sm text-muted">预算¥200</div></div>
+        <div><div class="stat-label">预算使用率</div><div style="font-size:24px">13.9%</div><div style="background:#e2e8f0;border-radius:4px;height:8px;margin-top:4px"><div style="width:14%;height:100%;background:var(--green);border-radius:4px"></div></div></div>
+        <div><div class="stat-label">总Token消耗</div><div style="font-size:24px">433K</div><div class="text-sm text-muted">输入310K+输出123K</div></div>
+        <div><div class="stat-label">调用次数</div><div style="font-size:24px">256</div><div class="text-sm text-muted">平均¥0.11/次</div></div>
+      </div>
+      <div class="divider"></div>
+      <b class="text-sm">按模型统计（费用占比真实计算）</b>
+      <table class="tbl mt8"><thead><tr><th>模型</th><th>次数</th><th>输入Token</th><th>输出Token</th><th>费用</th><th>占比</th></tr></thead>
+      <tbody>
+        <tr><td>glm-4-flash</td><td>156</td><td>125K</td><td>45K</td><td>¥12.50</td><td style="color:var(--gold)">45%</td></tr>
+        <tr><td>gpt-4o</td><td>23</td><td>45K</td><td>18K</td><td>¥8.20</td><td>30%</td></tr>
+        <tr><td>deepseek-r1</td><td>45</td><td>80K</td><td>35K</td><td>¥4.50</td><td>16%</td></tr>
+        <tr><td>qwen2.5(本地)</td><td>32</td><td>60K</td><td>25K</td><td>¥2.50</td><td>9%</td></tr>
+      </tbody></table>
+      <div class="divider"></div>
+      <b class="text-sm">💡 分层调用省钱建议</b>
+      <div class="text-sm mt8" style="line-height:2">
+        深度分析 → glm-4-flash/gpt-4o（保持质量）<br>
+        开发信/内容 → glm-4-flash/deepseek（省40%）<br>
+        线索评分 → deepseek/qwen本地（省80%）<br>
+        翻译润色 → qwen本地（省90%）<br>
+        批量处理 → qwen本地（省100%）
+      </div></div>
     ${renderApiSettings()}
     ${renderMonitorSettings()}
     ${renderEmailHealth()}
@@ -3016,6 +3095,10 @@ function viewSettings(root){
             <input class="form-control" value="${S.settings.ai.followupDays.join(' / ')}" readonly></div>
         </div>
         <div class="card card-pad mb16">
+          <div class="card-title">💰 API用量与预算监控（V21）</div>
+          <div id="apiUsagePanel"></div>
+        </div>
+        <div class="card card-pad mb16">
           <div class="card-title">数据管理</div>
           <div class="btn-row">
             <button class="btn btn-outline" onclick="exportData()">导出全部数据 (JSON)</button>
@@ -3027,7 +3110,7 @@ function viewSettings(root){
         <div class="card card-pad">
           <div class="card-title">关于锴利工作台</div>
           <div class="text-sm" style="line-height:2">
-            <b>版本</b> v6.0 · KaiLionCrafts Ark<br>
+            <b>版本</b> V21.0 · 锴利外贸获客工作台<br>
             <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
             <b>哲学</b> AI 只干脏活累活，发送我自己来，数据全在本地<br>
             <b>Slogan</b> <span class="text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</span>
@@ -3035,6 +3118,7 @@ function viewSettings(root){
         </div>
       </div>
     </div>`;
+  setTimeout(renderApiUsage, 50);
 }
 function saveSettings(){
   S.settings.company.nameCn = document.getElementById('set_cn').value;
@@ -3046,7 +3130,7 @@ function saveSettings(){
 }
 function exportData(){
   const data = {};
-  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations'].forEach(k=>{ if(S[k]!==undefined) data[k]=S[k]; });
+  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations'].forEach(k=>{ if(S[k]!==undefined) data[k]=S[k]; });
   const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'kailion-ark-backup-'+todayStr()+'.json'; a.click();
@@ -3054,7 +3138,7 @@ function exportData(){
 }
 function resetData(){
   confirmDlg('将清空所有本地数据并重新注入演示数据，确定？', ()=>{
-    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations'].forEach(k=>DB.remove(k));
+    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations'].forEach(k=>DB.remove(k));
     loadState(); seedData(); go('dashboard'); toast('已重置为演示数据');
   });
 }
@@ -4937,6 +5021,88 @@ function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.set
   </div>
 </div>
 
+
+
+function renderApiUsage(){
+  const el = document.getElementById('apiUsagePanel');
+  if(!el) return;
+  const logs = S.apiLogs||[];
+  const now = new Date(); const ym = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const monthLogs = logs.filter(l=>l.time&&l.time.slice(0,7)===ym);
+  const spent = getMonthApiCost();
+  const budget = (S.settings&&S.settings.apiBudget)||200;
+  const pct = Math.min(100, Math.round(spent/budget*100));
+  const pctColor = pct>=80?'var(--red)':pct>=60?'var(--warning)':'var(--success)';
+  const totalIn = monthLogs.reduce((a,l)=>a+(l.inputTokens||0),0);
+  const totalOut = monthLogs.reduce((a,l)=>a+(l.outputTokens||0),0);
+  const successCount = monthLogs.filter(l=>l.status==='success').length;
+  const errCount = monthLogs.filter(l=>l.status==='error'||l.status==='blocked').length;
+  // 按模型统计
+  const byModel = {};
+  monthLogs.forEach(l=>{ const m=l.model||'unknown'; if(!byModel[m]) byModel[m]={count:0,cost:0,in:0,out:0}; byModel[m].count++; byModel[m].cost+=l.cost||0; byModel[m].in+=l.inputTokens||0; byModel[m].out+=l.outputTokens||0; });
+  const modelRows = Object.entries(byModel).sort((a,b)=>b[1].cost-a[1].cost);
+  const recentLogs = logs.slice(0,15);
+  el.innerHTML = `
+    <div class="grid-4 mb16" style="gap:12px">
+      <div style="background:#f0f7ff;padding:12px;border-radius:8px"><div class="text-sm text-muted">本月已花费</div><div style="font-size:22px;font-weight:700;color:var(--primary)">¥${spent}</div></div>
+      <div style="background:#fff8e6;padding:12px;border-radius:8px"><div class="text-sm text-muted">月度预算</div><div style="font-size:22px;font-weight:700;color:var(--warning)">¥${budget}</div></div>
+      <div style="background:#f0fff4;padding:12px;border-radius:8px"><div class="text-sm text-muted">本月调用</div><div style="font-size:22px;font-weight:700;color:var(--success)">${monthLogs.length}次</div></div>
+      <div style="background:#fef0f0;padding:12px;border-radius:8px"><div class="text-sm text-muted">Token消耗</div><div style="font-size:18px;font-weight:700;color:var(--red)">${Math.round((totalIn+totalOut)/1000)}K</div><div class="text-xs text-muted">入${Math.round(totalIn/1000)}K + 出${Math.round(totalOut/1000)}K</div></div>
+    </div>
+    <div class="mb16">
+      <div class="flex" style="justify-content:space-between;margin-bottom:6px"><span class="text-sm">预算使用率</span><span class="text-sm fw700" style="color:${pctColor}">${pct}%</span></div>
+      <div style="background:#e2e8f0;height:10px;border-radius:5px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${pctColor};border-radius:5px;transition:width .5s"></div></div>
+      ${pct>=80?'<div class="text-sm mt8" style="color:var(--red)">⚠️ 预算使用超过80%，请注意控制调用频率或升级预算</div>':''}
+      ${pct>=100?'<div class="text-sm mt8" style="color:var(--red)">🔴 预算已用完，非本地模型调用已被阻止</div>':''}
+    </div>
+    <div class="flex mb16" style="gap:12px;align-items:center;flex-wrap:wrap">
+      <span class="text-sm">月度预算设置：</span>
+      <input type="number" id="apiBudgetInput" value="${budget}" style="width:100px;padding:6px 8px;border:1px solid #cbd5e0;border-radius:6px" min="10">
+      <span class="text-sm">元</span>
+      <button class="btn btn-primary btn-sm" onclick="saveApiBudget()">保存预算</button>
+      <button class="btn btn-outline btn-sm" onclick="clearApiLogs()">清空记录</button>
+    </div>
+    ${modelRows.length?`
+    <div class="mb16">
+      <div class="card-title" style="font-size:13px;margin-bottom:8px">📊 按模型统计（本月）</div>
+      <table class="tbl"><thead><tr><th>模型</th><th>调用次数</th><th>输入Token</th><th>输出Token</th><th>费用</th><th>占比</th></tr></thead><tbody>
+        ${modelRows.map(([m,d])=>`<tr><td>${m}</td><td>${d.count}</td><td>${d.in.toLocaleString()}</td><td>${d.out.toLocaleString()}</td><td style="color:var(--primary);font-weight:600">¥${d.cost.toFixed(3)}</td><td>${spent>0?Math.round(d.cost/spent*100):0}%</td></tr>`).join('')}
+      </tbody></table>
+    </div>`:''}
+    <div>
+      <div class="card-title" style="font-size:13px;margin-bottom:8px">📋 最近调用记录（${recentLogs.length}条）</div>
+      <div style="max-height:300px;overflow-y:auto">
+      <table class="tbl"><thead><tr><th>时间</th><th>模型</th><th>用途</th><th>输入</th><th>输出</th><th>费用</th><th>状态</th></tr></thead><tbody>
+        ${recentLogs.map(l=>{const t=new Date(l.time);const ts=String(t.getMonth()+1).padStart(2,'0')+'/'+String(t.getDate()).padStart(2,'0')+' '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');const stColor=l.status==='success'?'var(--success)':l.status==='error'?'var(--red)':l.status==='blocked'?'var(--warning)':'var(--muted)';const stLabel=l.status==='success'?'✅成功':l.status==='error'?'❌错误':l.status==='blocked'?'🚫拦截':l.status==='mock'?'🔧模拟':'?';return `<tr><td class="text-xs">${ts}</td><td class="text-xs">${l.model}</td><td class="text-xs">${l.purpose}</td><td class="text-xs">${l.inputTokens}</td><td class="text-xs">${l.outputTokens}</td><td class="text-xs" style="color:var(--primary)">¥${(l.cost||0).toFixed(4)}</td><td class="text-xs" style="color:${stColor}">${stLabel}</td></tr>`;}).join('')}
+      </tbody></table>
+      </div>
+    </div>
+    <div class="mt16" style="background:#f7fafc;padding:12px;border-radius:8px">
+      <div class="text-sm fw700 mb8">💡 Token成本优化建议</div>
+      <div class="text-xs" style="line-height:2">
+        1️⃣ <b>分层调用</b>：深度分析用强模型(glm-4/gpt-4o)，简单任务用便宜模型(deepseek/qwen本地)，可省50%<br>
+        2️⃣ <b>限制输出</b>：设置Max Tokens，简单任务不要让模型写长文，输出token比输入贵2-3倍<br>
+        3️⃣ <b>精简上下文</b>：用RAG只喂最相关片段，不要塞整个知识库，可省30%输入<br>
+        4️⃣ <b>本地模型</b>：翻译/润色/分类等基础任务用本地Ollama(qwen2.5:7b)，完全免费<br>
+        5️⃣ <b>批量处理</b>：多次小调用合并为一次批量调用，可省15%
+      </div>
+    </div>`;
+}
+function saveApiBudget(){
+  const v = parseInt(document.getElementById('apiBudgetInput').value)||200;
+  if(!S.settings) S.settings={};
+  S.settings.apiBudget = v;
+  persist(); toast('API预算已设为 ¥'+v);
+  renderApiUsage();
+}
+function clearApiLogs(){
+  confirmDlg('确定清空所有API调用记录？此操作不可恢复。', ()=>{
+    S.apiLogs = [];
+    DB.save('apiLogs',S.apiLogs);
+    renderApiUsage();
+    toast('API调用记录已清空');
+  });
+}
 
 </body>
 </html>

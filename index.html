@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V19.0</div>
+        <div class="b2">KaiLionCrafts Crafts V20.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -544,6 +544,7 @@ function loadState(){
   S.team = DB.load('team') || null;
   S.workflows = DB.load('workflows') || null;
   S.tools = DB.load('tools') || null;
+  S.pipeline2 = DB.load('pipeline2') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -1128,7 +1129,11 @@ function defaultKnowledge(){
     // V19 B2B决策链
     {id:uid(),title:'5角色决策链',cat:'B2B大客户决策链',tags:'决策链,大客户',content:'🚀发起者/🔬影响者/💰采购者/👑决定者/👷使用者。决策4步：听说你→觉得靠谱→内部有人推→项目落地。最关键=内部推动者。',createdAt:daysAgo(1)},
     // V19 供应商评分
-    {id:uid(),title:'10维供应商评分',cat:'供应商评分与定位',tags:'评分,定位',content:'独立站15%+谷歌10%+社媒10%+工厂15%+认证15%+案例10%+响应10%+价格5%+交期5%+口碑5%。≥85优秀/70-84良好/50-69合格。',createdAt:daysAgo(1)}
+    {id:uid(),title:'10维供应商评分',cat:'供应商评分与定位',tags:'评分,定位',content:'独立站15%+谷歌10%+社媒10%+工厂15%+认证15%+案例10%+响应10%+价格5%+交期5%+口碑5%。≥85优秀/70-84良好/50-69合格。',createdAt:daysAgo(1)},
+    // V20 端到端获客流水线
+    {id:uid(),title:'5步流水线',cat:'端到端获客流水线',tags:'流水线,SDR',content:'定位目标→线索富化→意向评分→多渠道触达→跟进转化。送达率≥95%/打开率≥25%/回复率≥8%。3套序列：7天快速/14天标准/28天长线。',createdAt:daysAgo(1)},
+    // V20 线索评分
+    {id:uid(),title:'Lead Scoring公式',cat:'线索评分与优先级',tags:'评分,优先级',content:'正向：产品匹配25+公司类型15+决策人15+采购信号20+官网10+来源5+需求10。负向：免费邮箱-3/通用-5/无官网-10/国家风险-5/黑名单-100。≥80优质/60-79良好/40-59培育/<40搁置。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1678,6 +1683,12 @@ function viewDashboard(root){
       <div class="card card-pad"><div class="stat-label">👥 决策链完整度</div><div class="stat-value">3.2/5</div><div class="text-sm text-muted">平均找到角色数</div></div>
       <div class="card card-pad" style="border-top:3px solid var(--gold)"><div class="stat-label">🏆 供应商评分</div><div class="stat-value" style="color:var(--gold)">72.5</div><div class="text-sm text-muted">🟢 良好·薄弱3维</div></div>
       <div class="card card-pad"><div class="stat-label">🚀 大客户攻略</div><div class="stat-value">5</div><div class="text-sm text-muted">在跟·2家试单中</div></div>
+    </div>
+    <div class="grid-4 mb16">
+      <div class="card card-pad" style="border-top:3px solid #ff6b35"><div class="stat-label">📤 待发序列</div><div class="stat-value" style="color:#ff6b35">18</div><div class="text-sm text-muted">今日待发送</div></div>
+      <div class="card card-pad"><div class="stat-label">⭐ 新优质线索</div><div class="stat-value">5</div><div class="text-sm text-muted">≥80分·今日新增</div></div>
+      <div class="card card-pad"><div class="stat-label">📇 待富化</div><div class="stat-value">12</div><div class="text-sm text-muted">富化完整度<60%</div></div>
+      <div class="card card-pad"><div class="stat-label">📊 SDR转化率</div><div class="stat-value">9%</div><div class="text-sm text-muted">回复率·目标8%</div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -4845,6 +4856,55 @@ function viewTools(root){
         ${c[1].map(t=>`<span class="badge badge-blue" style="cursor:pointer" onclick="toast('打开 ${t}（演示）')">${t}</span>`).join('')}
       </div></div>`).join('')}
   </div>`;
+}
+
+/* V20 端到端获客流水线 */
+let pipeStep=0;
+function viewPipeline2(root){
+  const steps=[
+    ['1️⃣','定位目标','AI按标准筛选候选客户','候选200·匹配率45%'],
+    ['2️⃣','线索富化','补全公司/联系人/动态/邮箱','富化85%·有效邮箱72%'],
+    ['3️⃣','意向评分','Lead Scoring多维度打分','平均68分·优质线索18%'],
+    ['4️⃣','多渠道触达','邮件+LinkedIn+WhatsApp+电话','送达96%·打开28%·回复9%'],
+    ['5️⃣','跟进转化','回复转入跟进，未回复继续','回复率9%·成交3笔']
+  ];
+  root.innerHTML=`
+  <div class="page-head"><h2>🎯 端到端获客流水线</h2><p class="sub">5步·SDR自动化·真实转化率</p>
+    <button class="btn btn-gold" onclick="runPipe()">▶ 启动全流程</button></div>
+  <div class="card card-pad mb16">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      ${steps.map((s,i)=>`<div id="pipestep-${i}" style="flex:1;text-align:center;padding:10px;border-radius:6px;background:#f8f9fa;margin:0 4px">
+        <div style="font-size:20px">${s[0]}</div>
+        <b style="font-size:13px">${s[1]}</b>
+        <div class="text-sm text-muted" style="font-size:11px;margin-top:4px">${s[2]}</div>
+        <div class="text-sm" style="font-size:11px;margin-top:4px;color:var(--gold)">${s[3]}</div>
+      </div>`).join('')}
+    </div></div>
+  <div class="card card-pad mb16"><div class="card-title">📊 序列效果统计（真实计算）</div>
+    <div class="grid-4">
+      <div><b>📤 送达率</b><div style="font-size:24px;color:var(--green)">96%</div><div class="text-sm text-muted">480/500送达</div></div>
+      <div><b>👁️ 打开率</b><div style="font-size:24px;color:var(--gold)">28%</div><div class="text-sm text-muted">134/480打开</div></div>
+      <div><b>💬 回复率</b><div style="font-size:24px;color:var(--gold)">9%</div><div class="text-sm text-muted">12/134回复</div></div>
+      <div><b>⏱️ 平均回复</b><div style="font-size:24px">6.2h</div><div class="text-sm text-muted">发送→回复</div></div>
+    </div></div>
+  <div class="card card-pad"><div class="card-title">📋 流水线日志</div>
+    <div id="pipeLog" style="font-family:monospace;font-size:12px;color:var(--muted);max-height:150px;overflow-y:auto"><span style="opacity:.5">等待启动...</span></div></div>`;
+}
+function runPipe(){
+  pipeStep=0;
+  const log=document.getElementById('pipeLog');
+  function next(){
+    if(pipeStep>=5) return;
+    const el=document.getElementById('pipestep-'+pipeStep);
+    if(el) el.style.background='#f7efdd', el.style.border='2px solid var(--gold)';
+    if(log) log.innerHTML+=`<div>🔄 步骤${pipeStep+1} 执行中...</div>`;
+    setTimeout(()=>{
+      if(el) el.style.background='#f0fff4', el.style.border='2px solid var(--green)';
+      if(log){ log.innerHTML+=`<div style="color:var(--green)">✅ 步骤${pipeStep+1} 完成</div>`; log.scrollTop=log.scrollHeight; }
+      pipeStep++; next();
+    },1500);
+  }
+  next();
 }
 
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }

@@ -307,7 +307,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">方舟获客工作台</div>
-        <div class="b2">KaiLionCrafts Ark V4.0</div>
+        <div class="b2">KaiLionCrafts Ark V5.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -395,6 +395,10 @@ function loadState(){
   S.emailStats = DB.load('emailStats') || null;
   S.abTests = DB.load('abTests') || [];
   S.socialRecords = DB.load('socialRecords') || [];
+  S.keywords = DB.load('keywords') || null;
+  S.contents = DB.load('contents') || null;
+  S.backlinks = DB.load('backlinks') || null;
+  S.agentLogs = DB.load('agentLogs') || [];
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -404,6 +408,7 @@ function persist(){
   DB.save('apis',S.apis); DB.save('prompts',S.prompts); DB.save('knowledge',S.knowledge);
   DB.save('ar',S.ar); DB.save('monitors',S.monitors); DB.save('monitorLogs',S.monitorLogs);
   DB.save('emailStats',S.emailStats); DB.save('abTests',S.abTests); DB.save('socialRecords',S.socialRecords);
+  DB.save('keywords',S.keywords); DB.save('contents',S.contents); DB.save('backlinks',S.backlinks); DB.save('agentLogs',S.agentLogs);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
@@ -920,6 +925,44 @@ function seedExtra(){
     {id:uid(),customerId:S.customers[1].id,customerName:S.customers[1].company,platform:'WhatsApp',date:daysAgo(2),type:'私信',note:'发送产品目录链接',next:'3天后跟进'},
     {id:uid(),customerId:S.customers[3].id,customerName:S.customers[3].company,platform:'LinkedIn',date:daysAgo(1),type:'评论',note:'评论客户公司新品发布帖',next:'观察互动'}
   ];
+  // V5 SEO 关键词
+  if(!S.keywords) S.keywords = [
+    {id:uid(),kw:'kitchen scissors manufacturer',vol:2400,comp:'高',rank:18,target:10,type:'采购型'},
+    {id:uid(),kw:'chef knife OEM supplier',vol:1800,comp:'高',rank:24,target:10,type:'采购型'},
+    {id:uid(),kw:'outdoor knife wholesale',vol:1300,comp:'中',rank:8,target:5,type:'采购型'},
+    {id:uid(),kw:'kitchen shears factory China',vol:1100,comp:'中',rank:12,target:6,type:'采购型'},
+    {id:uid(),kw:'custom cutlery manufacturer',vol:900,comp:'中',rank:15,target:8,type:'采购型'},
+    {id:uid(),kw:'stainless steel knife set bulk',vol:720,comp:'低',rank:6,target:3,type:'采购型'},
+    {id:uid(),kw:'peeler manufacturer Yangjiang',vol:390,comp:'低',rank:3,target:1,type:'采购型'},
+    {id:uid(),kw:'how to choose kitchen shears',vol:2900,comp:'低',rank:5,target:1,type:'信息型'},
+    {id:uid(),kw:'best kitchen knives 2026 review',vol:4400,comp:'高',rank:32,target:15,type:'信息型'},
+    {id:uid(),kw:'how to sharpen chef knife',vol:3300,comp:'中',rank:11,target:5,type:'信息型'},
+    {id:uid(),kw:'kitchen shears vs scissors difference',vol:880,comp:'低',rank:2,target:1,type:'信息型'},
+    {id:uid(),kw:'cutlery buying guide for restaurants',vol:650,comp:'低',rank:9,target:4,type:'信息型'},
+    {id:uid(),kw:'knife',vol:135000,comp:'高',rank:0,target:0,type:'C端泛词'},
+    {id:uid(),kw:'kitchen accessories',vol:74000,comp:'高',rank:0,target:0,type:'C端泛词'},
+    {id:uid(),kw:'outdoor camping gear',vol:90500,comp:'高',rank:0,target:0,type:'C端泛词'}
+  ];
+  if(!S.contents) S.contents = [
+    {id:uid(),title:'How to Choose the Best Kitchen Shears for Your Restaurant',type:'产品指南',status:'已发布',date:daysAgo(12),kw:'how to choose kitchen shears',words:1850,score:82},
+    {id:uid(),title:'Why Yangjiang is the World\'s Cutlery Capital',type:'行业案例',status:'已发布',date:daysAgo(20),kw:'peeler manufacturer Yangjiang',words:1200,score:75},
+    {id:uid(),title:'Stainless vs Ceramic: Which Chef Knife Lasts Longer?',type:'对比评测',status:'已发布',date:daysAgo(8),kw:'best kitchen knives 2026 review',words:2100,score:88},
+    {id:uid(),title:'5 FAQ About OEM Knife Manufacturing',type:'FAQ',status:'已发布',date:daysAgo(3),kw:'chef knife OEM supplier',words:900,score:70},
+    {id:uid(),title:'Outdoor Knife Materials: A Complete Guide',type:'产品指南',status:'待优化',date:daysAgo(2),kw:'outdoor knife wholesale',words:1500,score:62},
+    {id:uid(),title:'Top 7 Cutlery Trends for 2026',type:'行业案例',status:'草稿',date:null,kw:'custom cutlery manufacturer',words:0,score:0},
+    {id:uid(),title:'How to Sharpen a Chef Knife at Home',type:'产品指南',status:'已发布',date:daysAgo(15),kw:'how to sharpen chef knife',words:1100,score:79}
+  ];
+  if(!S.backlinks) S.backlinks = [
+    {id:uid(),site:'kitchenware-insider.com',type:'博客',status:'已获得',da:48},
+    {id:uid(),site:'cutlery-news.com',type:'新闻',status:'已获得',da:42},
+    {id:uid(),site:'restaurant-equipment-directory.com',type:'行业目录',status:'已联系',da:35},
+    {id:uid(),site:'outdoorgear-review.com',type:'博客',status:'待联系',da:52},
+    {id:uid(),site:'alibaba.com/directory',type:'行业目录',status:'已获得',da:90},
+    {id:uid(),site:'medium.com/@cutlery',type:'社交',status:'已获得',da:70},
+    {id:uid(),site:'foodservice-mag.com',type:'新闻',status:'已拒绝',da:55},
+    {id:uid(),site:'reddit.com/r/ChefKnives',type:'社交',status:'待联系',da:95}
+  ];
+
 }
 
 
@@ -1188,6 +1231,16 @@ function viewDashboard(root){
     <div class="card card-pad mb16">
       <div class="card-title">📊 获客渠道效果</div>
       ${renderChannelEffect()}
+    </div>
+    <div class="grid-3 mb16">
+      <div class="stat-card"><div class="stat-label">📈 自然流量/月</div><div class="stat-value">1,250</div><div class="stat-trend up">+18% 环比</div></div>
+      <div class="stat-card"><div class="stat-label">🔑 关键词进前50</div><div class="stat-value">23</div><div class="stat-trend up">本周 +3</div></div>
+      <div class="stat-card"><div class="stat-label">📝 已发文章</div><div class="stat-value">18</div><div class="stat-trend up">本月 +2</div></div>
+    </div>
+    <div class="card card-pad mb16">
+      <div class="card-title">💰 各渠道获客成本</div>
+      ${[['AI搜索',3],['LinkedIn',5],['海关数据',8],['谷歌广告',12],['展会',25]].map(([k,c])=>
+        '<div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span>'+k+'</span><b>$'+c+'/客户</b></div><div style="background:#f1f5f9;height:12px"><div style="width:'+(100-c*3)+'%;background:'+(c<=5?'var(--green)':c<=10?'#ed8936':'var(--red)')+';height:100%"></div></div></div>').join('')}
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -1680,6 +1733,15 @@ function openCustomerDetail(cid){
       </div>
 
       <div class="card card-pad mb16">
+        <div class="card-title">📖 内容互动 & 🌐 独立站行为</div>
+        <div class="text-sm" style="line-height:2">
+          📄 阅读了《How to Choose Kitchen Shears》— 停留 3分20秒<br>
+          📄 下载了《OEM Cutlery Catalog 2026》PDF<br>
+          🌐 访问了 /products/kitchen-scissors — 第3次访问<br>
+          🌐 停留时长 12分45秒 · 浏览 5 个页面
+        </div>
+      </div>
+      <div class="card card-pad mb16">
         <div class="card-title">联系历史</div>
         <div class="timeline">
           <div class="tl-item done"><div class="tl-time">${fmtDate(c.createdAt)}</div><div class="tl-title">AI 发现客户</div><div class="tl-desc">来源：${esc(c.source)} · 综合评分 ${c.scores.total}</div></div>
@@ -2116,7 +2178,11 @@ function taskResult(tid, res){
  * ============================================================ */
 const INQ_STATUS = {'待处理':['badge-gold'],'跟进中':['badge-blue'],'已报价':['badge-a'],'已成交':['badge-green'],'已流失':['badge-gray']};
 function viewInquiries(root){
+  const srcStats=[['独立站SEO',5,40],['开发信',12,21],['社交媒体',3,15],['展会',2,50],['转介绍',1,100],['谷歌广告',2,10]];
   root.innerHTML = `
+    <div class="grid-3 mb16" style="grid-template-columns:repeat(6,1fr)">
+      ${srcStats.map(([n,c,r])=>'<div class="stat-card"><div class="stat-label">'+n+'</div><div class="stat-value">'+c+'</div><div class="stat-trend '+(r>=30?'up':'')+'">转化率 '+r+'%</div></div>').join('')}
+    </div>
     <div class="flex-between mb16">
       <div class="flex gap12">
         ${Object.keys(INQ_STATUS).map(s=>`<span class="badge ${INQ_STATUS[s][0]}">${s} ${S.inquiries.filter(i=>i.status===s).length}</span>`).join('')}
@@ -2771,6 +2837,167 @@ function renderChannelEffect(){
       '<div style="background:#f1f5f9;height:14px"><div style="width:'+w+'%;background:#c9a961;height:100%"></div></div></div>';
   }).join('');
 }
+/* V5 SEO内容营销 */
+let seoTab='kw';
+function viewSEO(root){
+  root.innerHTML = `
+  <div class="page-head"><h2>📈 SEO与内容营销</h2><p class="sub">SEO是保底，GEO是放大 — 让客户在谷歌和AI搜索中都找到你</p></div>
+  <div class="btn-row mb16">
+    ${[['kw','🔑 关键词库'],['content','📝 内容营销'],['geo','🤖 GEO优化'],['link','🔗 外链建设']].map(([k,l])=>
+      `<button class="btn ${seoTab===k?'btn-gold':'btn-outline'}" onclick="seoTab='${k}';renderView()">${l}</button>`).join('')}
+  </div>
+  ${seoTab==='kw'?seoKw():seoTab==='content'?seoContent():seoTab==='geo'?seoGeo():seoLink()}
+  `;
+}
+function seoKw(){
+  const typeColor={'采购型':'badge-a','信息型':'badge-blue','C端泛词':'badge-gray'};
+  return `<div class="card card-pad">
+    <div class="card-title">关键词库（${S.keywords.length}）<button class="btn btn-gold btn-sm" onclick="toast('新增关键词（演示）')">＋ 新增</button></div>
+    <table class="tbl"><thead><tr><th>关键词</th><th>月搜索量</th><th>竞争度</th><th>当前排名</th><th>目标</th><th>类型</th></tr></thead>
+    <tbody>${S.keywords.map(k=>`<tr>
+      <td class="mono">${esc(k.kw)}</td><td>${k.vol.toLocaleString()}</td>
+      <td><span class="badge ${k.comp==='高'?'badge-red':k.comp==='中'?'badge-gold':'badge-a'}">${k.comp}</span></td>
+      <td>${k.rank||'-'}</td><td>${k.target||'-'}</td>
+      <td><span class="badge ${typeColor[k.type]}">${k.type}</span></td></tr>`).join('')}</tbody></table>
+  </div>`;
+}
+function seoContent(){
+  return `<div class="card card-pad mb16">
+    <div class="card-title">📝 内容营销（${S.contents.length}篇）
+      <button class="btn btn-gold btn-sm" onclick="toast('🤖 AI生成文章中...')">🤖 AI生成文章</button></div>
+    <table class="tbl"><thead><tr><th>标题</th><th>类型</th><th>状态</th><th>发布日期</th><th>字数</th><th>质量分</th></tr></thead>
+    <tbody>${S.contents.map(c=>`<tr>
+      <td>${esc(c.title)}</td><td class="text-sm">${c.type}</td>
+      <td><span class="badge ${c.status==='已发布'?'badge-a':c.status==='待优化'?'badge-gold':'badge-gray'}">${c.status}</span></td>
+      <td class="text-sm">${c.date?fmtDay(c.date):'-'}</td><td>${c.words||'-'}</td>
+      <td><b style="color:${c.score>=80?'var(--green)':c.score>=60?'#ed8936':'var(--red)'}">${c.score||'-'}</b></td></tr>`).join('')}</tbody></table>
+  </div>`;
+}
+function seoGeo(){
+  return `<div class="grid-2">
+    <div class="card card-pad"><div class="card-title">🤖 AI答案监测（GEO）</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card"><div class="stat-label">AI提及次数</div><div class="stat-value">7</div></div>
+        <div class="stat-card"><div class="stat-label">平均位置</div><div class="stat-value">#3</div></div>
+        <div class="stat-card"><div class="stat-label">覆盖AI引擎</div><div class="stat-value">3/5</div></div>
+      </div>
+      <div class="divider"></div>
+      <b>结构化数据检查</b>
+      <div class="text-sm mt8" style="line-height:2">
+        ✓ FAQ Schema<br>✓ Product Schema<br>✓ Breadcrumb<br>○ Company Info（待补）<br>✓ llms.txt 已部署
+      </div></div>
+    <div class="card card-pad"><div class="card-title">💡 AI友好内容建议</div>
+      <ol style="padding-left:20px;line-height:2;font-size:13px">
+        <li>用问答式H2标题，匹配用户提问</li>
+        <li>每篇文章开头直接给结论</li>
+        <li>加FAQ Schema让AI抓取答案</li>
+        <li>数据用具体数字而非模糊描述</li>
+        <li>建立内部链接网络</li>
+      </ol></div></div>`;
+}
+function seoLink(){
+  const stColor={'已获得':'badge-a','已联系':'badge-blue','待联系':'badge-gold','已拒绝':'badge-red'};
+  return `<div class="card card-pad"><div class="card-title">🔗 外链建设（${S.backlinks.length}）
+    <button class="btn btn-gold btn-sm" onclick="toast('新增外链目标（演示）')">＋ 新增</button></div>
+    <table class="tbl"><thead><tr><th>目标网站</th><th>类型</th><th>DA</th><th>状态</th></tr></thead>
+    <tbody>${S.backlinks.map(b=>`<tr><td class="mono">${esc(b.site)}</td><td class="text-sm">${b.type}</td>
+      <td><b>${b.da}</b></td><td><span class="badge ${stColor[b.status]}">${b.status}</span></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+/* V5 业绩战报 */
+function viewReports(root){
+  const goal=50000, actual=32600;
+  const funnel=[['新线索',39,'#1a365d'],['建立联系',26,'#2c5282'],['方案报价',12,'#c9a961'],['谈判中',5,'#ed8936'],['已成交',2,'#48bb78']];
+  root.innerHTML = `
+  <div class="page-head"><h2>🏆 业绩战报</h2><p class="sub">漏斗看未来 · 战报看现在 · 行为看过程</p></div>
+  <div class="grid-3">
+    <div class="card card-pad"><div class="card-title">🔮 漏斗（未来）</div>
+      ${funnel.map(([n,v,c])=>'<div style="margin-bottom:6px"><div style="font-size:12px;margin-bottom:2px">'+n+' <b>'+v+'</b></div><div style="background:#f1f5f9;height:16px"><div style="width:'+Math.round(v/39*100)+'%;background:'+c+';height:100%"></div></div></div>').join('')}
+    </div>
+    <div class="card card-pad"><div class="card-title">💰 战报（现在）</div>
+      <div class="stat-label">本月目标 $${(goal/1000)}K</div>
+      <div class="stat-value">$${(actual/1000).toFixed(1)}K</div>
+      <div style="background:#f1f5f9;height:18px;border-radius:9px;overflow:hidden;margin:8px 0"><div style="width:${Math.round(actual/goal*100)}%;background:var(--gold);height:100%"></div></div>
+      <div class="text-sm">完成率 <b>${Math.round(actual/goal*100)}%</b> · 环比 <span style="color:var(--green)">+12%</span> · 同比 <span style="color:var(--green)">+35%</span></div>
+    </div>
+    <div class="card card-pad"><div class="card-title">⚡ 行为（过程）</div>
+      <table class="tbl"><tbody>
+        <tr><td>今日新客户</td><td><b>3</b></td></tr>
+        <tr><td>今日发邮件</td><td><b>8</b></td></tr>
+        <tr><td>今日跟进</td><td><b>5</b></td></tr>
+        <tr><td>邮件回复率</td><td><b style="color:var(--green)">21%</b></td></tr>
+        <tr><td>跟进转化率</td><td><b style="color:var(--gold)">8%</b></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+  <div class="card card-pad mt16">
+    <div class="card-title">近6个月销售额趋势</div>
+    <div style="display:flex;align-items:flex-end;height:140px;gap:12px;padding-top:10px">
+      ${[['4月',18],['5月',22],['6月',28],['7月',25],['8月',31],['9月',32.6]].map(([m,v])=>
+        '<div style="flex:1;text-align:center"><div style="height:'+v*3+'px;background:#c9a961;border-radius:4px 4px 0 0"></div><div class="text-sm mt8">$'+v+'K</div><div class="text-sm text-muted">'+m+'</div></div>').join('')}
+    </div>
+  </div>`;
+}
+
+/* V5 AI Agent 团队 */
+let agentRunning=false;
+const AGENTS=[
+  {emoji:'🔍',name:'产品分析Agent',role:'分析产品卖点和差异化',status:'idle'},
+  {emoji:'🌍',name:'市场研究Agent',role:'目标市场规模和趋势',status:'idle'},
+  {emoji:'👤',name:'客户画像Agent',role:'构建理想客户画像',status:'idle'},
+  {emoji:'🏢',name:'找公司Agent',role:'搜索潜在客户公司',status:'idle'},
+  {emoji:'📋',name:'企业背调Agent',role:'深度背调公司信息',status:'idle'},
+  {emoji:'⭐',name:'客户评分Agent',role:'多维度评分和分级',status:'idle'},
+  {emoji:'📞',name:'联系人研究Agent',role:'找决策人联系方式',status:'idle'},
+  {emoji:'📡',name:'近期信号Agent',role:'捕捉采购信号和动态',status:'idle'},
+  {emoji:'✉️',name:'开发信Agent',role:'个性化开发信撰写',status:'idle'},
+  {emoji:'💬',name:'社媒运营Agent',role:'社媒内容和互动',status:'idle'},
+  {emoji:'✍️',name:'内容创作Agent',role:'博客和SEO内容',status:'idle'}
+];
+function viewAgents(root){
+  root.innerHTML = `
+  <div class="page-head"><h2>🤖 AI Agent 团队</h2><p class="sub">AI CEO 调度，11个专业Agent协同获客</p></div>
+  <div class="card card-pad mb16" style="background:linear-gradient(120deg,var(--primary),#2c5282);color:#fff">
+    <div style="display:flex;align-items:center;gap:16px">
+      <div style="font-size:36px">👑</div>
+      <div style="flex:1"><b style="font-size:16px">AI CEO（调度者）</b>
+        <div style="font-size:13px;opacity:.85;margin-top:4px">接收任务后拆解分配给专业Agent，监控进度，汇总结果</div></div>
+      <button class="btn btn-gold" onclick="runAgents()">▶ 运行获客任务</button>
+    </div>
+  </div>
+  <div class="grid-3" id="agentGrid">
+    ${AGENTS.map((a,i)=>`<div class="card card-pad" id="agent-${i}" style="transition:all .3s">
+      <div style="font-size:28px">${a.emoji}</div>
+      <b style="font-size:13.5px">${a.name}</b>
+      <div class="text-sm text-muted mt8" style="font-size:12px">${a.role}</div>
+      <div class="text-sm mt8" id="agent-status-${i}"><span class="badge badge-gray">⚪ 空闲</span></div>
+    </div>`).join('')}
+  </div>
+  <div class="card card-pad mt16" id="agentLogCard" style="display:none">
+    <div class="card-title">📋 Agent 工作日志</div>
+    <div id="agentLog" style="font-size:12.5px;line-height:1.9;max-height:240px;overflow-y:auto"></div>
+  </div>`;
+}
+function runAgents(){
+  if(agentRunning) return; agentRunning=true;
+  const log=document.getElementById('agentLogCard'); const out=document.getElementById('agentLog');
+  if(log) log.style.display='block'; if(out) out.innerHTML='';
+  AGENTS.forEach((a,i)=>{ const el=document.getElementById('agent-'+i); if(el) el.style.background='#f7efdd';
+    const st=document.getElementById('agent-status-'+i); if(st) st.innerHTML='<span class="badge badge-gold">🟡 工作中</span>'; });
+  const msgs=['🔍 产品分析Agent：识别出厨房剪刀3个核心卖点','🌍 市场研究Agent：北美厨房用品市场规模$12B','👤 客户画像Agent：目标客户=进口商+分销商+电商',
+    '🏢 找公司Agent：搜索到47家潜在客户公司','📋 企业背调Agent：完成47家公司官网分析','⭐ 客户评分Agent：筛选出12家A级客户',
+    '📞 联系人研究Agent：找到9个决策人邮箱','📡 近期信号Agent：3家客户近期有采购动态','✉️ 开发信Agent：生成12封个性化开发信',
+    '💬 社媒运营Agent：准备领英加好友附言','✍️ 内容创作Agent：推荐2篇博客选题'];
+  msgs.forEach((m,i)=>{
+    setTimeout(()=>{
+      if(out) out.innerHTML += '<div>'+m+'</div>';
+      const st=document.getElementById('agent-status-'+i); if(st) st.innerHTML='<span class="badge badge-a">✅ 完成</span>';
+      const el=document.getElementById('agent-'+i); if(el) el.style.background='var(--success-bg,#f0fff4)';
+      if(i===msgs.length-1 && out){ out.innerHTML += '<div style="margin-top:12px;color:var(--green);font-weight:700">✅ 获客任务完成：发现 12 家精准客户，生成 12 封开发信</div>'; agentRunning=false; }
+    }, i*800);
+  });
+}
+
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }
 
 /* ============================================================

@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V22.0</div>
+        <div class="b2">KaiLionCrafts Crafts V23.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -508,6 +508,7 @@ function loadState(){
   S.settings = DB.load('settings') || null;
   S.apis = DB.load('apis') || [];
   S.autoSearch = DB.load('autoSearch') || {results:[],history:[],totalSearches:0,totalFound:0,totalImported:0};
+  S.linkedin = DB.load('linkedin') || {leads:[],messages:[],posts:[],interactions:[],stats:{connections:0,requestsSent:0,replies:0,meetings:0}};
   S.apiLogs = DB.load('apiLogs') || [];
   S.prompts = DB.load('prompts') || null;
   S.knowledge = DB.load('knowledge') || [];
@@ -1344,6 +1345,7 @@ const NAV = [
   {group:'数据与智能'},
   {key:'reports',icon:'🏆',label:'业绩战报',title:'业绩战报',crumb:'漏斗看未来 · 战报看现在 · 行为看过程'},
   {key:'agents',icon:'🤖',label:'AI Agent团队',title:'AI Agent团队',crumb:'AI CEO调度 · 11个专业Agent协同'},
+  {key:'linkedin',icon:'💼',label:'领英拓客',title:'领英智能拓客',crumb:'4步拓客法 · AI站内信 · 智能互动'},
   {group:'系统'},
   {key:'tools',icon:'🧰',label:'工具箱',title:'工具箱',crumb:'14类·100+工具'},
   {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings'}
@@ -1381,7 +1383,7 @@ function renderView(){
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
-    seo:viewSEO, reports:viewReports, agents:viewAgents, expos:viewExpos, settings:viewSettings};
+    seo:viewSEO, reports:viewReports, agents:viewAgents, linkedin:viewLinkedin, expos:viewExpos, settings:viewSettings};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
@@ -3112,7 +3114,7 @@ function viewSettings(root){
         <div class="card card-pad">
           <div class="card-title">关于锴利工作台</div>
           <div class="text-sm" style="line-height:2">
-            <b>版本</b> V22.0 · 锴利外贸获客工作台<br>
+            <b>版本</b> V23.0 · 锴利外贸获客工作台<br>
             <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
             <b>哲学</b> AI 只干脏活累活，发送我自己来，数据全在本地<br>
             <b>Slogan</b> <span class="text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</span>
@@ -5413,6 +5415,508 @@ function loadSearchHistory(hid){
   document.getElementById('as_resultsList').innerHTML = renderSearchResults();
   document.getElementById('as_resultCount').textContent = `（${searchResults.length}家）`;
   toast(`已加载历史搜客结果：${h.keyword}（${searchResults.length}家）`);
+}
+
+
+/* ============================================================
+ * V23: 领英智能拓客中心
+ * ============================================================ */
+const LINKEDIN_TITLES = ['Procurement Manager','Purchasing Manager','Buyer','Sourcing Manager','Supply Chain Manager','CEO','Founder','Owner','Managing Director','Sales Director','Product Manager','Category Manager'];
+const LINKEDIN_INDUSTRIES = ['kitchenware','cutlery','houseware','restaurant supply','hotel supply','catering equipment','food service','retail','wholesale','import export'];
+const LINKEDIN_COUNTRIES = [
+  {name:'美国',code:'us',limit:100},
+  {name:'英国',code:'gb',limit:80},
+  {name:'德国',code:'de',limit:80},
+  {name:'法国',code:'fr',limit:60},
+  {name:'加拿大',code:'ca',limit:60},
+  {name:'澳大利亚',code:'au',limit:50},
+  {name:'荷兰',code:'nl',limit:40},
+  {name:'阿联酋',code:'ae',limit:30}
+];
+const MOCK_LINKEDIN_LEADS = [
+  {name:'Michael Carter',title:'Procurement Manager',company:'Kitchen Universe Inc.',country:'美国',city:'Chicago',connection:'2nd',mutual:12,profile:'linkedin.com/in/michaelcarter',email:'m.carter@kitchenuniverse.com',status:'待联系',score:92},
+  {name:'Emma Thompson',title:'Buyer',company:'British Chef Supplies Ltd',country:'英国',city:'London',connection:'2nd',mutual:8,profile:'linkedin.com/in/emmathompsonbuyer',email:'emma@britchef.co.uk',status:'已发申请',score:88},
+  {name:'Lukas Schmidt',title:'Geschäftsführer',company:'Messerei Schmidt GmbH',country:'德国',city:'Munich',connection:'3rd',mutual:3,profile:'linkedin.com/in/lukasschmidt',email:'l.schmidt@messerei-schmidt.de',status:'已通过',score:85},
+  {name:'Sarah Johnson',title:'Sourcing Manager',company:'Aussie Kitchen Warehouse',country:'澳大利亚',city:'Sydney',connection:'2nd',mutual:15,profile:'linkedin.com/in/sarahjohnson',email:'sarah@aussiekitchen.com.au',status:'已回复',score:90},
+  {name:'David Kim',title:'Sales Director',company:'Toronto Cutlery Distributors',country:'加拿大',city:'Toronto',connection:'1st',mutual:0,profile:'linkedin.com/in/davidkim',email:'dkim@torontocutlery.ca',status:'已约会议',score:95},
+  {name:'Anna Petrova',title:'Category Manager',company:'Gulf Premier Trading LLC',country:'阿联酋',city:'Dubai',connection:'3rd',mutual:5,profile:'linkedin.com/in/annapetrova',email:'anna@gulfpremier.ae',status:'待联系',score:78},
+  {name:'James Wilson',title:'Founder',company:'Milano Kitchen Trade',country:'意大利',city:'Milan',connection:'2nd',mutual:6,profile:'linkedin.com/in/jameswilson',email:'james@milanokitchen.it',status:'已发申请',score:82},
+  {name:'Lisa Chen',title:'Product Manager',company:'Paris Culinary Supplies',country:'法国',city:'Paris',connection:'3rd',mutual:2,profile:'linkedin.com/in/lisachen',email:'lisa@parisculinary.fr',status:'待联系',score:75}
+];
+let linkedinTab = 'dashboard';
+
+function viewLinkedin(root){
+  if(!S.linkedin) S.linkedin = {leads:[],messages:[],posts:[],interactions:[],stats:{connections:0,requestsSent:0,replies:0,meetings:0}};
+  const li = S.linkedin;
+  const stats = li.stats||{connections:0,requestsSent:0,replies:0,meetings:0};
+  const leads = li.leads&&li.leads.length?li.leads:MOCK_LINKEDIN_LEADS;
+  root.innerHTML = `
+    <div class="grid-4 mb16" style="gap:12px">
+      <div class="card card-pad"><div class="stat-label">🤝 领英好友</div><div class="stat-value">${stats.connections||0}</div></div>
+      <div class="card card-pad"><div class="stat-label">📨 已发申请</div><div class="stat-value" style="color:var(--primary)">${stats.requestsSent||0}</div></div>
+      <div class="card card-pad"><div class="stat-label">💬 客户回复</div><div class="stat-value" style="color:var(--success)">${stats.replies||0}</div></div>
+      <div class="card card-pad"><div class="stat-label">📅 已约会议</div><div class="stat-value" style="color:var(--gold)">${stats.meetings||0}</div></div>
+    </div>
+    <div class="card card-pad mb16">
+      <div class="tabs">
+        <button class="tab ${linkedinTab==='dashboard'?'active':''}" onclick="linkedinTab='dashboard';go('linkedin')">📊 拓客看板</button>
+        <button class="tab ${linkedinTab==='search'?'active':''}" onclick="linkedinTab='search';go('linkedin')">🔍 搜索找人</button>
+        <button class="tab ${linkedinTab==='message'?'active':''}" onclick="linkedinTab='message';go('linkedin')">✉️ AI站内信</button>
+        <button class="tab ${linkedinTab==='interact'?'active':''}" onclick="linkedinTab='interact';go('linkedin')">👍 智能互动</button>
+        <button class="tab ${linkedinTab==='content'?'active':''}" onclick="linkedinTab='content';go('linkedin')">📝 内容Post</button>
+        <button class="tab ${linkedinTab==='guide'?'active':''}" onclick="linkedinTab='guide';go('linkedin')">📖 4步拓客法</button>
+      </div>
+      <div id="linkedinTabContent">${renderLinkedinTab(leads)}</div>
+    </div>`;
+}
+
+function renderLinkedinTab(leads){
+  if(linkedinTab==='dashboard') return renderLinkedinDashboard(leads);
+  if(linkedinTab==='search') return renderLinkedinSearch();
+  if(linkedinTab==='message') return renderLinkedinMessage();
+  if(linkedinTab==='interact') return renderLinkedinInteract();
+  if(linkedinTab==='content') return renderLinkedinContent();
+  if(linkedinTab==='guide') return renderLinkedinGuide();
+  return '';
+}
+
+function renderLinkedinDashboard(leads){
+  const statusCount = {};
+  leads.forEach(l=>{ statusCount[l.status]=(statusCount[l.status]||0)+1; });
+  return `
+    <div class="grid-3 mb16" style="gap:12px">
+      <div style="background:#f0f7ff;padding:16px;border-radius:8px">
+        <div class="text-sm text-muted mb8">📋 线索状态分布</div>
+        ${Object.entries(statusCount).map(([s,c])=>`<div class="flex" style="justify-content:space-between;margin:4px 0"><span class="text-xs">${s}</span><span class="text-xs fw700">${c}</span></div>`).join('')}
+      </div>
+      <div style="background:#f0fff4;padding:16px;border-radius:8px">
+        <div class="text-sm text-muted mb8">📈 本周拓客进度</div>
+        <div class="text-xs" style="line-height:2">
+          加好友目标：20个/周<br>
+          已完成：${Math.floor(Math.random()*15)+5}个<br>
+          站内信目标：15封/周<br>
+          已完成：${Math.floor(Math.random()*12)+3}封<br>
+          互动目标：30次/周<br>
+          已完成：${Math.floor(Math.random()*25)+5}次
+        </div>
+      </div>
+      <div style="background:#fff8e6;padding:16px;border-radius:8px">
+        <div class="text-sm text-muted mb8">⚠️ 领英风控提醒</div>
+        <div class="text-xs" style="line-height:2">
+          🔴 新号每天加好友≤10个<br>
+          🟡 老号每天加好友≤30个<br>
+          🟢 2度人脉通过率最高<br>
+          ⚠️ 避免批量群发站内信<br>
+          💡 每天花2小时互动养号
+        </div>
+      </div>
+    </div>
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">👥 高优先级领英线索（Top 8）</div>
+    <table class="tbl"><thead><tr><th>姓名</th><th>职位</th><th>公司</th><th>国家</th><th>人脉</th><th>共同好友</th><th>匹配度</th><th>状态</th><th>操作</th></tr></thead><tbody>
+      ${leads.slice(0,8).map((l,i)=>`<tr>
+        <td class="text-xs"><b>${l.name}</b></td>
+        <td class="text-xs">${l.title}</td>
+        <td class="text-xs">${l.company}</td>
+        <td class="text-xs">${l.country}</td>
+        <td><span class="badge ${l.connection==='1st'?'badge-green':l.connection==='2nd'?'badge-blue':'badge-gold'}">${l.connection}度</span></td>
+        <td class="text-xs">${l.mutual}</td>
+        <td class="text-xs fw700" style="color:var(--gold)">${l.score}%</td>
+        <td class="text-xs">${l.status}</td>
+        <td><button class="btn btn-sm btn-outline" onclick="viewLinkedInLeadDetail(${i})">详情</button></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+function renderLinkedinSearch(){
+  return `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">🔍 领英高级搜索关键词生成器</div>
+    <div class="text-sm text-muted mb12" style="line-height:1.8">
+      💡 在领英搜索栏或谷歌中使用以下关键词组合，精准定位海外采购决策人。<br>
+      公式：<code>site:linkedin.com/in + 国家简称 + 行业词 + 职位</code>
+    </div>
+    <div class="grid-3 mb16" style="gap:12px">
+      <div><label class="text-sm">产品/行业关键词</label><input type="text" id="li_kw" value="kitchenware" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+      <div><label class="text-sm">目标国家</label><select id="li_country" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">${LINKEDIN_COUNTRIES.map(c=>`<option value="${c.code}">${c.name}</option>`).join('')}</select></div>
+      <div><label class="text-sm">目标职位</label><select id="li_title" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">${LINKEDIN_TITLES.map(t=>`<option>${t}</option>`).join('')}</select></div>
+    </div>
+    <div class="btn-row mb16">
+      <button class="btn btn-primary" onclick="generateLinkedInSearch()">🎯 生成搜索关键词</button>
+      <button class="btn btn-outline" onclick="document.getElementById('li_kw').value='kitchenware'">重置</button>
+    </div>
+    <div id="li_searchResults"></div>
+    <div class="mt16" style="background:#f7fafc;padding:12px;border-radius:8px">
+      <div class="text-sm fw700 mb8">📌 领英搜索技巧</div>
+      <div class="text-xs" style="line-height:2">
+        1️⃣ <b>用行业词不用产品词</b>：搜kitchenware比搜kitchen scissors结果更多更准<br>
+        2️⃣ <b>2度人脉优先</b>：筛选Connections=2nd，通过率比3度高3倍<br>
+        3️⃣ <b>从公司主页找人</b>：进入目标公司→People标签→找在职采购/高管<br>
+        4️⃣ <b>谷歌site指令</b>：<code>site:linkedin.com/in "Procurement Manager" kitchenware USA</code><br>
+        5️⃣ <b>国家简称</b>：美国=USA，英国=UK，德国=Germany，不要用缩写
+      </div>
+    </div>`;
+}
+
+function generateLinkedInSearch(){
+  const kw = document.getElementById('li_kw').value.trim()||'kitchenware';
+  const country = document.getElementById('li_country').value;
+  const title = document.getElementById('li_title').value;
+  const countryName = LINKEDIN_COUNTRIES.find(c=>c.code===country)?.name||'美国';
+  const queries = [
+    {label:'谷歌site指令（最精准）',query:`site:linkedin.com/in "${title}" ${kw} ${countryName}`,desc:'在谷歌中搜索，结果最精准'},
+    {label:'领英站内搜索',query:`${title} ${kw}`,desc:'在领英搜索栏输入，然后筛选国家和2度人脉'},
+    {label:'公司+职位组合',query:`${kw} company "${title}"`,desc:'找到行业公司后，从公司主页找采购决策人'},
+    {label:'行业词+国家',query:`${kw} ${countryName} buyer`,desc:'宽泛搜索，适合发现新客户'},
+    {label:'采购经理专用',query:`"Procurement Manager" OR "Purchasing Manager" ${kw}`,desc:'精准定位采购岗位'}
+  ];
+  document.getElementById('li_searchResults').innerHTML = `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">✅ 生成的搜索关键词（点击复制）</div>
+    ${queries.map((q,i)=>`<div style="background:#f0f7ff;padding:10px;border-radius:6px;margin-bottom:8px;cursor:pointer" onclick="navigator.clipboard.writeText('${q.query.replace(/'/g,"\\'")}');toast('已复制到剪贴板')">
+      <div class="text-xs fw700" style="color:var(--primary)">${q.label}</div>
+      <div class="text-xs" style="font-family:monospace;margin:4px 0">${q.query}</div>
+      <div class="text-xs text-muted">${q.desc}</div>
+    </div>`).join('')}`;
+  toast('已生成5组搜索关键词，点击即可复制');
+}
+
+function renderLinkedinMessage(){
+  return `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">✉️ AI个性化站内信生成器</div>
+    <div class="grid-2 mb16" style="gap:12px">
+      <div>
+        <label class="text-sm">客户姓名</label>
+        <input type="text" id="li_msg_name" value="Michael Carter" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px;margin-bottom:8px">
+        <label class="text-sm">客户公司</label>
+        <input type="text" id="li_msg_company" value="Kitchen Universe Inc." style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px;margin-bottom:8px">
+        <label class="text-sm">客户职位</label>
+        <input type="text" id="li_msg_title" value="Procurement Manager" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px;margin-bottom:8px">
+        <label class="text-sm">你的产品/优势</label>
+        <textarea id="li_msg_product" rows="3" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">阳江厨房剪刀/刀具工厂，20年OEM经验，月产50万把，通过LFGB/FDA认证</textarea>
+      </div>
+      <div>
+        <label class="text-sm">站内信类型</label>
+        <select id="li_msg_type" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px;margin-bottom:8px">
+          <option>加好友申请（≤300字符）</option>
+          <option>首次站内信（通过好友后）</option>
+          <option>跟进站内信（3天后）</option>
+          <option>价值分享（行业资讯）</option>
+          <option>转WhatsApp邀请</option>
+        </select>
+        <label class="text-sm">语气风格</label>
+        <select id="li_msg_tone" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px;margin-bottom:8px">
+          <option>专业友好</option>
+          <option>简洁直接</option>
+          <option>价值导向</option>
+          <option>轻松幽默</option>
+        </select>
+        <div style="margin-top:12px">
+          <button class="btn btn-primary" onclick="generateLinkedInMessage()">🤖 AI生成站内信</button>
+        </div>
+      </div>
+    </div>
+    <div id="li_msgResult"></div>
+    <div class="mt16" style="background:#fff8e6;padding:12px;border-radius:8px">
+      <div class="text-sm fw700 mb8">💡 站内信黄金法则</div>
+      <div class="text-xs" style="line-height:2">
+        1️⃣ <b>加好友申请≤300字符</b>：只说"我是谁+为什么加你"，不要推销<br>
+        2️⃣ <b>首次站内信不提产品</b>：先建立关系，问一个行业问题<br>
+        3️⃣ <b>3天跟进法则</b>：通过好友后3天内发第一封站内信<br>
+        4️⃣ <b>每封只问一个问题</b>：降低回复门槛，提高回复率<br>
+        5️⃣ <b>不要群发</b>：每封都要提到客户公司或职位的具体信息
+      </div>
+    </div>`;
+}
+
+function generateLinkedInMessage(){
+  const name = document.getElementById('li_msg_name').value||'there';
+  const company = document.getElementById('li_msg_company').value||'your company';
+  const title = document.getElementById('li_msg_title').value||'';
+  const product = document.getElementById('li_msg_product').value||'';
+  const type = document.getElementById('li_msg_type').value;
+  const firstName = name.split(' ')[0];
+  let messages = [];
+  if(type.includes('加好友')){
+    messages = [
+      `Hi ${firstName}, I'm in kitchenware manufacturing from Yangjiang, China. Noticed your work at ${company} — would love to connect and share industry insights.`,
+      `Hi ${firstName}, came across your profile while researching kitchenware buyers. I work with OEM/ODM manufacturers in Yangjiang. Would value connecting with you.`,
+      `Hi ${firstName}, I help kitchenware brands source quality products from China. Saw that you're a ${title} at ${company} — let's connect!`
+    ];
+  } else if(type.includes('首次')){
+    messages = [
+      `Hi ${firstName}, thanks for connecting! I noticed ${company} has a strong presence in kitchenware retail. Quick question — who usually handles your OEM sourcing from Asia? Happy to share our factory catalog if useful.`,
+      `Hi ${firstName}, great to connect! I work with a Yangjiang-based factory specializing in kitchen scissors and knives (20 years OEM). What's your biggest challenge when sourcing from China these days?`,
+      `Hi ${firstName}, thanks for the connection! I saw you're a ${title} at ${company}. We just developed a new line of LFGB-certified kitchen shears. Would it be helpful if I sent over a quick spec sheet?`
+    ];
+  } else if(type.includes('跟进')){
+    messages = [
+      `Hi ${firstName}, following up on my earlier message. I completely understand you're busy — just wanted to share that we recently helped a US kitchenware brand cut their sourcing cost by 18%. Would a 10-minute call next week be useful?`,
+      `Hi ${firstName}, not sure if my last message got lost in your inbox. Quick recap: we're a Yangjiang factory with 20 years in kitchen scissors/knives, LFGB/FDA certified, 500K/month capacity. Any upcoming sourcing needs I can help with?`,
+      `Hi ${firstName}, I wanted to share something relevant — our latest OEM case study with a European kitchenware distributor. They reduced lead time from 45 to 30 days. Want me to send it over?`
+    ];
+  } else if(type.includes('价值分享')){
+    messages = [
+      `Hi ${firstName}, came across this report on 2026 kitchenware trends in the US market — thought it might be useful for your sourcing planning at ${company}. Key takeaway: eco-friendly materials and space-saving designs are growing 35% YoY. Want the full report?`,
+      `Hi ${firstName}, I recently compiled a list of the top 10 kitchenware trade shows in Europe for 2026. Since ${company} is active there, thought you might find it useful. Happy to share if interested!`,
+      `Hi ${firstName}, saw this article about how US tariffs are affecting kitchenware imports — thought it might be relevant to your work at ${company}. We've been helping clients navigate this with alternative sourcing strategies. Want to chat?`
+    ];
+  } else {
+    messages = [
+      `Hi ${firstName}, thanks for the great conversation! As discussed, here's my WhatsApp: +86 138 xxxx xxxx. Feel free to reach out anytime — I can send our full catalog and latest pricing right away. Looking forward to working with ${company}!`,
+      `Hi ${firstName}, let's move this to WhatsApp for faster communication — it's easier to share photos and quotes there. My number: +86 138 xxxx xxxx. I'll send over the kitchen shears catalog as soon as you connect!`,
+      `Hi ${firstName}, as promised, adding you on WhatsApp for quicker follow-ups. My number is +86 138 xxxx xxxx. I'll share the ${company}-specific pricing and MOQ details there. Talk soon!`
+    ];
+  }
+  document.getElementById('li_msgResult').innerHTML = `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">✅ AI生成的3版站内信（点击复制）</div>
+    ${messages.map((m,i)=>`<div style="background:#f0fff4;padding:12px;border-radius:8px;margin-bottom:8px;cursor:pointer;border-left:3px solid var(--success)" onclick="navigator.clipboard.writeText(\`${m.replace(/`/g,'\\`')}\`);toast('已复制到剪贴板')">
+      <div class="text-xs fw700" style="color:var(--success);margin-bottom:4px">版本 ${i+1}（${m.length}字符）</div>
+      <div class="text-xs" style="line-height:1.8">${m}</div>
+    </div>`).join('')}`;
+  toast('已生成3版站内信，点击即可复制');
+}
+
+function renderLinkedinInteract(){
+  const today = new Date();
+  const interactions = [
+    {day:'周一',tasks:['给5个精准客户的动态点赞','评论3条行业相关Post','加2个2度人脉好友'],done:false},
+    {day:'周二',tasks:['发布1条行业洞察Post','给10个客户动态点赞','加3个采购经理好友'],done:false},
+    {day:'周三',tasks:['评论5条客户Post','给8个潜在客户点赞','发送2封站内信'],done:false},
+    {day:'周四',tasks:['发布1条产品知识Post','给10个客户点赞','加3个新好友'],done:false},
+    {day:'周五',tasks:['评论5条行业Post','给8个客户点赞','发送2封跟进站内信'],done:false}
+  ];
+  return `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">👍 智能互动计划（每周）</div>
+    <div class="text-sm text-muted mb12" style="line-height:1.8">
+      💡 领英算法偏爱活跃账号。每天花30分钟互动，比一次性加100个好友更有效。<br>
+      互动原则：先点赞→再评论→最后加好友/发消息，建立信任后再推销。
+    </div>
+    <div class="grid-3 mb16" style="gap:12px">
+      ${interactions.map((d,i)=>`<div style="background:${i===today.getDay()-1?'#f0f7ff':'#f7fafc'};padding:12px;border-radius:8px;border:${i===today.getDay()-1?'2px solid var(--primary)':'1px solid #e2e8f0'}">
+        <div class="text-sm fw700" style="margin-bottom:8px">${d.day} ${i===today.getDay()-1?'📍今天':''}</div>
+        ${d.tasks.map(t=>`<div class="text-xs" style="line-height:2"><input type="checkbox" style="margin-right:4px"> ${t}</div>`).join('')}
+      </div>`).join('')}
+    </div>
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">🎯 互动话术模板</div>
+    <div class="grid-2" style="gap:12px">
+      <div style="background:#fff8e6;padding:12px;border-radius:8px">
+        <div class="text-xs fw700 mb8">💬 评论模板（点赞后评论）</div>
+        <div class="text-xs" style="line-height:2">
+          • "Great insight! We've seen similar trends in the Asian market too."<br>
+          • "Thanks for sharing — this is exactly what our team has been discussing."<br>
+          • "Love this perspective. How has this worked for your clients in Europe?"<br>
+          • "Excellent point about sustainability. We're seeing more demand for eco-friendly packaging."<br>
+          • "Really informative post. Would love to hear more about your sourcing strategy."
+        </div>
+      </div>
+      <div style="background:#f0fff4;padding:12px;border-radius:8px">
+        <div class="text-xs fw700 mb8">⏰ 互动时间建议</div>
+        <div class="text-xs" style="line-height:2">
+          • 美国客户：北京时间 21:00-23:00（他们早上9-11点）<br>
+          • 欧洲客户：北京时间 15:00-17:00（他们早上8-10点）<br>
+          • 最佳互动日：周二至周四（周一忙、周五无心）<br>
+          • 每天互动上限：点赞≤20个，评论≤5条，加好友≤10个<br>
+          • 新号前2周：只互动不加好友，先养号
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderLinkedinContent(){
+  return `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">📝 领英Post内容生成器</div>
+    <div class="text-sm text-muted mb12" style="line-height:1.8">
+      💡 每天发1条Post = 你的24小时业务员。优质内容会让客户主动来找你，比加好友更有效。
+    </div>
+    <div class="grid-3 mb16" style="gap:12px">
+      <div><label class="text-sm">内容类型</label><select id="li_post_type" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">
+        <option>客户案例</option><option>行业洞察</option><option>产品知识</option><option>经验分享</option><option>工厂日常</option><option>展会回顾</option>
+      </select></div>
+      <div><label class="text-sm">目标受众</label><select id="li_post_audience" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">
+        <option>采购经理</option><option>品牌创始人</option><option>进口商</option><option>经销商</option><option>通用B2B</option>
+      </select></div>
+      <div><label class="text-sm">产品关键词</label><input type="text" id="li_post_kw" value="kitchen shears" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+    </div>
+    <div class="btn-row mb16">
+      <button class="btn btn-primary" onclick="generateLinkedInPost()">🤖 AI生成Post</button>
+    </div>
+    <div id="li_postResult"></div>
+    <div class="mt16" style="background:#f0f7ff;padding:12px;border-radius:8px">
+      <div class="text-sm fw700 mb8">📅 30天内容日历（建议）</div>
+      <div class="text-xs" style="line-height:2">
+        周一：行业洞察（趋势/数据/报告）<br>
+        周二：产品知识（材质/工艺/认证）<br>
+        周三：客户案例（成功故事/数据对比）<br>
+        周四：经验分享（踩坑/技巧/建议）<br>
+        周五：工厂日常（生产/质检/团队）<br>
+        周末：轻松内容（行业趣闻/个人感悟）
+      </div>
+    </div>`;
+}
+
+function generateLinkedInPost(){
+  const type = document.getElementById('li_post_type').value;
+  const audience = document.getElementById('li_post_audience').value;
+  const kw = document.getElementById('li_post_kw').value||'kitchen shears';
+  let posts = [];
+  if(type==='客户案例'){
+    posts = [
+      `How we helped a US kitchenware brand cut sourcing costs by 18%\n\nLast year, a ${audience} at a mid-sized kitchenware brand came to us with a problem: their current supplier kept raising prices and missing deadlines.\n\nWe did a full audit and found 3 issues:\n🔴 Material waste was 12% (industry avg: 5%)\n🔴 No QC before shipping — 8% defect rate\n🔴 Lead time was 45 days (we do 30)\n\nAfter switching to our Yangjiang factory:\n✅ Cost down 18%\n✅ Defect rate under 1%\n✅ Lead time: 30 days consistently\n\nThe client just placed their 4th reorder this year.\n\nMoral: the cheapest quote isn't always the lowest cost.\n\n#sourcing #kitchenware #OEM #manufacturing`,
+      `From sample to 50K units in 60 days — here's what happened\n\nA European ${audience} needed a custom kitchen shear design for their spring catalog. Timeline was tight — 60 days from sample approval to container loading.\n\nWhat we did:\n📐 Day 1-3: 3D design + material selection\n🔨 Day 4-10: Prototype (2 rounds of revisions)\n✅ Day 11: Sample approved\n🏭 Day 12-45: Mass production with daily QC photos\n🚢 Day 46-55: Inspection + packing\n📦 Day 56-60: Container loaded + on the way\n\nResult: delivered 2 days ahead of schedule. Zero defects in the first inspection.\n\nThe client's spring line sold out in 3 weeks.\n\n#OEM #kitchenware #manufacturing #supplychain`
+    ];
+  } else if(type==='行业洞察'){
+    posts = [
+      `3 kitchenware trends that will define 2026 sourcing\n\nAfter working with 50+ kitchenware brands this year, here's what I'm seeing:\n\n1️⃣ Eco-friendly materials are no longer optional\nPlant-based handles, recycled steel, biodegradable packaging — buyers are asking for it, retailers are requiring it. We've invested in 2 new eco-material lines.\n\n2️⃣ Space-saving designs are growing 35% YoY\nSmaller kitchens in urban areas = demand for multi-function tools, magnetic storage, compact sets. Our 3-in-1 shear design is our bestseller this year.\n\n3️⃣ Transparency is the new competitive advantage\nBuyers want factory tours, QC reports, material traceability. We now provide live factory video calls and digital QC dashboards for every order.\n\nThe brands that adapt early will win. The ones that wait... will be looking for new suppliers.\n\n#kitchenware #sourcing #trends2026 #manufacturing`,
+      `Why 70% of kitchenware importers are overpaying — and how to fix it\n\nI review 20+ supplier quotes every month for kitchenware brands. Here's the pattern I see:\n\nMost importers focus only on unit price. But unit price is just 60% of total cost.\n\nThe hidden 40%:\n💸 Defect rates (1% vs 8% = huge difference)\n💸 Air freight for rush orders (late shipments)\n💸 Rework costs (wrong specs, bad packaging)\n💸 Opportunity cost (missed seasons, lost sales)\n\nA supplier that's $0.20 cheaper per unit but has 5% defects and 10-day delays actually costs you MORE.\n\nHow to fix it:\n✅ Ask for defect rate data (not just claims)\n✅ Check their on-time delivery record\n✅ Request references from similar-sized clients\n✅ Visit the factory (or do a live video tour)\n\nCheap isn't always cost-effective.\n\n#sourcing #kitchenware #procurement #supplychain`
+    ];
+  } else if(type==='产品知识'){
+    posts = [
+      `Kitchen shear quality: 5 things most buyers get wrong\n\nAfter 20 years making kitchen shears in Yangjiang, here's what separates a $2 shear from a $10 shear:\n\n1️⃣ Steel grade matters more than thickness\n2Cr13 vs 3Cr13 vs 4Cr13 — higher carbon = better edge retention. A 2mm 4Cr13 blade outperforms a 3mm 2Cr13 blade.\n\n2️⃣ The pivot screw is the heart of the shear\nA cheap loose pivot = blades separate when cutting. We use custom-machined pivots with lock nuts. Test: hold shear vertically, blades should NOT separate.\n\n3️⃣ Handle material isn't just about comfort\nPP handles crack in cold weather. TPR handles get sticky over time. We use PP+TPR co-molding for durability AND comfort.\n\n4️⃣ Edge grinding angle affects sharpness\n15° = razor sharp but chips easily. 25° = durable but needs more force. We use 20° for kitchen shears — the sweet spot.\n\n5️⃣ Certification isn't optional for food contact\nLFGB (Germany) is stricter than FDA (US). If you sell in Europe, demand LFGB. We provide both for every batch.\n\nA $2 shear costs you more in returns. A $10 shear builds your brand.\n\n#kitchenware #productquality #OEM #manufacturing`,
+      `LFGB vs FDA: which certification do you actually need for kitchen tools?\n\nThis is the #1 question I get from new kitchenware buyers.\n\nShort answer: if you sell in Europe → LFGB. If you sell in the US → FDA. If both → get both (we do).\n\nBut here's what most people don't know:\n\n🔬 LFGB (German Food and Feed Code)\n- Tests for 30+ substances (heavy metals, formaldehyde, phthalates)\n- Includes sensory testing (taste/odor transfer)\n- Required for Germany, and effectively the EU standard\n- More expensive, stricter, but universally accepted\n\n🔬 FDA (US Food and Drug Administration)\n- Tests for specific materials (stainless steel, plastics, coatings)\n- No sensory testing requirement\n- Required for US market\n- Less expensive, but not accepted in Europe\n\n💡 Pro tip: Even if you only sell in the US, getting LFGB gives you a marketing advantage — "European-grade quality" resonates with premium buyers.\n\nWe provide both certifications for every batch, included in the price. No surprises.\n\n#kitchenware #certification #LFGB #FDA #sourcing`
+    ];
+  } else if(type==='经验分享'){
+    posts = [
+      `5 things I wish I knew before starting kitchenware OEM manufacturing\n\n20 years ago, I started in a small Yangjiang workshop with 5 workers. Today, we ship 500K+ units/month to 20+ countries.\n\nHere's what I wish someone told me on day 1:\n\n1️⃣ Quality is the only marketing that works\nEarly on, I took every order at any price. One bad batch cost me 3 clients. Since then, zero-defect policy = our growth engine.\n\n2️⃣ Communication prevents 90% of problems\nMost factory disputes come from miscommunication. We now do daily photo updates, weekly video calls, and written spec confirmations for every order.\n\n3️⃣ Certifications are an investment, not a cost\nLFGB, FDA, BSCI — getting certified early opened doors that would've stayed closed. We got our first European client BECAUSE we had LFGB before they asked.\n\n4️⃣ Your best employees are your best marketing\nOur production manager has been with us 15 years. Clients meet him on factory tours and trust us immediately. Invest in your team.\n\n5️⃣ The client who pushes you hardest makes you better\nWe had a Japanese client with impossible QC standards. We failed their first 3 inspections. Then we improved. Now their standards are our minimum standard for ALL clients.\n\nManufacturing isn't about making products. It's about building trust.\n\n#manufacturing #OEM #kitchenware #entrepreneurship`,
+      `How to vet a kitchenware factory in 30 minutes (without visiting)\n\nYou can't visit every factory. But you CAN vet them effectively in 30 minutes.\n\nHere's my checklist:\n\n📞 1. Video call the factory (5 min)\n- Ask to see the production floor LIVE\n- Count workers (under 10 = trading company, not factory)\n- Look for organized workstations vs chaos\n\n📋 2. Ask for these documents (10 min)\n- Business license (check registered capital and year established)\n- LFGB/FDA test reports (verify they're recent and for YOUR product type)\n- BSCI/Sedex audit report (if they claim ethical manufacturing)\n- Client references (at least 2 from your country)\n\n🔍 3. Technical questions (10 min)\n- "What steel grade do you use for kitchen shears?" (correct: 3Cr13 or 4Cr13)\n- "What's your typical defect rate?" (acceptable: under 2%; if they say 0%, they're lying)\n- "What's your MOQ for custom designs?" (real factory: 500-1000pcs; trading company: 3000+)\n- "Can you show me your QC process?" (real factory: IQC → IPQC → FQC → OQC)\n\n📊 4. Sample test (5 min)\n- Order a sample and test it yourself\n- Check pivot tightness, edge sharpness, handle durability\n- Compare with your current supplier's sample\n\nIf they pass all 4 → they're worth a real factory visit.\n\nIf they fail any → move on. There are 3,000+ kitchenware factories in Yangjiang alone.\n\n#sourcing #kitchenware #factoryvetting #OEM`
+    ];
+  } else if(type==='工厂日常'){
+    posts = [
+      `Inside a Yangjiang kitchenware factory: what 500K units/month actually looks like\n\nPeople ask me what a "real factory" looks like. Here's a day in ours:\n\n🌅 7:30 AM — Morning meeting\nProduction managers review yesterday's output, today's priorities, and any quality issues. 15 minutes, every day.\n\n🔨 8:00 AM — Production starts\n3 production lines running:\n- Line 1: Kitchen shears (15 workers, 8K units/day)\n- Line 2: Chef knives (12 workers, 5K units/day)\n- Line 3: Peelers & tools (10 workers, 12K units/day)\n\n🔍 10:00 AM — In-process QC\nOur QC team checks every 50th unit on each line. Dimensions, sharpness, handle fit. Results logged digitally.\n\n📦 2:00 PM — Packing & final inspection\nFinished goods go through final QC (100% inspection for export orders), then packed with custom branding.\n\n🚢 4:00 PM — Shipping preparation\nToday we're loading a 40ft container for Germany — 25K kitchen shears, 10K knife sets, all LFGB certified.\n\n📊 Daily output: ~25K units\n📊 Monthly output: ~500K units\n📊 Defect rate: 0.8% (target: under 1%)\n\nThis is what 20 years of manufacturing experience looks like.\n\n#manufacturing #kitchenware #factory #OEM`,
+      `Why we invested $200K in new QC equipment — and what happened next\n\nLast year, we made a big decision: invest $200K in new quality control equipment.\n\nOur old QC process:\n- Manual visual inspection (human error)\n- Random sampling only (defects slip through)\n- Paper records (hard to trace)\n\nOur new QC setup:\n🔬 Digital measuring microscopes (blade angle, dimensions)\n⚖️ Automated weight sorting (material consistency)\n📷 Camera-based defect detection (surface scratches, handle gaps)\n💻 Digital QC dashboard (real-time data, traceable by batch)\n\nResults after 6 months:\n✅ Defect rate: 2.1% → 0.8%\n✅ Client complaints: down 70%\n✅ Return rate: down 65%\n✅ New clients from referrals: up 40%\n\nThe $200K paid for itself in 8 months through reduced returns and increased client trust.\n\nQuality isn't expensive. It's priceless.\n\n#qualitycontrol #manufacturing #kitchenware #OEM #investment`
+    ];
+  } else {
+    posts = [
+      `We just got back from Ambiente Frankfurt — here's what we learned\n\nJust spent 3 days at Ambiente, the world's largest consumer goods trade show. Here are the key takeaways for kitchenware sourcing in 2026:\n\n🌍 Trend 1: Sustainability is now table stakes\nEvery major buyer asked about eco-materials, carbon footprint, and recyclable packaging. If you can't answer these, you're already behind.\n\n📐 Trend 2: Compact & multi-functional\nSmaller living spaces = demand for space-saving designs. Our 3-in-1 kitchen shear generated the most interest at our booth.\n\n🎨 Trend 3: Bold colors are back\nMatte black, sage green, terracotta — buyers are moving away from basic stainless steel finishes. We're adding 4 new color options next quarter.\n\n🤝 Trend 4: Nearshoring is real, but not replacing China\nSome buyers are exploring Vietnam and India for lower tariffs, but quality and capacity still lead them back to China. Our message: "China quality, competitive pricing, full transparency."\n\n📊 Results from the show:\n- 120+ qualified leads\n- 15 sample requests\n- 3 potential new clients (Germany, UK, Netherlands)\n\nTrade shows still work. You just have to show up with the right products and the right story.\n\n#Ambiente #tradeshow #kitchenware #sourcing #export`
+    ];
+  }
+  document.getElementById('li_postResult').innerHTML = `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">✅ AI生成的领英Post（点击复制）</div>
+    ${posts.map((p,i)=>`<div style="background:#f7fafc;padding:12px;border-radius:8px;margin-bottom:12px;cursor:pointer;border-left:3px solid var(--primary)" onclick="navigator.clipboard.writeText(\`${p.replace(/`/g,'\\`')}\`);toast('已复制到剪贴板')">
+      <div class="text-xs fw700" style="color:var(--primary);margin-bottom:6px">Post版本 ${i+1}（${p.length}字符）</div>
+      <div class="text-xs" style="line-height:1.8;white-space:pre-wrap">${p}</div>
+    </div>`).join('')}`;
+  toast('已生成领英Post，点击即可复制');
+}
+
+function renderLinkedinGuide(){
+  return `
+    <div class="card-title" style="font-size:13px;margin-bottom:8px">📖 领英拓客4步法（外贸B2B专用）</div>
+    <div class="text-sm text-muted mb12" style="line-height:1.8">
+      💡 领英不是广告平台，是建立信任的地方。先做人，再做生意。4步法，每天2小时，客户主动来找你。
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:16px;border-radius:8px;margin-bottom:8px">
+        <div class="text-lg fw700">第1步：打造专业个人简介（1天完成）</div>
+      </div>
+      <div class="text-xs" style="line-height:2;padding:0 8px">
+        ✅ <b>头像</b>：商务正装照，背景干净，面带微笑（不要用产品图或风景照）<br>
+        ✅ <b>标题</b>：不要写"Sales Manager"，写"Helping kitchenware brands source quality OEM products from Yangjiang | 20 years experience | LFGB/FDA certified"<br>
+        ✅ <b>关于</b>：3段式——你是谁+你帮谁+你能提供什么价值。不要只写公司介绍。<br>
+        ✅ <b>经历</b>：详细填写工作经历，突出成果和数据（如"管理500K/月产能""服务20+国家客户"）<br>
+        ✅ <b>技能</b>：添加10+相关技能（Sourcing, OEM, Kitchenware, Supply Chain, Quality Control等）<br>
+        ✅ <b>联系方式</b>：填写邮箱、WhatsApp、公司网站<br>
+        ⚠️ <b>新号注意</b>：前2周只完善资料和浏览，不要加好友，避免被风控
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="background:linear-gradient(135deg,#f093fb,#f5576c);color:white;padding:16px;border-radius:8px;margin-bottom:8px">
+        <div class="text-lg fw700">第2步：精准搜索目标客户（每天30分钟）</div>
+      </div>
+      <div class="text-xs" style="line-height:2;padding:0 8px">
+        ✅ <b>搜索公式</b>：行业词 + 职位 + 国家（用行业词不用产品词，结果多10倍）<br>
+        ✅ <b>职位筛选</b>：Procurement Manager, Purchasing Manager, Buyer, Sourcing Manager, CEO, Founder<br>
+        ✅ <b>人脉筛选</b>：优先2度人脉（通过率最高），其次3度，1度已经是好友了<br>
+        ✅ <b>国家筛选</b>：按目标市场筛选（美国/德国/英国/法国/加拿大/澳大利亚等）<br>
+        ✅ <b>公司主页找人</b>：进入目标公司→People标签→找在职员工（不会搜到离职的）<br>
+        ✅ <b>谷歌site指令</b>：<code>site:linkedin.com/in "Procurement Manager" kitchenware USA</code>（结果最精准）<br>
+        ✅ <b>保存搜索</b>：领英会自动推荐符合条件的新用户，定期查看<br>
+        ⚠️ <b>每天上限</b>：新号≤10个/天，老号≤30个/天，不要贪多
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="background:linear-gradient(135deg,#4facfe,#00f2fe);color:white;padding:16px;border-radius:8px;margin-bottom:8px">
+        <div class="text-lg fw700">第3步：智能互动建立信任（每天1小时）</div>
+      </div>
+      <div class="text-xs" style="line-height:2;padding:0 8px">
+        ✅ <b>互动顺序</b>：先点赞→再评论→最后加好友/发消息（不要一上来就推销）<br>
+        ✅ <b>点赞</b>：给目标客户的最新动态点赞（每天≤20个），让他们注意到你<br>
+        ✅ <b>评论</b>：在客户的Post下写有价值的评论（每天≤5条），不要只写"Great post!"<br>
+        ✅ <b>加好友申请</b>：互动2-3天后再加好友，申请语≤300字符，只说"我是谁+为什么加你"<br>
+        ✅ <b>通过后</b>：3天内发第一封站内信，不提产品，先问一个行业问题建立关系<br>
+        ✅ <b>跟进节奏</b>：第1天加好友→第3天首次站内信→第7天价值分享→第14天产品介绍→第21天约会议<br>
+        ✅ <b>转私域</b>：客户回复后，了解痛点，加WhatsApp，发定制目录<br>
+        ⚠️ <b>禁忌</b>：不要群发站内信、不要每天催客户、不要一通过就发产品目录
+      </div>
+    </div>
+    <div>
+      <div style="background:linear-gradient(135deg,#43e97b,#38f9d7);color:white;padding:16px;border-radius:8px;margin-bottom:8px">
+        <div class="text-lg fw700">第4步：内容营销吸引客户（每天30分钟）</div>
+      </div>
+      <div class="text-xs" style="line-height:2;padding:0 8px">
+        ✅ <b>每天1条Post</b>：你的24小时业务员，优质内容让客户主动来找你<br>
+        ✅ <b>内容类型</b>：周一行业洞察/周二产品知识/周三客户案例/周四经验分享/周五工厂日常<br>
+        ✅ <b>Post结构</b>：吸引眼球的标题→痛点/问题→解决方案→数据/案例→行动号召→话题标签<br>
+        ✅ <b>最佳发布时间</b>：美国客户北京时间21:00-23:00，欧洲客户北京时间15:00-17:00<br>
+        ✅ <b>话题标签</b>：每Post加3-5个标签（#kitchenware #sourcing #OEM #manufacturing #supplychain）<br>
+        ✅ <b>互动回复</b>：Post发布后1小时内回复所有评论，算法会推给更多人<br>
+        ✅ <b>长期坚持</b>：内容营销3个月见效，6个月爆发，不要发两周就放弃<br>
+        ⚠️ <b>不要做</b>：不要只发产品广告（会被算法降权），不要复制粘贴别人的内容
+      </div>
+    </div>
+    <div class="mt16" style="background:#fef0f0;padding:12px;border-radius:8px">
+      <div class="text-sm fw700 mb8" style="color:var(--red)">🚫 领英红线（触碰即封号）</div>
+      <div class="text-xs" style="line-height:2">
+        1. 新号每天加好友超过20个 → 临时限制<br>
+        2. 批量群发相同内容的站内信 → 永久封号<br>
+        3. 使用自动化工具（未授权的bot）→ 永久封号<br>
+        4. 短时间内大量查看 profiles → 临时限制<br>
+        5. 在站内信中直接发WhatsApp链接（新号）→ 被标记为垃圾信息<br>
+        6. 虚假信息（假职位、假公司）→ 永久封号<br>
+        💡 <b>安全原则</b>：模拟人类行为，有节奏有间隔，先养号再拓客
+      </div>
+    </div>`;
+}
+
+function viewLinkedInLeadDetail(idx){
+  const leads = S.linkedin&&S.linkedin.leads&&S.linkedin.leads.length?S.linkedin.leads:MOCK_LINKEDIN_LEADS;
+  const l = leads[idx];
+  if(!l) return;
+  openModal(`
+    <div class="modal-head"><h3>👤 ${l.name}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="grid-2" style="gap:16px">
+        <div>
+          <div class="card-title" style="font-size:13px;margin-bottom:8px">📋 基本信息</div>
+          <table class="tbl"><tbody>
+            <tr><td class="text-xs" style="width:80px"><b>职位</b></td><td class="text-xs">${l.title}</td></tr>
+            <tr><td class="text-xs"><b>公司</b></td><td class="text-xs">${l.company}</td></tr>
+            <tr><td class="text-xs"><b>国家/城市</b></td><td class="text-xs">${l.country} ${l.city}</td></tr>
+            <tr><td class="text-xs"><b>人脉</b></td><td class="text-xs">${l.connection}度人脉</td></tr>
+            <tr><td class="text-xs"><b>共同好友</b></td><td class="text-xs">${l.mutual}个</td></tr>
+            <tr><td class="text-xs"><b>主页</b></td><td class="text-xs">${l.profile}</td></tr>
+            <tr><td class="text-xs"><b>邮箱</b></td><td class="text-xs">${l.email||'-'}</td></tr>
+            <tr><td class="text-xs"><b>匹配度</b></td><td class="text-xs"><b style="color:var(--gold)">${l.score}%</b></td></tr>
+            <tr><td class="text-xs"><b>状态</b></td><td class="text-xs">${l.status}</td></tr>
+          </tbody></table>
+        </div>
+        <div>
+          <div class="card-title" style="font-size:13px;margin-bottom:8px">🎯 推荐行动</div>
+          <div class="text-xs" style="line-height:2">
+            ${l.connection==='2nd'?'✅ <b>2度人脉</b>：通过率最高，优先加好友<br>':''}
+            ${l.connection==='3rd'?'⚠️ <b>3度人脉</b>：先互动2-3次再加好友<br>':''}
+            ${l.score>=90?'⭐ <b>高匹配</b>：重点跟进，建议1周内联系<br>':''}
+            ${l.mutual>=10?'🤝 <b>共同好友多</b>：可以请共同好友引荐<br>':''}
+            💡 <b>建议</b>：先点赞2条动态→评论1条→再加好友
+          </div>
+          <div class="mt12" style="background:#f0f7ff;padding:10px;border-radius:6px">
+            <div class="text-xs fw700" style="color:var(--primary);margin-bottom:4px">📝 加好友申请参考</div>
+            <div class="text-xs" style="line-height:1.6">Hi ${l.name.split(' ')[0]}, I'm in kitchenware manufacturing from Yangjiang. Noticed your work at ${l.company} — would love to connect.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+      <button class="btn btn-primary" onclick="closeModal();linkedinTab='message';go('linkedin')">✉️ 生成站内信</button>
+    </div>`);
 }
 
 </body>

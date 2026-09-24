@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V17.0</div>
+        <div class="b2">KaiLionCrafts Crafts V18.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -543,6 +543,7 @@ function loadState(){
   S.catalog = DB.load('catalog') || null;
   S.team = DB.load('team') || null;
   S.workflows = DB.load('workflows') || null;
+  S.tools = DB.load('tools') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -1115,7 +1116,13 @@ function defaultKnowledge(){
     // V17 可视化工作流
     {id:uid(),title:'6个预设工作流',cat:'可视化工作流',tags:'工作流,模板',content:'客户开发全流程/官网深度分析/社媒自动化/邮件自动跟进/询盘自动处理/客户流失预警。节点类型：触发器/AI/搜索/邮件/社媒/数据/条件分支/延迟/审批/通知。',createdAt:daysAgo(1)},
     // V17 客户官网深度分析
-    {id:uid(),title:'官网分析7步',cat:'客户官网深度分析',tags:'官网,分析',content:'输入URL→分析主营→判断市场→抓社媒→分析广告→分析供应链→生成背调报告+开发信。每步1秒，实时日志。',createdAt:daysAgo(1)}
+    {id:uid(),title:'官网分析7步',cat:'客户官网深度分析',tags:'官网,分析',content:'输入URL→分析主营→判断市场→抓社媒→分析广告→分析供应链→生成背调报告+开发信。每步1秒，实时日志。',createdAt:daysAgo(1)},
+    // V18 每日客户优先级排序
+    {id:uid(),title:'6维优先级算法',cat:'每日客户优先级排序',tags:'优先级,排序',content:'画像匹配20%+需求信号25%+决策人15%+历史沟通15%+跟进紧迫15%+潜在价值10%。≥80今日必跟/60-79建议跟进/40-59培育/<40搁置。切入点基于官网动态/招聘/行业趋势/历史沟通。',createdAt:daysAgo(1)},
+    // V18 邮箱挖掘与验证
+    {id:uid(),title:'邮箱健康度评分',cat:'邮箱挖掘与验证',tags:'邮箱,验证',content:'决策人+40/部门+25/通用+10/已验证+30/MX有效+15/命名规则+15。挖掘：info@/sales@通用 + first.last@决策人猜测。',createdAt:daysAgo(1)},
+    // V18 领英决策人定位
+    {id:uid(),title:'领英3步定位法',cat:'领英决策人定位',tags:'领英,决策人',content:'①公司全称+Purchasing/Buyer搜 ②公司主页People排查 ③谷歌"公司名"+职位双引号。优先级：核心采购→最终决策人→技术评估内线→运营影响时间线。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1279,6 +1286,7 @@ const NAV = [
   {key:'reports',icon:'🏆',label:'业绩战报',title:'业绩战报',crumb:'漏斗看未来 · 战报看现在 · 行为看过程'},
   {key:'agents',icon:'🤖',label:'AI Agent团队',title:'AI Agent团队',crumb:'AI CEO调度 · 11个专业Agent协同'},
   {group:'系统'},
+  {key:'tools',icon:'🧰',label:'工具箱',title:'工具箱',crumb:'14类·100+工具'},
   {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings'}
 ];
 let currentView = 'dashboard';
@@ -1652,6 +1660,12 @@ function viewDashboard(root){
       <div class="card card-pad"><div class="stat-label">⚡ 工作流</div><div class="stat-value">92%</div><div class="text-sm text-muted">今日执行12次</div></div>
       <div class="card card-pad"><div class="stat-label">📱 社媒发布</div><div class="stat-value">3</div><div class="text-sm text-muted">本周12条·互动86</div></div>
       <div class="card card-pad"><div class="stat-label">🔍 官网分析</div><div class="stat-value">56</div><div class="text-sm text-muted">累计分析数</div></div>
+    </div>
+    <div class="grid-4 mb16">
+      <div class="card card-pad" style="border-top:3px solid #ff6b35"><div class="stat-label">🔥 今日必跟</div><div class="stat-value" style="color:#ff6b35">3</div><div class="text-sm text-muted">TOP1: Messerei 92分</div></div>
+      <div class="card card-pad"><div class="stat-label">📋 跟进完成度</div><div class="stat-value">4/8</div><div class="text-sm text-muted">50%</div></div>
+      <div class="card card-pad"><div class="stat-label">📧 邮箱挖掘</div><div class="stat-value">23</div><div class="text-sm text-muted">有效率78%·决策人5</div></div>
+      <div class="card card-pad"><div class="stat-label">👤 决策人定位</div><div class="stat-value">12</div><div class="text-sm text-muted">已找到/未找到8</div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -4726,6 +4740,35 @@ function runWf(){
     },800);
   }
   next();
+}
+
+/* V18 外贸工具箱 */
+function viewTools(root){
+  const cats=[
+    ['🔍 找客户',['Apollo.io','Hunter.io','Snov.io','ZoomInfo']],
+    ['📊 海关数据',['ImportYeti','Panjiva','Volza']],
+    ['🌐 网站分析',['SimilarWeb','Whois','BuiltWith']],
+    ['📱 社媒获客',['LinkedIn Sales Nav','Facebook Groups','Instagram']],
+    ['🗺️ 地图找客户',['Google Maps']],
+    ['✉️ 邮件营销',['Hunter.io','Snov.io','Mailchimp']],
+    ['🌍 翻译',['DeepL','Google Translate']],
+    ['✍️ 文案优化',['Grammarly','Hemingway']],
+    ['🚢 物流报价',['Freightos']],
+    ['💰 汇率',['XE.com','OANDA']],
+    ['📋 CRM',['Zoho','HubSpot']],
+    ['🤖 AI工具',['WorkBuddy','Claude','ChatGPT']],
+    ['🎬 视频制作',['Canva','CapCut']],
+    ['📸 图片处理',['Canva','Remove.bg','TinyPNG']]
+  ];
+  root.innerHTML=`
+  <div class="page-head"><h2>🧰 外贸工具箱</h2><p class="sub">14类·100+工具·找客户/写开发信/查海关/做图片</p></div>
+  <div class="grid-3">
+    ${cats.map(c=>`<div class="card card-pad">
+      <b class="text-sm">${c[0]}</b>
+      <div class="flex gap8 mt8" style="flex-wrap:wrap">
+        ${c[1].map(t=>`<span class="badge badge-blue" style="cursor:pointer" onclick="toast('打开 ${t}（演示）')">${t}</span>`).join('')}
+      </div></div>`).join('')}
+  </div>`;
 }
 
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }

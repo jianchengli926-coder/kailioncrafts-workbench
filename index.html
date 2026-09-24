@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V11.0</div>
+        <div class="b2">KaiLionCrafts Crafts V12.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -537,6 +537,8 @@ function loadState(){
   S.competitors = DB.load('competitors') || null;
   S.productmedia = DB.load('productmedia') || null;
   S.aisales = DB.load('aisales') || null;
+  S.pipeline = DB.load('pipeline') || null;
+  S.documents = DB.load('documents') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -554,6 +556,7 @@ function persist(){
   DB.save('payments',S.payments); DB.save('certifications',S.certifications); DB.save('whatsapp',S.whatsapp);
   DB.save('rfm',S.rfm); DB.save('landingpages',S.landingpages); DB.save('competitors',S.competitors);
   DB.save('productmedia',S.productmedia); DB.save('aisales',S.aisales);
+  DB.save('pipeline',S.pipeline); DB.save('documents',S.documents);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
@@ -1067,7 +1070,14 @@ function defaultKnowledge(){
     {id:uid(),title:'决策人挖掘指南',cat:'客户背调深化',tags:'LinkedIn,邮箱',content:'LinkedIn搜CEO/Purchasing/Procurement/Sourcing；邮箱格式first.last@domain或first@domain；职位分决策人/影响者/使用者/守门人。',createdAt:daysAgo(1)},
     // V11 开发信高回复率
     {id:uid(),title:'高回复率标题公式',cat:'开发信高回复率',tags:'标题,公式',content:'优势数字+客户行业关键词+互动提问。例："Cut packaging damage from 5% to 1% — for [Client] kitchen tools?"正文3句：痛点→方案→回复理由。',createdAt:daysAgo(1)},
-    {id:uid(),title:'4阶段跟进序列',cat:'开发信高回复率',tags:'跟进,序列',content:'Day0建立联系→Day3同区域案例→Day7最后跟进给台阶→Day14新品/原料变动。报价后不回复：1-2天确认收到→3-5天追问→7天行业动态→14天价格到期。',createdAt:daysAgo(1)}
+    {id:uid(),title:'4阶段跟进序列',cat:'开发信高回复率',tags:'跟进,序列',content:'Day0建立联系→Day3同区域案例→Day7最后跟进给台阶→Day14新品/原料变动。报价后不回复：1-2天确认收到→3-5天追问→7天行业动态→14天价格到期。',createdAt:daysAgo(1)},
+    // V12 销售漏斗管理
+    {id:uid(),title:'6阶段销售漏斗',cat:'销售漏斗管理',tags:'阶段,BANT',content:'新线索(24h触达)→初步接触(3天回访)→需求确认(7天报价)→报价中(48h沟通)→谈判中(每周2次)→已成交。停滞超期红色标记。',createdAt:daysAgo(1)},
+    {id:uid(),title:'销售预测加权法',cat:'销售漏斗管理',tags:'预测,加权',content:'加权预测=Σ(阶段转化率×预计金额)。报价中按35%加权，谈判中按70%加权。',createdAt:daysAgo(1)},
+    // V12 外贸单据制作
+    {id:uid(),title:'8种外贸单据',cat:'外贸单据制作',tags:'PI,CI,PL,B/L',content:'报价单QT→形式发票PI→销售合同→商业发票CI→装箱单PL→提单BN→产地证CO/FA→验货报告。编号规则：QT-2026-001。',createdAt:daysAgo(1)},
+    // V12 客户跟进SOP
+    {id:uid(),title:'跟进频率标准',cat:'客户跟进SOP',tags:'频率,超时',content:'A类≤3天/B类≤7天/C类≤14天/D类≤30天。<7天绿/7-14黄/14-30橙/>30红。严重超时一键生成跟进建议。',createdAt:daysAgo(1)}
   ];
 }
 function defaultAR(){
@@ -1545,6 +1555,31 @@ function viewDashboard(root){
       <div class="card card-pad"><div class="stat-label">📦 素材完整度</div><div class="stat-value">92%</div><div class="text-sm text-muted" style="color:var(--red)">1个参数缺失</div></div>
       <div class="card card-pad"><div class="stat-label">🔍 背调完成率</div><div class="stat-value">72%</div><div class="text-sm text-muted">28/39 客户</div></div>
       <div class="card card-pad"><div class="stat-label">📈 开发信回复率</div><div class="stat-value" style="color:var(--green)">21%</div><div class="stat-trend up">+3%</div></div>
+    </div>
+    <div class="grid-2 mb16">
+      <div class="card card-pad"><div class="card-title">📊 本月销售目标</div>
+        <div style="font-size:28px;font-weight:700;color:var(--gold)">$32.6K <span style="font-size:14px;color:var(--muted)">/ $50K</span></div>
+        <div style="background:#f1f5f9;height:14px;border-radius:7px;margin-top:8px"><div style="width:65%;background:linear-gradient(90deg,var(--primary),var(--gold));height:100%;border-radius:7px"></div></div>
+        <div class="text-sm text-muted mt8">完成率 <b>65%</b> · 已成交2单 · 加权预测$32.6K</div></div>
+      <div class="card card-pad"><div class="card-title">🌍 按国家销售额</div>
+        ${[['德国',42,'var(--gold)'],['美国',28,'var(--primary)'],['英国',15,'#2c5282'],['加拿大',8,'#4a6fa5'],['其他',7,'var(--muted)']].map(([c,v,col])=>
+          `<div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span>${c}</span><b>$${v}K</b></div><div style="background:#f1f5f9;height:10px"><div style="width:${v*2}%;background:${col};height:100%"></div></div></div>`).join('')}
+      </div>
+    </div>
+    <div class="grid-2 mb16">
+      <div class="card card-pad"><div class="card-title">🏆 畅销产品 TOP5</div>
+        <table class="tbl"><tbody>
+          <tr><td>1. 厨房剪刀 KL-001</td><td style="text-align:right">$18K</td><td>32%</td></tr>
+          <tr><td>2. 主厨刀 KL-002</td><td style="text-align:right">$14K</td><td>25%</td></tr>
+          <tr><td>3. 削皮器 KL-003</td><td style="text-align:right">$8K</td><td>14%</td></tr>
+          <tr><td>4. 户外折叠刀 KL-004</td><td style="text-align:right">$6K</td><td>11%</td></tr>
+          <tr><td>5. 多用剪刀 KL-005</td><td style="text-align:right">$5K</td><td>9%</td></tr>
+        </tbody></table>
+        <div class="text-sm text-muted mt8">💡 5%款式贡献89%金额</div></div>
+      <div class="card card-pad"><div class="card-title">⚠️ 本月丢单分析</div>
+        <div class="text-sm" style="line-height:2.2">本月丢单 <b>4</b> 笔，合计 <b style="color:var(--red)">$11K</b>
+          <div class="text-sm mt8">价格太高 <b style="color:var(--red)">2</b> · 选择竞品 <b style="color:#ed8936">1</b> · 需求取消 <b style="color:var(--muted)">1</b></div>
+        </div></div>
     </div>
     <div class="grid-3-2">
       <div class="card card-pad">
@@ -2498,6 +2533,16 @@ function viewSchedule(root){
     else groups['以后'].push(t);
   });
   root.innerHTML = `
+    <div class="card card-pad mb16" style="background:linear-gradient(120deg,var(--primary),#2c5282);color:#fff">
+      <div class="flex-between"><b style="font-size:15px">📅 今日看板</b><span class="text-sm">本周：待跟进 12 · 待办 8 · 已完成 5 · 新增询盘 3</span></div>
+      <div class="grid-4 mt16" style="gap:12px">
+        <div><div style="opacity:.8;font-size:12px">🔴 重要紧急</div><b style="font-size:22px">2</b></div>
+        <div><div style="opacity:.8;font-size:12px">🟠 重要不紧急</div><b style="font-size:22px">3</b></div>
+        <div><div style="opacity:.8;font-size:12px">🟡 紧急不重要</div><b style="font-size:22px">2</b></div>
+        <div><div style="opacity:.8;font-size:12px">⚪ 不重要不紧急</div><b style="font-size:22px">1</b></div>
+      </div>
+      <div class="text-sm mt8" style="opacity:.9">今日待跟进 <b>8</b> 家（含超时 <b style="color:#ffd700">2</b> 家🔴）</div>
+    </div>
     <div class="card card-pad mb16" style="background:#f7efdd">
       <b class="text-gold">💡 多渠道跟进提示：</b><span class="text-sm">电话+邮件组合跟进，回复率可提高 <b>3.24 倍</b>。</span>
       <div class="flex gap16 mt8" style="flex-wrap:wrap">
@@ -2812,11 +2857,29 @@ let orderTab = 'quotes';
 function viewOrders(root){
   root.innerHTML = `
     <div class="flex gap8 mb16">
-      ${[['quotes','📄 报价单'],['contracts','📋 合同'],['orders','🚚 订单执行'],['calc','🧮 计算器']].map(([k,l])=>
+      ${[['quotes','📄 报价单'],['contracts','📋 合同'],['orders','🚚 订单执行'],['calc','🧮 计算器'],['docs','📑 单据中心']].map(([k,l])=>
         `<button class="btn ${orderTab===k?'btn-gold':'btn-outline'}" onclick="orderTab='${k}';renderView()">${l}</button>`).join('')}
     </div>
-    ${orderTab==='quotes'?orderQuotes():orderTab==='contracts'?orderContracts():orderTab==='calc'?quoteCalc():orderOrders()}`;
+    ${orderTab==='quotes'?orderQuotes():orderTab==='contracts'?orderContracts():orderTab==='calc'?quoteCalc():orderTab==='docs'?orderDocs():orderOrders()}`;
   if(orderTab==='calc') setTimeout(calcQuote,50);
+}
+function orderDocs(){
+  const docs=[
+    ['QT-2026-001','报价单','Messerei Schmidt','2026-09-01','已发送'],
+    ['PI-2026-001','形式发票','BritChef Ltd','2026-09-05','已确认'],
+    ['CI-2026-001','商业发票','Messerei Schmidt','2026-09-10','已完成'],
+    ['PL-2026-001','装箱单','Messerei Schmidt','2026-09-10','已完成']
+  ];
+  return `<div class="card card-pad mb16"><div class="card-title">8种单据一键生成</div>
+    <div class="flex gap8" style="flex-wrap:wrap">
+      ${['📄 报价单','📋 形式发票','📝 销售合同','💰 商业发票','📦 装箱单','🚢 提单确认','🏭 产地证','🧾 验货报告'].map(t=>
+        `<button class="btn btn-outline" onclick="toast('生成 ${t}（演示）')">${t}</button>`).join('')}
+    </div></div>
+  <div class="card card-pad"><div class="card-title">已生成单据</div>
+    <table class="tbl"><thead><tr><th>编号</th><th>类型</th><th>客户</th><th>日期</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>${docs.map(d=>`<tr><td class="mono">${d[0]}</td><td>${d[1]}</td><td>${d[2]}</td><td>${d[3]}</td>
+      <td><span class="badge ${d[4]==='已完成'?'badge-a':d[4]==='已确认'?'badge-gold':'badge-blue'}">${d[4]}</span></td>
+      <td><button class="btn btn-outline btn-sm" onclick="window.print()">🖨 打印</button></td></tr>`).join('')}</tbody></table></div>`;
 }
 function orderQuotes(){
   return `<div class="flex-between mb16">
@@ -4175,6 +4238,56 @@ function mediaQuote(){
 }
 
 /* V11 AI业务员（AI Agent模块追加区块） */
+
+/* V12 销售漏斗 */
+function viewPipeline(root){
+  const stages=[
+    ['📥 新线索',39,'100%',''],
+    ['🤝 初步接触',18,'46%','→'],
+    ['📋 需求确认',9,'23%','→'],
+    ['💰 报价中',5,'13%','→'],
+    ['🤝 谈判中',3,'8%','→'],
+    ['✅ 已成交',2,'5%','→']
+  ];
+  root.innerHTML=`
+  <div class="page-head"><h2>🎯 销售漏斗</h2><p class="sub">6阶段·商机管理·销售预测</p>
+    <button class="btn btn-primary" onclick="toast('新增商机（演示）')">＋ 新增商机</button></div>
+  <div class="card card-pad mb16">
+    <div class="card-title">6阶段漏斗（本月）</div>
+    ${stages.map(([n,c,pct,arr],i)=>`
+      <div style="margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">
+          <span>${n}</span><b>${c} 家 · ${pct}</b>
+        </div>
+        <div style="background:#f1f5f9;height:22px;border-radius:4px">
+          <div style="width:${100-i*15}%;background:${i===5?'var(--green)':i>=3?'var(--gold)':'var(--primary)'};height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;color:#fff;font-size:11px">${c}</div>
+        </div>
+      </div>`).join('')}
+    <div class="text-sm text-muted mt8">总体转化率 <b style="color:var(--green)">5%</b>（39线索→2成交）</div>
+  </div>
+  <div class="grid-2 mb16">
+    <div class="card card-pad"><div class="card-title">💰 销售预测（加权）</div>
+      <div class="text-sm" style="line-height:2.2">
+        本月目标：<b>$50K</b><br>
+        加权预测：<b style="color:var(--gold)">$32.6K</b>（完成率 65%）<br>
+        已成交：<b style="color:var(--green)">$18K</b>
+      </div></div>
+    <div class="card card-pad"><div class="card-title">⚠️ 停滞超期提醒</div>
+      <div class="text-sm" style="line-height:2">
+        🔴 Kitchen Universe 在报价中停留 <b>12天</b>（标准48h）<br>
+        🟠 ABC Home GmbH 在初步接触停留 <b>9天</b>（标准3天）<br>
+        🟡 Aussie Cutlery 在新线索停留 <b>2天</b>（标准24h）
+      </div></div>
+  </div>
+  <div class="card card-pad"><div class="card-title">📋 商机列表</div>
+    <table class="tbl"><thead><tr><th>客户</th><th>阶段</th><th>预计金额</th><th>停留</th><th>下一步</th></tr></thead>
+    <tbody>
+      <tr><td>Messerei Schmidt</td><td><span class="badge badge-a">谈判中</span></td><td>$12K</td><td>5天</td><td>确认交期</td></tr>
+      <tr><td>BritChef Ltd</td><td><span class="badge badge-a">报价中</span></td><td>$8K</td><td>3天</td><td>跟进反馈</td></tr>
+      <tr><td>Kitchen Universe</td><td><span class="badge badge-gold">报价中</span></td><td>$6K</td><td style="color:var(--red)"><b>12天⚠️</b></td><td>🔴 催回复</td></tr>
+      <tr><td>ABC Home GmbH</td><td><span class="badge badge-blue">需求确认</span></td><td>$5K</td><td>2天</td><td>发样品</td></tr>
+    </tbody></table></div>`;
+}
 
 function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem(PREFIX+'theme', document.body.classList.contains('dark')?'dark':'light'); }
 

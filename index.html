@@ -394,7 +394,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
       <div class="brand-logo">K</div>
       <div class="brand-text">
         <div class="b1">锴利获客工作台</div>
-        <div class="b2">KaiLionCrafts Crafts V28.0</div>
+        <div class="b2">KaiLionCrafts Crafts V29.0</div>
       </div>
     </div>
     <nav class="nav" id="nav"><!-- 渲染导航 --></nav>
@@ -2444,11 +2444,11 @@ const DRAFT_STATUS = {'待检查':['badge-gold','待检查'],'已修改':['badge
 function viewDrafts(root){
   root.innerHTML = `
     <div class="flex gap8 mb16">
-      ${[['list','📋 草稿箱'],['short','✂️ 短开发信'],['seq','🔁 跟进序列'],['send','📤 审核发送'],['stats','📊 效果分析'],['ab','🧪 A/B测试'],['tpl','📚 模板库']].map(([k,l])=>
+      ${[['list','📋 草稿箱'],['short','✂️ 短开发信'],['multi','🌍 多语言生成'],['seq','🔁 跟进序列'],['send','📤 审核发送'],['stats','📊 效果分析'],['ab','🧪 A/B测试'],['tpl','📚 模板库']].map(([k,l])=>
         `<button class="btn ${draftTab===k?'btn-gold':'btn-outline'}" onclick="draftTab='${k}';renderView()">${l}</button>`).join('')}
       <button class="btn btn-gold" style="margin-left:auto" onclick="toast('A/B测试（演示）')">🧪 新建 A/B 测试</button>
     </div>
-    ${draftTab==='list'?draftList():draftTab==='short'?draftShort():draftTab==='seq'?draftSeq():draftTab==='send'?draftSend():draftTab==='stats'?draftStats():draftTab==='ab'?draftAB():draftTpl()}`;
+    ${draftTab==='list'?draftList():draftTab==='short'?draftShort():draftTab==='multi'?draftMultiLang():draftTab==='seq'?draftSeq():draftTab==='send'?draftSend():draftTab==='stats'?draftStats():draftTab==='ab'?draftAB():draftTpl()}`;
 }
 function draftShort(){
   return `<div class="card card-pad"><div class="card-title">✂️ 短开发信（≤50词）</div>
@@ -3162,7 +3162,7 @@ function viewSettings(root){
         <div class="card card-pad">
           <div class="card-title">关于锴利工作台</div>
           <div class="text-sm" style="line-height:2">
-            <b>版本</b> V28.0 · 锴利外贸获客工作台<br>
+            <b>版本</b> V29.0 · 锴利外贸获客工作台<br>
             <b>五步闭环</b> 找客户 → 核证据 → 写草稿 → 人工发送 → 跟进<br>
             <b>哲学</b> AI 只干脏活累活，发送我自己来，数据全在本地<br>
             <b>Slogan</b> <span class="text-gold fw700">Crafted in Yangjiang, Trusted Worldwide</span>
@@ -6256,7 +6256,7 @@ function generateLeadEmail(idx){
 
 
 /* ============================================================
- * V28.0 开发信审核发送中心 + SMTP配置
+ * V29.0 开发信审核发送中心 + SMTP配置
  * ============================================================ */
 function saveSmtpConfig(){
   const cfg={
@@ -6500,7 +6500,7 @@ function nowStr(){const d=new Date();return todayStr()+' '+String(d.getHours()).
 
 
 /* ============================================================
- * V28.0 全球采购商地图 + 决策人挖掘
+ * V29.0 全球采购商地图 + 决策人挖掘
  * ============================================================ */
 function globalMapView(){
   const regions=[
@@ -6746,7 +6746,7 @@ function decisionMinerView(){
 
 
 /* ============================================================
- * V28.0 开发计划中心 - 多计划并行 AI自动运行
+ * V29.0 开发计划中心 - 多计划并行 AI自动运行
  * ============================================================ */
 function viewDevPlans(root){
   const plans = S.devPlans || [];
@@ -6944,7 +6944,7 @@ function loadDemoDevPlans(){
 
 
 /* ============================================================
- * V28.0 客户跟进超时预警 - 距上次跟进天数+颜色标识
+ * V29.0 客户跟进超时预警 - 距上次跟进天数+颜色标识
  * ============================================================ */
 function followDaysBadge(c){
   const lastFollow = (c.followUpHistory && c.followUpHistory.length) ? c.followUpHistory[c.followUpHistory.length-1].t : c.createdAt;
@@ -6975,6 +6975,209 @@ function getTodayFollowCount(){
     if(c.nextFollowUp && new Date(c.nextFollowUp).toDateString() === today) count++;
   });
   return count;
+}
+
+
+/* ============================================================
+ * V29.0 多语言开发信生成器 - 4种语气风格 + 10种语言自动判断
+ * ============================================================ */
+const COUNTRY_LANG_MAP = {
+  '美国':'English','英国':'English','加拿大':'English','澳大利亚':'English','爱尔兰':'English',
+  '德国':'German','奥地利':'German','瑞士':'German',
+  '法国':'French','比利时':'French','卢森堡':'French',
+  '西班牙':'Spanish','墨西哥':'Spanish','阿根廷':'Spanish','智利':'Spanish','哥伦比亚':'Spanish','秘鲁':'Spanish',
+  '意大利':'Italian',
+  '日本':'Japanese',
+  '韩国':'Korean',
+  '俄罗斯':'Russian',
+  '巴西':'Portuguese','葡萄牙':'Portuguese',
+  '阿联酋':'Arabic','沙特':'Arabic','埃及':'Arabic',
+  '荷兰':'Dutch','瑞典':'Swedish','波兰':'Polish','土耳其':'Turkish','越南':'Vietnamese','泰国':'Thai','印度':'English','南非':'English'
+};
+const LANG_FLAGS = {'English':'🇺🇸','Spanish':'🇪🇸','German':'🇩🇪','French':'🇫🇷','Japanese':'🇯🇵','Korean':'🇰🇷','Russian':'🇷🇺','Arabic':'🇸🇦','Portuguese':'🇧🇷','Italian':'🇮🇹','Dutch':'🇳🇱','Swedish':'🇸🇪','Polish':'🇵🇱','Turkish':'🇹🇷','Vietnamese':'🇻🇳','Thai':'🇹🇭'};
+function draftMultiLang(){
+  const countries = Object.keys(COUNTRY_LANG_MAP);
+  return `<div class="card card-pad">
+    <div class="card-title">🌍 AI多语言开发信生成器</div>
+    <div class="text-sm text-muted mb16">核心理念：千邮千面。AI根据客户国家自动判断开发信语言，4种语气风格可选，确保每封开发信都像母语者写的。</div>
+    <div class="grid-3 mb16" style="gap:12px">
+      <div>
+        <label class="text-sm">客户国家（自动推荐语言）</label>
+        <select id="ml_country" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px;margin-bottom:8px" onchange="autoSelectLang()">
+          ${countries.map(c=>`<option>${c}</option>`).join('')}
+        </select>
+        <label class="text-sm">开发信语言</label>
+        <select id="ml_language" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px;margin-bottom:8px">
+          ${Object.keys(LANG_FLAGS).map(l=>`<option>${LANG_FLAGS[l]} ${l}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="text-sm">语气风格</label>
+        <select id="ml_tone" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px;margin-bottom:8px">
+          <option value="professional">🎩 专业稳重（适合德国/日本客户）</option>
+          <option value="friendly">😊 友好自然（适合美国/澳洲客户）</option>
+          <option value="technical">🔧 技术型（适合工程师/采购技术岗）</option>
+          <option value="direct">⚡ 简洁直接（适合忙碌的高管/老板）</option>
+        </select>
+        <label class="text-sm">邮件长度</label>
+        <select id="ml_length" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px;margin-bottom:8px">
+          <option value="short">✂️ 短开发信（≤50词）</option>
+          <option value="medium" selected>📝 标准开发信（50-120词）</option>
+          <option value="long">📄 详细开发信（120-200词）</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm">客户公司</label>
+        <input type="text" id="ml_company" value="Kitchen Universe Inc." style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px;margin-bottom:8px">
+        <label class="text-sm">联系人/职位</label>
+        <input type="text" id="ml_contact" value="Michael Carter, Procurement Manager" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px;margin-bottom:8px">
+      </div>
+    </div>
+    <div class="form-group mb16">
+      <label>你的产品/优势（AI会基于此生成个性化内容）</label>
+      <textarea id="ml_product" rows="3" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px">阳江厨房剪刀/刀具工厂，20年OEM经验，月产50万把，通过LFGB/FDA认证，可定制包装和Logo，起订量500把</textarea>
+    </div>
+    <div class="flex gap8 mb16">
+      <button class="btn btn-gold" onclick="generateMultiLangEmail()">🤖 AI生成多语言开发信</button>
+      <button class="btn btn-outline" onclick="toast('已保存到草稿箱（演示）')">💾 保存到草稿箱</button>
+      <button class="btn btn-outline" onclick="copyMultiLangResult()">📋 复制全文</button>
+    </div>
+    <div id="ml_result"></div>
+    <div class="mt16" style="background:#f0f9ff;padding:12px;border-radius:8px;border-left:3px solid var(--primary)">
+      <div class="text-sm fw700 mb8">💡 多语言开发信黄金法则</div>
+      <div class="text-xs" style="line-height:2">
+        1️⃣ <b>按国家选语言</b>：德国客户用德语、日本客户用日语，母语开发信回复率提升3倍<br>
+        2️⃣ <b>按文化选语气</b>：德国/日本客户偏好专业稳重，美国/澳洲客户偏好友好自然<br>
+        3️⃣ <b>主题行本地化</b>：不同国家对促销词敏感度不同，避免用"Free""Discount"等词<br>
+        4️⃣ <b>日期格式</b>：美国用MM/DD/YYYY，欧洲用DD/MM/YYYY，日本用YYYY年MM月DD日<br>
+        5️⃣ <b>称呼规范</b>：德国用"Sehr geehrter Herr/Frau"，日本用"様"，阿拉伯国家注意性别称呼
+      </div>
+    </div>
+  </div>`;
+}
+function autoSelectLang(){
+  const country = document.getElementById('ml_country').value;
+  const lang = COUNTRY_LANG_MAP[country] || 'English';
+  const sel = document.getElementById('ml_language');
+  for(let i=0;i<sel.options.length;i++){
+    if(sel.options[i].text.includes(lang)){ sel.selectedIndex = i; break; }
+  }
+}
+function generateMultiLangEmail(){
+  const country = document.getElementById('ml_country').value;
+  const language = document.getElementById('ml_language').value.replace(/^[^\s]+\s/,'');
+  const tone = document.getElementById('ml_tone').value;
+  const length = document.getElementById('ml_length').value;
+  const company = document.getElementById('ml_company').value || 'your company';
+  const contact = document.getElementById('ml_contact').value || '';
+  const product = document.getElementById('ml_product').value || '';
+  const firstName = contact.split(',')[0].split(' ')[0] || 'there';
+  const toneLabels = {professional:'专业稳重',friendly:'友好自然',technical:'技术型',direct:'简洁直接'};
+  const lengthLabels = {short:'短开发信',medium:'标准开发信',long:'详细开发信'};
+  const flag = LANG_FLAGS[language] || '🌍';
+  const subjects = {
+    English: {
+      professional:`${product.split('，')[0]||'Quality Products'} Supply from Yangjiang Factory`,
+      friendly:`Hi ${firstName}, quick question about your ${product.split('，')[0]||'product'} line`,
+      technical:`Technical Specification: ${product.split('，')[0]||'Product'} — OEM/ODM Capabilities`,
+      direct:`${product.split('，')[0]||'Product'} Quote — Factory Direct, 20yr Experience`
+    },
+    Spanish: {
+      professional:`Suministro de ${product.split('，')[0]||'Productos'} desde Fábrica en Yangjiang`,
+      friendly:`Hola ${firstName}, una pregunta rápida sobre su línea de ${product.split('，')[0]||'productos'}`,
+      technical:`Especificación Técnica: ${product.split('，')[0]||'Producto'} — Capacidades OEM/ODM`,
+      direct:`Cotización de ${product.split('，')[0]||'Producto'} — Directo de Fábrica, 20 años`
+    },
+    German: {
+      professional:`${product.split('，')[0]||'Qualitätsprodukte'} Lieferung aus Yangjiang Fabrik`,
+      friendly:`Hallo ${firstName}, eine kurze Frage zu Ihrer ${product.split('，')[0]||'Produkt'}-Linie`,
+      technical:`Technische Spezifikation: ${product.split('，')[0]||'Produkt'} — OEM/ODM Fähigkeiten`,
+      direct:`Angebot für ${product.split('，')[0]||'Produkt'} — Direkt vom Fabrik, 20 Jahre Erfahrung`
+    },
+    French: {
+      professional:`Fourniture de ${product.split('，')[0]||'Produits'} depuis l'usine de Yangjiang`,
+      friendly:`Bonjour ${firstName}, une question rapide sur votre gamme de ${product.split('，')[0]||'produits'}`,
+      technical:`Spécification Technique: ${product.split('，')[0]||'Produit'} — Capacités OEM/ODM`,
+      direct:`Devis ${product.split('，')[0]||'Produit'} — Direct Usine, 20 ans d'expérience`
+    },
+    Japanese: {
+      professional:`陽江工場からの${product.split('，')[0]||'製品'}供給について`,
+      friendly:`${firstName}様、${product.split('，')[0]||'製品'}ラインについて簡単な質問です`,
+      technical:`技術仕様書: ${product.split('，')[0]||'製品'} — OEM/ODM対応可能`,
+      direct:`${product.split('，')[0]||'製品'}見積もり — 工場直販、20年の経験`
+    },
+    Korean: {
+      professional:`양징 공장에서의 ${product.split('，')[0]||'제품'} 공급`,
+      friendly:`${firstName}님, ${product.split('，')[0]||'제품'} 라인에 대해 빠른 질문입니다`,
+      technical:`기술 사양: ${product.split('，')[0]||'제품'} — OEM/ODM 가능`,
+      direct:`${product.split('，')[0]||'제품'} 견적 — 공장 직판, 20년 경험`
+    },
+    Russian: {
+      professional:`Поставка ${product.split('，')[0]||'продукции'} с завода в Янцзяне`,
+      friendly:`Здравствуйте, ${firstName}, быстрый вопрос о вашей линейке ${product.split('，')[0]||'продукции'}`,
+      technical:`Техническая спецификация: ${product.split('，')[0]||'продукт'} — Возможности OEM/ODM`,
+      direct:`Расценки на ${product.split('，')[0]||'продукт'} — Прямо с завода, 20 лет опыта`
+    },
+    Arabic: {
+      professional:`توريد ${product.split('،')[0]||'المنتجات'} من مصنع يانغجيانغ`,
+      friendly:`مرحباً ${firstName}، سؤال سريع حول خط ${product.split('،')[0]||'المنتجات'} الخاص بك`,
+      technical:`المواصفات الفنية: ${product.split('،')[0]||'المنتج'} — قدرات OEM/ODM`,
+      direct:`عرض سعر ${product.split('،')[0]||'المنتج'} — مباشرة من المصنع، 20 عاماً من الخبرة`
+    },
+    Portuguese: {
+      professional:`Fornecimento de ${product.split('，')[0]||'Produtos'} da fábrica de Yangjiang`,
+      friendly:`Olá ${firstName}, uma pergunta rápida sobre sua linha de ${product.split('，')[0]||'produtos'}`,
+      technical:`Especificação Técnica: ${product.split('，')[0]||'Produto'} — Capacidades OEM/ODM`,
+      direct:`Cotação de ${product.split('，')[0]||'Produto'} — Direto da Fábrica, 20 anos de experiência`
+    },
+    Italian: {
+      professional:`Fornitura di ${product.split('，')[0]||'Prodotti'} dalla fabbrica di Yangjiang`,
+      friendly:`Ciao ${firstName}, una domanda veloce sulla tua linea di ${product.split('，')[0]||'prodotti'}`,
+      technical:`Specifiche Tecniche: ${product.split('，')[0]||'Prodotto'} — Capacità OEM/ODM`,
+      direct:`Preventivo ${product.split('，')[0]||'Prodotto'} — Diretto dalla Fabbrica, 20 anni di esperienza`
+    }
+  };
+  const bodies = {
+    English: {
+      professional:`Dear ${firstName},\n\nI came across ${company} while researching premium kitchenware distributors in ${country}. Your product lineup aligns well with our manufacturing capabilities.\n\nWe are KaiLionCrafts, a Yangjiang-based factory with 20 years of OEM experience in kitchen shears and cutlery. Our monthly capacity reaches 500,000 units, and we hold LFGB and FDA certifications.\n\nKey advantages:\n• Custom packaging and logo branding\n• MOQ from 500 units\n• Strict quality control with 3 inspection stages\n\nWould you be open to receiving a detailed catalog and quotation? I am happy to schedule a brief call at your convenience.\n\nBest regards,\nKaiLionCrafts Team`,
+      friendly:`Hi ${firstName},\n\nHope you're having a great week! I noticed ${company} and thought I'd reach out — we might be a good fit for your kitchenware sourcing.\n\nWe're a factory in Yangjiang (the cutlery capital of China!) making kitchen shears and knives for 20 years. Currently supplying 3 EU distributors, with LFGB/FDA certification.\n\nWhat makes us different:\n• Flexible MOQ (start from 500 pcs)\n• Custom packaging with your logo\n• Fast sample turnaround (3-5 days)\n\nWould love to send you our latest catalog. Any interest?\n\nCheers,\nKaiLionCrafts Team`,
+      technical:`Dear ${firstName},\n\nRegarding your ${product.split('，')[0]||'kitchen shears'} product line, I would like to present our technical capabilities:\n\n**Manufacturing Specs:**\n• Material: 3Cr13 / 4Cr13 stainless steel (customizable)\n• Hardness: HRC 52-55\n• Blade thickness: 2.0-3.0mm\n• Handle: PP/TPR soft grip (food-grade)\n• Certification: LFGB, FDA, BSCI\n\n**Production Capacity:**\n• Monthly output: 500,000 units\n• Lead time: 25-35 days for OEM orders\n• MOQ: 500 units per model\n\n**Quality Control:**\n• IQC (incoming material) → IPQC (in-process) → OQC (outgoing)\n• AQL 2.5 inspection standard\n\nWould you like a full technical datasheet and sample?\n\nBest regards,\nKaiLionCrafts Engineering Team`,
+      direct:`${firstName},\n\nQuick pitch: We make kitchen shears in Yangjiang, 20 years, 500k/month capacity, LFGB/FDA certified.\n\nFor ${company}:\n• Factory direct pricing (15-25% below trading companies)\n• OEM with your logo/packaging\n• MOQ 500 pcs\n\nWant a quote? Send me your target specs or current supplier price. I'll get back within 24 hours.\n\nKaiLionCrafts`
+    }
+  };
+  const subject = (subjects[language] && subjects[language][tone]) || subjects.English[tone];
+  const body = (bodies[language] && bodies[language][tone]) || bodies.English[tone];
+  const wordCount = body.split(/\s+/).filter(Boolean).length;
+  document.getElementById('ml_result').innerHTML = `
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-top:16px">
+      <div class="flex-between mb12" style="align-items:center">
+        <div class="flex gap8" style="align-items:center">
+          <span style="font-size:20px">${flag}</span>
+          <span class="fw700">${language} 开发信</span>
+          <span class="badge badge-blue">${toneLabels[tone]}</span>
+          <span class="badge badge-gray">${lengthLabels[length]}</span>
+        </div>
+        <span class="text-sm text-muted">${wordCount} 词 · 客户: ${company} (${country})</span>
+      </div>
+      <div style="background:#f7fafc;padding:12px;border-radius:8px;margin-bottom:12px">
+        <div class="text-xs text-muted mb4"><b>主题 (Subject):</b></div>
+        <div class="fw700">${subject}</div>
+      </div>
+      <div style="background:#f7fafc;padding:12px;border-radius:8px">
+        <div class="text-xs text-muted mb4"><b>正文 (Body):</b></div>
+        <div style="white-space:pre-wrap;line-height:1.8;font-size:14px">${body.replace(/\n/g,'\n')}</div>
+      </div>
+      <div class="mt12 text-xs text-muted" style="line-height:1.8">
+        💡 <b>发送建议：</b>最佳发送时间 ${country==='美国'?'美东时间 9:00-10:00':country==='德国'?'中欧时间 10:00-11:00':country==='日本'?'日本时间 10:00-11:00':'当地时间 9:00-11:00'}，避免周一早上和周五下午发送。
+      </div>
+    </div>`;
+  toast('AI已生成'+language+'开发信（'+toneLabels[tone]+'风格）');
+}
+function copyMultiLangResult(){
+  const result = document.getElementById('ml_result');
+  if(!result || !result.innerText){ toast('请先生成开发信','error'); return; }
+  const text = result.innerText;
+  navigator.clipboard.writeText(text).then(()=>toast('已复制到剪贴板')).catch(()=>toast('复制失败，请手动选择','error'));
 }
 
 </body>

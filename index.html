@@ -981,6 +981,22 @@ function defaultApis(){
      apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
      model:'glm-4-flash', temperature:0.1, enabled:false, isDefault:true,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'智谱 GLM-4.7-Flash(深度思考·免费)', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
+     apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
+     model:'glm-4.7-flash', temperature:0.1, enabled:false, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'智谱 GLM-4.6V-Flash(视觉理解·免费)', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
+     apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
+     model:'glm-4.6v-flash', temperature:0.1, enabled:false, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'智谱 GLM-4-Flash(文本生成·免费)', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
+     apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
+     model:'glm-4-flash', temperature:0.1, enabled:false, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'智谱 CogView-3-Flash(图像生成·免费)', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
+     apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
+     model:'cogview-3-flash', temperature:0.1, enabled:false, isDefault:false,
+     caps:{lead:0,score:0,draft:0,reply:0,quote:0,assistant:0}},
     {id:uid(), name:'本地 Qwen2.5-7B(文本)', type:'ollama', baseURL:'http://localhost:11434/v1',
      apiKey:b64enc(''), model:'qwen2.5:7b', temperature:0.7, enabled:false, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
@@ -1157,7 +1173,7 @@ function defaultAR(){
 }
 // V21: 模型单价配置（每百万token，元）
 const MODEL_PRICES = {
-  'glm-4-flash':{in:0.5,out:1.0},'glm-4':{in:10,out:20},'glm-4-plus':{in:5,out:10},
+  'glm-4-flash':{in:0,out:0},'glm-4.7-flash':{in:0,out:0},'glm-4.6v-flash':{in:0,out:0},'cogview-3-flash':{in:0,out:0},'glm-4':{in:10,out:20},'glm-4-plus':{in:5,out:10},
   'gpt-4o':{in:18,out:54},'gpt-4o-mini':{in:1.8,out:5.4},'gpt-3.5-turbo':{in:1.2,out:3.6},
   'deepseek-chat':{in:1,out:2},'deepseek-reasoner':{in:2,out:8},'deepseek-r1':{in:1,out:2},
   'qwen2.5:7b':{in:0,out:0},'qwen2.5vl:7b':{in:0,out:0},'qwen2.5':{in:0.8,out:2},
@@ -3466,6 +3482,14 @@ function openApiForm(aid){
         <div style="display:flex;gap:8px"><input type="password" class="form-control" id="ap_key" value="${esc(show)}" style="flex:1">
         <button class="btn btn-outline" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'">👁</button></div></div>
       <div class="form-group"><label>模型名称</label>
+        <div style="margin-bottom:4px"><span class="text-xs text-muted">智谱免费模型：</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <span class="badge" style="cursor:pointer;background:#f0fff4;color:#276749;border:1px solid #9ae6b4" onclick="document.getElementById('ap_model').value='glm-4.7-flash'">glm-4.7-flash(深度思考)</span>
+          <span class="badge" style="cursor:pointer;background:#f0fff4;color:#276749;border:1px solid #9ae6b4" onclick="document.getElementById('ap_model').value='glm-4.6v-flash'">glm-4.6v-flash(视觉)</span>
+          <span class="badge" style="cursor:pointer;background:#f0fff4;color:#276749;border:1px solid #9ae6b4" onclick="document.getElementById('ap_model').value='glm-4-flash'">glm-4-flash(文本)</span>
+          <span class="badge" style="cursor:pointer;background:#f0fff4;color:#276749;border:1px solid #9ae6b4" onclick="document.getElementById('ap_model').value='cogview-3-flash'">cogview-3-flash(图像)</span>
+        </div>
+        <div style="margin-bottom:4px"><span class="text-xs text-muted">本地Ollama模型：</span></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
           <span class="badge badge-blue" style="cursor:pointer" onclick="document.getElementById('ap_model').value='qwen2.5:7b'">qwen2.5:7b</span>
           <span class="badge badge-blue" style="cursor:pointer" onclick="document.getElementById('ap_model').value='deepseek-r1:7b'">deepseek-r1:7b</span>

@@ -1843,6 +1843,7 @@ function filterCustomersByTag(tagLabel){
     S.customerFilter.tag = tagLabel;
   }
   renderView();
+  initNotifications();
 }
 
 /* V48 获取标签统计 */
@@ -2304,6 +2305,99 @@ function clearActivityLog(){
   try{ DB.save('activityLog', S.activityLog); }catch(e){}
   toast('✅ 操作日志已清空');
   renderView();
+}
+
+
+
+/* V54 客户跟进桌面通知 */
+let notificationEnabled = false;
+let notificationChecked = false;
+
+async function requestNotificationPermission(){
+  if(!('Notification' in window)){
+    toast('当前浏览器不支持桌面通知');
+    return false;
+  }
+  if(Notification.permission === 'granted'){
+    notificationEnabled = true;
+    toast('✅ 桌面通知已开启');
+    return true;
+  }
+  if(Notification.permission !== 'denied'){
+    const permission = await Notification.requestPermission();
+    if(permission === 'granted'){
+      notificationEnabled = true;
+      toast('✅ 桌面通知已开启');
+      return true;
+    }
+  }
+  toast('⚠️ 桌面通知未授权，请在浏览器设置中允许');
+  return false;
+}
+
+function checkFollowUpNotifications(){
+  if(!notificationEnabled || notificationChecked) return;
+  notificationChecked = true;
+  
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const dueToday = S.customers.filter(c => 
+    c.nextFollowUp && new Date(c.nextFollowUp) <= today && c.status !== '已回复'
+  );
+  const dueTomorrow = S.customers.filter(c => {
+    if(!c.nextFollowUp) return false;
+    const d = new Date(c.nextFollowUp);
+    d.setHours(0,0,0,0);
+    return d.getTime() === tomorrow.getTime() && c.status !== '已回复';
+  });
+  
+  if(dueToday.length > 0){
+    showNotification(
+      '📅 今日待跟进客户',
+      `有 ${dueToday.length} 个客户需要今日跟进：${dueToday.slice(0,3).map(c=>c.company).join('、')}${dueToday.length>3?'等':''}`,
+      'customers'
+    );
+  }
+  if(dueTomorrow.length > 0){
+    setTimeout(() => {
+      showNotification(
+        '⏰ 明日待跟进提醒',
+        `有 ${dueTomorrow.length} 个客户明日需要跟进：${dueTomorrow.slice(0,3).map(c=>c.company).join('、')}${dueTomorrow.length>3?'等':''}`,
+        'customers'
+      );
+    }, 3000);
+  }
+}
+
+function showNotification(title, body, view='dashboard'){
+  if(!notificationEnabled || !('Notification' in window)) return;
+  try{
+    const notification = new Notification(title, {
+      body: body,
+      icon: 'favicon-32.png',
+      badge: 'favicon-32.png',
+      tag: 'kailion-followup',
+      requireInteraction: false
+    });
+    notification.onclick = () => {
+      window.focus();
+      if(view) go(view);
+      notification.close();
+    };
+    setTimeout(() => notification.close(), 10000);
+  }catch(e){
+    console.log('通知失败:', e);
+  }
+}
+
+function initNotifications(){
+  if('Notification' in window && Notification.permission === 'granted'){
+    notificationEnabled = true;
+    setTimeout(checkFollowUpNotifications, 2000);
+  }
 }
 
 function renderView(){
@@ -4841,6 +4935,7 @@ function viewSettings(root){
           <div class="card-title">数据管理</div>
           <div class="btn-row">
             <button class="btn btn-outline" onclick="exportData()">导出全部数据 (JSON)</button>
+        <button class="btn btn-outline" onclick="requestNotificationPermission()">🔔 开启桌面通知</button>
             <button class="btn btn-outline" onclick="toast('请选择 JSON 文件导入')">导入数据</button>
             <button class="btn btn-danger" onclick="resetData()">重置演示数据</button>
           </div>

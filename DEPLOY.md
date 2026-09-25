@@ -7,7 +7,8 @@
 4. [在线模型配置](#在线模型配置)
 5. [故障转移机制](#故障转移机制)
 6. [服务器功能说明](#服务器功能说明)
-7. [常见问题](#常见问题)
+7. [公网部署（Cloudflare Tunnel）](#公网部署cloudflare-tunnel)
+8. [常见问题](#常见问题)
 
 ---
 
@@ -272,6 +273,85 @@ launchctl load ~/Library/LaunchAgents/com.kailion.workbench.plist
 # 查看状态
 launchctl list | grep kailion
 ```
+
+
+---
+
+## 🌐 公网部署（Cloudflare Tunnel）
+
+通过 Cloudflare Tunnel 将本地工作台暴露到公网，无需公网IP、无需端口映射、免费HTTPS。
+
+### 前提条件
+- 域名已托管在 Cloudflare（如 kailioncrafts.com）
+- 已安装 cloudflared：`brew install cloudflared`
+- 本地服务器已启动（端口8080）
+
+### 已配置的子域名
+
+| 子域名 | 本地端口 | 用途 |
+|--------|----------|------|
+| crm.kailioncrafts.com | 5188 | CRM系统 |
+| workbench.kailioncrafts.com | 8501 | 通用工作台 |
+| creator.kailioncrafts.com | 8766 | 创作工具 |
+| **prospect.kailioncrafts.com** | **8080** | **外贸获客工作台** |
+
+### 配置文件位置
+`~/.cloudflared/config.yml`
+
+```yaml
+tunnel: 0df6566a-2cb5-4dbd-aaeb-30b7c973cc2b
+credentials-file: /Users/a123/.cloudflared/0df6566a-2cb5-4dbd-aaeb-30b7c973cc2b.json
+ingress:
+  - hostname: crm.kailioncrafts.com
+    service: http://127.0.0.1:5188
+  - hostname: workbench.kailioncrafts.com
+    service: http://127.0.0.1:8501
+  - hostname: creator.kailioncrafts.com
+    service: http://127.0.0.1:8766
+  - hostname: prospect.kailioncrafts.com
+    service: http://127.0.0.1:8080
+  - service: http_status:404
+```
+
+### 常用命令
+
+```bash
+# 登录Cloudflare（首次）
+cloudflared tunnel login
+
+# 创建Tunnel
+cloudflared tunnel create kailion-workbench
+
+# 添加DNS记录
+cloudflared tunnel route dns kailion-workbench prospect.kailioncrafts.com
+
+# 验证配置
+cloudflared tunnel ingress validate
+
+# 启动Tunnel（前台）
+cloudflared tunnel run kailion-workbench
+
+# 启动Tunnel（后台）
+nohup cloudflared tunnel run kailion-workbench > /tmp/cloudflared.log 2>&1 &
+
+# 查看Tunnel状态
+cloudflared tunnel list
+
+# 查看日志
+tail -f /tmp/cloudflared.log
+```
+
+### 访问方式
+- 公网地址：**https://prospect.kailioncrafts.com**
+- 访问密码：**441723**
+- 任何人在任何地方只要有网络就能访问
+
+### 注意事项
+1. **保持本地服务器运行**：Mac不能关机、不能休眠
+2. **保持cloudflared运行**：Tunnel进程不能关闭
+3. **数据存储在本地**：所有数据存在Mac的浏览器localStorage中
+4. **多用户共享**：所有人访问的是同一份数据，修改实时同步
+5. **安全建议**：工作台已有密码保护，敏感操作建议二次确认
 
 ---
 

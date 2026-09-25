@@ -581,6 +581,7 @@ function loadState(){
   S.emailTemplates = DB.load('emailTemplates') || null;
   S.modelSpeedTest = DB.load('modelSpeedTest') || null;
   S.contentHistory = DB.load('contentHistory') || null;
+  S.communications = DB.load('communications') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -598,7 +599,7 @@ function persist(){
   DB.save('payments',S.payments); DB.save('certifications',S.certifications); DB.save('whatsapp',S.whatsapp);
   DB.save('rfm',S.rfm); DB.save('landingpages',S.landingpages); DB.save('competitors',S.competitors);
   DB.save('productmedia',S.productmedia); DB.save('aisales',S.aisales);
-  DB.save('pipeline',S.pipeline); DB.save('emailTemplates',S.emailTemplates); DB.save('modelSpeedTest',S.modelSpeedTest); DB.save('contentHistory',S.contentHistory); DB.save('documents',S.documents);
+  DB.save('pipeline',S.pipeline); DB.save('emailTemplates',S.emailTemplates); DB.save('modelSpeedTest',S.modelSpeedTest); DB.save('contentHistory',S.contentHistory); DB.save('communications',S.communications); DB.save('documents',S.documents);
   DB.save('finance',S.finance); DB.save('catalog',S.catalog); DB.save('team',S.team);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
@@ -1620,7 +1621,250 @@ function loadContentHistory(id){
     output.textContent = h.content;
     result.style.display = 'block';
   }
-  toast('已加载历史内容');
+}
+
+/* ============ V48 客户沟通记录与标签管理系统 ============ */
+
+// 沟通记录类型
+const COMM_TYPES = [
+  {id:'email', label:'邮件', icon:'📧', color:'#3182ce'},
+  {id:'whatsapp', label:'WhatsApp', icon:'💬', color:'#25d366'},
+  {id:'phone', label:'电话', icon:'📞', color:'#805ad5'},
+  {id:'meeting', label:'会议/视频', icon:'🎥', color:'#dd6b20'},
+  {id:'sample', label:'样品寄送', icon:'📦', color:'#38a169'},
+  {id:'quote', label:'报价/PI', icon:'💰', color:'#d69e2e'},
+  {id:'visit', label:'客户拜访', icon:'🤝', color:'#e53e3e'},
+  {id:'note', label:'备注/其他', icon:'📝', color:'#718096'}
+];
+
+// 预设客户标签
+const PRESET_TAGS = [
+  {id:'vip', label:'⭐ VIP客户', color:'#d69e2e'},
+  {id:'hot', label:'🔥 高意向', color:'#e53e3e'},
+  {id:'warm', label:'🌡️ 跟进中', color:'#dd6b20'},
+  {id:'cold', label:'❄️ 待激活', color:'#718096'},
+  {id:'sample', label:'📦 已寄样', color:'#38a169'},
+  {id:'quote', label:'💰 已报价', color:'#3182ce'},
+  {id:'negotiation', label:'⚖️ 谈判中', color:'#805ad5'},
+  {id:'deal', label:'✅ 已成交', color:'#38a169'},
+  {id:'repeat', label:'🔄 复购客户', color:'#d69e2e'},
+  {id:'lost', label:'❌ 已流失', color:'#e53e3e'},
+  {id:'distributor', label:'🏪 经销商', color:'#3182ce'},
+  {id:'brand', label:'🏷️ 品牌商', color:'#805ad5'},
+  {id:'retailer', label:'🛒 零售商', color:'#dd6b20'},
+  {id:'online', label:'🌐 电商卖家', color:'#38a169'},
+  {id:'factory', label:'🏭 工厂客户', color:'#718096'}
+];
+
+// 客户分级
+const CUSTOMER_LEVELS = [
+  {id:'A', label:'A级（重点）', color:'#e53e3e', desc:'高意向+高匹配+有采购记录'},
+  {id:'B', label:'B级（优质）', color:'#dd6b20', desc:'意向明确+匹配度高'},
+  {id:'C', label:'C级（普通）', color:'#3182ce', desc:'有一定意向，需持续跟进'},
+  {id:'D', label:'D级（待培育）', color:'#718096', desc:'意向不明，长期培育'}
+];
+
+/* V48 添加沟通记录 */
+function addCommunication(cid, type, content, contactPerson, nextFollowup){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c) return;
+  if(!S.communications) S.communications = [];
+  const record = {
+    id: uid(),
+    customerId: cid,
+    type: type,
+    content: content,
+    contactPerson: contactPerson || '',
+    nextFollowup: nextFollowup || '',
+    createdAt: Date.now(),
+    createdBy: 'Leo'
+  };
+  S.communications.unshift(record);
+  // 更新客户最后沟通时间
+  c.lastComm = Date.now();
+  c.commCount = (c.commCount||0) + 1;
+  persist();
+  toast('✅ 沟通记录已添加');
+  return record;
+}
+
+/* V48 删除沟通记录 */
+function deleteCommunication(commId){
+  if(!S.communications) return;
+  const idx = S.communications.findIndex(x=>x.id===commId);
+  if(idx>=0){
+    const cid = S.communications[idx].customerId;
+    S.communications.splice(idx,1);
+    const c = S.customers.find(x=>x.id===cid);
+    if(c && c.commCount) c.commCount--;
+    persist();
+    toast('沟通记录已删除');
+  }
+}
+
+/* V48 获取客户沟通记录 */
+function getCustomerCommunications(cid){
+  if(!S.communications) return [];
+  return S.communications.filter(x=>x.customerId===cid).sort((a,b)=>b.createdAt-a.createdAt);
+}
+
+/* V48 渲染沟通记录时间线 */
+function renderCommunicationTimeline(cid){
+  const records = getCustomerCommunications(cid);
+  if(!records.length){
+    return '<div style="text-align:center;padding:20px;color:#a0aec0;font-size:13px">暂无沟通记录，点击上方按钮添加第一条记录</div>';
+  }
+  return records.map(r=>{
+    const type = COMM_TYPES.find(t=>t.id===r.type) || COMM_TYPES[7];
+    const time = new Date(r.createdAt);
+    const timeStr = time.getFullYear()+'-'+String(time.getMonth()+1).padStart(2,'0')+'-'+String(time.getDate()).padStart(2,'0')+' '+String(time.getHours()).padStart(2,'0')+':'+String(time.getMinutes()).padStart(2,'0');
+    const daysAgo = Math.floor((Date.now()-r.createdAt)/(1000*60*60*24));
+    const timeLabel = daysAgo===0?'今天':daysAgo===1?'昨天':daysAgo+'天前';
+    return `
+    <div style="display:flex;gap:12px;margin-bottom:16px;position:relative">
+      <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:${type.color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;position:relative;z-index:1">${type.icon}</div>
+      <div style="flex:1;background:#f8fafc;border-radius:8px;padding:12px;border:1px solid #e2e8f0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:12px;font-weight:600;color:${type.color}">${type.label}</span>
+          <span style="font-size:11px;color:#718096">${timeStr} · ${timeLabel}</span>
+        </div>
+        <div style="font-size:13px;line-height:1.7;color:#2d3748;white-space:pre-wrap">${esc(r.content)}</div>
+        ${r.contactPerson?`<div style="margin-top:6px;font-size:11px;color:#718096">👤 联系人：${esc(r.contactPerson)}</div>`:''}
+        ${r.nextFollowup?`<div style="margin-top:6px;font-size:11px;color:#dd6b20">📅 下次跟进：${esc(r.nextFollowup)}</div>`:''}
+        <div style="margin-top:8px;text-align:right">
+          <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px" onclick="if(confirm('确定删除这条沟通记录？')){deleteCommunication('${r.id}');openCustomerDetail('${cid}');}">🗑️ 删除</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* V48 打开添加沟通记录弹窗 */
+function openAddCommunication(cid){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c) return;
+  openModal(`
+    <div class="modal-head">
+      <h3>📝 添加沟通记录 - ${esc(c.company)}</h3>
+      <span class="modal-close" onclick="closeModal()">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-row mb12">
+        <div>
+          <label class="text-sm text-muted">沟通类型 *</label>
+          <select id="commType" class="form-control">
+            ${COMM_TYPES.map(t=>`<option value="${t.id}">${t.icon} ${t.label}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-muted">联系人</label>
+          <input id="commContact" class="form-control" value="${esc(c.contact.name||'')}" placeholder="对方联系人">
+        </div>
+      </div>
+      <div class="mb12">
+        <label class="text-sm text-muted">沟通内容 *</label>
+        <textarea id="commContent" class="form-control" rows="5" placeholder="记录沟通的详细内容、客户反馈、关键信息..."></textarea>
+      </div>
+      <div class="mb12">
+        <label class="text-sm text-muted">下次跟进计划</label>
+        <input id="commNext" class="form-control" placeholder="例如：下周三发送报价单、周五电话跟进...">
+      </div>
+      <div class="flex gap8 justify-end">
+        <button class="btn btn-outline" onclick="closeModal()">取消</button>
+        <button class="btn btn-gold" onclick="saveCommunication('${cid}')">💾 保存记录</button>
+      </div>
+    </div>
+  `);
+}
+
+/* V48 保存沟通记录 */
+function saveCommunication(cid){
+  const type = document.getElementById('commType').value;
+  const content = document.getElementById('commContent').value.trim();
+  const contactPerson = document.getElementById('commContact').value.trim();
+  const nextFollowup = document.getElementById('commNext').value.trim();
+  if(!content){ toast('请填写沟通内容'); return; }
+  addCommunication(cid, type, content, contactPerson, nextFollowup);
+  closeModal();
+  // 刷新客户详情
+  openCustomerDetail(cid);
+}
+
+/* V48 添加客户标签 */
+function addCustomerTag(cid, tagId){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c) return;
+  if(!c.tags) c.tags = [];
+  const tag = PRESET_TAGS.find(t=>t.id===tagId);
+  if(!tag) return;
+  if(!c.tags.includes(tag.label)){
+    c.tags.push(tag.label);
+    persist();
+    toast('✅ 已添加标签：'+tag.label);
+    openCustomerDetail(cid);
+  } else {
+    toast('该标签已存在');
+  }
+}
+
+/* V48 移除客户标签 */
+function removeCustomerTag(cid, tagLabel){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c || !c.tags) return;
+  c.tags = c.tags.filter(t=>t!==tagLabel);
+  persist();
+  toast('已移除标签：'+tagLabel);
+  openCustomerDetail(cid);
+}
+
+/* V48 设置客户分级 */
+function setCustomerLevel(cid, level){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c) return;
+  c.level = level;
+  persist();
+  toast('✅ 客户分级已设置为：'+level+'级');
+  openCustomerDetail(cid);
+}
+
+/* V48 按标签筛选客户 */
+function filterCustomersByTag(tagLabel){
+  if(!S.customerFilter) S.customerFilter = {};
+  if(S.customerFilter.tag === tagLabel){
+    delete S.customerFilter.tag;
+  } else {
+    S.customerFilter.tag = tagLabel;
+  }
+  renderView();
+}
+
+/* V48 获取标签统计 */
+function getTagStats(){
+  const stats = {};
+  (S.customers||[]).forEach(c=>{
+    (c.tags||[]).forEach(t=>{
+      stats[t] = (stats[t]||0) + 1;
+    });
+  });
+  return Object.entries(stats).sort((a,b)=>b[1]-a[1]);
+}
+
+/* V48 沟通记录统计 */
+function getCommStats(){
+  if(!S.communications) return {total:0, today:0, thisWeek:0, byType:{}};
+  const now = Date.now();
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const weekStart = todayStart.getTime() - 7*24*60*60*1000;
+  const stats = {
+    total: S.communications.length,
+    today: S.communications.filter(c=>c.createdAt>=todayStart.getTime()).length,
+    thisWeek: S.communications.filter(c=>c.createdAt>=weekStart).length,
+    byType: {}
+  };
+  S.communications.forEach(c=>{
+    stats.byType[c.type] = (stats.byType[c.type]||0)+1;
+  });
+  return stats;
 }
 
 /* V31 AI图像生成 - 支持智谱CogView-3-Flash */
@@ -2833,6 +3077,52 @@ function openCustomerDetail(cid){
           <button class="btn btn-outline btn-sm" onclick="copyText('${c.contact.whatsapp||''}')">📱 复制</button></div>
         <div>💼 LinkedIn: ${esc(c.contact.linkedin||'-')}</div>
         </div>
+      </div>
+
+      <!-- V48 标签与分级管理 -->
+      <div class="card card-pad mb16" style="border-left:4px solid #805ad5">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>🏷️ 标签与分级管理</span>
+          <span class="text-xs text-muted">沟通 ${c.commCount||0} 次</span>
+        </div>
+        <div class="mb12">
+          <div class="text-xs text-muted mb6" style="font-weight:bold">客户分级：</div>
+          <div class="flex gap8" style="flex-wrap:wrap">
+            ${CUSTOMER_LEVELS.map(l=>`<span class="badge" style="cursor:pointer;padding:6px 12px;font-size:12px;border:2px solid ${c.level===l.id?l.color:'#e2e8f0'};background:${c.level===l.id?l.color:'#fff'};color:${c.level===l.id?'#fff':'#333'}" onclick="setCustomerLevel('${cid}','${l.id}')" title="${l.desc}">${l.id}级 ${l.label.split('（')[1]?.replace('）','')||''}</span>`).join('')}
+          </div>
+        </div>
+        <div class="mb12">
+          <div class="text-xs text-muted mb6" style="font-weight:bold">已有标签（点击移除）：</div>
+          <div class="flex gap8" style="flex-wrap:wrap">
+            ${(c.tags||[]).length ? (c.tags||[]).map(t=>`<span class="badge badge-gold" style="cursor:pointer;padding:5px 10px" onclick="if(confirm('移除标签 ${t}？'))removeCustomerTag('${cid}','${t}')">${t} ×</span>`).join('') : '<span class="text-xs text-muted">暂无标签</span>'}
+          </div>
+        </div>
+        <div>
+          <div class="text-xs text-muted mb6" style="font-weight:bold">添加标签：</div>
+          <div class="flex gap8" style="flex-wrap:wrap">
+            ${PRESET_TAGS.filter(t=>!(c.tags||[]).includes(t.label)).map(t=>`<span class="badge" style="cursor:pointer;padding:5px 10px;font-size:11px;background:#f0f4f8;color:${t.color};border:1px solid ${t.color}30" onclick="addCustomerTag('${cid}','${t.id}')" onmouseover="this.style.background='${t.color}15'" onmouseout="this.style.background='#f0f4f8'">+ ${t.label}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- V48 沟通记录时间线 -->
+      <div class="card card-pad mb16" style="border-left:4px solid #3182ce">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📝 沟通记录时间线</span>
+          <button class="btn btn-gold btn-sm" onclick="openAddCommunication('${cid}')">➕ 添加记录</button>
+        </div>
+        ${(() => {
+          const comms = getCustomerCommunications(cid);
+          if(!comms.length) return '<div style="text-align:center;padding:20px;color:#a0aec0;font-size:13px">暂无沟通记录，点击上方按钮添加第一条记录</div>';
+          return comms.slice(0,10).map(r=>{
+            const type = COMM_TYPES.find(t=>t.id===r.type) || COMM_TYPES[7];
+            const time = new Date(r.createdAt);
+            const timeStr = (time.getMonth()+1)+'/'+time.getDate()+' '+String(time.getHours()).padStart(2,'0')+':'+String(time.getMinutes()).padStart(2,'0');
+            const daysAgo = Math.floor((Date.now()-r.createdAt)/(1000*60*60*24));
+            const timeLabel = daysAgo===0?'今天':daysAgo===1?'昨天':daysAgo+'天前';
+            return '<div style="display:flex;gap:10px;margin-bottom:14px"><div style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+type.color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px">'+type.icon+'</div><div style="flex:1;background:#f8fafc;border-radius:8px;padding:10px;border:1px solid #e2e8f0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-size:11px;font-weight:600;color:'+type.color+'">'+type.label+'</span><span style="font-size:10px;color:#718096">'+timeStr+' · '+timeLabel+'</span></div><div style="font-size:12px;line-height:1.6;color:#2d3748;white-space:pre-wrap;max-height:80px;overflow:hidden">'+esc(r.content.substring(0,150))+(r.content.length>150?'...':'')+'</div>'+(r.nextFollowup?'<div style="margin-top:4px;font-size:10px;color:#dd6b20">📅 下次：'+esc(r.nextFollowup)+'</div>':'')+'<div style="margin-top:6px;text-align:right"><button class="btn btn-outline btn-sm" style="font-size:10px;padding:2px 6px" onclick="if(confirm(\'确定删除？\')){deleteCommunication(\'"+r.id+"\');openCustomerDetail(\'"+cid+"\');}">删除</button></div></div></div>';
+          }).join('') + (comms.length>10?'<div style="text-align:center;padding:8px;color:#718096;font-size:12px">还有 '+(comms.length-10)+' 条记录，共 '+comms.length+' 条</div>':'');
+        })()}
       </div>
 
       <div class="card card-pad mb16">

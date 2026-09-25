@@ -2942,7 +2942,10 @@ function viewCustomers(root){
     <div class="flex gap8 mb16">
       ${[['all','全部客户'],['new','新开发客户'],['old','老客户（已成交）']].map(([k,l])=>
         `<button class="btn ${custFilter.view===k?'btn-gold':'btn-outline'}" onclick="custFilter.view='${k}';custFilter.page=1;renderView()">${l}</button>`).join('')}
-      <button class="btn btn-primary" style="margin-left:auto" onclick="aiBatchCheck()">🤖 AI 批量背调（${custFilter.selected.length} 已选）</button>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        ${custFilter.selected.length?`<button class="btn btn-gold" onclick="openBatchOps()">⚡ 批量操作（${custFilter.selected.length}）</button>`:''}
+        <button class="btn btn-primary" onclick="aiBatchCheck()">🤖 AI 批量背调（${custFilter.selected.length} 已选）</button>
+      </div>
     </div>
     <div class="flex-between mb16">
       <div class="flex gap12">
@@ -2988,8 +2991,136 @@ function viewCustomers(root){
     </div>`;
 }
 function gotoCustPage(p){ custFilter.page=p; renderView(); }
-function toggleCustSel(id,on){ if(on){ if(!custFilter.selected.includes(id))custFilter.selected.push(id); } else { custFilter.selected=custFilter.selected.filter(x=>x!==id); } }
+function toggleCustSel(id,on){ if(on){ if(!custFilter.selected.includes(id))custFilter.selected.push(id); } else { custFilter.selected=custFilter.selected.filter(x=>x!==id); } renderView(); }
 function toggleAllCust(on){ const list=(typeof custFilter!=='undefined'&&custFilter.filtered)?custFilter.filtered:S.customers; if(on){ list.forEach(c=>{ if(!custFilter.selected.includes(c.id))custFilter.selected.push(c.id); }); } else { custFilter.selected=[]; } renderView(); }
+
+/* V49 客户批量操作 */
+function openBatchOps(){
+  const count = custFilter.selected.length;
+  if(!count){ toast('请先选择客户'); return; }
+  openModal(`
+    <div class="modal-head">
+      <h3>⚡ 批量操作（已选 ${count} 个客户）</h3>
+      <span class="modal-close" onclick="closeModal()">×</span>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="card card-pad" style="background:#fff5f5;border-color#feb2b2">
+          <div style="font-weight:700;color:#c53030;margin-bottom:10px">🗑️ 批量删除</div>
+          <div style="font-size:12px;color:#718096;margin-bottom:10px">删除选中的 ${count} 个客户（不可恢复）</div>
+          <button class="btn btn-danger" style="width:100%" onclick="batchDeleteCustomers()">确认删除</button>
+        </div>
+        <div class="card card-pad" style="background:#f0fff4;border-color:#9ae6b4">
+          <div style="font-weight:700;color:#2f855a;margin-bottom:10px">📋 批量修改状态</div>
+          <select id="batchStatus" class="form-control" style="margin-bottom:10px">
+            <option value="待跟进">待跟进</option>
+            <option value="跟进中">跟进中</option>
+            <option value="已回复">已回复</option>
+            <option value="已报价">已报价</option>
+            <option value="已成交">已成交</option>
+            <option value="已流失">已流失</option>
+          </select>
+          <button class="btn btn-success" style="width:100%" onclick="batchUpdateStatus()">应用状态</button>
+        </div>
+        <div class="card card-pad" style="background:#fffff0;border-color:#f6e05e">
+          <div style="font-weight:700;color:#975a16;margin-bottom:10px">🏷️ 批量添加标签</div>
+          <select id="batchTag" class="form-control" style="margin-bottom:10px">
+            ${PRESET_TAGS.map(t=>`<option value="${t.label}">${t.label}</option>`).join('')}
+          </select>
+          <button class="btn btn-gold" style="width:100%" onclick="batchAddTag()">添加标签</button>
+        </div>
+        <div class="card card-pad" style="background:#ebf8ff;border-color:#90cdf4">
+          <div style="font-weight:700;color:#2b6cb0;margin-bottom:10px">⭐ 批量设置等级</div>
+          <select id="batchGrade" class="form-control" style="margin-bottom:10px">
+            <option value="A">A 级（高价值）</option>
+            <option value="B">B 级（中价值）</option>
+            <option value="C">C 级（低价值）</option>
+          </select>
+          <button class="btn btn-primary" style="width:100%" onclick="batchSetGrade()">应用等级</button>
+        </div>
+        <div class="card card-pad" style="background:#faf5ff;border-color:#d6bcfa;grid-column:1/-1">
+          <div style="font-weight:700;color:#6b46c1;margin-bottom:10px">📅 批量设置下次跟进日期</div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input type="date" id="batchFollowDate" class="form-control" style="flex:1">
+            <button class="btn" style="background:#805ad5;color:#fff" onclick="batchSetFollowUp()">设置跟进日期</button>
+            <button class="btn btn-outline" onclick="document.getElementById('batchFollowDate').value='${new Date(Date.now()+3*86400000).toISOString().slice(0,10)}'">3天后</button>
+            <button class="btn btn-outline" onclick="document.getElementById('batchFollowDate').value='${new Date(Date.now()+7*86400000).toISOString().slice(0,10)}'">7天后</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding:12px;background:#f7fafc;border-radius:8px;font-size:12px;color:#718096">
+        💡 提示：批量操作会立即生效并保存。已选 ${count} 个客户：${S.customers.filter(c=>custFilter.selected.includes(c.id)).slice(0,5).map(c=>c.company).join('、')}${count>5?' 等':''}
+      </div>
+    </div>
+  `);
+}
+
+function batchDeleteCustomers(){
+  const count = custFilter.selected.length;
+  if(!confirm(`确定要删除选中的 ${count} 个客户吗？此操作不可恢复！`)) return;
+  S.customers = S.customers.filter(c=>!custFilter.selected.includes(c.id));
+  persist();
+  toast(`✅ 已删除 ${count} 个客户`);
+  custFilter.selected = [];
+  closeModal();
+  renderView();
+}
+
+function batchUpdateStatus(){
+  const status = document.getElementById('batchStatus').value;
+  const count = custFilter.selected.length;
+  S.customers.forEach(c=>{
+    if(custFilter.selected.includes(c.id)) c.status = status;
+  });
+  persist();
+  toast(`✅ 已将 ${count} 个客户状态改为「${status}」`);
+  closeModal();
+  renderView();
+}
+
+function batchAddTag(){
+  const tag = document.getElementById('batchTag').value;
+  const count = custFilter.selected.length;
+  let added = 0;
+  S.customers.forEach(c=>{
+    if(custFilter.selected.includes(c.id)){
+      if(!c.tags) c.tags = [];
+      if(!c.tags.includes(tag)){ c.tags.push(tag); added++; }
+    }
+  });
+  persist();
+  toast(`✅ 已为 ${added}/${count} 个客户添加标签「${tag}」`);
+  closeModal();
+  renderView();
+}
+
+function batchSetGrade(){
+  const grade = document.getElementById('batchGrade').value;
+  const count = custFilter.selected.length;
+  S.customers.forEach(c=>{
+    if(custFilter.selected.includes(c.id)){
+      if(!c.scores) c.scores = {total:0, grade:grade};
+      c.scores.grade = grade;
+    }
+  });
+  persist();
+  toast(`✅ 已将 ${count} 个客户等级设为「${grade} 级」`);
+  closeModal();
+  renderView();
+}
+
+function batchSetFollowUp(){
+  const date = document.getElementById('batchFollowDate').value;
+  if(!date){ toast('请选择日期'); return; }
+  const count = custFilter.selected.length;
+  S.customers.forEach(c=>{
+    if(custFilter.selected.includes(c.id)) c.nextFollowUp = date;
+  });
+  persist();
+  toast(`✅ 已为 ${count} 个客户设置下次跟进日期 ${date}`);
+  closeModal();
+  renderView();
+}
 function aiBatchCheck(){
   const ids = custFilter.selected.length? custFilter.selected : S.customers.filter(c=>!c.isOld).slice(0,8).map(c=>c.id);
   if(!ids.length){ toast('请先勾选客户','err'); return; }

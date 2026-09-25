@@ -2943,6 +2943,7 @@ function viewCustomers(root){
       ${[['all','全部客户'],['new','新开发客户'],['old','老客户（已成交）']].map(([k,l])=>
         `<button class="btn ${custFilter.view===k?'btn-gold':'btn-outline'}" onclick="custFilter.view='${k}';custFilter.page=1;renderView()">${l}</button>`).join('')}
       <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="openImportModal()">📥 导入</button>
         <button class="btn btn-outline" onclick="findDuplicates()">🔍 查重</button>
         ${custFilter.selected.length?`<button class="btn btn-gold" onclick="openBatchOps()">⚡ 批量操作（${custFilter.selected.length}）</button>`:''}
         <button class="btn btn-primary" onclick="aiBatchCheck()">🤖 AI 批量背调（${custFilter.selected.length} 已选）</button>
@@ -3238,6 +3239,296 @@ function findDuplicates(){
       `:''}
     </div>
   `);
+}
+
+
+
+/* V51 客户数据CSV导入 */
+let _importData = {rows:[], headers:[], mapping:{}};
+
+function openImportModal(){
+  _importData = {rows:[], headers:[], mapping:{}};
+  openModal(`
+    <div class="modal-head">
+      <h3>📥 导入客户数据（CSV）</h3>
+      <span class="modal-close" onclick="closeModal()">×</span>
+    </div>
+    <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+      <div id="importStep1">
+        <div class="card card-pad" style="border:2px dashed #cbd5e0;text-align:center;padding:32px;margin-bottom:16px">
+          <div style="font-size:36px;margin-bottom:8px">📄</div>
+          <div style="font-weight:700;margin-bottom:8px">拖拽CSV文件到这里，或点击选择文件</div>
+          <div style="font-size:12px;color:#718096;margin-bottom:12px">支持UTF-8编码的CSV文件，首行为列名</div>
+          <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="handleCSVFile(this.files[0])">
+          <button class="btn btn-primary" onclick="document.getElementById('csvFileInput').click()">选择CSV文件</button>
+        </div>
+        <div class="card card-pad" style="background:#f7fafc">
+          <div style="font-weight:700;margin-bottom:8px">📋 CSV格式说明</div>
+          <div style="font-size:12px;color:#4a5568;line-height:1.8">
+            首行为列名，支持以下列（自动识别，列名可中英文）：<br>
+            • 公司名 / company（必填）<br>
+            • 国家 / country<br>
+            • 邮箱 / email<br>
+            • 网站 / website<br>
+            • 产品 / products<br>
+            • 联系人 / contact_name<br>
+            • 电话 / phone<br>
+            • 客户类型 / customer_type（进口商/分销商/品牌商等）<br>
+            • 来源 / source（AI搜索/海关数据/展会/转介绍等）<br>
+            • 状态 / status（待跟进/跟进中/已回复/已报价/已成交）<br>
+            • 标签 / tags（多个标签用逗号分隔）
+          </div>
+        </div>
+      </div>
+      <div id="importStep2" style="display:none">
+        <div id="importMappingArea"></div>
+        <div id="importPreviewArea"></div>
+        <div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px">
+          <button class="btn btn-outline" onclick="openImportModal()">← 重新选择文件</button>
+          <div style="display:flex;gap:8px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="importDedup" checked> 自动去重（公司名+邮箱）
+            </label>
+            <button class="btn btn-primary" onclick="executeImport()">✅ 确认导入（<span id="importCount">0</span>条）</button>
+          </div>
+        </div>
+      </div>
+      <div id="importStep3" style="display:none">
+        <div id="importResultArea"></div>
+        <div style="text-align:center;margin-top:16px">
+          <button class="btn btn-primary" onclick="closeModal();renderView()">完成</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function handleCSVFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const text = e.target.result;
+    parseCSV(text);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCSV(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length < 2){ toast('CSV文件至少需要2行（表头+数据）'); return; }
+  
+  // 解析CSV（支持引号包裹的字段）
+  const parseLine = (line)=>{
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for(let i=0;i<line.length;i++){
+      const char = line[i];
+      if(char === '"'){
+        if(inQuotes && line[i+1] === '"'){ current += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if(char === ',' && !inQuotes){
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+  
+  const headers = parseLine(lines[0]);
+  const rows = lines.slice(1).map(parseLine).filter(r=>r.some(c=>c));
+  
+  _importData = {rows, headers, mapping:{}};
+  
+  // 自动字段映射
+  const fieldMap = {
+    'company': ['company','公司','公司名','公司名称','企业','企业名称','customer','客户','客户名称'],
+    'country': ['country','国家','地区','国家/地区'],
+    'email': ['email','邮箱','电子邮件','e-mail','mail','联系邮箱'],
+    'website': ['website','网站','网址','官网','web','url','链接'],
+    'products': ['products','产品','主营产品','产品类别','品类','product'],
+    'contact_name': ['contact','联系人','联系人姓名','姓名','contact name','name'],
+    'phone': ['phone','电话','手机','联系电话','tel','mobile'],
+    'customer_type': ['customer_type','客户类型','类型','type','客户分类'],
+    'source': ['source','来源','客户来源','渠道','获取来源'],
+    'status': ['status','状态','客户状态','跟进状态'],
+    'tags': ['tags','标签','客户标签','tag']
+  };
+  
+  headers.forEach((h, idx)=>{
+    const hLower = h.toLowerCase().trim();
+    for(const [field, aliases] of Object.entries(fieldMap)){
+      if(aliases.some(a=>hLower.includes(a.toLowerCase()))){
+        _importData.mapping[idx] = field;
+        break;
+      }
+    }
+  });
+  
+  showImportMapping();
+}
+
+function showImportMapping(){
+  const {headers, mapping, rows} = _importData;
+  const fields = [
+    ['company','公司名（必填）'],
+    ['country','国家'],
+    ['email','邮箱'],
+    ['website','网站'],
+    ['products','产品'],
+    ['contact_name','联系人'],
+    ['phone','电话'],
+    ['customer_type','客户类型'],
+    ['source','来源'],
+    ['status','状态'],
+    ['tags','标签']
+  ];
+  
+  document.getElementById('importStep1').style.display = 'none';
+  document.getElementById('importStep2').style.display = 'block';
+  
+  document.getElementById('importMappingArea').innerHTML = `
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:12px">🔗 字段映射（共 ${rows.length} 条数据）</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${headers.map((h, idx)=>`
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="flex:1;font-size:13px;background:#f7fafc;padding:6px 10px;border-radius:4px">${esc(h)}</span>
+            <span style="color:#a0aec0">→</span>
+            <select class="form-control" style="width:140px;font-size:12px" onchange="_importData.mapping[${idx}]=this.value;updateImportPreview()">
+              <option value="">-- 不导入 --</option>
+              ${fields.map(([v,l])=>`<option value="${v}" ${mapping[idx]===v?'selected':''}>${l}</option>`).join('')}
+            </select>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  
+  updateImportPreview();
+}
+
+function updateImportPreview(){
+  const {rows, headers, mapping} = _importData;
+  const companyIdx = Object.entries(mapping).find(([k,v])=>v==='company')?.[0];
+  
+  if(companyIdx === undefined){
+    document.getElementById('importPreviewArea').innerHTML = '<div class="card card-pad" style="background:#fff5f5;color:#c53030">⚠️ 请映射「公司名」字段，这是必填项</div>';
+    document.getElementById('importCount').textContent = '0';
+    return;
+  }
+  
+  const validRows = rows.filter(r=>r[companyIdx] && r[companyIdx].trim());
+  document.getElementById('importCount').textContent = validRows.length;
+  
+  const previewRows = validRows.slice(0, 5);
+  document.getElementById('importPreviewArea').innerHTML = `
+    <div class="card card-pad">
+      <div style="font-weight:700;margin-bottom:12px">👀 数据预览（前 ${previewRows.length} 条，共 ${validRows.length} 条有效）</div>
+      <div class="table-wrap"><table class="tbl" style="font-size:12px">
+        <thead><th>#</th>${Object.entries(mapping).filter(([k,v])=>v).map(([k,v])=>`<th>${v}</th>`).join('')}</thead>
+        <tbody>
+          ${previewRows.map((r, i)=>`
+            <tr>
+              <td>${i+1}</td>
+              ${Object.entries(mapping).filter(([k,v])=>v).map(([k,v])=>`<td>${esc(r[k]||'-')}</td>`).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table></div>
+    </div>
+  `;
+}
+
+function executeImport(){
+  const {rows, mapping} = _importData;
+  const companyIdx = Object.entries(mapping).find(([k,v])=>v==='company')?.[0];
+  
+  if(companyIdx === undefined){ toast('请先映射公司名字段'); return; }
+  
+  const dedup = document.getElementById('importDedup')?.checked !== false;
+  let success = 0, skipped = 0, duplicates = 0;
+  const errors = [];
+  
+  rows.forEach((row, idx)=>{
+    const company = row[companyIdx]?.trim();
+    if(!company){ skipped++; return; }
+    
+    // 构建客户对象
+    const customer = {
+      id: uid(),
+      company: company,
+      country: '',
+      customerType: '进口商',
+      source: 'CSV导入',
+      products: '',
+      website: '',
+      contact: {name:'', email:'', phone:''},
+      status: '待跟进',
+      scores: {total:0, grade:'C'},
+      tags: [],
+      notes: '',
+      createdAt: new Date().toISOString()
+    };
+    
+    Object.entries(mapping).forEach(([colIdx, field])=>{
+      if(!field) return;
+      const value = row[colIdx]?.trim() || '';
+      switch(field){
+        case 'country': customer.country = value; break;
+        case 'email': customer.contact.email = value; break;
+        case 'website': customer.website = value; break;
+        case 'products': customer.products = value; break;
+        case 'contact_name': customer.contact.name = value; break;
+        case 'phone': customer.contact.phone = value; break;
+        case 'customer_type': customer.customerType = value || '进口商'; break;
+        case 'source': customer.source = value || 'CSV导入'; break;
+        case 'status': customer.status = value || '待跟进'; break;
+        case 'tags': customer.tags = value.split(/[,，]/).map(t=>t.trim()).filter(t=>t); break;
+      }
+    });
+    
+    // 去重检查
+    if(dedup){
+      const isDup = S.customers.some(c=>{
+        const sameCompany = c.company.toLowerCase().replace(/\s+/g,'') === company.toLowerCase().replace(/\s+/g,'');
+        const sameEmail = customer.contact.email && c.contact?.email?.toLowerCase() === customer.contact.email.toLowerCase();
+        return sameCompany || sameEmail;
+      });
+      if(isDup){ duplicates++; return; }
+    }
+    
+    S.customers.push(customer);
+    success++;
+  });
+  
+  persist();
+  
+  document.getElementById('importStep2').style.display = 'none';
+  document.getElementById('importStep3').style.display = 'block';
+  document.getElementById('importResultArea').innerHTML = `
+    <div style="text-align:center;padding:24px">
+      <div style="font-size:48px;margin-bottom:16px">✅</div>
+      <h3 style="margin-bottom:16px">导入完成</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;max-width:500px;margin:0 auto">
+        <div class="card card-pad" style="background:#f0fff4">
+          <div style="font-size:24px;font-weight:800;color:#2f855a">${success}</div>
+          <div style="font-size:12px;color:#718096">成功导入</div>
+        </div>
+        <div class="card card-pad" style="background:#fffff0">
+          <div style="font-size:24px;font-weight:800;color:#975a16">${duplicates}</div>
+          <div style="font-size:12px;color:#718096">重复跳过</div>
+        </div>
+        <div class="card card-pad" style="background:#fff5f5">
+          <div style="font-size:24px;font-weight:800;color:#c53030">${skipped}</div>
+          <div style="font-size:12px;color:#718096">无效跳过</div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function mergeCustomers(groupKey){

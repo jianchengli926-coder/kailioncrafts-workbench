@@ -2176,7 +2176,8 @@ const NAV = [
   {key:'socialmonitor',icon:'📡',label:'社媒监控',title:'社媒关键词监控',crumb:'监控行业痛点 · 发现潜在客户'},
   {group:'系统'},
   {key:'tools',icon:'🧰',label:'工具箱',title:'工具箱',crumb:'14类·100+工具'},
-  {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings'}
+  {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings'},
+  {key:'manual',icon:'📖',label:'使用说明书',title:'工作台使用说明书',crumb:'小白也能轻松上手 · 20个页面详解'}
 ];
 let currentView = 'dashboard';
 let routeParams = {};
@@ -2878,12 +2879,398 @@ function renderView(){
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, devplans:viewDevPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
-    seo:viewSEO, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, pipeline:viewPipeline, outreach:viewOutreach};
+    seo:viewSEO, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
   document.getElementById('notifDot').textContent = todo;
 }
+
+
+/* V66 工作台使用说明书页面 */
+function viewManual(c){
+  c.innerHTML = `
+  <div style="max-width:1100px;margin:0 auto">
+    <!-- 顶部Hero -->
+    <div style="background:linear-gradient(135deg,#1a365d 0%,#2c5282 100%);color:#fff;border-radius:14px;padding:32px 28px;margin-bottom:20px">
+      <div style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;opacity:.7;margin-bottom:8px">KaiLionCrafts · 锴利外贸获客工作台</div>
+      <h2 style="margin:0 0 8px;font-size:24px">📖 工作台使用说明书</h2>
+      <p style="margin:0;opacity:.85;font-size:14px;max-width:700px">这份说明书按左侧导航的每一个页面逐页讲清楚：这一页是干什么用的、每一步怎么操作、需要提前配置什么。小白也能轻松上手。</p>
+      <div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:8px">
+        <span style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:4px 12px;font-size:12px">共 20 个页面</span>
+        <span style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:4px 12px;font-size:12px">4 个导航分组</span>
+        <span style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:4px 12px;font-size:12px">6 个 AI 模型</span>
+        <span style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:4px 12px;font-size:12px">15 个快捷键</span>
+      </div>
+    </div>
+
+    <!-- 快速导航 -->
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:20px">
+      <h3 style="margin:0 0 12px;font-size:15px;color:#1a365d">⚡ 快速跳转</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">
+        <a href="#m-start" onclick="document.getElementById(\'m-start\').scrollIntoView({behavior:\'smooth\'});return false" style="padding:8px 12px;background:#f0f4f8;border-radius:6px;font-size:13px;color:#2c5282;text-decoration:none;text-align:center">① 开始使用</a>
+        <a href="#m-overview" onclick="document.getElementById(\'m-overview\').scrollIntoView({behavior:\'smooth\'});return false" style="padding:8px 12px;background:#f0f4f8;border-radius:6px;font-size:13px;color:#2c5282;text-decoration:none;text-align:center">② 业务全流程</a>
+        <a href="#m-ai" onclick="document.getElementById(\'m-ai\').scrollIntoView({behavior:\'smooth\'});return false" style="padding:8px 12px;background:#f0f4f8;border-radius:6px;font-size:13px;color:#2c5282;text-decoration:none;text-align:center">③ AI模型配置</a>
+        <a href="#m-core" onclick="document.getElementById(\'m-core\').scrollIntoView({behavior:\'smooth\'});return false" style="padding:8px 12px;background:#f0f4f8;border-radius:6px;font-size:13px;color:#2c5282;text-decoration:none;text-align:center">一、核心业务</a>
+        <a href="#m-ai2" onclick="document.getElementById(\'m-ai2\').scrollIntoView({behavior:\'smooth\'});return false" style="padding:8px 12px;background:#f0f4f8;border-radius:6px;font-size:13px;color:#2c5282;text-decoration:none;text-align:center">二、AI智能</a>
+        <a href="#m-marketing" onclick="document.getElementById(\'m-marketing\').scrollIntoView({behavior:\'smooth\'});return false" style="padding:8px 12px;background:#f0f4f8;border-radius:6px;font-size:13px;color:#2c5282;text-decoration:none;text-align:center">三、营销推广</a>
+        <a href="#m-tools" onclick="document.getElementById(\'m-tools\').scrollIntoView({behavior:\'smooth\'});return false" style="padding:8px 12px;background:#f0f4f8;border-radius:6px;font-size:13px;color:#2c5282;text-decoration:none;text-align:center">四、支撑工具</a>
+        <a href="#m-shortcuts" onclick="document.getElementById(\'m-shortcuts\').scrollIntoView({behavior:\'smooth\'});return false" style="padding:8px 12px;background:#f0f4f8;border-radius:6px;font-size:13px;color:#2c5282;text-decoration:none;text-align:center">④ 快捷键</a>
+        <a href="#m-data" onclick="document.getElementById(\'m-data\').scrollIntoView({behavior:\'smooth\'});return false" style="padding:8px 12px;background:#f0f4f8;border-radius:6px;font-size:13px;color:#2c5282;text-decoration:none;text-align:center">⑤ 数据管理</a>
+        <a href="#m-deploy" onclick="document.getElementById(\'m-deploy\').scrollIntoView({behavior:\'smooth\'});return false" style="padding:8px 12px;background:#f0f4f8;border-radius:6px;font-size:13px;color:#2c5282;text-decoration:none;text-align:center">⑥ 部署访问</a>
+        <a href="#m-faq" onclick="document.getElementById(\'m-faq\').scrollIntoView({behavior:\'smooth\'});return false" style="padding:8px 12px;background:#f0f4f8;border-radius:6px;font-size:13px;color:#2c5282;text-decoration:none;text-align:center">⑦ 常见问题</a>
+      </div>
+    </div>
+
+    <!-- ① 开始使用 -->
+    <div id="m-start" style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:24px 28px;margin-bottom:18px;scroll-margin-top:20px">
+      <h3 style="margin:0 0 6px;font-size:18px;color:#1a365d"><span style="color:#c9a961;margin-right:6px">①</span>开始使用</h3>
+      <p style="color:#8b949e;font-size:13px;margin:0 0 16px">5 分钟上手，先跑通「登录 → 看板 → 加一个客户」这条最短路径。</p>
+      
+      <h4 style="font-size:14px;margin:16px 0 8px;color:#2c5282">1. 三种访问方式</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0">
+        <tr><th style="background:#f2f4f6;padding:8px 10px;border:1px solid #e4e7eb;text-align:left">访问类型</th><th style="background:#f2f4f6;padding:8px 10px;border:1px solid #e4e7eb;text-align:left">地址</th><th style="background:#f2f4f6;padding:8px 10px;border:1px solid #e4e7eb;text-align:left">适用场景</th></tr>
+        <tr><td style="padding:8px 10px;border:1px solid #e4e7eb"><b>本机访问</b></td><td style="padding:8px 10px;border:1px solid #e4e7eb"><code>http://localhost:8080</code></td><td style="padding:8px 10px;border:1px solid #e4e7eb">在您自己的 Mac 电脑上使用</td></tr>
+        <tr><td style="padding:8px 10px;border:1px solid #e4e7eb"><b>局域网访问</b></td><td style="padding:8px 10px;border:1px solid #e4e7eb"><code>http://192.168.1.22:8080</code></td><td style="padding:8px 10px;border:1px solid #e4e7eb">同一 WiFi 下的同事电脑/手机访问</td></tr>
+        <tr><td style="padding:8px 10px;border:1px solid #e4e7eb"><b>公网访问</b></td><td style="padding:8px 10px;border:1px solid #e4e7eb"><code>https://prospect.kailioncrafts.com</code></td><td style="padding:8px 10px;border:1px solid #e4e7eb">异地访问、客户演示、外出办公</td></tr>
+      </table>
+      <div style="background:#fdf3e2;border:1px solid #f0dcb4;border-radius:8px;padding:12px 16px;margin:12px 0;font-size:13px">
+        <b style="color:#9a6200">⚠️ 注意：</b>使用前请确保服务器已启动。在工作台目录下运行 <code>node server.js</code> 启动服务器，或双击 <code>start.command</code> 一键启动。
+      </div>
+
+      <h4 style="font-size:14px;margin:16px 0 8px;color:#2c5282">2. 登录系统</h4>
+      <p style="font-size:13px;margin:6px 0">工作台设有密码保护，确保只有授权人员可以访问。</p>
+      <div style="display:flex;gap:12px;margin:10px 0;align-items:flex-start">
+        <div style="flex-shrink:0;width:26px;height:26px;background:#c9a961;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">1</div>
+        <div style="flex:1;font-size:13px;padding-top:3px">在浏览器中打开工作台地址，看到登录页面，显示公司 Logo 和名称</div>
+      </div>
+      <div style="display:flex;gap:12px;margin:10px 0;align-items:flex-start">
+        <div style="flex-shrink:0;width:26px;height:26px;background:#c9a961;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">2</div>
+        <div style="flex:1;font-size:13px;padding-top:3px">在密码输入框中输入访问密码：<code>441723</code></div>
+      </div>
+      <div style="display:flex;gap:12px;margin:10px 0;align-items:flex-start">
+        <div style="flex-shrink:0;width:26px;height:26px;background:#c9a961;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">3</div>
+        <div style="flex:1;font-size:13px;padding-top:3px">点击「进入工作台」按钮，即可进入工作台主界面</div>
+      </div>
+      <div style="background:#eef4fb;border:1px solid #cfdff2;border-radius:8px;padding:12px 16px;margin:12px 0;font-size:13px">
+        <b style="color:#1a365d">💡 首次登录后建议先做三件事：</b>
+        <ul style="margin:6px 0 0 18px">
+          <li>进「设置 → 供应商管理」配置一个免费 AI 模型 API Key（推荐智谱 GLM，永久免费）</li>
+          <li>进「设置」完善公司业务背景、个人背景、主推产品库</li>
+          <li>进「产品管理」添加您的产品信息</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ② 业务全流程 -->
+    <div id="m-overview" style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:24px 28px;margin-bottom:18px;scroll-margin-top:20px">
+      <h3 style="margin:0 0 6px;font-size:18px;color:#1a365d"><span style="color:#c9a961;margin-right:6px">②</span>业务全流程</h3>
+      <p style="color:#8b949e;font-size:13px;margin:0 0 16px">整套工作台是把外贸业务的一条主线做成了「一条流水线」，每个页面是其中一个工位。</p>
+      <div style="background:#fafbfc;border:1px solid #e4e7eb;border-radius:10px;padding:20px;margin:12px 0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px">
+          <span style="background:#1a365d;color:#fff;padding:6px 14px;border-radius:6px;font-weight:600">① 找客户</span>
+          <span style="color:#94a3b8">→</span>
+          <span style="background:#2c5282;color:#fff;padding:6px 14px;border-radius:6px;font-weight:600">② 筛客户</span>
+          <span style="color:#94a3b8">→</span>
+          <span style="background:#3182ce;color:#fff;padding:6px 14px;border-radius:6px;font-weight:600">③ 写开发信</span>
+          <span style="color:#94a3b8">→</span>
+          <span style="background:#805ad5;color:#fff;padding:6px 14px;border-radius:6px;font-weight:600">④ 跟进</span>
+          <span style="color:#94a3b8">→</span>
+          <span style="background:#c9a961;color:#fff;padding:6px 14px;border-radius:6px;font-weight:600">⑤ 报价成交</span>
+        </div>
+        <div style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          <div style="background:#fff;border:1px solid #e4e7eb;border-radius:8px;padding:12px">
+            <b style="font-size:13px;color:#1a365d">🤖 AI获客计划</b>
+            <p style="font-size:12px;color:#6b7280;margin:4px 0">自动搜索 / AI背调 / 客户评分</p>
+          </div>
+          <div style="background:#fff;border:1px solid #e4e7eb;border-radius:8px;padding:12px">
+            <b style="font-size:13px;color:#1a365d">👥 客户列表</b>
+            <p style="font-size:12px;color:#6b7280;margin:4px 0">A/B/C评分 / 标签 / 批量操作</p>
+          </div>
+          <div style="background:#fff;border:1px solid #e4e7eb;border-radius:8px;padding:12px">
+            <b style="font-size:13px;color:#1a365d">✉️ 开发信</b>
+            <p style="font-size:12px;color:#6b7280;margin:4px 0">12模板 / AI生成 / 一键复制</p>
+          </div>
+          <div style="background:#fff;border:1px solid #e4e7eb;border-radius:8px;padding:12px">
+            <b style="font-size:13px;color:#1a365d">📅 跟进日程</b>
+            <p style="font-size:12px;color:#6b7280;margin:4px 0">SOP流程 / 桌面通知 / 超时提醒</p>
+          </div>
+          <div style="background:#fff;border:1px solid #e4e7eb;border-radius:8px;padding:12px">
+            <b style="font-size:13px;color:#1a365d">📦 产品管理</b>
+            <p style="font-size:12px;color:#6b7280;margin:4px 0">快速报价 / 30秒生成专业报价单</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ AI模型配置 -->
+    <div id="m-ai" style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:24px 28px;margin-bottom:18px;scroll-margin-top:20px">
+      <h3 style="margin:0 0 6px;font-size:18px;color:#1a365d"><span style="color:#c9a961;margin-right:6px">③</span>AI模型与外部依赖</h3>
+      <p style="color:#8b949e;font-size:13px;margin:0 0 16px">工作台支持 6 个 AI 模型（3 在线免费 + 3 本地），内置智能故障转移机制。</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0">
+        <tr><th style="background:#f2f4f6;padding:8px 10px;border:1px solid #e4e7eb;text-align:left">模型</th><th style="background:#f2f4f6;padding:8px 10px;border:1px solid #e4e7eb;text-align:left">类型</th><th style="background:#f2f4f6;padding:8px 10px;border:1px solid #e4e7eb;text-align:left">费用</th><th style="background:#f2f4f6;padding:8px 10px;border:1px solid #e4e7eb;text-align:left">特点</th></tr>
+        <tr><td style="padding:8px 10px;border:1px solid #e4e7eb"><b>智谱 GLM</b></td><td style="padding:8px 10px;border:1px solid #e4e7eb">在线</td><td style="padding:8px 10px;border:1px solid #e4e7eb"><span style="color:#0f7b3f">免费</span></td><td style="padding:8px 10px;border:1px solid #e4e7eb">4个模型：深度思考/视觉理解/文本生成/图像生成</td></tr>
+        <tr><td style="padding:8px 10px;border:1px solid #e4e7eb"><b>硅基流动</b></td><td style="padding:8px 10px;border:1px solid #e4e7eb">在线</td><td style="padding:8px 10px;border:1px solid #e4e7eb"><span style="color:#0f7b3f">免费额度</span></td><td style="padding:8px 10px;border:1px solid #e4e7eb">开源大模型，速度快</td></tr>
+        <tr><td style="padding:8px 10px;border:1px solid #e4e7eb"><b>Google Gemini</b></td><td style="padding:8px 10px;border:1px solid #e4e7eb">在线</td><td style="padding:8px 10px;border:1px solid #e4e7eb"><span style="color:#0f7b3f">免费</span></td><td style="padding:8px 10px;border:1px solid #e4e7eb">11个免费模型，能力强</td></tr>
+        <tr><td style="padding:8px 10px;border:1px solid #e4e7eb"><b>千问 2.5</b></td><td style="padding:8px 10px;border:1px solid #e4e7eb">本地</td><td style="padding:8px 10px;border:1px solid #e4e7eb"><span style="color:#0f7b3f">免费</span></td><td style="padding:8px 10px;border:1px solid #e4e7eb">文本生成，本地运行，断网可用</td></tr>
+        <tr><td style="padding:8px 10px;border:1px solid #e4e7eb"><b>DeepSeek</b></td><td style="padding:8px 10px;border:1px solid #e4e7eb">本地</td><td style="padding:8px 10px;border:1px solid #e4e7eb"><span style="color:#0f7b3f">免费</span></td><td style="padding:8px 10px;border:1px solid #e4e7eb">深度推理，本地运行</td></tr>
+        <tr><td style="padding:8px 10px;border:1px solid #e4e7eb"><b>视觉模型</b></td><td style="padding:8px 10px;border:1px solid #e4e7eb">本地</td><td style="padding:8px 10px;border:1px solid #e4e7eb"><span style="color:#0f7b3f">免费</span></td><td style="padding:8px 10px;border:1px solid #e4e7eb">图像理解，本地运行</td></tr>
+      </table>
+      <div style="background:#fdf6e3;border:1px solid #e8d5a0;border-radius:8px;padding:12px 16px;margin:12px 0;font-size:13px">
+        <b style="color:#8b6914">🔄 智能故障转移：</b>默认模型 → 在线生成模型 → 在线推理模型 → 本地 Ollama 模型。当一个模型调用失败时自动切换到下一个，确保 AI 功能始终可用。
+      </div>
+    </div>
+
+    <!-- 一、核心业务 -->
+    <div id="m-core" style="background:linear-gradient(90deg,#1a365d,#2c5282);color:#fff;border-radius:10px;padding:14px 20px;margin:24px 0 14px;font-size:15px;font-weight:600">一、核心业务（8 个页面）</div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">📊 1. 数据看板 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>工作台首页，业务全局概览，每天早上先看这里。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>今日最重要的事、预警提醒、客户质量分布（A/B/C）、跟进状态统计、工作台使用统计、客户增长趋势图、国家分布图、今日待联系客户。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>快捷键：</b><code>g</code> + <code>d</code></p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">👥 2. 客户列表 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>核心模块，管理所有客户信息。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>客户台账、多维度筛选（等级/国家/来源/状态/标签）、关键词搜索、标签云统计、批量操作（删除/改状态/加标签/设等级/设跟进）、客户查重合并、CSV导入导出、AI批量背调。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>客户详情：</b>点击客户名称滑出详情抽屉，含快捷操作栏（6个按钮）、SOP流程（7步跟进法）、沟通记录时间线、跟进记录、开发信记录。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>快捷键：</b><code>g</code> + <code>c</code></p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">✉️ 3. 开发信 <span style="font-size:11px;background:#fdf6e3;color:#8b6914;padding:2px 8px;border-radius:4px;margin-left:6px">AI功能</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>高效撰写和管理外贸开发信。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>AI生成开发信、12个专业模板（6大分类）、草稿管理、分类筛选、一键复制。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>操作步骤：</b>选模板 → 修改内容 → 复制全文 → 粘贴到邮件客户端发送。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>快捷键：</b><code>g</code> + <code>e</code></p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">📅 4. 跟进日程 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>管理所有客户跟进任务，确保不遗漏。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>今日待跟进、跟进记录、桌面通知（浏览器原生Notification）、超时提醒（14天未跟进）、SOP流程引导（7步跟进法）。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>快捷键：</b><code>g</code> + <code>s</code></p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">📦 5. 产品管理 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>管理产品信息，支持快速报价。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>产品库（名称/分类/规格/成本/售价/库存/关键词）、快速报价（30秒生成专业报价单，实时计算金额，5种付款方式）、产品分类、关键词管理。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>快捷键：</b><code>g</code> + <code>p</code></p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">💬 6. 询盘管理 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>记录和管理客户询盘，跟踪处理进度。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>询盘记录（内容/产品/数量/目标价格）、状态跟踪（待处理/已报价/已回复/已成交）、询盘分配。</p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">💰 7. 报价与订单 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>管理所有订单信息，跟踪生产和发货进度。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>订单记录（订单号/客户/产品/数量/金额/交货期）、状态管理（待生产/生产中/已发货/已完成）、生产进度、发货跟踪。</p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">🏆 8. 业绩战报 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>展示销售数据和团队业绩。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>销售数据（销售额/订单量/客户数）、业绩目标（月度/季度/年度）、团队排名、趋势分析。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>快捷键：</b><code>g</code> + <code>r</code></p>
+    </div>
+
+    <!-- 二、AI智能 -->
+    <div id="m-ai2" style="background:linear-gradient(90deg,#805ad5,#6b46c1);color:#fff;border-radius:10px;padding:14px 20px;margin:24px 0 14px;font-size:15px;font-weight:600">二、AI智能（4 个页面）</div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">🤖 9. AI获客计划 <span style="font-size:11px;background:#fdecea;color:#a3341f;padding:2px 8px;border-radius:4px;margin-left:6px">需先配置</span> <span style="font-size:11px;background:#fdf6e3;color:#8b6914;padding:2px 8px;border-radius:4px;margin-left:4px">AI功能</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>核心AI功能，自动执行客户搜索、背调、评分。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>自动搜索客户、AI背调（访问官网分析业务）、客户评分（A/B/C三级）、批量处理、执行日志。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>前置条件：</b>需配置AI模型才能正常运行。</p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">📋 10. 开发计划 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>规划和管理客户开发任务。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>任务规划、执行进度跟踪、效果跟踪（回复率/转化率）。</p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">🎯 11. 商机管道 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>销售漏斗形式管理所有商机。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>阶段管理（初步接触→需求确认→报价→样品→谈判→成交）、转化率分析、销售漏斗可视化。</p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">📤 12. 触达中心 <span style="font-size:11px;background:#fdf3e2;color:#9a6200;padding:2px 8px;border-radius:4px;margin-left:6px">可选增强</span> <span style="font-size:11px;background:#fdf6e3;color:#8b6914;padding:2px 8px;border-radius:4px;margin-left:4px">AI功能</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>统一管理多渠道客户触达，跟踪效果。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>多渠道触达（邮件/WhatsApp/领英/电话）、触达统计、效果分析（回复率/平均沟通次数）、快捷入口。</p>
+    </div>
+
+    <!-- 三、营销推广 -->
+    <div id="m-marketing" style="background:linear-gradient(90deg,#dd6b20,#c05621);color:#fff;border-radius:10px;padding:14px 20px;margin:24px 0 14px;font-size:15px;font-weight:600">三、营销推广（3 个页面）</div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">📥 13. AI收件箱 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span> <span style="font-size:11px;background:#fdf6e3;color:#8b6914;padding:2px 8px;border-radius:4px;margin-left:4px">AI功能</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>管理客户回复邮件，支持AI回复建议。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>回复管理（已读/未读）、邮件分类、AI回复建议。</p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">💼 14. 领英拓客 <span style="font-size:11px;background:#fdf3e2;color:#9a6200;padding:2px 8px;border-radius:4px;margin-left:6px">可选增强</span> <span style="font-size:11px;background:#fdf6e3;color:#8b6914;padding:2px 8px;border-radius:4px;margin-left:4px">AI功能</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>在LinkedIn上寻找和联系潜在客户。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>客户搜索（行业/职位/地区）、智能互动（点赞/评论/好友请求）、好友管理、AI话术生成。</p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">📡 15. 社媒监控 <span style="font-size:11px;background:#fdf3e2;color:#9a6200;padding:2px 8px;border-radius:4px;margin-left:6px">可选增强</span> <span style="font-size:11px;background:#fdf6e3;color:#8b6914;padding:2px 8px;border-radius:4px;margin-left:4px">AI功能</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>监控社交媒体行业动态，发现潜在商机。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能（5个Tab）：</b>监控看板、关键词管理、社媒帖子、痛点分析（AI）、线索发现。</p>
+    </div>
+
+    <!-- 四、支撑工具 -->
+    <div id="m-tools" style="background:linear-gradient(90deg,#0f766e,#0b5c56);color:#fff;border-radius:10px;padding:14px 20px;margin:24px 0 14px;font-size:15px;font-weight:600">四、支撑工具（5 个页面）</div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">📚 16. 知识库 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>存储业务知识、产品资料、话术模板，AI写开发信时自动引用。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>知识分类、知识搜索、AI自动引用。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>快捷键：</b><code>g</code> + <code>k</code></p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">🧰 17. 工具箱 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>14个外贸常用工具一站式解决。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>常用工具：</b>汇率换算、时区查询、HS编码查询、翻译工具、单位换算、关税查询等。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>快捷键：</b><code>g</code> + <code>t</code></p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">📋 18. 操作日志 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>记录所有关键操作，支持审计追溯。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>7种日志类型（客户操作/开发信/跟进操作/报价订单/系统操作/数据导入/AI调用）、自动记录、筛选查询、导出CSV、清空日志（最多500条）。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>快捷键：</b><code>g</code> + <code>a</code></p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">⚙️ 19. 设置 <span style="font-size:11px;background:#e6f5ec;color:#0f7b3f;padding:2px 8px;border-radius:4px;margin-left:6px">开箱即用</span> <span style="font-size:11px;background:#fdf6e3;color:#8b6914;padding:2px 8px;border-radius:4px;margin-left:4px">AI配置</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>管理工作台所有配置，最重要的配置页面。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>公司信息、团队管理、获客资料（业务背景/个人背景/主推产品）、AI模型配置（在线+本地+故障转移）、通知设置、快捷键、数据管理。</p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:20px 24px;margin-bottom:14px">
+      <h4 style="margin:0 0 6px;font-size:15px;color:#1a365d">📈 20. SEO内容营销 <span style="font-size:11px;background:#fdf3e2;color:#9a6200;padding:2px 8px;border-radius:4px;margin-left:6px">可选增强</span> <span style="font-size:11px;background:#fdf6e3;color:#8b6914;padding:2px 8px;border-radius:4px;margin-left:4px">AI功能</span></h4>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>用途：</b>生成SEO优化的营销内容，提升独立站排名。</p>
+      <p style="font-size:13px;color:#495057;margin:4px 0"><b>主要功能：</b>关键词研究、AI内容生成（博客/产品描述）、内容规划。</p>
+    </div>
+
+    <!-- ④ 快捷键 -->
+    <div id="m-shortcuts" style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:24px 28px;margin-bottom:18px;scroll-margin-top:20px">
+      <h3 style="margin:0 0 6px;font-size:18px;color:#1a365d"><span style="color:#c9a961;margin-right:6px">④</span>快捷键大全</h3>
+      <p style="color:#8b949e;font-size:13px;margin:0 0 16px">15个快捷键，熟练使用大幅提高效率。按 <code>?</code> 键随时查看帮助。</p>
+      <h4 style="font-size:14px;margin:12px 0 8px;color:#2c5282">页面导航（按 g 然后按对应字母）</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;font-size:13px">
+        <div><code>g</code>+<code>d</code> 数据看板</div>
+        <div><code>g</code>+<code>c</code> 客户列表</div>
+        <div><code>g</code>+<code>e</code> 开发信</div>
+        <div><code>g</code>+<code>s</code> 跟进日程</div>
+        <div><code>g</code>+<code>p</code> 产品管理</div>
+        <div><code>g</code>+<code>k</code> 知识库</div>
+        <div><code>g</code>+<code>t</code> 工具箱</div>
+        <div><code>g</code>+<code>r</code> 业绩战报</div>
+        <div><code>g</code>+<code>a</code> 操作日志</div>
+        <div><code>g</code>+<code>i</code> 询盘管理</div>
+        <div><code>g</code>+<code>o</code> 订单管理</div>
+      </div>
+      <h4 style="font-size:14px;margin:16px 0 8px;color:#2c5282">常用操作</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;font-size:13px">
+        <div><code>/</code> 搜索客户</div>
+        <div><code>n</code> 新建客户</div>
+        <div><code>?</code> 快捷键帮助</div>
+        <div><code>Esc</code> 关闭弹窗</div>
+      </div>
+    </div>
+
+    <!-- ⑤ 数据管理 -->
+    <div id="m-data" style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:24px 28px;margin-bottom:18px;scroll-margin-top:20px">
+      <h3 style="margin:0 0 6px;font-size:18px;color:#1a365d"><span style="color:#c9a961;margin-right:6px">⑤</span>数据管理</h3>
+      <p style="color:#8b949e;font-size:13px;margin:0 0 16px">所有数据保存在浏览器本地（localStorage），建议定期备份。</p>
+      <h4 style="font-size:14px;margin:12px 0 6px;color:#2c5282">数据导入（CSV）</h4>
+      <p style="font-size:13px;margin:4px 0">客户列表 → 「📥 导入」→ 选择CSV文件 → 预览 → 执行导入</p>
+      <h4 style="font-size:14px;margin:12px 0 6px;color:#2c5282">数据导出</h4>
+      <p style="font-size:13px;margin:4px 0"><b>客户CSV：</b>客户列表 → 「导出CSV」</p>
+      <p style="font-size:13px;margin:4px 0"><b>全部数据（JSON备份）：</b>设置 → 数据导出与备份中心 → 「导出全部数据」</p>
+      <h4 style="font-size:14px;margin:12px 0 6px;color:#2c5282">客户查重合并</h4>
+      <p style="font-size:13px;margin:4px 0">客户列表 → 「🔍 查重」→ 确认重复客户 → 「合并」（不可恢复，操作前建议备份）</p>
+      <div style="background:#eef4fb;border:1px solid #cfdff2;border-radius:8px;padding:12px 16px;margin:12px 0;font-size:13px">
+        <b>💡 备份建议：</b>每周导出一次JSON备份，保存在云盘或移动硬盘。重要操作前（批量删除/数据导入）也先备份。
+      </div>
+    </div>
+
+    <!-- ⑥ 部署访问 -->
+    <div id="m-deploy" style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:24px 28px;margin-bottom:18px;scroll-margin-top:20px">
+      <h3 style="margin:0 0 6px;font-size:18px;color:#1a365d"><span style="color:#c9a961;margin-right:6px">⑥</span>部署与访问</h3>
+      <p style="color:#8b949e;font-size:13px;margin:0 0 16px">支持本地、局域网、公网三种访问方式。</p>
+      <h4 style="font-size:14px;margin:12px 0 6px;color:#2c5282">本地部署</h4>
+      <p style="font-size:13px;margin:4px 0"><code>cd 工作台目录</code> → <code>node server.js</code> → 浏览器打开 <code>http://localhost:8080</code></p>
+      <p style="font-size:13px;margin:4px 0">或双击 <code>start.command</code> 一键启动</p>
+      <h4 style="font-size:14px;margin:12px 0 6px;color:#2c5282">局域网访问</h4>
+      <p style="font-size:13px;margin:4px 0">同一WiFi下，同事浏览器打开 <code>http://192.168.1.22:8080</code></p>
+      <h4 style="font-size:14px;margin:12px 0 6px;color:#2c5282">公网访问</h4>
+      <p style="font-size:13px;margin:4px 0"><code>https://prospect.kailioncrafts.com</code>（Cloudflare Tunnel，需Mac保持开机且服务器运行）</p>
+      <h4 style="font-size:14px;margin:12px 0 6px;color:#2c5282">团队协作</h4>
+      <p style="font-size:13px;margin:4px 0">数据共享、客户分配、密码权限控制、操作审计追溯</p>
+    </div>
+
+    <!-- ⑦ 常见问题 -->
+    <div id="m-faq" style="background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:24px 28px;margin-bottom:18px;scroll-margin-top:20px">
+      <h3 style="margin:0 0 6px;font-size:18px;color:#1a365d"><span style="color:#c9a961;margin-right:6px">⑦</span>常见问题 FAQ</h3>
+      <p style="color:#8b949e;font-size:13px;margin:0 0 16px">使用过程中遇到问题，先在这里查找答案。</p>
+      
+      <div style="margin-bottom:14px">
+        <b style="font-size:14px;color:#1a365d">Q1：数据保存在哪里？会丢失吗？</b>
+        <p style="font-size:13px;color:#495057;margin:4px 0">A：保存在浏览器本地（localStorage），不上传服务器。不清除浏览器数据就不会丢失。建议定期导出JSON备份。</p>
+      </div>
+      <div style="margin-bottom:14px">
+        <b style="font-size:14px;color:#1a365d">Q2：换电脑了，数据怎么迁移？</b>
+        <p style="font-size:13px;color:#495057;margin:4px 0">A：旧电脑导出全部数据（JSON），新电脑设置页面导入即可。</p>
+      </div>
+      <div style="margin-bottom:14px">
+        <b style="font-size:14px;color:#1a365d">Q3：AI模型调用失败怎么办？</b>
+        <p style="font-size:13px;color:#495057;margin:4px 0">A：工作台内置故障转移，自动切换其他模型。在线全失败时自动用本地Ollama兜底。也可在设置页面检查API Key。</p>
+      </div>
+      <div style="margin-bottom:14px">
+        <b style="font-size:14px;color:#1a365d">Q4：局域网同事无法访问？</b>
+        <p style="font-size:13px;color:#495057;margin:4px 0">A：检查：①服务器已启动且监听0.0.0.0:8080 ②同一WiFi ③Mac防火墙允许node ④IP地址正确。</p>
+      </div>
+      <div style="margin-bottom:14px">
+        <b style="font-size:14px;color:#1a365d">Q5：公网访问不了？</b>
+        <p style="font-size:13px;color:#495057;margin:4px 0">A：需同时满足：Mac开机、服务器运行（8080）、cloudflared服务运行、Tunnel配置正确。</p>
+      </div>
+      <div style="margin-bottom:14px">
+        <b style="font-size:14px;color:#1a365d">Q6：开发信怎么发送？</b>
+        <p style="font-size:13px;color:#495057;margin:4px 0">A：工作台负责生成内容，发送用您自己的邮件客户端（Gmail/Outlook/企业邮箱）。生成后点「复制全文」粘贴发送。</p>
+      </div>
+      <div style="margin-bottom:14px">
+        <b style="font-size:14px;color:#1a365d">Q7：支持手机访问吗？</b>
+        <p style="font-size:13px;color:#495057;margin:4px 0">A：支持。通过局域网或公网地址在手机浏览器访问，工作台做了响应式适配。</p>
+      </div>
+      <div style="margin-bottom:14px">
+        <b style="font-size:14px;color:#1a365d">Q8：访问密码是多少？</b>
+        <p style="font-size:13px;color:#495057;margin:4px 0">A：<code>441723</code>。修改密码需联系管理员修改代码。</p>
+      </div>
+    </div>
+
+    <!-- 底部 -->
+    <div style="text-align:center;padding:30px 0;color:#8b949e;font-size:13px">
+      <p><b>锴利外贸获客工作台</b> · KaiLionCrafts Prospect</p>
+      <p>使用说明书 | 版本 V66 | 2026年9月</p>
+      <p style="margin-top:10px;font-size:15px">🎉 祝您外贸获客顺利，订单源源不断！</p>
+    </div>
+  </div>`;
+}
+
 
 /* ---------- 通用：弹窗 / 抽屉 ---------- */
 function openModal(html, wide){

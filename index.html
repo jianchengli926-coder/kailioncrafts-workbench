@@ -539,6 +539,7 @@ function loadState(){
   S.settings = DB.load('settings') || null;
   S.apis = DB.load('apis') || [];
   S.autoSearch = DB.load('autoSearch') || {results:[],history:[],totalSearches:0,totalFound:0,totalImported:0};
+  S.activityLog = DB.load('activityLog') || [];
   S.linkedin = DB.load('linkedin') || {leads:[],messages:[],posts:[],interactions:[],stats:{connections:0,requestsSent:0,replies:0,meetings:0}};
   S.socialMonitor = DB.load('socialMonitor') || {keywords:[],posts:[],painPoints:[],leads:[],lastScan:null};
   S.mailQueue = DB.load('mailQueue') || [];
@@ -2168,6 +2169,7 @@ const NAV = [
   {group:'数据与智能'},
   {key:'reports',icon:'🏆',label:'业绩战报',title:'业绩战报',crumb:'漏斗看未来 · 战报看现在 · 行为看过程'},
   {key:'agents',icon:'🤖',label:'AI Agent团队',title:'AI Agent团队',crumb:'AI CEO调度 · 11个专业Agent协同'},
+  {key:'activity',icon:'📋',label:'操作日志',title:'操作日志与审计',crumb:'记录所有重要操作 · 可追溯可审计'},
   {key:'linkedin',icon:'💼',label:'领英拓客',title:'领英智能拓客',crumb:'4步拓客法 · AI站内信 · 智能互动'},
   {key:'socialmonitor',icon:'📡',label:'社媒监控',title:'社媒关键词监控',crumb:'监控行业痛点 · 发现潜在客户'},
   {group:'系统'},
@@ -2201,13 +2203,116 @@ function go(view, params){
   renderView();
   document.getElementById('mainContent').scrollTop = 0;
 }
+
+
+/* V52 操作日志与审计 */
+const LOG_TYPES = {
+  customer: {label:'客户操作', icon:'👥', color:'#3182ce'},
+  draft: {label:'开发信', icon:'✉️', color:'#805ad5'},
+  followup: {label:'跟进操作', icon:'📅', color:'#dd6b20'},
+  quote: {label:'报价订单', icon:'💰', color:'#38a169'},
+  system: {label:'系统操作', icon:'⚙️', color:'#718096'},
+  import: {label:'数据导入', icon:'📥', color:'#d69e2e'},
+  ai: {label:'AI调用', icon:'🤖', color:'#00a3c4'}
+};
+
+function logAction(type, action, detail=''){
+  if(!S.activityLog) S.activityLog = [];
+  const entry = {
+    id: uid(),
+    type: type,
+    action: action,
+    detail: detail,
+    timestamp: Date.now(),
+    user: 'Leo'
+  };
+  S.activityLog.unshift(entry);
+  // 最多保留500条
+  if(S.activityLog.length > 500) S.activityLog = S.activityLog.slice(0, 500);
+  try{ DB.save('activityLog', S.activityLog); }catch(e){}
+}
+
+function viewActivityLog(root){
+  const logs = S.activityLog || [];
+  const types = [...new Set(logs.map(l=>l.type))];
+  
+  root.innerHTML = `
+    <div class="flex-between mb16">
+      <div>
+        <h2 style="margin:0">📋 操作日志与审计</h2>
+        <div class="text-sm text-muted" style="margin-top:4px">记录所有重要操作，共 ${logs.length} 条（最多保留500条）</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <select class="form-control" style="width:140px" id="logTypeFilter" onchange="renderView()">
+          <option value="">全部类型</option>
+          ${Object.entries(LOG_TYPES).map(([k,v])=>`<option value="${k}">${v.icon} ${v.label}</option>`).join('')}
+        </select>
+        <button class="btn btn-outline" onclick="exportActivityLog()">📤 导出日志</button>
+        <button class="btn btn-danger" onclick="clearActivityLog()">🗑️ 清空日志</button>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="table-wrap"><table class="tbl">
+        <colgroup><col style="width:5%"><col style="width:12%"><col style="width:12%"><col style="width:25%"><col style="width:36%"><col style="width:10%"></colgroup>
+        <thead><th>#</th><th>时间</th><th>类型</th><th>操作</th><th>详情</th><th>操作人</th></thead>
+        <tbody>
+          ${logs.length? logs.map((log, i)=>{
+            const typeInfo = LOG_TYPES[log.type] || {label:log.type, icon:'📌', color:'#718096'};
+            const date = new Date(log.timestamp);
+            const timeStr = date.toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'});
+            return `
+              <tr>
+                <td class="text-sm text-muted">${i+1}</td>
+                <td class="text-sm mono">${timeStr}</td>
+                <td><span class="badge" style="background:${typeInfo.color}20;color:${typeInfo.color}">${typeInfo.icon} ${typeInfo.label}</span></td>
+                <td style="font-weight:600">${esc(log.action)}</td>
+                <td class="text-sm text-muted">${esc(log.detail)||'-'}</td>
+                <td class="text-sm">${esc(log.user||'-')}</td>
+              </tr>
+            `;
+          }).join('')
+          : `<tr><td colspan="6"><div class="empty"><div class="big">📋</div><p>暂无操作日志</p><p class="text-sm text-muted">进行客户管理、开发信、跟进等操作后会自动记录</p></div></td></tr>`}
+        </tbody>
+      </table></div>
+    </div>
+  `;
+}
+
+function exportActivityLog(){
+  const logs = S.activityLog || [];
+  if(!logs.length){ toast('暂无日志可导出'); return; }
+  let csv = '时间,类型,操作,详情,操作人\n';
+  logs.forEach(log=>{
+    const typeInfo = LOG_TYPES[log.type] || {label:log.type};
+    const date = new Date(log.timestamp).toLocaleString('zh-CN');
+    csv += `"${date}","${typeInfo.label}","${log.action}","${(log.detail||'').replace(/"/g,'""')}","${log.user||''}"\n`;
+  });
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `操作日志_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ 操作日志已导出');
+}
+
+function clearActivityLog(){
+  if(!confirm('确定要清空所有操作日志吗？此操作不可恢复！')) return;
+  S.activityLog = [];
+  try{ DB.save('activityLog', S.activityLog); }catch(e){}
+  toast('✅ 操作日志已清空');
+  renderView();
+}
+
 function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, devplans:viewDevPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
-    seo:viewSEO, reports:viewReports, agents:viewAgents, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings};
+    seo:viewSEO, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
@@ -3063,6 +3168,7 @@ function batchDeleteCustomers(){
   S.customers = S.customers.filter(c=>!custFilter.selected.includes(c.id));
   persist();
   toast(`✅ 已删除 ${count} 个客户`);
+  logAction('customer', '批量删除客户', `删除了${count}个客户`);
   custFilter.selected = [];
   closeModal();
   renderView();
@@ -3076,6 +3182,7 @@ function batchUpdateStatus(){
   });
   persist();
   toast(`✅ 已将 ${count} 个客户状态改为「${status}」`);
+  logAction('customer', '批量修改状态', `${count}个客户状态改为${status}`);
   closeModal();
   renderView();
 }
@@ -3506,6 +3613,7 @@ function executeImport(){
   });
   
   persist();
+  logAction('import', 'CSV导入客户', `成功导入${success}条，重复跳过${duplicates}条，无效跳过${skipped}条`);
   
   document.getElementById('importStep2').style.display = 'none';
   document.getElementById('importStep3').style.display = 'block';
@@ -3590,6 +3698,7 @@ function mergeCustomers(groupKey){
   
   persist();
   toast(`✅ 已合并 ${otherIds.length} 个客户到「${main.company}」`);
+  logAction('customer', '合并客户', `合并${otherIds.length}个客户到${main.company}`);
   closeModal();
   renderView();
 }

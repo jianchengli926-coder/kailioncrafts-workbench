@@ -2943,6 +2943,7 @@ function viewCustomers(root){
       ${[['all','全部客户'],['new','新开发客户'],['old','老客户（已成交）']].map(([k,l])=>
         `<button class="btn ${custFilter.view===k?'btn-gold':'btn-outline'}" onclick="custFilter.view='${k}';custFilter.page=1;renderView()">${l}</button>`).join('')}
       <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="findDuplicates()">🔍 查重</button>
         ${custFilter.selected.length?`<button class="btn btn-gold" onclick="openBatchOps()">⚡ 批量操作（${custFilter.selected.length}）</button>`:''}
         <button class="btn btn-primary" onclick="aiBatchCheck()">🤖 AI 批量背调（${custFilter.selected.length} 已选）</button>
       </div>
@@ -3109,6 +3110,198 @@ function batchSetGrade(){
   renderView();
 }
 
+
+
+/* V50 客户查重与合并 */
+function findDuplicates(){
+  const customers = S.customers;
+  const groups = {company:[], email:[], website:[]};
+  
+  // 按公司名查重（忽略大小写和空格）
+  const companyMap = {};
+  customers.forEach(c=>{
+    const key = (c.company||'').toLowerCase().replace(/\s+/g,'').trim();
+    if(key && key.length>2){
+      if(!companyMap[key]) companyMap[key]=[];
+      companyMap[key].push(c);
+    }
+  });
+  Object.values(companyMap).forEach(arr=>{ if(arr.length>1) groups.company.push(arr); });
+  
+  // 按邮箱查重
+  const emailMap = {};
+  customers.forEach(c=>{
+    const email = (c.contact?.email||'').toLowerCase().trim();
+    if(email){
+      if(!emailMap[email]) emailMap[email]=[];
+      emailMap[email].push(c);
+    }
+  });
+  Object.values(emailMap).forEach(arr=>{ if(arr.length>1) groups.email.push(arr); });
+  
+  // 按网站查重
+  const websiteMap = {};
+  customers.forEach(c=>{
+    const site = (c.website||'').toLowerCase().replace(/^https?:\/\//,'').replace(/\/$/,'').trim();
+    if(site && site.length>4){
+      if(!websiteMap[site]) websiteMap[site]=[];
+      websiteMap[site].push(c);
+    }
+  });
+  Object.values(websiteMap).forEach(arr=>{ if(arr.length>1) groups.website.push(arr); });
+  
+  const totalDup = groups.company.length + groups.email.length + groups.website.length;
+  
+  openModal(`
+    <div class="modal-head">
+      <h3>🔍 客户查重结果</h3>
+      <span class="modal-close" onclick="closeModal()">×</span>
+    </div>
+    <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+        <div class="card card-pad" style="text-align:center;background:#fff5f5">
+          <div style="font-size:24px;font-weight:800;color:#c53030">${groups.company.length}</div>
+          <div style="font-size:12px;color:#718096">公司名重复</div>
+        </div>
+        <div class="card card-pad" style="text-align:center;background:#fffff0">
+          <div style="font-size:24px;font-weight:800;color:#975a16">${groups.email.length}</div>
+          <div style="font-size:12px;color:#718096">邮箱重复</div>
+        </div>
+        <div class="card card-pad" style="text-align:center;background:#ebf8ff">
+          <div style="font-size:24px;font-weight:800;color:#2b6cb0">${groups.website.length}</div>
+          <div style="font-size:12px;color:#718096">网站重复</div>
+        </div>
+      </div>
+      ${totalDup===0?`<div class="empty"><div class="big">✅</div><p>没有发现重复客户</p></div>`:''}
+      ${groups.company.length?`
+        <div style="margin-bottom:16px">
+          <h4 style="color:#c53030;margin-bottom:8px">🏢 公司名重复（${groups.company.length}组）</h4>
+          ${groups.company.map((arr,i)=>`
+            <div class="card card-pad" style="margin-bottom:8px;background:#fff5f5">
+              <div style="font-weight:700;margin-bottom:8px">${esc(arr[0].company)}</div>
+              ${arr.map(c=>`
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #feb2b2">
+                  <input type="radio" name="merge_company_${i}" value="${c.id}" ${arr.indexOf(c)===0?'checked':''}>
+                  <div style="flex:1">
+                    <b>${esc(c.company)}</b>
+                    <span class="text-sm text-muted">| ${esc(c.country)} | ${esc(c.contact?.email||'无邮箱')} | ${esc(c.status)}</span>
+                  </div>
+                  <span class="badge badge-gold">${c.scores?.grade||'?'}级 ${c.scores?.total||0}分</span>
+                </div>
+              `).join('')}
+              <button class="btn btn-danger btn-sm" style="margin-top:8px" onclick="mergeCustomers('company_${i}')">🔗 合并为一条（保留选中的主客户）</button>
+            </div>
+          `).join('')}
+        </div>
+      `:''}
+      ${groups.email.length?`
+        <div style="margin-bottom:16px">
+          <h4 style="color:#975a16;margin-bottom:8px">📧 邮箱重复（${groups.email.length}组）</h4>
+          ${groups.email.map((arr,i)=>`
+            <div class="card card-pad" style="margin-bottom:8px;background:#fffff0">
+              <div style="font-weight:700;margin-bottom:8px">${esc(arr[0].contact?.email)}</div>
+              ${arr.map(c=>`
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f6e05e">
+                  <input type="radio" name="merge_email_${i}" value="${c.id}" ${arr.indexOf(c)===0?'checked':''}>
+                  <div style="flex:1">
+                    <b>${esc(c.company)}</b>
+                    <span class="text-sm text-muted">| ${esc(c.country)} | ${esc(c.status)}</span>
+                  </div>
+                  <span class="badge badge-gold">${c.scores?.grade||'?'}级</span>
+                </div>
+              `).join('')}
+              <button class="btn btn-gold btn-sm" style="margin-top:8px" onclick="mergeCustomers('email_${i}')">🔗 合并为一条</button>
+            </div>
+          `).join('')}
+        </div>
+      `:''}
+      ${groups.website.length?`
+        <div style="margin-bottom:16px">
+          <h4 style="color:#2b6cb0;margin-bottom:8px">🌐 网站重复（${groups.website.length}组）</h4>
+          ${groups.website.map((arr,i)=>`
+            <div class="card card-pad" style="margin-bottom:8px;background:#ebf8ff">
+              <div style="font-weight:700;margin-bottom:8px">${esc(arr[0].website)}</div>
+              ${arr.map(c=>`
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #90cdf4">
+                  <input type="radio" name="merge_website_${i}" value="${c.id}" ${arr.indexOf(c)===0?'checked':''}>
+                  <div style="flex:1">
+                    <b>${esc(c.company)}</b>
+                    <span class="text-sm text-muted">| ${esc(c.country)} | ${esc(c.contact?.email||'无邮箱')}</span>
+                  </div>
+                  <span class="badge badge-gold">${c.scores?.grade||'?'}级</span>
+                </div>
+              `).join('')}
+              <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="mergeCustomers('website_${i}')">🔗 合并为一条</button>
+            </div>
+          `).join('')}
+        </div>
+      `:''}
+    </div>
+  `);
+}
+
+function mergeCustomers(groupKey){
+  const radios = document.querySelectorAll(`input[name="merge_${groupKey}"]:checked`);
+  if(!radios.length){ toast('请选择主客户'); return; }
+  const mainId = radios[0].value;
+  const allRadios = document.querySelectorAll(`input[name="merge_${groupKey}"]`);
+  const ids = Array.from(allRadios).map(r=>r.value);
+  const otherIds = ids.filter(id=>id!==mainId);
+  
+  if(!confirm(`确定要将 ${otherIds.length} 个客户合并到主客户吗？\n合并后其他客户将被删除，其沟通记录、标签等数据将合并到主客户。`)) return;
+  
+  const main = S.customers.find(c=>c.id===mainId);
+  if(!main){ toast('主客户不存在'); return; }
+  
+  // 合并数据
+  otherIds.forEach(id=>{
+    const other = S.customers.find(c=>c.id===id);
+    if(!other) return;
+    
+    // 合并标签
+    if(other.tags){
+      if(!main.tags) main.tags = [];
+      other.tags.forEach(t=>{ if(!main.tags.includes(t)) main.tags.push(t); });
+    }
+    
+    // 合并沟通记录
+    if(other.communications){
+      if(!main.communications) main.communications = [];
+      main.communications = main.communications.concat(other.communications);
+    }
+    
+    // 合并备注
+    if(other.notes && !main.notes) main.notes = other.notes;
+    else if(other.notes && main.notes) main.notes += '\n\n--- 合并自 ' + other.company + ' ---\n' + other.notes;
+    
+    // 如果主客户缺少字段，从其他客户补充
+    if(!main.products && other.products) main.products = other.products;
+    if(!main.contact?.email && other.contact?.email) main.contact.email = other.contact.email;
+    if(!main.contact?.name && other.contact?.name) main.contact.name = other.contact.name;
+    if(!main.website && other.website) main.website = other.website;
+    if(!main.phone && other.phone) main.phone = other.phone;
+    
+    // 取较高的评分
+    if(other.scores?.total > (main.scores?.total||0)){
+      main.scores = other.scores;
+    }
+    
+    // 合并开发信
+    if(other.drafts){
+      S.drafts.forEach(d=>{
+        if(otherIds.includes(d.customerId)) d.customerId = mainId;
+      });
+    }
+  });
+  
+  // 删除其他客户
+  S.customers = S.customers.filter(c=>!otherIds.includes(c.id));
+  
+  persist();
+  toast(`✅ 已合并 ${otherIds.length} 个客户到「${main.company}」`);
+  closeModal();
+  renderView();
+}
 function batchSetFollowUp(){
   const date = document.getElementById('batchFollowDate').value;
   if(!date){ toast('请选择日期'); return; }

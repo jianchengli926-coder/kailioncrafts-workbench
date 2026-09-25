@@ -5634,6 +5634,104 @@ function viewTools(root){
     </div>` : ''}
   </div>
   
+  <!-- V37 产品报价计算器与PI生成器面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>💰 产品报价计算器与PI生成器（4种贸易术语 · 汇率换算 · 一键生成形式发票）</span>
+      <span class="badge" style="background:#805ad5;color:#fff">新功能 V37</span>
+    </div>
+    <p class="text-sm text-muted mb12">输入产品成本和各项费用，自动计算EXW/FOB/CIF/DDP四种贸易术语报价，支持多货币汇率换算，一键生成专业PI形式发票</p>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <!-- 左侧：产品信息 -->
+      <div>
+        <div class="text-xs text-muted mb6" style="color:#805ad5;font-weight:bold">📦 产品信息</div>
+        <div class="mb8"><input id="qProductName" class="form-control" placeholder="品名（如：厨房剪刀）" style="font-size:12px"></div>
+        <div class="mb8"><input id="qModel" class="form-control" placeholder="型号（如：KS-001）" style="font-size:12px"></div>
+        <div class="mb8"><input id="qMaterial" class="form-control" placeholder="材质（如：3Cr13不锈钢）" style="font-size:12px"></div>
+        <div class="mb8"><input id="qSpec" class="form-control" placeholder="规格（如：8.5寸）" style="font-size:12px"></div>
+        <div style="display:flex;gap:8px">
+          <input id="qQuantity" class="form-control" type="number" placeholder="数量" value="1000" style="font-size:12px;flex:1">
+          <input id="qUnit" class="form-control" placeholder="单位" value="pcs" style="font-size:12px;width:80px">
+        </div>
+      </div>
+      
+      <!-- 右侧：成本与费用 -->
+      <div>
+        <div class="text-xs text-muted mb6" style="color:#805ad5;font-weight:bold">💵 成本与费用（人民币¥）</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input id="qProductCost" class="form-control" type="number" step="0.01" placeholder="产品成本/个" value="5.50" style="font-size:12px;flex:1">
+          <input id="qPackagingCost" class="form-control" type="number" step="0.01" placeholder="包装费/个" value="0.80" style="font-size:12px;flex:1">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input id="qInlandFreight" class="form-control" type="number" step="0.01" placeholder="内陆运费（总）" value="500" style="font-size:12px;flex:1">
+          <input id="qPortCharges" class="form-control" type="number" step="0.01" placeholder="港杂费（总）" value="800" style="font-size:12px;flex:1">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input id="qSeaFreight" class="form-control" type="number" step="0.01" placeholder="海运费（总）" value="3000" style="font-size:12px;flex:1">
+          <input id="qInsurance" class="form-control" type="number" step="0.01" placeholder="保险费（总）" value="200" style="font-size:12px;flex:1">
+        </div>
+        <div style="display:flex;gap:8px">
+          <input id="qTariffRate" class="form-control" type="number" step="0.1" placeholder="关税率%" value="5" style="font-size:12px;flex:1">
+          <input id="qProfitRate" class="form-control" type="number" step="0.1" placeholder="利润率%" value="25" style="font-size:12px;flex:1">
+        </div>
+      </div>
+    </div>
+    
+    <!-- 贸易术语和货币选择 -->
+    <div class="mt12 mb12" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <div class="text-xs text-muted mb6">贸易术语：</div>
+        <select id="qIncoterm" class="form-control" style="font-size:12px">
+          ${INCOTERMS.map(t=>`<option value="${t.id}" ${t.id==='FOB'?'selected':''}>${t.label}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div class="text-xs text-muted mb6">报价货币：</div>
+        <select id="qCurrency" class="form-control" style="font-size:12px">
+          ${CURRENCIES.map(c=>`<option value="${c.id}" ${c.id==='USD'?'selected':''}>${c.label}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div class="text-xs text-muted mb6">装运港：</div>
+        <input id="qPort" class="form-control" value="Yangjiang" style="font-size:12px;width:140px">
+      </div>
+      <div>
+        <div class="text-xs text-muted mb6">客户名称：</div>
+        <input id="qCustomer" class="form-control" placeholder="客户公司名" style="font-size:12px;width:180px">
+      </div>
+      <div>
+        <div class="text-xs text-muted mb6">有效期(天)：</div>
+        <input id="qValidDays" class="form-control" type="number" value="30" style="font-size:12px;width:80px">
+      </div>
+    </div>
+    
+    <!-- 操作按钮 -->
+    <div class="flex gap8 items-center">
+      <button class="btn" style="background:#805ad5;color:#fff" onclick="runCalculate()">🧮 计算报价</button>
+      <button class="btn btn-outline" onclick="document.getElementById('quoteResult').style.display='none';document.getElementById('piResult').style.display='none'">🗑️ 清空结果</button>
+      <span id="quoteStatus" class="text-sm text-muted"></span>
+    </div>
+    
+    <!-- 报价结果 -->
+    <div id="quoteResult" class="mt12" style="display:none">
+      <div class="text-xs text-muted mb6" style="color:#805ad5;font-weight:bold">📊 报价结果（4种贸易术语对比）</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="quoteCards">
+      </div>
+      <div class="mt8 text-xs text-muted" id="quoteBreakdown"></div>
+    </div>
+    
+    <!-- PI结果 -->
+    <div id="piResult" class="mt12" style="display:none">
+      <div class="text-xs text-muted mb6" style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:#805ad5;font-weight:bold">📄 PI 形式发票</span>
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 8px" onclick="copyPI(document.getElementById('piContent').textContent)">📋 复制PI</button>
+      </div>
+      <pre id="piContent" style="background:#faf5ff;padding:12px;border-radius:6px;font-size:11px;line-height:1.6;max-height:400px;overflow-y:auto;border:1px solid #d6bcfa;white-space:pre-wrap;font-family:monospace">
+      </pre>
+    </div>
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -6414,6 +6512,201 @@ function clearReplyHistory(){
   DB.save('replyHistory', S.replyHistory);
   viewTools(document.getElementById('mainContent'));
   toast('已清空分析历史');
+}
+
+/* V37 产品报价计算器与PI生成器 */
+const INCOTERMS = [
+  {id:'EXW',label:'EXW 工厂交货',desc:'卖方只需在工厂交货，买方承担全部运费和风险'},
+  {id:'FOB',label:'FOB 离岸价',desc:'卖方负责运到装运港船上，买方负责海运和保险'},
+  {id:'CIF',label:'CIF 到岸价',desc:'卖方负责运到目的港，含运费和保险'},
+  {id:'DDP',label:'DDP 完税后交货',desc:'卖方负责全部费用，包括目的地清关和关税'}
+];
+
+const CURRENCIES = [
+  {id:'USD',label:'USD 美元',symbol:'$',rate:7.25},
+  {id:'EUR',label:'EUR 欧元',symbol:'€',rate:7.85},
+  {id:'GBP',label:'GBP 英镑',symbol:'£',rate:9.15},
+  {id:'CNY',label:'CNY 人民币',symbol:'¥',rate:1}
+];
+
+/* 计算报价 */
+function calculateQuote(params){
+  const {productCost, packagingCost, inlandFreight, portCharges, seaFreight, insurance, tariffRate, profitRate, quantity, currency, incoterm} = params;
+  // 单位成本
+  const unitProductCost = Number(productCost) || 0;
+  const unitPackaging = Number(packagingCost) || 0;
+  const qty = Number(quantity) || 1;
+  // 总费用
+  const totalProduct = unitProductCost * qty;
+  const totalPackaging = unitPackaging * qty;
+  const totalInland = Number(inlandFreight) || 0;
+  const totalPort = Number(portCharges) || 0;
+  const totalSea = Number(seaFreight) || 0;
+  const totalInsurance = Number(insurance) || 0;
+  const tariff = Number(tariffRate) || 0;
+  const profit = Number(profitRate) || 0;
+  // 按贸易术语计算
+  let exwTotal = totalProduct + totalPackaging;
+  let fobTotal = exwTotal + totalInland + totalPort;
+  let cifTotal = fobTotal + totalSea + totalInsurance;
+  let ddpTotal = cifTotal + (cifTotal * tariff / 100);
+  // 加利润
+  const applyProfit = (val) => val * (1 + profit / 100);
+  exwTotal = applyProfit(exwTotal);
+  fobTotal = applyProfit(fobTotal);
+  cifTotal = applyProfit(cifTotal);
+  ddpTotal = applyProfit(ddpTotal);
+  // 单价
+  const exwUnit = exwTotal / qty;
+  const fobUnit = fobTotal / qty;
+  const cifUnit = cifTotal / qty;
+  const ddpUnit = ddpTotal / qty;
+  // 汇率换算
+  const cur = CURRENCIES.find(c=>c.id===currency) || CURRENCIES[0];
+  const rate = cur.rate;
+  return {
+    exw: {total: exwTotal/rate, unit: exwUnit/rate},
+    fob: {total: fobTotal/rate, unit: fobUnit/rate},
+    cif: {total: cifTotal/rate, unit: cifUnit/rate},
+    ddp: {total: ddpTotal/rate, unit: ddpUnit/rate},
+    currency: cur,
+    breakdown: {
+      product: totalProduct,
+      packaging: totalPackaging,
+      inland: totalInland,
+      port: totalPort,
+      sea: totalSea,
+      insurance: totalInsurance,
+      tariff: cifTotal * tariff / 100,
+      profit: (exwTotal + totalInland + totalPort + totalSea + totalInsurance) * profit / 100
+    }
+  };
+}
+
+/* 生成PI文本 */
+function generatePI(params, quote){
+  const {productName, model, material, spec, quantity, unit, incoterm, port, customer, validDays} = params;
+  const selected = quote[incoterm.toLowerCase()] || quote.fob;
+  const cur = quote.currency;
+  const total = selected.total.toFixed(2);
+  const unitPrice = selected.unit.toFixed(4);
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0];
+  const validDate = new Date(today.getTime() + (Number(validDays)||30)*24*60*60*1000).toISOString().split('T')[0];
+  const piNo = 'PI-' + today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0') + '-' + Math.floor(Math.random()*900+100);
+  return `PROFORMA INVOICE (形式发票)
+========================================
+PI No.: ${piNo}
+Date: ${dateStr}
+Valid Until: ${validDate}
+
+【卖方 SELLER】
+阳江市锴利国际贸易有限公司
+Yangjiang Kailion Crafts Co., Ltd.
+地址：广东省阳江市
+
+【买方 BUYER】
+${customer || '客户名称'}
+
+----------------------------------------
+【商品详情 PRODUCT DETAILS】
+----------------------------------------
+品名 Product: ${productName || '-'}
+型号 Model: ${model || '-'}
+材质 Material: ${material || '-'}
+规格 Spec: ${spec || '-'}
+数量 Quantity: ${quantity || 0} ${unit || 'pcs'}
+单价 Unit Price: ${cur.symbol}${unitPrice} (${incoterm} ${port || 'Yangjiang'})
+总价 Total Amount: ${cur.symbol}${total}
+
+----------------------------------------
+【贸易条款 TERMS】
+----------------------------------------
+贸易术语 Incoterm: ${incoterm}
+装运港 Port of Loading: ${port || 'Yangjiang, China'}
+付款方式 Payment: T/T 30% deposit, 70% balance before shipment
+交货期 Lead Time: 30-35 days after deposit
+
+【银行信息 BANK INFO】
+Beneficiary: Yangjiang Kailion Crafts Co., Ltd.
+Bank: [请填写银行名称]
+Account No.: [请填写账号]
+SWIFT: [请填写SWIFT代码]
+
+========================================
+本形式发票有效期至 ${validDate}，价格以最终确认为准。
+This PI is valid until ${validDate}. Prices subject to final confirmation.
+========================================`;
+}
+
+/* 复制PI */
+function copyPI(text){
+  navigator.clipboard.writeText(text).then(()=>toast('✅ PI已复制')).catch(()=>{
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('✅ PI已复制');
+  });
+}
+
+/* 执行报价计算 */
+function runCalculate(){
+  const params = {
+    productName: document.getElementById('qProductName').value,
+    model: document.getElementById('qModel').value,
+    material: document.getElementById('qMaterial').value,
+    spec: document.getElementById('qSpec').value,
+    quantity: document.getElementById('qQuantity').value,
+    unit: document.getElementById('qUnit').value,
+    productCost: document.getElementById('qProductCost').value,
+    packagingCost: document.getElementById('qPackagingCost').value,
+    inlandFreight: document.getElementById('qInlandFreight').value,
+    portCharges: document.getElementById('qPortCharges').value,
+    seaFreight: document.getElementById('qSeaFreight').value,
+    insurance: document.getElementById('qInsurance').value,
+    tariffRate: document.getElementById('qTariffRate').value,
+    profitRate: document.getElementById('qProfitRate').value,
+    currency: document.getElementById('qCurrency').value,
+    incoterm: document.getElementById('qIncoterm').value,
+    port: document.getElementById('qPort').value,
+    customer: document.getElementById('qCustomer').value,
+    validDays: document.getElementById('qValidDays').value
+  };
+  if(!params.quantity || Number(params.quantity)<=0){ toast('请输入有效数量'); return; }
+  const quote = calculateQuote(params);
+  const cur = quote.currency;
+  const status = document.getElementById('quoteStatus');
+  status.innerHTML = `<span style="color:#805ad5">✅ 计算完成！1${cur.label} = ¥${cur.rate}</span>`;
+  // 显示4种贸易术语报价卡片
+  const cards = [
+    {key:'exw',label:'EXW 工厂交货',color:'#718096',desc:'仅产品+包装'},
+    {key:'fob',label:'FOB 离岸价',color:'#3182ce',desc:'+内陆+港杂'},
+    {key:'cif',label:'CIF 到岸价',color:'#38a169',desc:'+海运+保险'},
+    {key:'ddp',label:'DDP 完税后',color:'#805ad5',desc:'+关税清关'}
+  ];
+  const selectedKey = params.incoterm.toLowerCase();
+  document.getElementById('quoteCards').innerHTML = cards.map(c=>{
+    const q = quote[c.key];
+    const isSelected = c.key === selectedKey;
+    return `<div style="padding:10px;border-radius:6px;border:2px solid ${isSelected?c.color:'#e2e8f0'};background:${isSelected?c.color+'10':'#fff'};text-align:center">
+      <div style="font-size:11px;font-weight:bold;color:${c.color}">${c.label}</div>
+      <div style="font-size:10px;color:#999;margin:2px 0">${c.desc}</div>
+      <div style="font-size:16px;font-weight:bold;color:${c.color};margin:4px 0">${cur.symbol}${q.unit.toFixed(4)}</div>
+      <div style="font-size:10px;color:#666">总价: ${cur.symbol}${q.total.toFixed(2)}</div>
+      ${isSelected?'<div style="font-size:10px;color:'+c.color+';margin-top:2px">✓ 当前选择</div>':''}
+    </div>`;
+  }).join('');
+  // 费用明细
+  const b = quote.breakdown;
+  document.getElementById('quoteBreakdown').innerHTML = `
+    <b>费用明细（人民币¥）：</b>
+    产品成本 ¥${b.product.toFixed(2)} + 包装费 ¥${b.packaging.toFixed(2)} + 内陆运费 ¥${b.inland.toFixed(2)} + 港杂费 ¥${b.port.toFixed(2)} + 海运费 ¥${b.sea.toFixed(2)} + 保险费 ¥${b.insurance.toFixed(2)} + 关税 ¥${b.tariff.toFixed(2)} + 利润 ¥${b.profit.toFixed(2)}
+  `;
+  document.getElementById('quoteResult').style.display = 'block';
+  // 生成PI
+  const piText = generatePI(params, quote);
+  document.getElementById('piContent').textContent = piText;
+  document.getElementById('piResult').style.display = 'block';
 }
 
 /* V20 端到端获客流水线 */

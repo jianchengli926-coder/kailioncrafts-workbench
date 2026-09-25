@@ -5565,6 +5565,75 @@ function viewTools(root){
     </div>` : ''}
   </div>
   
+  <!-- V36 AI客户回复分析与一键回复助手面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #319795;background:linear-gradient(135deg,#f0fdfa,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>💬 AI 客户回复分析与一键回复助手（8类回复智能分类 · 回复策略 · 英文草稿）</span>
+      <span class="badge" style="background:#319795;color:#fff">新功能 V36</span>
+    </div>
+    <p class="text-sm text-muted mb12">粘贴客户邮件/消息，AI自动分析回复类型、提取关键信息、评估意向等级、给出回复策略、一键生成英文回复草稿</p>
+    
+    <!-- 回复类型快速参考 -->
+    <div class="mb12" style="display:flex;gap:6px;flex-wrap:wrap">
+      ${REPLY_TYPES.map(t=>`<span class="badge" style="font-size:10px;background:${t.color}15;color:${t.color};border:1px solid ${t.color}40" title="${t.desc}">${t.label}</span>`).join('')}
+    </div>
+    
+    <!-- 客户回复输入 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">客户回复内容（粘贴客户邮件/WhatsApp消息/询盘内容）：</div>
+      <textarea id="replyInput" class="form-control" rows="5" placeholder="粘贴客户回复内容，例如：&#10;Dear Leo,&#10;Thank you for your quotation. The price is a bit high for us. Can you offer better price for 5000pcs? Also we need samples first.&#10;Best regards,&#10;Michael" style="font-family:monospace;font-size:12px"></textarea>
+    </div>
+    
+    <!-- 业务背景 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">业务背景（可选，帮助AI更准确分析）：</div>
+      <input id="replyContext" class="form-control" placeholder="例如：客户是美国分销商，之前询过厨房剪刀，目标价USD1.50" value="">
+    </div>
+    
+    <!-- 快速示例 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">快速填充示例：</div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        <span class="badge" style="cursor:pointer;background:#f0fdfa;color:#319795;border:1px solid #81e6d9;font-size:11px" onclick="document.getElementById('replyInput').value='Dear Leo,\nThank you for your quotation. The price is a bit high for us. Can you offer better price for 5000pcs? Also we need samples first.\nBest regards,\nMichael'">💰 还价+样品</span>
+        <span class="badge" style="cursor:pointer;background:#f0fdfa;color:#319795;border:1px solid #81e6d9;font-size:11px" onclick="document.getElementById('replyInput').value='Hi,\nI am interested in your kitchen scissors. Please send me your catalog and best price for 1000pcs. Also what is your MOQ and lead time?\nThanks,\nSarah'">🔍 询价</span>
+        <span class="badge" style="cursor:pointer;background:#f0fdfa;color:#319795;border:1px solid #81e6d9;font-size:11px" onclick="document.getElementById('replyInput').value='Dear Leo,\nWe have received the samples. The quality is good. Please send us PI for 2000pcs of model KS-001. We will arrange deposit after confirmation.\nBest,\nDavid'">✅ 下单意向</span>
+        <span class="badge" style="cursor:pointer;background:#f0fdfa;color:#319795;border:1px solid #81e6d9;font-size:11px" onclick="document.getElementById('replyInput').value='Hi Leo,\nSorry, your price is too high. We found another supplier with lower price. Thank you anyway.\nRegards,\nTom'">❌ 拒绝</span>
+      </div>
+    </div>
+    
+    <!-- 分析按钮 -->
+    <div class="flex gap8 items-center">
+      <button id="replyBtn" class="btn" style="background:#319795;color:#fff" onclick="runReplyAnalysis()">🔍 AI分析并生成回复</button>
+      <button class="btn btn-outline" onclick="document.getElementById('replyInput').value='';document.getElementById('replyContext').value='';document.getElementById('replyResult').style.display='none'">🗑️ 清空</button>
+      <span id="replyStatus" class="text-sm text-muted"></span>
+    </div>
+    
+    <!-- 分析结果 -->
+    <div id="replyResult" class="mt12" style="display:none">
+      <div class="text-xs text-muted mb6" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📊 AI分析结果：</span>
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 8px" onclick="copyReply(document.getElementById('replyResultContent').innerText)">📋 复制全部</button>
+      </div>
+      <div id="replyResultContent" style="background:#f0fdfa;padding:12px;border-radius:6px;font-size:13px;line-height:1.8;max-height:500px;overflow-y:auto;border:1px solid #81e6d9">
+      </div>
+    </div>
+    
+    <!-- 历史记录 -->
+    ${(S.replyHistory && S.replyHistory.length) ? `
+    <div class="mt16">
+      <div class="text-xs text-muted mb6" style="display:flex;justify-content:space-between">
+        <span>📜 分析历史（最近${Math.min(S.replyHistory.length,10)}条）</span>
+        <span style="cursor:pointer;color:#319795" onclick="clearReplyHistory()">清空</span>
+      </div>
+      <div style="max-height:200px;overflow-y:auto">
+        ${S.replyHistory.slice(0,10).map(h=>`<div style="padding:8px;background:#f0fdfa;border-radius:4px;margin-bottom:6px;cursor:pointer;border-left:3px solid #319795" onclick="showReplyHistory('${h.id}')">
+          <div class="text-xs" style="color:#666">${h.latency}ms · ${h.model}</div>
+          <div style="font-size:12px;color:#333;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.msg.slice(0,80)}...</div>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -6203,6 +6272,148 @@ function clearTranslateHistory(){
   DB.save('translateHistory', S.translateHistory);
   viewTools(document.getElementById('mainContent'));
   toast('已清空翻译历史');
+}
+
+/* V36 AI客户回复分析与一键回复助手 */
+const REPLY_TYPES = [
+  {id:'inquiry',label:'🔍 询价',color:'#3182ce',desc:'客户询问产品价格、规格、MOQ等'},
+  {id:'negotiation',label:'💰 还价',color:'#dd6b20',desc:'客户对价格、付款方式、交期提出异议'},
+  {id:'sample',label:'📦 样品请求',color:'#38a169',desc:'客户要求寄送样品或询问样品政策'},
+  {id:'order',label:'✅ 下单意向',color:'#805ad5',desc:'客户表达下单意向或确认订单细节'},
+  {id:'reject',label:'❌ 拒绝/已读不回',color:'#e53e3e',desc:'客户拒绝报价或长时间未回复'},
+  {id:'followup',label:'📞 跟进询问',color:'#319795',desc:'客户询问订单进度、样品状态、发货情况'},
+  {id:'complaint',label:'⚠️ 投诉/问题',color:'#d69e2e',desc:'客户对产品质量、交期、服务提出投诉'},
+  {id:'other',label:'📋 其他',color:'#718096',desc:'节日问候、公司介绍、其他商务沟通'}
+];
+
+/* 分析客户回复 */
+async function analyzeReply(customerMsg, context){
+  if(!customerMsg || !customerMsg.trim()) return {error:'请输入客户回复内容'};
+  const prompt = `你是资深外贸业务专家。请分析以下客户回复，并给出专业的回复策略。
+
+【客户回复内容】
+${customerMsg}
+
+【业务背景（可选）】
+${context || '五金刀剪产品出口，主营厨房剪刀、厨师刀、美容工具等，FOB阳江，MOQ1000起'}
+
+请按以下格式输出分析结果：
+
+## 一、回复类型判断
+- 类型：（询价/还价/样品请求/下单意向/拒绝/跟进询问/投诉/其他）
+- 置信度：（高/中/低）
+- 客户情绪：（积极/中性/消极/紧急）
+
+## 二、关键信息提取
+- 关注产品：
+- 询问数量：
+- 目标价格：
+- 时间要求：
+- 核心关注点：（价格/质量/交期/认证/付款方式/样品）
+- 隐含需求：
+
+## 三、客户意向评估
+- 意向等级：（A-高意向/B-中意向/C-低意向/D-无意向）
+- 评估理由：
+- 成交概率：（百分比）
+- 建议优先级：（立即回复/24小时内/48小时内/可暂缓）
+
+## 四、回复策略建议
+- 回复要点：（3-5条）
+- 推荐话术风格：（专业/友好/紧迫/让步）
+- 需要准备的资料：
+- 注意事项/避坑提示：
+
+## 五、推荐回复草稿
+（用中文写出回复草稿的要点，然后用英文写出完整的英文回复邮件，语气专业、简洁、有说服力，不超过150词）
+
+## 六、后续跟进计划
+- 本次回复后预期：
+- 下一步动作：
+- 跟进时间点：`;
+  const result = await callAI([{role:'user',content:prompt}], {purpose:'reply_analysis', temperature:0.3});
+  if(result.error) return {error:result.error};
+  // 保存历史
+  if(!S.replyHistory) S.replyHistory = [];
+  S.replyHistory.unshift({id:uid(),msg:customerMsg,context:context,result:result.content,t:Date.now(),model:result.model,latency:result.latency});
+  if(S.replyHistory.length>30) S.replyHistory = S.replyHistory.slice(0,30);
+  DB.save('replyHistory', S.replyHistory);
+  return {content:result.content, model:result.model, latency:result.latency};
+}
+
+/* 复制回复内容 */
+function copyReply(text){
+  navigator.clipboard.writeText(text).then(()=>toast('✅ 已复制')).catch(()=>{
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('✅ 已复制');
+  });
+}
+
+/* 客户回复分析 - 执行分析 */
+async function runReplyAnalysis(){
+  const msg = document.getElementById('replyInput').value.trim();
+  const context = document.getElementById('replyContext').value.trim();
+  if(!msg){ toast('请输入客户回复内容'); return; }
+  const btn = document.getElementById('replyBtn');
+  const status = document.getElementById('replyStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ 分析中...';
+  status.textContent = 'AI正在深度分析客户回复，请稍候...';
+  const result = await analyzeReply(msg, context);
+  btn.disabled = false;
+  btn.textContent = '🔍 AI分析并生成回复';
+  if(result.error){
+    status.innerHTML = '<span style="color:#e53e3e">❌ '+result.error+'</span>';
+    return;
+  }
+  status.innerHTML = `<span style="color:#319795">✅ 分析完成！${result.latency}ms · ${result.model}</span>`;
+  const resultDiv = document.getElementById('replyResult');
+  const resultContent = document.getElementById('replyResultContent');
+  resultDiv.style.display = 'block';
+  // 简单的markdown渲染
+  let html = result.content
+    .replace(/^### (.*$)/gm, '<h4 style="color:#319795;margin:12px 0 6px;font-size:14px">$1</h4>')
+    .replace(/^## (.*$)/gm, '<h3 style="color:#319795;margin:16px 0 8px;font-size:15px;border-bottom:1px solid #e2e8f0;padding-bottom:4px">$1</h3>')
+    .replace(/^- (.*$)/gm, '<div style="margin:4px 0;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:#319795">•</span>$1</div>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+  resultContent.innerHTML = html;
+  // 刷新历史
+  setTimeout(()=>viewTools(document.getElementById('mainContent')), 500);
+}
+
+/* 客户回复分析 - 显示历史 */
+function showReplyHistory(id){
+  const item = (S.replyHistory||[]).find(h=>h.id===id);
+  if(!item) return;
+  let html = item.result
+    .replace(/^### (.*$)/gm, '<h4 style="color:#319795;margin:12px 0 6px;font-size:14px">$1</h4>')
+    .replace(/^## (.*$)/gm, '<h3 style="color:#319795;margin:16px 0 8px;font-size:15px;border-bottom:1px solid #e2e8f0;padding-bottom:4px">$1</h3>')
+    .replace(/^- (.*$)/gm, '<div style="margin:4px 0;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:#319795">•</span>$1</div>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+  openModal(`
+    <div class="modal-head"><h3>💬 客户回复分析报告</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="text-xs text-muted mb6">模型：${item.model} · 耗时：${item.latency}ms</div>
+      <div class="text-xs text-muted mb6" style="background:#f8fafc;padding:8px;border-radius:4px">客户回复：${item.msg.slice(0,200)}${item.msg.length>200?'...':''}</div>
+      <div style="font-size:13px;line-height:1.8;max-height:400px;overflow-y:auto">${html}</div>
+      <div class="flex gap8 mt12">
+        <button class="btn" style="background:#319795;color:#fff" onclick="copyReply(document.querySelector('#modalRoot .modal-body div:nth-child(3)').innerText);closeModal()">📋 复制报告</button>
+      </div>
+    </div>
+  `);
+}
+
+/* 客户回复分析 - 清空历史 */
+function clearReplyHistory(){
+  if(!confirm('确定清空所有分析历史？')) return;
+  S.replyHistory = [];
+  DB.save('replyHistory', S.replyHistory);
+  viewTools(document.getElementById('mainContent'));
+  toast('已清空分析历史');
 }
 
 /* V20 端到端获客流水线 */

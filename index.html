@@ -2887,6 +2887,7 @@ function getReplyRate(){
 
 
 /* V62 标签云统计函数 */
+/* V74 修复：显示客户实际使用的所有标签（包括不在预设列表中的），支持模糊匹配预设标签颜色 */
 function getTagCloudHTML(){
   const tagCounts = {};
   S.customers.forEach(c=>{
@@ -2895,10 +2896,28 @@ function getTagCloudHTML(){
     });
   });
   
-  const tagsWithCount = PRESET_TAGS.map(t=>({
-    ...t,
-    count: tagCounts[t.label] || 0
-  })).filter(t=>t.count > 0).sort((a,b)=>b.count - a.count);
+  // 辅助函数：去掉emoji，用于模糊匹配
+  const stripEmoji = (s) => String(s||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim();
+  
+  // 预设标签颜色映射（支持精确匹配和去掉emoji后的模糊匹配）
+  const presetColorMap = {};
+  PRESET_TAGS.forEach(t => {
+    presetColorMap[t.label] = t.color;
+    const stripped = stripEmoji(t.label);
+    if(stripped && !presetColorMap[stripped]) presetColorMap[stripped] = t.color;
+  });
+  
+  // 默认颜色列表（用于不在预设列表中的标签）
+  const defaultColors = ['#e53e3e','#dd6b20','#d69e2e','#38a169','#3182ce','#805ad5','#00a3c4','#718096','#d53f8c','#0bc5ea'];
+  
+  // 构建所有使用中的标签列表（客户实际使用的标签，而不仅是预设标签）
+  const tagsWithCount = Object.entries(tagCounts).map(([label, count], idx) => {
+    // 尝试匹配预设标签颜色
+    let color = presetColorMap[label] || presetColorMap[stripEmoji(label)];
+    // 如果没有匹配到，使用默认颜色
+    if(!color) color = defaultColors[idx % defaultColors.length];
+    return { label, count, color };
+  }).sort((a,b) => b.count - a.count);
   
   if(!tagsWithCount.length){
     return '<div class="text-sm text-muted" style="padding:10px">暂无标签数据，在客户详情页添加标签后这里会显示统计</div>';

@@ -2400,6 +2400,65 @@ function initNotifications(){
   }
 }
 
+
+
+/* V55 客户跟进SOP流程 */
+const SOP_STEPS = [
+  {step:1, name:'初次接触', icon:'✉️', action:'发送开发信', tip:'发送个性化开发信，突出产品优势和客户价值，建议在工作日上午9-10点发送', key:'draft'},
+  {step:2, name:'客户回复', icon:'💬', action:'及时回复', tip:'客户回复后24小时内必须回复，先感谢再回答问题，保持专业友好', key:'reply'},
+  {step:3, name:'需求确认', icon:'🔍', action:'了解需求', tip:'通过提问确认客户需求：产品规格、数量、目标价格、交货时间、认证要求', key:'needs'},
+  {step:4, name:'报价', icon:'💰', action:'发送报价', tip:'根据客户需求制作专业报价单，包含价格、MOQ、交货期、付款方式、有效期', key:'quote'},
+  {step:5, name:'样品', icon:'📦', action:'安排样品', tip:'客户确认价格后安排样品，样品费可谈，寄送后提供跟踪号并跟进签收', key:'sample'},
+  {step:6, name:'订单', icon:'📝', action:'确认订单', tip:'客户确认样品后，发送PI形式发票，确认付款方式和交货期，收到定金后排产', key:'order'},
+  {step:7, name:'售后', icon:'🤝', action:'维护关系', tip:'订单完成后定期回访，了解产品使用情况，推荐新品，维护长期合作关系', key:'after'}
+];
+
+function getSOPSteps(cid){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c) return '';
+  const currentStep = c.sopStep || 0;
+  return SOP_STEPS.map((s, i) => {
+    const isDone = i < currentStep;
+    const isCurrent = i === currentStep;
+    const bgColor = isDone ? 'var(--green)' : isCurrent ? 'var(--primary)' : '#e2e8f0';
+    const textColor = isDone || isCurrent ? '#fff' : '#64748b';
+    return `
+      <div style="flex:1;min-width:80px;text-align:center;cursor:pointer" onclick="showSOPTip('${cid}',${i})">
+        <div style="width:32px;height:32px;border-radius:50%;background:${bgColor};color:${textColor};display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:14px;font-weight:bold">${isDone?'✓':s.step}</div>
+        <div class="text-xs" style="margin-top:4px;color:${isCurrent?'var(--primary)':'#64748b'};font-weight:${isCurrent?'bold':'normal'}">${s.name}</div>
+      </div>
+      ${i < SOP_STEPS.length-1 ? '<div style="width:12px;height:2px;background:#e2e8f0"></div>' : ''}
+    `;
+  }).join('');
+}
+
+function showSOPTip(cid, stepIndex){
+  const s = SOP_STEPS[stepIndex];
+  const tipEl = document.getElementById(`sopTip_${cid}`);
+  if(tipEl){
+    tipEl.innerHTML = `
+      <div style="background:#f0f4f8;padding:10px;border-radius:8px;margin-top:4px">
+        <b>${s.icon} 第${s.step}步：${s.name} - ${s.action}</b><br>
+        <span style="color:#475569">${s.tip}</span>
+        <div style="margin-top:8px">
+          <button class="btn btn-primary btn-sm" onclick="markSOPStep('${cid}',${stepIndex})">✅ 标记已完成</button>
+          <button class="btn btn-outline btn-sm" onclick="recordFollowUp('${cid}')">📅 记录本次跟进</button>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function markSOPStep(cid, stepIndex){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c) return;
+  c.sopStep = stepIndex + 1;
+  persist();
+  toast(`✅ 已标记第${stepIndex+1}步完成，进入第${stepIndex+2}步`);
+  logAction('followup', 'SOP流程推进', `${c.company}推进到第${stepIndex+2}步`);
+  openCustomerDetail(cid);
+}
+
 function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
@@ -3910,6 +3969,20 @@ function openCustomerDetail(cid){
           <button class="btn btn-outline btn-sm" style="font-size:12px;padding:8px 6px;background:#fff" onclick="generateCustomerProfile('${cid}')">🤖 AI画像</button>
           <button class="btn btn-outline btn-sm" style="font-size:12px;padding:8px 6px;background:#fff" onclick="generateReplySuggestion('${cid}')">💡 回复建议</button>
           <button class="btn btn-outline btn-sm" style="font-size:12px;padding:8px 6px;background:#fff" onclick="copyText('${esc(c.company)} - ${esc(c.contact.email)} - ${esc(c.website)}')">📋 复制信息</button>
+        </div>
+      </div>
+
+      <!-- V55 客户跟进SOP流程引导 -->
+      <div class="card card-pad mb16" style="border-left:4px solid var(--primary)">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📋 客户跟进SOP流程</span>
+          <span class="text-sm text-muted">标准7步跟进法</span>
+        </div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:8px">
+          ${getSOPSteps(cid)}
+        </div>
+        <div class="text-sm text-muted mt8" id="sopTip_${cid}" style="line-height:1.6">
+          💡 点击上方步骤查看操作指引，按标准流程跟进可提高30%回复率
         </div>
       </div>
 

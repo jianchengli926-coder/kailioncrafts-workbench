@@ -2605,6 +2605,202 @@ function showShortcutHelp(){
   `);
 }
 
+
+
+/* V60 客户沟通记录AI自动总结 */
+function generateCommSummary(cid){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c) return;
+  const comms = getCustomerCommunications(cid);
+  if(!comms.length){
+    toast('暂无沟通记录，无法生成总结');
+    return;
+  }
+  
+  // 本地智能总结（不依赖AI API）
+  const summary = buildLocalCommSummary(c, comms);
+  
+  openModal(`
+    <div class="modal-head">
+      <h3>📊 AI沟通总结 - ${esc(c.company)}</h3>
+      <span class="modal-close" onclick="closeModal()">×</span>
+    </div>
+    <div class="modal-body">
+      <div style="background:linear-gradient(135deg,#ebf8ff,#bee3f8);padding:16px;border-radius:10px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="text-sm text-muted">客户意向等级</div>
+            <div style="font-size:28px;font-weight:800;color:${summary.intentColor}">${summary.intentLevel}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="text-sm text-muted">沟通记录</div>
+            <div style="font-size:24px;font-weight:700">${comms.length} 条</div>
+          </div>
+        </div>
+        <div class="text-sm mt8" style="color:#2c5282">${summary.intentDesc}</div>
+      </div>
+      
+      <div class="card card-pad mb16">
+        <div class="card-title">🎯 客户需求与痛点</div>
+        <div style="line-height:2">
+          ${summary.needs.map(n=>`<div style="display:flex;gap:8px"><span style="color:#3182ce">▸</span><span>${n}</span></div>`).join('')}
+        </div>
+      </div>
+      
+      <div class="card card-pad mb16">
+        <div class="card-title">💡 关键信息提取</div>
+        <div class="grid-2" style="gap:10px">
+          ${summary.keyInfo.map(k=>`
+            <div style="background:#f7fafc;padding:10px;border-radius:6px;border-left:3px solid #c9a961">
+              <div class="text-xs text-muted">${k.label}</div>
+              <div class="text-sm mt4" style="font-weight:600">${k.value}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      
+      <div class="card card-pad mb16">
+        <div class="card-title">📅 沟通时间线摘要</div>
+        <div style="max-height:150px;overflow-y:auto">
+          ${summary.timeline.map(t=>`
+            <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #f1f5f9">
+              <span class="text-xs text-muted" style="min-width:80px">${t.date}</span>
+              <span class="badge" style="font-size:10px;min-width:60px;text-align:center">${t.type}</span>
+              <span class="text-sm" style="flex:1">${t.content}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      
+      <div class="card card-pad" style="background:linear-gradient(135deg,#fefcbf,#fef3c7);border:none">
+        <div class="card-title">🚀 下一步行动建议</div>
+        <div style="line-height:2.2">
+          ${summary.actions.map((a,i)=>`<div style="display:flex;gap:10px"><span style="background:#c9a961;color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;flex-shrink:0">${i+1}</span><span>${a}</span></div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="copyCommSummary('${cid}')">📋 复制总结</button>
+      <button class="btn btn-primary" onclick="closeModal()">知道了</button>
+    </div>
+  `);
+  logAction('ai', 'AI沟通总结', `为客户${c.company}生成沟通总结`);
+}
+
+function buildLocalCommSummary(c, comms){
+  // 分析沟通类型分布
+  const typeCount = {};
+  comms.forEach(r=>{ typeCount[r.type] = (typeCount[r.type]||0)+1; });
+  
+  // 判断意向等级
+  let intentLevel = '低意向';
+  let intentColor = '#718096';
+  let intentDesc = '客户处于初步接触阶段，需要持续培育和跟进';
+  
+  const hasQuote = comms.some(r=>r.type==='报价' || r.content.includes('报价') || r.content.includes('quote') || r.content.includes('price'));
+  const hasSample = comms.some(r=>r.type==='样品' || r.content.includes('样品') || r.content.includes('sample'));
+  const hasMeeting = comms.some(r=>r.type==='会议' || r.type==='电话' || r.content.includes('电话') || r.content.includes('call'));
+  const hasOrder = comms.some(r=>r.content.includes('订单') || r.content.includes('order') || r.content.includes('PO'));
+  
+  if(hasOrder){
+    intentLevel = '已成交';
+    intentColor = '#38a169';
+    intentDesc = '客户已经下单，重点做好订单跟进和售后服务，争取复购和转介绍';
+  } else if(hasSample){
+    intentLevel = '高意向';
+    intentColor = '#dd6b20';
+    intentDesc = '客户已经索要样品，意向强烈，重点跟进样品测试反馈，推动报价和订单';
+  } else if(hasQuote){
+    intentLevel = '中高意向';
+    intentColor = '#d69e2e';
+    intentDesc = '客户已经询问报价，有明确采购意向，重点跟进报价反馈，提供样品促进成交';
+  } else if(hasMeeting){
+    intentLevel = '中意向';
+    intentColor = '#3182ce';
+    intentDesc = '客户愿意深入沟通，有一定兴趣，需要进一步挖掘需求，推动到报价阶段';
+  } else if(comms.length >= 3){
+    intentLevel = '低中意向';
+    intentColor = '#805ad5';
+    intentDesc = '客户有多次互动，但尚未进入实质阶段，需要加强价值传递，激发采购兴趣';
+  }
+  
+  // 提取客户需求
+  const needs = [];
+  const allContent = comms.map(r=>r.content).join(' ');
+  if(allContent.includes('价格') || allContent.includes('price') || allContent.includes('报价')) needs.push('关注产品价格和成本控制');
+  if(allContent.includes('质量') || allContent.includes('quality') || allContent.includes('认证')) needs.push('重视产品质量和认证资质');
+  if(allContent.includes('交期') || allContent.includes('delivery') || allContent.includes('发货')) needs.push('关注交货周期和物流时效');
+  if(allContent.includes('样品') || allContent.includes('sample')) needs.push('需要样品测试验证产品');
+  if(allContent.includes('定制') || allContent.includes('OEM') || allContent.includes('ODM')) needs.push('有定制化需求，需要OEM/ODM服务');
+  if(allContent.includes('包装') || allContent.includes('package')) needs.push('关注产品包装和品牌展示');
+  if(needs.length === 0) needs.push('需要进一步沟通挖掘具体需求');
+  
+  // 关键信息
+  const keyInfo = [];
+  keyInfo.push({label:'沟通总次数', value:comms.length + ' 次'});
+  keyInfo.push({label:'首次沟通', value:new Date(comms[0].createdAt).toLocaleDateString('zh-CN')});
+  keyInfo.push({label:'最近沟通', value:new Date(comms[comms.length-1].createdAt).toLocaleDateString('zh-CN')});
+  const typeLabels = {'邮件':'📧 邮件','电话':'📞 电话','会议':'🤝 会议','WhatsApp':'💬 WhatsApp','领英':'💼 领英','报价':'💰 报价','样品':'📦 样品','其他':'📌 其他'};
+  const mainType = Object.keys(typeCount).sort((a,b)=>typeCount[b]-typeCount[a])[0];
+  keyInfo.push({label:'主要沟通方式', value:typeLabels[mainType] || mainType});
+  keyInfo.push({label:'客户等级', value:(c.scores&&c.scores.grade?c.scores.grade+'级':'未评级')});
+  keyInfo.push({label:'客户状态', value:c.status || '未知'});
+  
+  // 沟通时间线
+  const timeline = comms.slice(-5).reverse().map(r=>{
+    const type = COMM_TYPES.find(t=>t.id===r.type) || COMM_TYPES[7];
+    const date = new Date(r.createdAt);
+    return {
+      date: (date.getMonth()+1)+'/'+date.getDate(),
+      type: type.label,
+      content: r.content.substring(0, 40) + (r.content.length>40?'...':'')
+    };
+  });
+  
+  // 下一步行动建议
+  const actions = [];
+  if(hasOrder){
+    actions.push('做好订单生产进度跟踪，及时向客户汇报生产情况');
+    actions.push('安排发货并提供物流跟踪信息');
+    actions.push('收货后主动回访，了解产品使用反馈，争取复购');
+  } else if(hasSample){
+    actions.push('跟进样品签收情况，确认客户已收到样品');
+    actions.push('样品签收后3天内主动询问测试反馈');
+    actions.push('根据反馈提供正式报价，推动订单成交');
+  } else if(hasQuote){
+    actions.push('报价后3天内跟进客户对报价的反馈');
+    actions.push('针对客户关注点提供更详细的产品资料和案例');
+    actions.push('主动提供免费样品，降低客户决策门槛');
+  } else if(hasMeeting){
+    actions.push('整理会议纪要，发送给客户确认');
+    actions.push('根据客户需求准备针对性的产品方案和报价');
+    actions.push('安排下一步产品演示或样品寄送');
+  } else {
+    actions.push('发送个性化开发信，突出产品优势和客户价值');
+    actions.push('通过多渠道（邮件+WhatsApp+领英）触达客户');
+    actions.push('提供行业案例和客户证言，建立信任');
+  }
+  actions.push('设置下次跟进提醒，保持持续跟进节奏');
+  
+  return {intentLevel, intentColor, intentDesc, needs, keyInfo, timeline, actions};
+}
+
+function copyCommSummary(cid){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c) return;
+  const comms = getCustomerCommunications(cid);
+  const summary = buildLocalCommSummary(c, comms);
+  let text = `【${c.company}】沟通总结\n\n`;
+  text += `意向等级：${summary.intentLevel}\n`;
+  text += `沟通次数：${comms.length}次\n\n`;
+  text += `【客户需求与痛点】\n`;
+  summary.needs.forEach(n=>{ text += `• ${n}\n`; });
+  text += `\n【下一步行动建议】\n`;
+  summary.actions.forEach((a,i)=>{ text += `${i+1}. ${a}\n`; });
+  copyText(text);
+  toast('✅ 沟通总结已复制');
+}
+
 function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
@@ -4278,6 +4474,7 @@ function openCustomerDetail(cid){
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
           <span>📝 沟通记录时间线</span>
           <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="generateCommSummary('${cid}')" style="font-size:11px">📊 AI沟通总结</button>
             <button class="btn btn-outline btn-sm" onclick="generateReplySuggestion('${cid}')" style="font-size:11px">🤖 AI回复建议</button>
             <button class="btn btn-gold btn-sm" onclick="openAddCommunication('${cid}')">➕ 添加记录</button>
           </div>

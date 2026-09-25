@@ -5732,6 +5732,108 @@ function viewTools(root){
     </div>
   </div>
   
+  <!-- V38 订单管理与生产跟踪面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #3182ce;background:linear-gradient(135deg,#ebf8ff,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📦 订单管理与生产跟踪（6阶段进度 · 物流跟踪 · 收款记录 · 交货期预警）</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="badge" style="background:#3182ce;color:#fff">新功能 V38</span>
+        <button class="btn" style="background:#3182ce;color:#fff;font-size:12px;padding:4px 12px" onclick="openAddOrder()">➕ 新增订单</button>
+      </div>
+    </div>
+    <p class="text-sm text-muted mb12">从发PI到订单完成全流程管理，6阶段生产进度跟踪，物流信息记录，收款登记，交货期智能预警</p>
+    
+    <!-- 订单统计 -->
+    ${(() => {
+      const orders = S.orders || [];
+      const totalAmount = orders.reduce((sum,o)=>sum+Number(o.amount||0),0);
+      const pendingCount = orders.filter(o=>o.stage==='pending').length;
+      const productionCount = orders.filter(o=>['production','qc','ready'].includes(o.stage)).length;
+      const shippedCount = orders.filter(o=>o.stage==='shipped').length;
+      const completedCount = orders.filter(o=>o.stage==='completed').length;
+      const overdueCount = orders.filter(o=>{
+        if(!o.deliveryDate || o.stage==='completed') return false;
+        return new Date(o.deliveryDate) < new Date();
+      }).length;
+      return `<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px">
+        <div style="text-align:center;padding:10px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:20px;font-weight:bold;color:#3182ce">${orders.length}</div>
+          <div style="font-size:11px;color:#666">全部订单</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:20px;font-weight:bold;color:#2b6cb0">$${totalAmount.toFixed(0)}</div>
+          <div style="font-size:11px;color:#666">总金额</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:20px;font-weight:bold;color:#718096">${pendingCount}</div>
+          <div style="font-size:11px;color:#666">待确认</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:20px;font-weight:bold;color:#d69e2e">${productionCount}</div>
+          <div style="font-size:11px;color:#666">生产中</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:20px;font-weight:bold;color:#38a169">${shippedCount+completedCount}</div>
+          <div style="font-size:11px;color:#666">已发货/完成</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:${overdueCount>0?'#fff5f5':'#fff'};border-radius:6px;border:1px solid ${overdueCount>0?'#feb2b2':'#e2e8f0'}">
+          <div style="font-size:20px;font-weight:bold;color:${overdueCount>0?'#e53e3e':'#38a169'}">${overdueCount}</div>
+          <div style="font-size:11px;color:#666">交货期逾期</div>
+        </div>
+      </div>`;
+    })()}
+    
+    <!-- 6阶段进度条 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">🏭 生产阶段流转</div>
+      <div style="display:flex;gap:4px;align-items:center">
+        ${ORDER_STAGES.map((s,i)=>`
+          <div style="flex:1;text-align:center;padding:8px 4px;border-radius:6px;background:${s.color}10;border:1px solid ${s.color}30">
+            <div style="font-size:18px">${s.icon}</div>
+            <div style="font-size:11px;color:${s.color};font-weight:bold">${s.label}</div>
+          </div>
+          ${i<ORDER_STAGES.length-1?'<div style="color:#cbd5e0;font-size:16px">→</div>':''}
+        `).join('')}
+      </div>
+    </div>
+    
+    <!-- 订单列表 -->
+    <div>
+      <div class="text-xs text-muted mb6">📋 订单列表（点击查看详情）</div>
+      ${(S.orders && S.orders.length) ? `
+        <div style="max-height:400px;overflow-y:auto">
+          ${S.orders.map(o=>{
+            const stage = ORDER_STAGES.find(s=>s.id===o.stage) || ORDER_STAGES[0];
+            const deliveryStatus = getDeliveryStatus(o.deliveryDate);
+            const totalPaid = (o.payments||[]).reduce((sum,p)=>sum+Number(p.amount||0),0);
+            const unpaid = Number(o.amount||0) - totalPaid;
+            return `<div style="padding:10px;background:#fff;border-radius:6px;margin-bottom:8px;border:1px solid #e2e8f0;cursor:pointer;border-left:3px solid ${stage.color}" onclick="viewOrderDetail('${o.id}')">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="flex:1">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <b style="font-size:13px">${o.customer}</b>
+                    <span class="badge" style="background:${stage.color};color:#fff;font-size:10px;padding:2px 6px">${stage.icon} ${stage.label}</span>
+                    ${deliveryStatus.color==='#e53e3e'?`<span class="badge" style="background:#e53e3e;color:#fff;font-size:10px;padding:2px 6px">⚠️ ${deliveryStatus.label}</span>`:''}
+                  </div>
+                  <div class="text-xs text-muted" style="margin-top:4px">${o.product} × ${o.quantity} · $${Number(o.amount||0).toFixed(2)} · ${o.incoterm||'-'}</div>
+                </div>
+                <div style="text-align:right;min-width:120px">
+                  <div class="text-xs" style="color:${unpaid>0?'#e53e3e':'#38a169'}">${unpaid>0?'待收 $'+unpaid.toFixed(0):'已收清'}</div>
+                  <div class="text-xs text-muted" style="margin-top:2px">交货: ${o.deliveryDate||'-'}</div>
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      ` : `
+        <div style="text-align:center;padding:40px;color:#999">
+          <div style="font-size:40px;margin-bottom:8px">📦</div>
+          <div>暂无订单，点击「➕ 新增订单」开始管理订单</div>
+        </div>
+      `}
+    </div>
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -6707,6 +6809,256 @@ function runCalculate(){
   const piText = generatePI(params, quote);
   document.getElementById('piContent').textContent = piText;
   document.getElementById('piResult').style.display = 'block';
+}
+
+/* V38 订单管理与生产跟踪 */
+const ORDER_STAGES = [
+  {id:'pending',label:'待确认',color:'#718096',icon:'📋'},
+  {id:'production',label:'生产中',color:'#3182ce',icon:'🏭'},
+  {id:'qc',label:'质检中',color:'#d69e2e',icon:'🔍'},
+  {id:'ready',label:'待发货',color:'#805ad5',icon:'📦'},
+  {id:'shipped',label:'已发货',color:'#38a169',icon:'🚢'},
+  {id:'completed',label:'已完成',color:'#38a169',icon:'✅'}
+];
+
+/* 初始化订单数据 */
+if(!S.orders) S.orders = [];
+
+/* 添加订单 */
+function addOrder(order){
+  if(!S.orders) S.orders = [];
+  order.id = order.id || uid();
+  order.createdAt = order.createdAt || Date.now();
+  order.stage = order.stage || 'pending';
+  order.payments = order.payments || [];
+  S.orders.unshift(order);
+  DB.save('orders', S.orders);
+  return order;
+}
+
+/* 更新订单 */
+function updateOrder(id, updates){
+  const idx = S.orders.findIndex(o=>o.id===id);
+  if(idx>=0){
+    S.orders[idx] = {...S.orders[idx], ...updates};
+    DB.save('orders', S.orders);
+    return S.orders[idx];
+  }
+  return null;
+}
+
+/* 删除订单 */
+function deleteOrder(id){
+  S.orders = S.orders.filter(o=>o.id!==id);
+  DB.save('orders', S.orders);
+}
+
+/* 推进订单阶段 */
+function advanceOrder(id){
+  const order = S.orders.find(o=>o.id===id);
+  if(!order) return;
+  const currentIdx = ORDER_STAGES.findIndex(s=>s.id===order.stage);
+  if(currentIdx < ORDER_STAGES.length-1){
+    order.stage = ORDER_STAGES[currentIdx+1].id;
+    if(order.stage==='shipped') order.shippedAt = Date.now();
+    if(order.stage==='completed') order.completedAt = Date.now();
+    DB.save('orders', S.orders);
+    toast(`✅ 订单已推进到「${ORDER_STAGES[currentIdx+1].label}」`);
+  } else {
+    toast('订单已完成');
+  }
+}
+
+/* 计算交货期状态 */
+function getDeliveryStatus(deliveryDate){
+  if(!deliveryDate) return {label:'未设置',color:'#718096'};
+  const now = new Date();
+  const delivery = new Date(deliveryDate);
+  const diffDays = Math.ceil((delivery - now) / (1000*60*60*24));
+  if(diffDays < 0) return {label:`逾期${Math.abs(diffDays)}天`,color:'#e53e3e'};
+  if(diffDays <= 3) return {label:`还剩${diffDays}天`,color:'#dd6b20'};
+  if(diffDays <= 7) return {label:`还剩${diffDays}天`,color:'#d69e2e'};
+  return {label:`还剩${diffDays}天`,color:'#38a169'};
+}
+
+/* 打开新增订单弹窗 */
+function openAddOrder(){
+  openModal(`
+    <div class="modal-head"><h3>➕ 新增订单</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="mb8"><label class="text-xs text-muted">客户名称 *</label><input id="oCustomer" class="form-control" placeholder="客户公司名"></div>
+      <div style="display:flex;gap:8px" class="mb8">
+        <div style="flex:1"><label class="text-xs text-muted">产品名称 *</label><input id="oProduct" class="form-control" placeholder="产品名"></div>
+        <div style="width:100px"><label class="text-xs text-muted">数量</label><input id="oQty" class="form-control" type="number" value="1000"></div>
+      </div>
+      <div style="display:flex;gap:8px" class="mb8">
+        <div style="flex:1"><label class="text-xs text-muted">订单金额(USD)</label><input id="oAmount" class="form-control" type="number" step="0.01" placeholder="0.00"></div>
+        <div style="flex:1"><label class="text-xs text-muted">贸易术语</label><select id="oIncoterm" class="form-control"><option>FOB</option><option>EXW</option><option>CIF</option><option>DDP</option></select></div>
+      </div>
+      <div style="display:flex;gap:8px" class="mb8">
+        <div style="flex:1"><label class="text-xs text-muted">交货日期</label><input id="oDelivery" class="form-control" type="date"></div>
+        <div style="flex:1"><label class="text-xs text-muted">付款方式</label><select id="oPayment" class="form-control"><option>T/T 30%定金+70%尾款</option><option>T/T 100%</option><option>L/C</option><option>其他</option></select></div>
+      </div>
+      <div class="mb8"><label class="text-xs text-muted">备注</label><textarea id="oRemark" class="form-control" rows="2" placeholder="订单备注..."></textarea></div>
+      <div class="flex gap8">
+        <button class="btn" style="background:#805ad5;color:#fff" onclick="saveNewOrder()">💾 保存订单</button>
+        <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      </div>
+    </div>
+  `);
+}
+
+/* 保存新订单 */
+function saveNewOrder(){
+  const customer = document.getElementById('oCustomer').value.trim();
+  const product = document.getElementById('oProduct').value.trim();
+  if(!customer || !product){ toast('请填写客户名称和产品名称'); return; }
+  addOrder({
+    customer: customer,
+    product: product,
+    quantity: document.getElementById('oQty').value || 0,
+    amount: document.getElementById('oAmount').value || 0,
+    incoterm: document.getElementById('oIncoterm').value,
+    deliveryDate: document.getElementById('oDelivery').value,
+    paymentMethod: document.getElementById('oPayment').value,
+    remark: document.getElementById('oRemark').value,
+    stage: 'pending'
+  });
+  closeModal();
+  toast('✅ 订单已添加');
+  viewTools(document.getElementById('mainContent'));
+}
+
+/* 查看订单详情 */
+function viewOrderDetail(id){
+  const order = S.orders.find(o=>o.id===id);
+  if(!order) return;
+  const stage = ORDER_STAGES.find(s=>s.id===order.stage) || ORDER_STAGES[0];
+  const deliveryStatus = getDeliveryStatus(order.deliveryDate);
+  const totalPaid = (order.payments||[]).reduce((sum,p)=>sum+Number(p.amount||0),0);
+  openModal(`
+    <div class="modal-head"><h3>📋 订单详情</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div><b style="font-size:16px">${order.customer}</b><div class="text-xs text-muted">${order.product} × ${order.quantity}</div></div>
+        <span class="badge" style="background:${stage.color};color:#fff;font-size:12px">${stage.icon} ${stage.label}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:12px">
+        <div>💰 金额: <b>$${Number(order.amount||0).toFixed(2)}</b></div>
+        <div>📦 贸易术语: ${order.incoterm||'-'}</div>
+        <div>📅 交货期: ${order.deliveryDate||'未设置'} <span style="color:${deliveryStatus.color}">(${deliveryStatus.label})</span></div>
+        <div>💳 付款: ${order.paymentMethod||'-'}</div>
+        <div>已收款: <b style="color:#38a169">$${totalPaid.toFixed(2)}</b></div>
+        <div>未收款: <b style="color:#e53e3e">$${(Number(order.amount||0)-totalPaid).toFixed(2)}</b></div>
+      </div>
+      ${order.remark?`<div class="text-xs mb8" style="background:#f8f9fa;padding:8px;border-radius:4px">📝 ${order.remark}</div>`:''}
+      
+      <!-- 生产进度 -->
+      <div class="mb12">
+        <div class="text-xs text-muted mb6">🏭 生产进度</div>
+        <div style="display:flex;gap:4px">
+          ${ORDER_STAGES.map((s,i)=>{
+            const currentIdx = ORDER_STAGES.findIndex(x=>x.id===order.stage);
+            const isDone = i < currentIdx;
+            const isCurrent = i === currentIdx;
+            return `<div style="flex:1;text-align:center;padding:6px 2px;border-radius:4px;background:${isCurrent?s.color+'20':isDone?s.color+'10':'#f8f9fa'};border:1px solid ${isCurrent?s.color:'#e2e8f0'}">
+              <div style="font-size:14px">${isDone?'✅':s.icon}</div>
+              <div style="font-size:10px;color:${isCurrent?s.color:'#666'}">${s.label}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      
+      <!-- 物流信息 -->
+      ${order.shippedAt?`
+      <div class="mb12">
+        <div class="text-xs text-muted mb6">🚢 物流信息</div>
+        <div style="font-size:12px;background:#f0fdf4;padding:8px;border-radius:4px">
+          发货时间: ${new Date(order.shippedAt).toLocaleDateString()}<br>
+          ${order.trackingNo?'跟踪号: '+order.trackingNo+'<br>':''}
+          ${order.carrier?'货代: '+order.carrier:''}
+        </div>
+      </div>`:''}
+      
+      <div class="flex gap8" style="flex-wrap:wrap">
+        ${order.stage!=='completed'?`<button class="btn" style="background:#38a169;color:#fff" onclick="advanceOrder('${order.id}');closeModal();setTimeout(()=>viewOrderDetail('${order.id}'),300)">⏩ 推进到下一阶段</button>`:''}
+        <button class="btn btn-outline" onclick="addPayment('${order.id}')">💰 登记收款</button>
+        <button class="btn btn-outline" onclick="editOrderLogistics('${order.id}')">🚢 编辑物流</button>
+        <button class="btn btn-outline" style="color:#e53e3e" onclick="if(confirm('确定删除此订单？')){deleteOrder('${order.id}');closeModal();viewTools(document.getElementById('mainContent'));toast('订单已删除')}">🗑️ 删除</button>
+      </div>
+    </div>
+  `);
+}
+
+/* 登记收款 */
+function addPayment(orderId){
+  const order = S.orders.find(o=>o.id===orderId);
+  if(!order) return;
+  openModal(`
+    <div class="modal-head"><h3>💰 登记收款</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="text-xs text-muted mb6">订单: ${order.customer} - ${order.product}</div>
+      <div class="mb8"><label class="text-xs text-muted">收款金额(USD)</label><input id="pAmount" class="form-control" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="mb8"><label class="text-xs text-muted">收款类型</label><select id="pType" class="form-control"><option>定金(30%)</option><option>尾款(70%)</option><option>全款</option><option>其他</option></select></div>
+      <div class="mb8"><label class="text-xs text-muted">到账日期</label><input id="pDate" class="form-control" type="date" value="${new Date().toISOString().split('T')[0]}"></div>
+      <div class="mb8"><label class="text-xs text-muted">备注</label><input id="pRemark" class="form-control" placeholder="交易流水号等"></div>
+      <div class="flex gap8">
+        <button class="btn" style="background:#38a169;color:#fff" onclick="savePayment('${orderId}')">💾 保存</button>
+        <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      </div>
+    </div>
+  `);
+}
+
+/* 保存收款 */
+function savePayment(orderId){
+  const amount = document.getElementById('pAmount').value;
+  if(!amount || Number(amount)<=0){ toast('请输入有效金额'); return; }
+  const order = S.orders.find(o=>o.id===orderId);
+  if(!order) return;
+  if(!order.payments) order.payments = [];
+  order.payments.push({
+    amount: amount,
+    type: document.getElementById('pType').value,
+    date: document.getElementById('pDate').value,
+    remark: document.getElementById('pRemark').value
+  });
+  DB.save('orders', S.orders);
+  closeModal();
+  toast('✅ 收款已登记');
+  setTimeout(()=>viewOrderDetail(orderId),300);
+}
+
+/* 编辑物流 */
+function editOrderLogistics(orderId){
+  const order = S.orders.find(o=>o.id===orderId);
+  if(!order) return;
+  openModal(`
+    <div class="modal-head"><h3>🚢 编辑物流信息</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="mb8"><label class="text-xs text-muted">货代公司</label><input id="lCarrier" class="form-control" value="${order.carrier||''}" placeholder="货代名称"></div>
+      <div class="mb8"><label class="text-xs text-muted">提单号/跟踪号</label><input id="lTracking" class="form-control" value="${order.trackingNo||''}" placeholder="B/L No.或跟踪号"></div>
+      <div class="mb8"><label class="text-xs text-muted">船名航次</label><input id="lVessel" class="form-control" value="${order.vessel||''}" placeholder="船名/航次"></div>
+      <div class="mb8"><label class="text-xs text-muted">预计到港日</label><input id="lETA" class="form-control" type="date" value="${order.eta||''}"></div>
+      <div class="flex gap8">
+        <button class="btn" style="background:#3182ce;color:#fff" onclick="saveLogistics('${orderId}')">💾 保存</button>
+        <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      </div>
+    </div>
+  `);
+}
+
+/* 保存物流 */
+function saveLogistics(orderId){
+  updateOrder(orderId, {
+    carrier: document.getElementById('lCarrier').value,
+    trackingNo: document.getElementById('lTracking').value,
+    vessel: document.getElementById('lVessel').value,
+    eta: document.getElementById('lETA').value
+  });
+  closeModal();
+  toast('✅ 物流信息已保存');
+  setTimeout(()=>viewOrderDetail(orderId),300);
 }
 
 /* V20 端到端获客流水线 */

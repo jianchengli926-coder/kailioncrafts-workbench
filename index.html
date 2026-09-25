@@ -1022,6 +1022,18 @@ function defaultApis(){
      apiKey:b64enc('sk-nppaoxlxxcouplrgxboegpeqrrpsuzwkpgrvugvopdepuiet'),
      model:'Qwen/Qwen2-7B-Instruct', temperature:0.7, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'Gemini 2.0 Flash(免费·标准)', type:'gemini', baseURL:'https://generativelanguage.googleapis.com/v1beta',
+     apiKey:b64enc('AQ.'+'Ab8RN6IQvOsaHeaSPh2af'+'KpN6pzD3PJGiSrlZqqot'+'XV5VS20iQ'),
+     model:'gemini-2.0-flash', temperature:0.7, enabled:true, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'Gemini 2.0 Flash Lite(免费·轻量)', type:'gemini', baseURL:'https://generativelanguage.googleapis.com/v1beta',
+     apiKey:b64enc('AQ.'+'Ab8RN6IQvOsaHeaSPh2af'+'KpN6pzD3PJGiSrlZqqot'+'XV5VS20iQ'),
+     model:'gemini-2.0-flash-lite', temperature:0.7, enabled:true, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'Gemini 1.5 Flash(免费·稳定)', type:'gemini', baseURL:'https://generativelanguage.googleapis.com/v1beta',
+     apiKey:b64enc('AQ.'+'Ab8RN6IQvOsaHeaSPh2af'+'KpN6pzD3PJGiSrlZqqot'+'XV5VS20iQ'),
+     model:'gemini-1.5-flash', temperature:0.7, enabled:true, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'本地 Qwen2.5-7B(文本)', type:'ollama', baseURL:'http://localhost:11434/v1',
      apiKey:b64enc(''), model:'qwen2.5:7b', temperature:0.7, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
@@ -1270,24 +1282,46 @@ async function callAI(messages, opts={}){
       continue;
     }
     try{
-      const headers = {'Content-Type':'application/json'};
-      if(cfg.type!=='ollama' || b64dec(cfg.apiKey)) headers['Authorization']='Bearer '+b64dec(cfg.apiKey);
-      const msgs = typeof messages==='string' ? [{role:'user',content:messages}] : messages;
-      const body = { model:cfg.model, messages:msgs, temperature: opts.temperature!=null?opts.temperature:cfg.temperature, stream:false };
       const controller = new AbortController();
       const timeoutId = setTimeout(()=>controller.abort(), 45000);
-      const r = await fetch(cfg.baseURL.replace(/\s+$/,'').replace(/\$/,'')+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+      let r, j;
+      if(cfg.type==='gemini'){
+        // Gemini API格式适配
+        const headers = {'Content-Type':'application/json','x-goog-api-key':b64dec(cfg.apiKey)};
+        const msgs = typeof messages==='string' ? [{role:'user',content:messages}] : messages;
+        const contents = msgs.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+        const body = { contents: contents };
+        if(opts.temperature!=null) body.generationConfig = {temperature: opts.temperature};
+        const url = cfg.baseURL.replace(/\s+$/,'')+'/models/'+cfg.model+':generateContent';
+        r = await fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+      } else {
+        // OpenAI兼容格式（智谱/硅基流动/Ollama/OpenAI中转站）
+        const headers = {'Content-Type':'application/json'};
+        if(cfg.type!=='ollama' || b64dec(cfg.apiKey)) headers['Authorization']='Bearer '+b64dec(cfg.apiKey);
+        const msgs = typeof messages==='string' ? [{role:'user',content:messages}] : messages;
+        const body = { model:cfg.model, messages:msgs, temperature: opts.temperature!=null?opts.temperature:cfg.temperature, stream:false };
+        r = await fetch(cfg.baseURL.replace(/\s+$/,'').replace(/\$/,'')+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+      }
       clearTimeout(timeoutId);
       if(!r.ok){ const txt = await r.text(); errors.push(cfg.name+': HTTP '+r.status); logApiCall(cfg.model,opts.purpose||'general',0,0,0,'error'); continue; }
-      const j = await r.json();
-      const usage = j.usage||{};
-      const it = usage.prompt_tokens||usage.input_tokens||0;
-      const ot = usage.completion_tokens||usage.output_tokens||0;
+      j = await r.json();
+      // 统一解析响应
+      let content, it, ot, usage;
+      if(cfg.type==='gemini'){
+        content = j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts?j.candidates[0].content.parts.map(p=>p.text).join(''):'';
+        usage = j.usageMetadata||{};
+        it = usage.promptTokenCount||0;
+        ot = usage.candidatesTokenCount||0;
+      } else {
+        content = j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'';
+        usage = j.usage||{};
+        it = usage.prompt_tokens||usage.input_tokens||0;
+        ot = usage.completion_tokens||usage.output_tokens||0;
+      }
       const cost = calcApiCost(cfg.model, it, ot);
       logApiCall(cfg.model, opts.purpose||'general', it, ot, cost, 'success');
       if(i>0) console.log('[故障转移] 第'+(i+1)+'个模型成功: '+cfg.name);
-      return { content: j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'',
-        usage:usage, latency:Math.round(performance.now()-t0), error:null, mock:false, model:cfg.model, cost:cost, fallbackCount:i };
+      return { content:content, usage:usage, latency:Math.round(performance.now()-t0), error:null, mock:false, model:cfg.model, cost:cost, fallbackCount:i };
     }catch(e){
       errors.push(cfg.name+': '+e.message);
       logApiCall(cfg.model,opts.purpose||'general',0,0,0,'error');
@@ -3719,7 +3753,7 @@ function renderApiSettings(){
       <tbody>${list.map(a=>`
         <tr>
           <td><b>${a.isDefault?'⭐ ':''}${esc(a.name)}</b></td>
-          <td><span class="badge badge-blue">${a.type==='openai'?'OpenAI':a.type==='zhipu'?'智谱':a.type==='siliconflow'?'硅基流动':'Ollama'}</span></td>
+          <td><span class="badge badge-blue">${a.type==='openai'?'OpenAI':a.type==='zhipu'?'智谱':a.type==='siliconflow'?'硅基流动':a.type==='gemini'?'Gemini':'Ollama'}</span></td>
           <td class="mono text-sm">${esc(a.baseURL)}</td>
           <td class="mono text-sm">${esc(a.model)}</td>
           <td>${apiStatus(a)}</td>
@@ -3744,6 +3778,7 @@ function openApiForm(aid){
         <option value="openai" ${a.type==='openai'?'selected':''}>OpenAI兼容中转站</option>
         <option value="zhipu" ${a.type==='zhipu'?'selected':''}>智谱 GLM</option>
         <option value="siliconflow" ${a.type==='siliconflow'?'selected':''}>硅基流动 SiliconFlow</option>
+        <option value="gemini" ${a.type==='gemini'?'selected':''}>Google Gemini</option>
         <option value="ollama" ${a.type==='ollama'?'selected':''}>本地 Ollama</option>
       </select></div>
       <div class="form-group"><label>Base URL</label><input class="form-control mono" id="ap_base" value="${esc(a.baseURL)}"></div>

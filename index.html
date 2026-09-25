@@ -5220,6 +5220,186 @@ function orderOrders(){
  * 视图：产品与样品
  * ============================================================ */
 let prodCat = '全部';
+
+
+/* V58 产品快速报价功能 */
+function openQuickQuote(productId){
+  const p = S.products.find(x=>x.id===productId);
+  if(!p) return;
+  openModal(`
+    <div class="modal-head">
+      <h3>💰 快速报价 - ${p.emoji} ${esc(p.name)}</h3>
+      <span class="modal-close" onclick="closeModal()">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group">
+          <label>客户名称</label>
+          <input type="text" id="qqCustomer" class="form-control" placeholder="输入客户公司名称" value="">
+        </div>
+        <div class="form-group">
+          <label>联系人</label>
+          <input type="text" id="qqContact" class="form-control" placeholder="联系人姓名" value="">
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="form-group">
+          <label>报价单价 (USD)</label>
+          <input type="number" id="qqPrice" class="form-control" value="${p.price}" step="0.01" min="0">
+        </div>
+        <div class="form-group">
+          <label>数量 (MOQ)</label>
+          <input type="number" id="qqQty" class="form-control" value="500" min="1">
+        </div>
+        <div class="form-group">
+          <label>交货期 (天)</label>
+          <input type="number" id="qqLeadTime" class="form-control" value="35" min="1">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>付款方式</label>
+          <select id="qqPayment" class="form-control">
+            <option>30% T/T deposit, 70% before shipment</option>
+            <option>50% T/T deposit, 50% before shipment</option>
+            <option>100% T/T in advance</option>
+            <option>L/C at sight</option>
+            <option>Western Union / PayPal</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>报价有效期 (天)</label>
+          <input type="number" id="qqValidity" class="form-control" value="30" min="1">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>产品规格</label>
+        <input type="text" id="qqSpec" class="form-control" value="${esc(p.spec)}">
+      </div>
+      <div class="form-group">
+        <label>备注说明</label>
+        <textarea id="qqRemark" class="form-control" rows="2" placeholder="其他说明，如包装方式、认证等">OEM/ODM available · CE/FDA certified · Custom packaging available</textarea>
+      </div>
+      <div style="background:#f0f4f8;padding:12px;border-radius:8px;margin-top:8px">
+        <div class="flex-between"><span>产品单价:</span><b>$<span id="qqUnitPriceShow">${p.price.toFixed(2)}</span></b></div>
+        <div class="flex-between"><span>订购数量:</span><b><span id="qqQtyShow">500</span> pcs</b></div>
+        <div class="flex-between" style="border-top:1px solid #cbd5e0;padding-top:8px;margin-top:8px"><span><b>总金额:</b></span><b style="color:var(--gold);font-size:16px">$<span id="qqTotalShow">${(p.price*500).toFixed(2)}</span></b></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="generateQuickQuote('${p.id}')">📄 生成报价单</button>
+      <button class="btn btn-gold" onclick="copyQuickQuote('${p.id}')">📋 复制报价单</button>
+    </div>
+  `);
+  // 实时计算总金额
+  setTimeout(()=>{
+    const priceInput = document.getElementById('qqPrice');
+    const qtyInput = document.getElementById('qqQty');
+    if(priceInput && qtyInput){
+      priceInput.oninput = updateQuoteTotal;
+      qtyInput.oninput = updateQuoteTotal;
+    }
+  }, 100);
+}
+
+function updateQuoteTotal(){
+  const price = parseFloat(document.getElementById('qqPrice')?.value || 0);
+  const qty = parseInt(document.getElementById('qqQty')?.value || 0);
+  const total = price * qty;
+  const unitShow = document.getElementById('qqUnitPriceShow');
+  const qtyShow = document.getElementById('qqQtyShow');
+  const totalShow = document.getElementById('qqTotalShow');
+  if(unitShow) unitShow.textContent = price.toFixed(2);
+  if(qtyShow) qtyShow.textContent = qty;
+  if(totalShow) totalShow.textContent = total.toFixed(2);
+}
+
+function generateQuickQuote(productId){
+  const p = S.products.find(x=>x.id===productId);
+  if(!p) return;
+  const quote = buildQuoteText(p);
+  openModal(`
+    <div class="modal-head">
+      <h3>📄 报价单预览</h3>
+      <span class="modal-close" onclick="closeModal()">×</span>
+    </div>
+    <div class="modal-body">
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px;font-family:Arial,sans-serif">
+        <div style="text-align:center;border-bottom:2px solid #1a365d;padding-bottom:12px;margin-bottom:16px">
+          <h2 style="color:#1a365d;margin:0">KaiLionCrafts</h2>
+          <div style="color:#64748b;font-size:12px">Yangjiang, Guangdong, China · Professional Cutlery Manufacturer</div>
+          <h3 style="color:#1a365d;margin-top:12px">QUOTATION / 报价单</h3>
+        </div>
+        <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:13px;line-height:1.8;color:#2d3748;margin:0">${quote}</pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+      <button class="btn btn-gold" onclick="copyText(document.querySelector('pre').textContent)">📋 复制报价单</button>
+    </div>
+  `);
+  logAction('quote', '生成报价单', `为产品${p.name}生成报价单`);
+}
+
+function copyQuickQuote(productId){
+  const p = S.products.find(x=>x.id===productId);
+  if(!p) return;
+  const quote = buildQuoteText(p);
+  copyText(quote);
+  logAction('quote', '复制报价单', `复制产品${p.name}的报价单`);
+  closeModal();
+}
+
+function buildQuoteText(p){
+  const customer = document.getElementById('qqCustomer')?.value || 'Valued Customer';
+  const contact = document.getElementById('qqContact')?.value || '';
+  const price = parseFloat(document.getElementById('qqPrice')?.value || p.price);
+  const qty = parseInt(document.getElementById('qqQty')?.value || 500);
+  const leadTime = document.getElementById('qqLeadTime')?.value || '35';
+  const payment = document.getElementById('qqPayment')?.value || '30% T/T deposit, 70% before shipment';
+  const validity = document.getElementById('qqValidity')?.value || '30';
+  const spec = document.getElementById('qqSpec')?.value || p.spec;
+  const remark = document.getElementById('qqRemark')?.value || '';
+  const total = (price * qty).toFixed(2);
+  const today = new Date().toLocaleDateString('en-US');
+  
+  return `TO: ${customer}${contact?' ('+contact+')':''}
+DATE: ${today}
+QUOTE NO: QLC-${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,'0')}${String(Math.floor(Math.random()*900)+100)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PRODUCT DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Item:        ${p.name}
+Spec:        ${spec}
+Unit Price:  USD $${price.toFixed(2)} / piece
+MOQ:         ${qty} pcs
+Total Amount: USD $${total}
+Lead Time:   ${leadTime} days after deposit
+Payment:     ${payment}
+Validity:    ${validity} days
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REMARKS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${remark}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COMPANY INFO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KaiLionCrafts
+Yangjiang, Guangdong, China
+Email: info@kailioncrafts.com
+Website: www.kailioncrafts.com
+
+Thank you for your inquiry. We look forward to working with you!
+
+Best regards,
+Leo Li
+KaiLionCrafts`;
+}
+
 function viewProducts(root){
   const cats = ['全部',...new Set(S.products.map(p=>p.category))];
   const list = prodCat==='全部'?S.products:S.products.filter(p=>p.category===prodCat);
@@ -5239,6 +5419,7 @@ function viewProducts(root){
           <div class="flex-between text-sm"><span>建议售价</span><b class="text-gold">$${p.price.toFixed(2)}</b></div>
           <div class="flex-between text-sm"><span>库存</span><span class="badge ${p.stock<3000?'badge-red':'badge-a'}">${p.stock} pcs</span></div>
           <div class="text-sm text-muted mt8" style="font-size:11px">关键词：${esc(p.keywords)}</div>
+          <button class="btn btn-gold btn-sm mt8" style="width:100%" onclick="openQuickQuote('${p.id}')">💰 快速报价</button>
         </div>`).join('')}
     </div>
     <div class="card card-pad">

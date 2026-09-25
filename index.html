@@ -5402,6 +5402,74 @@ function viewTools(root){
     </div>` : ''}
   </div>
   
+  <!-- V34 AI客户画像分析面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🎯 AI 客户画像分析（深度背调 · 精准开发策略）</span>
+      <span class="badge" style="background:#805ad5;color:#fff">新功能 V34</span>
+    </div>
+    <p class="text-sm text-muted mb12">输入客户信息，AI生成8维度深度画像：公司概况/采购能力/决策链/竞争态势/切入策略/风险提示/跟进计划</p>
+    
+    <!-- 客户信息输入 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">客户信息（越详细分析越精准，包括：公司名/官网/国家/已知产品/联系人/规模等）：</div>
+      <textarea id="profileCustomerInfo" class="form-control" rows="4" placeholder="例如：Kitchen Universe, USA, kitchenware distributor, website kitchenuniverse.com, sells kitchen scissors and knives, 50-200 employees, contact Michael Carter (Procurement Manager)..." style="font-family:monospace;font-size:12px"></textarea>
+    </div>
+    
+    <!-- 分析深度选择 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">分析深度：</div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        ${PROFILE_DEPTHS.map((d,i)=>`<label style="cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px"><input type="radio" name="profileDepth" value="${d.id}" ${i===1?'checked':''}> ${d.label}<span class="text-muted" style="font-size:10px">(${d.tokens})</span></label>`).join('')}
+      </div>
+    </div>
+    
+    <!-- 快速填充示例 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">快速填充示例：</div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        <span class="badge" style="cursor:pointer;background:#f0fff4;color:#276749;border:1px solid #9ae6b4;font-size:11px" onclick="document.getElementById('profileCustomerInfo').value='Kitchen Universe, USA, kitchenware distributor, website kitchenuniverse.com, sells kitchen scissors and knives, 50-200 employees, contact Michael Carter (Procurement Manager), founded 1998'">🇺🇸 美国分销商</span>
+        <span class="badge" style="cursor:pointer;background:#f0fff4;color:#276749;border:1px solid #9ae6b4;font-size:11px" onclick="document.getElementById('profileCustomerInfo').value='Messerei Schmidt GmbH, Germany, OEM outdoor knife brand, website messerei-schmidt.de, sells outdoor knives and tools, 10-50 employees, contact Lukas Schmidt (CEO), founded 2010, CE/GS certified'">🇩🇪 德国品牌商</span>
+        <span class="badge" style="cursor:pointer;background:#f0fff4;color:#276749;border:1px solid #9ae6b4;font-size:11px" onclick="document.getElementById('profileCustomerInfo').value='BritChef Co Ltd, UK, kitchenware e-commerce and retail, website britchef.co.uk, sells kitchen knives and scissors, online + 3 retail stores, contact Emma Thompson (Buyer), fast growing'">🇬🇧 英国电商</span>
+        <span class="badge" style="cursor:pointer;background:#f0fff4;color:#276749;border:1px solid #9ae6b4;font-size:11px" onclick="document.getElementById('profileCustomerInfo').value='Gulf Premier Trading, UAE, kitchenware importer and wholesaler, serves Middle East market, sells kitchen tools and cutlery, contact Omar Al-Rashid (General Manager), large volume buyer'">🇦🇪 中东进口商</span>
+      </div>
+    </div>
+    
+    <!-- 生成按钮 -->
+    <div class="flex gap8 items-center">
+      <button id="profileGenBtn" class="btn" style="background:#805ad5;color:#fff" onclick="runProfileGenerate()">🎯 生成客户画像</button>
+      <span id="profileStatus" class="text-sm text-muted"></span>
+    </div>
+    
+    <!-- 生成结果 -->
+    <div id="profileResult" class="mt12" style="display:none">
+      <div class="text-xs text-muted mb6" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📋 AI客户画像报告（<span id="profileDepthLabel"></span>）</span>
+        <div class="flex gap8">
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 8px" onclick="copyProfile(document.getElementById('profileResultContent').textContent)">📋 复制报告</button>
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 8px" onclick="runProfileGenerate()">🔄 重新生成</button>
+        </div>
+      </div>
+      <div id="profileResultContent" style="background:#f8fafc;padding:16px;border-radius:6px;font-size:13px;line-height:1.8;max-height:500px;overflow-y:auto">
+      </div>
+    </div>
+    
+    <!-- 历史记录 -->
+    ${(S.profileHistory && S.profileHistory.length) ? `
+    <div class="mt16">
+      <div class="text-xs text-muted mb6" style="display:flex;justify-content:space-between">
+        <span>📜 画像历史（最近${Math.min(S.profileHistory.length,8)}条）</span>
+        <span style="cursor:pointer;color:#805ad5" onclick="clearProfileHistory()">清空</span>
+      </div>
+      <div style="max-height:200px;overflow-y:auto">
+        ${S.profileHistory.slice(0,8).map(h=>`<div style="padding:8px;background:#f8fafc;border-radius:4px;margin-bottom:6px;cursor:pointer;border-left:3px solid #805ad5" onclick="showProfileHistory('${h.id}')">
+          <div class="text-xs" style="color:#666">${h.depthLabel} · ${h.latency}ms</div>
+          <div style="font-size:12px;color:#333;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.customerInfo.slice(0,80)}...</div>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -5714,6 +5782,171 @@ function clearWAHistory(){
   DB.save('waHistory', S.waHistory);
   viewTools(document.getElementById('mainContent'));
   toast('已清空WhatsApp话术历史');
+}
+
+/* V34 AI客户画像分析 - 深度背调与精准开发策略 */
+const PROFILE_DEPTHS = [
+  {id:'quick',label:'⚡ 快速分析（约30秒）',sections:['公司概况','采购需求','切入建议'],tokens:'约500字'},
+  {id:'standard',label:'📋 标准分析（约1分钟）',sections:['公司概况','业务分析','采购能力','决策链','切入策略','风险提示'],tokens:'约1200字'},
+  {id:'deep',label:'🎯 深度分析（约2分钟）',sections:['公司概况','业务分析','产品线','采购能力评估','决策链分析','竞争态势','最佳切入角度','话术建议','风险提示','跟进计划'],tokens:'约2500字'}
+];
+
+const PROFILE_PROMPT = `你是资深外贸客户背调专家。请根据以下客户信息，生成一份结构化的客户画像分析报告。
+
+客户信息：
+{customerInfo}
+
+请按以下结构输出（用中文，markdown格式）：
+
+## 1. 公司概况与业务定位
+- 公司类型（品牌商/分销商/批发商/电商/进口商）
+- 主营业务与目标市场
+- 公司规模估算（员工/营收/门店数）
+- 行业地位与知名度
+
+## 2. 业务与产品线分析
+- 现有产品线与品类结构
+- 价格带定位（高端/中端/性价比）
+- 可能的采购需求（基于产品线推断）
+- 与我们五金刀剪产品的匹配度（高/中/低）及原因
+
+## 3. 采购能力评估
+- 年采购量估算（基于公司规模和品类）
+- 采购模式（集中采购/分散采购/招标）
+- 供应商数量与区域分布
+- 付款习惯与账期可能性
+- 采购决策周期
+
+## 4. 决策链与关键人分析
+- 决策结构（老板决策/采购经理/委员会）
+- 关键角色与关注点（采购看价格/老板看品质/设计看创新）
+- 可能的决策人职位与姓名推断
+- 最佳联系人层级建议
+
+## 5. 竞争态势分析
+- 现有供应商可能是谁（中国/其他国家）
+- 客户对现有供应商的满意度信号
+- 我们的竞争优势（价格/品质/交期/认证/服务）
+- 我们的竞争劣势与弥补方案
+- 替代供应商进入的难度
+
+## 6. 最佳切入角度与策略
+- 推荐切入产品（基于匹配度和竞争空间）
+- 推荐切入角度（价格优势/品质升级/新品类/快速打样/认证齐全）
+- 首次沟通策略（邮件/WhatsApp/LinkedIn/电话）
+- 推荐的首封开发信要点（3-5个关键点）
+- 价值主张一句话总结
+
+## 7. 风险提示与注意事项
+- 客户信用风险（新公司/高风险国家/制裁名单可能性）
+- 商业风险（价格敏感/频繁换供应商/小单多频）
+- 沟通风险（语言/文化/时差/节假日）
+- 应对建议
+
+## 8. 跟进计划建议
+- 第1周：动作与目标
+- 第2-4周：跟进节奏与内容
+- 第1-3月：转化路径与里程碑
+- 关键成功指标（回复/样品/报价/订单）
+
+请确保分析基于客户信息合理推断，不确定的地方标注"需进一步验证"。报告要实用、可执行，不要泛泛而谈。`;
+
+/* 生成客户画像 */
+async function generateCustomerProfile(customerInfo, depth){
+  if(!customerInfo || !customerInfo.trim()) return {content:null, error:'请输入客户信息'};
+  const depthCfg = PROFILE_DEPTHS.find(d=>d.id===depth) || PROFILE_DEPTHS[1];
+  let prompt = PROFILE_PROMPT.replace('{customerInfo}', customerInfo);
+  if(depth === 'quick'){
+    prompt += '\n\n【注意】这是快速分析，请只输出前3个部分，每个部分简洁明了，总字数控制在500字以内。';
+  } else if(depth === 'standard'){
+    prompt += '\n\n【注意】这是标准分析，请输出前6个部分，每个部分适度展开，总字数控制在1200字以内。';
+  }
+  const result = await callAI([{role:'user',content:prompt}], {purpose:'customer_profile', temperature:0.3});
+  if(result.error) return {content:null, error:result.error};
+  // 保存历史
+  if(!S.profileHistory) S.profileHistory = [];
+  S.profileHistory.unshift({id:uid(),customerInfo:customerInfo,depth:depth,depthLabel:depthCfg.label,content:result.content,t:Date.now(),model:result.model,latency:result.latency});
+  if(S.profileHistory.length>30) S.profileHistory = S.profileHistory.slice(0,30);
+  DB.save('profileHistory', S.profileHistory);
+  return {content:result.content, model:result.model, latency:result.latency, depthLabel:depthCfg.label};
+}
+
+/* 复制画像报告 */
+function copyProfile(text){
+  navigator.clipboard.writeText(text).then(()=>toast('✅ 画像报告已复制')).catch(()=>{
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('✅ 画像报告已复制');
+  });
+}
+
+/* 客户画像 - 执行生成 */
+async function runProfileGenerate(){
+  const customerInfo = document.getElementById('profileCustomerInfo').value.trim();
+  if(!customerInfo){ toast('请输入客户信息'); return; }
+  const depthEl = document.querySelector('input[name="profileDepth"]:checked');
+  const depth = depthEl ? depthEl.value : 'standard';
+  const btn = document.getElementById('profileGenBtn');
+  const status = document.getElementById('profileStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ 分析中...';
+  status.textContent = 'AI正在深度分析客户画像，请稍候...';
+  const result = await generateCustomerProfile(customerInfo, depth);
+  btn.disabled = false;
+  btn.textContent = '🎯 生成客户画像';
+  if(result.error){
+    status.innerHTML = '<span style="color:#e53e3e">❌ '+result.error+'</span>';
+    return;
+  }
+  status.innerHTML = `<span style="color:#805ad5">✅ 分析完成！${result.latency}ms · ${result.model}</span>`;
+  const resultDiv = document.getElementById('profileResult');
+  const resultContent = document.getElementById('profileResultContent');
+  const depthLabel = document.getElementById('profileDepthLabel');
+  resultDiv.style.display = 'block';
+  depthLabel.textContent = result.depthLabel;
+  // 简单的markdown渲染
+  let html = result.content
+    .replace(/^### (.*$)/gm, '<h4 style="color:#805ad5;margin:12px 0 6px;font-size:14px">$1</h4>')
+    .replace(/^## (.*$)/gm, '<h3 style="color:#805ad5;margin:16px 0 8px;font-size:15px;border-bottom:1px solid #e2e8f0;padding-bottom:4px">$1</h3>')
+    .replace(/^- (.*$)/gm, '<div style="margin:4px 0;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:#805ad5">•</span>$1</div>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+  resultContent.innerHTML = html;
+  // 刷新历史
+  setTimeout(()=>viewTools(document.getElementById('mainContent')), 500);
+}
+
+/* 客户画像 - 显示历史 */
+function showProfileHistory(id){
+  const item = (S.profileHistory||[]).find(h=>h.id===id);
+  if(!item) return;
+  let html = item.content
+    .replace(/^### (.*$)/gm, '<h4 style="color:#805ad5;margin:12px 0 6px;font-size:14px">$1</h4>')
+    .replace(/^## (.*$)/gm, '<h3 style="color:#805ad5;margin:16px 0 8px;font-size:15px;border-bottom:1px solid #e2e8f0;padding-bottom:4px">$1</h3>')
+    .replace(/^- (.*$)/gm, '<div style="margin:4px 0;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:#805ad5">•</span>$1</div>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+  openModal(`
+    <div class="modal-head"><h3>🎯 客户画像报告</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="text-xs text-muted mb6">${item.depthLabel} · 模型：${item.model} · 耗时：${item.latency}ms</div>
+      <div class="text-xs text-muted mb6" style="background:#f8fafc;padding:8px;border-radius:4px">客户信息：${item.customerInfo}</div>
+      <div style="font-size:13px;line-height:1.8;max-height:400px;overflow-y:auto">${html}</div>
+      <div class="flex gap8 mt12">
+        <button class="btn" style="background:#805ad5;color:#fff" onclick="copyProfile(document.querySelector('#modalRoot .modal-body div:nth-child(3)').innerText);closeModal()">📋 复制报告</button>
+      </div>
+    </div>
+  `);
+}
+
+/* 客户画像 - 清空历史 */
+function clearProfileHistory(){
+  if(!confirm('确定清空所有客户画像历史？')) return;
+  S.profileHistory = [];
+  DB.save('profileHistory', S.profileHistory);
+  viewTools(document.getElementById('mainContent'));
+  toast('已清空客户画像历史');
 }
 
 /* V20 端到端获客流水线 */

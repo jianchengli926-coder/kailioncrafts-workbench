@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KaiLionCrafts AI客户开发工作台 · 使用说明书</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1c2024; --ink2:#495057; --ink3:#8b949e;
+  --line:#e4e7eb; --brand:#0f766e; --brand2:#0b5c56; --brandsoft:#e7f3f1;
+  --ok:#0f7b3f; --oksoft:#e6f5ec; --opt:#9a6200; --optsoft:#fdf3e2; --req:#a3341f; --reqsoft:#fdecea;
+  --radius:12px; --shadow:0 1px 2px rgba(16,24,40,.05),0 6px 20px rgba(16,24,40,.06);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased}
+code{background:#eef1f4;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:.88em;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.layout{display:flex;align-items:flex-start;max-width:1460px;margin:0 auto;gap:26px;padding:0 22px}
+
+/* ---------- 侧边目录 ---------- */
+.toc{position:sticky;top:0;flex:0 0 268px;height:100vh;overflow-y:auto;padding:24px 0 60px;font-size:13.5px}
+.toc h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin:0 0 10px}
+.toc .toc-brand{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.toc .toc-brand .m{width:34px;height:34px;border-radius:9px;background:var(--brand);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;letter-spacing:.02em}
+.toc .toc-brand b{display:block;font-size:14px;line-height:1.3}
+.toc .toc-brand i{font-style:normal;font-size:11.5px;color:var(--ink3)}
+.toc a{display:block;color:var(--ink2);text-decoration:none;padding:5px 10px;border-radius:7px;line-height:1.5}
+.toc a:hover{background:var(--brandsoft);color:var(--brand2)}
+.toc .grp{margin-top:14px;font-weight:600;color:var(--ink);padding:4px 10px;font-size:12.5px;
+  letter-spacing:.04em;border-top:1px solid var(--line);padding-top:12px}
+.toc .grp:first-of-type{border-top:none}
+
+/* ---------- 主体 ---------- */
+.main{flex:1 1 auto;min-width:0;padding:26px 0 90px}
+.hero{background:linear-gradient(150deg,#0f766e 0%,#115e59 55%,#134e4a 100%);color:#fff;
+  border-radius:18px;padding:40px 38px;box-shadow:var(--shadow);margin-bottom:26px}
+.hero .kicker{font-size:12.5px;letter-spacing:.22em;text-transform:uppercase;opacity:.8;margin-bottom:12px}
+.hero h1{margin:0 0 10px;font-size:31px;line-height:1.25;letter-spacing:-.01em}
+.hero p{margin:0;opacity:.92;max-width:760px;font-size:15px}
+.hero .meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:10px}
+.hero .meta span{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.22);
+  border-radius:999px;padding:5px 13px;font-size:12.5px}
+
+section.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:26px 28px;margin:0 0 20px;box-shadow:var(--shadow)}
+section.card > h2{margin:0 0 6px;font-size:21px;letter-spacing:-.01em}
+section.card > h2 .n{color:var(--brand);margin-right:8px}
+.sub{color:var(--ink3);font-size:13px;margin:0 0 18px}
+h3{font-size:15.5px;margin:22px 0 8px;padding-left:11px;border-left:3px solid var(--brand)}
+ul{margin:8px 0;padding-left:22px}
+li{margin:5px 0}
+p{margin:9px 0}
+.lead{font-size:15.5px;color:var(--ink2)}
+
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+th{background:#f2f4f6;font-weight:600;font-size:13px;white-space:nowrap}
+tbody tr:nth-child(even){background:#fbfcfd}
+
+.badge{display:inline-block;border-radius:6px;padding:2px 9px;font-size:12px;font-weight:600;
+  border:1px solid transparent;white-space:nowrap}
+.badge.ok{background:var(--oksoft);color:var(--ok);border-color:#bfe3cd}
+.badge.opt{background:var(--optsoft);color:var(--opt);border-color:#f0dcb4}
+.badge.req{background:var(--reqsoft);color:var(--req);border-color:#f5cfc9}
+.badge.ai{background:#f3e5f5;color:#7b1fa2;border-color:#e1bee7}
+.badge.free{background:#e8f5e9;color:#2e7d32;border-color:#c8e6c9}
+
+.callout{border-radius:10px;padding:14px 16px;margin:14px 0;font-size:14px;border:1px solid}
+.callout.cfg{background:var(--brandsoft);border-color:#c9e3df}
+.callout.warn{background:var(--optsoft);border-color:#f0dcb4}
+.callout.info{background:#eef4fb;border-color:#cfdff2}
+.callout b.t{display:block;margin-bottom:5px;font-size:13px;letter-spacing:.03em;color:var(--ink)}
+.callout ul{margin:6px 0 0}
+
+/* ---------- 页面卡 ---------- */
+.page{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  margin:0 0 18px;box-shadow:var(--shadow);overflow:hidden;scroll-margin-top:14px}
+.page > .hd{padding:20px 26px 16px;border-bottom:1px solid var(--line);
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#fafbfc}
+.page > .hd .idx{font-size:12px;font-weight:700;color:#fff;background:var(--brand);
+  width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.page > .hd h3{margin:0;padding:0;border:none;font-size:18.5px;flex:1 1 auto;letter-spacing:-.01em}
+.page > .hd .grp-tag{font-size:12px;color:var(--ink3)}
+.page > .bd{padding:20px 26px 24px}
+.purpose{font-size:15px;color:var(--ink2);margin:0 0 4px}
+
+figure{margin:16px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#eef0f3}
+figure .placeholder{display:flex;align-items:center;justify-content:center;height:200px;
+  background:repeating-linear-gradient(45deg,#f0f2f5,#f0f2f5 10px,#e8eaed 10px,#e8eaed 20px);
+  color:var(--ink3);font-size:14px}
+figcaption{padding:8px 12px;font-size:12.5px;color:var(--ink3);background:#fafbfc;border-top:1px solid var(--line)}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:1180px){
+  .layout{flex-direction:column;gap:0;padding:0 16px}
+  .toc{position:static;height:auto;flex:none;width:100%;padding:18px 0 0;
+    border-bottom:1px solid var(--line);max-height:none}
+  .toc .toc-links{display:none}
+  .toc.open .toc-links{display:block}
+  .grid2{grid-template-columns:1fr}
+}
+.toc-toggle{display:none;margin:0 0 12px;padding:9px 14px;border:1px solid var(--line);
+  background:#fff;border-radius:8px;font-size:14px;cursor:pointer;width:100%;text-align:left}
+@media(max-width:1180px){.toc-toggle{display:block}}
+
+/* ---------- 灯箱 ---------- */
+.lb{position:fixed;inset:0;background:rgba(15,20,25,.9);display:none;z-index:99;
+  align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
+.lb.show{display:flex}
+.lb img{max-width:100%;max-height:100%;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
+
+.steps{counter-reset:step;margin:12px 0}
+.step{display:flex;margin-bottom:12px;align-items:flex-start}
+.step-num{background:var(--brand);color:#fff;width:26px;height:26px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;
+  margin-right:12px;flex-shrink:0;margin-top:2px}
+.step-content{flex:1}
+.step-content strong{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="toc" id="toc">
+    <div class="toc-brand">
+      <div class="m">KL</div>
+      <div><b>KaiLionCrafts</b><i>AI客户开发工作台</i></div>
+    </div>
+    <button class="toc-toggle" onclick="document.getElementById('toc').classList.toggle('open')">☰ 展开 / 收起目录</button>
+    <div class="toc-links">
+      <a href="#start">开始使用</a>
+      <a href="#overview">业务全流程</a>
+      <a href="#api">AI模型配置总表</a>
+
+      <div class="grp">一、入门与总览</div>
+      <a href="#p-login">1. 登录与密码防护</a>
+      <a href="#p-dashboard">2. 仪表盘首页</a>
+      <a href="#p-morning">3. 晨间简报</a>
+
+      <div class="grp">二、客户开发中心</div>
+      <a href="#p-customer-center">4. 客户中心总览</a>
+      <a href="#p-prospect">5. 潜在客户分析</a>
+      <a href="#p-research">6. 客户深度背调</a>
+      <a href="#p-outreach">7. 开发信生成</a>
+      <a href="#p-followup">8. 跟进序列</a>
+      <a href="#p-qa">9. 客户问答</a>
+      <a href="#p-recommend">10. 产品推荐</a>
+      <a href="#p-product-lib">11. 产品库</a>
+
+      <div class="grp">三、锴利自研AI工具库</div>
+      <a href="#p-sku">12. SKU命名工具</a>
+      <a href="#p-lineart">13. 产品线稿工具</a>
+      <a href="#p-visual">14. 全品类视觉矫正</a>
+      <a href="#p-prompt">15. 刀剪产品提示词库</a>
+      <a href="#p-scene">16. 场景图反推</a>
+      <a href="#p-wb">17. 白平衡校正工具</a>
+      <a href="#p-raw">18. 选片与RAW对齐</a>
+      <a href="#p-video">19. 爆款视频反推</a>
+      <a href="#p-aiart">20. AI作图工作台</a>
+
+      <div class="grp">四、独立站SEO中心</div>
+      <a href="#p-img-seo">21. 图片SEO命名</a>
+      <a href="#p-listing-seo">22. Listing SEO</a>
+      <a href="#p-seo-table">23. SEO表格生成</a>
+      <a href="#p-blog-seo">24. 博客SEO</a>
+      <a href="#p-seo-strategy">25. SEO策略</a>
+      <a href="#p-seo-score">26. SEO评分卡</a>
+
+      <div class="grp">五、销售与客户管理</div>
+      <a href="#p-pipeline">27. 销售管道</a>
+      <a href="#p-crm">28. 客户管理CRM</a>
+      <a href="#p-market">29. 市场与产品分析</a>
+
+      <div class="grp">六、知识与协作</div>
+      <a href="#p-knowledge">30. 公司知识库</a>
+      <a href="#p-team">31. 团队工作空间</a>
+      <a href="#p-todo">32. 今日待办</a>
+      <a href="#p-social">33. 海外社媒矩阵</a>
+
+      <div class="grp">七、订单与经营</div>
+      <a href="#p-order">34. 订单台账</a>
+
+      <div class="grp">八、系统与模型</div>
+      <a href="#p-model">35. 模型管理</a>
+      <a href="#p-settings">36. 设置中心</a>
+      <a href="#p-trace">37. AI调用Trace</a>
+
+      <div class="grp">附录</div>
+      <a href="#config">模型配置详解</a>
+      <a href="#faq">常见问题</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="hero">
+      <div class="kicker">KaiLionCrafts · AI客户开发工作台</div>
+      <h1>工作台使用说明书</h1>
+      <p>这份说明书按「左侧导航的每一个页面」逐页讲清楚：这一页是干什么用的、每一步怎么点、需要提前配置什么。特别地，凡是<b>需要连接 AI 模型才能见效</b>的功能，都会单独标注清楚，避免配了工具却用不出效果。</p>
+      <div class="meta">
+        <span>共 37 个页面</span><span>8 个导航分组</span>
+        <span>8 个AI模型</span><span>5个免费在线模型</span>
+        <span>故障自动转移</span><span>2026-09 版</span>
+      </div>
+    </div>
+
+    <!-- 开始使用 -->
+    <section class="card" id="start">
+      <h2><span class="n">①</span>开始使用</h2>
+      <p class="sub">5 分钟上手，先跑通「启动 → 登录 → 仪表盘 → 试一个AI功能」这条最短路径。</p>
+
+      <h3>1. 启动工作台</h3>
+      <p>双击桌面上的 <code>AI工作台（workbench.kailioncrafts.com）.command</code> 文件，系统会自动启动服务并打开浏览器。</p>
+      <table>
+        <thead><tr><th>访问方式</th><th>地址</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>本地访问</td><td><code>http://localhost:8501</code></td><td>启动后自动打开</td></tr>
+          <tr><td>公网访问</td><td><code>https://workbench.kailioncrafts.com</code></td><td>需输入访问密码</td></tr>
+          <tr><td>局域网访问</td><td><code>http://你的IP:8501</code></td><td>同局域网其他设备可访问</td></tr>
+        </tbody>
+      </table>
+
+      <h3>2. 登录</h3>
+      <p>打开工作台后，首先看到登录页面，输入访问密码 <code>441723</code>，点击「进 入」按钮即可。</p>
+      <div class="callout info"><b class="t">首次登录后建议先做三件事</b>
+        <ul>
+          <li>查看「仪表盘」的 AI 引擎状态，确认模型连接正常。</li>
+          <li>进「模型管理」点击「一键检测所有模型」，确认8个模型都能正常调用。</li>
+          <li>在侧边栏「AI快速问答」随便问一个问题，验证AI功能正常。</li>
+        </ul>
+      </div>
+
+      <h3>3. 界面通用约定</h3>
+      <ul>
+        <li><b>左侧导航</b>：8 个分组（入门与总览 / 客户开发中心 / 锴利自研AI工具库 / 独立站SEO中心 / 销售与客户管理 / 知识与协作 / 订单与经营 / 系统与模型）。</li>
+        <li><b>侧边栏顶部</b>：当前AI模型选择器，可手动切换8个模型。</li>
+        <li><b>侧边栏AI快速问答</b>：折叠面板，任何页面都能快速提问AI。</li>
+        <li><b>AI按钮</b>：每个功能页面都有AI按钮，点击后等待3-15秒生成结果。</li>
+        <li><b>数据存储</b>：所有数据本地JSON存储，不上传第三方服务器。</li>
+      </ul>
+
+      <h3>4. 这份说明书的符号</h3>
+      <p>
+        <span class="badge ok">开箱即用</span> 不需要任何外部配置，登录就能用。&nbsp;&nbsp;
+        <span class="badge opt">可选增强</span> 不配也能用，配了效果更好。&nbsp;&nbsp;
+        <span class="badge req">需先配置</span> 不配置则功能无法完整工作。&nbsp;&nbsp;
+        <span class="badge ai">AI增强</span> 该功能已接入AI模型，可智能生成内容。
+      </p>
+    </section>
+
+    <!-- 业务全流程 -->
+    <section class="card" id="overview">
+      <h2><span class="n">②</span>业务全流程</h2>
+      <p class="sub">整套工作台是把外贸独立站业务的一条主线做成了「一条流水线」，每个页面是其中一个工位。理解这张图，就知道该在什么时候用哪一页。</p>
+      <svg viewBox="0 0 680 340" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;margin:6px 0 4px">
+        <defs>
+          <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+            <path d="M0,0 L7,3.2 L0,6.4 z" fill="#94a3b8"/>
+          </marker>
+          <style>
+            .bx{fill:#ffffff;stroke:#d7dde3;stroke-width:1.2;rx:10}
+            .bt{font:600 12.5px sans-serif;fill:#1c2024}
+            .bs{font:11px sans-serif;fill:#8b949e}
+            .st{font:600 11px sans-serif;fill:#0f766e}
+            .ln{stroke:#94a3b8;stroke-width:1.3;fill:none;marker-end:url(#ar)}
+            .tag{font:600 10.5px sans-serif;fill:#a3341f}
+          </style>
+        </defs>
+
+        <text x="0" y="16" class="st">① 找客户</text>
+        <text x="230" y="16" class="st">② 做内容</text>
+        <text x="440" y="16" class="st">③ 谈生意</text>
+        <text x="600" y="16" class="st">④ 交付</text>
+
+        <rect x="0" y="26" width="140" height="60" class="bx"></rect>
+        <text x="14" y="48" class="bt">客户中心</text>
+        <text x="14" y="66" class="bs">背调/开发信/跟进</text>
+        <text x="14" y="80" class="bs">AI生成全流程</text>
+
+        <path class="ln" d="M140,56 L186,56"></path>
+
+        <rect x="190" y="26" width="140" height="60" class="bx"></rect>
+        <text x="204" y="48" class="bt">SEO中心</text>
+        <text x="204" y="66" class="bs">Listing/图片/博客</text>
+        <text x="204" y="80" class="bs">AI直接生成内容</text>
+
+        <path class="ln" d="M330,56 L376,56"></path>
+
+        <rect x="380" y="26" width="130" height="60" class="bx"></rect>
+        <text x="394" y="48" class="bt">销售管道</text>
+        <text x="394" y="66" class="bs">5阶段看板</text>
+        <text x="394" y="80" class="bs">AI管道分析</text>
+
+        <path class="ln" d="M510,56 L556,56"></path>
+
+        <rect x="560" y="26" width="120" height="60" class="bx"></rect>
+        <text x="574" y="48" class="bt">订单台账</text>
+        <text x="574" y="66" class="bs">订单/采购/收付款</text>
+        <text x="574" y="80" class="bs">AI经营分析</text>
+
+        <path class="ln" d="M620,86 L620,120 L340,120 L340,150"></path>
+
+        <text x="230" y="142" class="st">② 做内容（图片与视频）</text>
+        <rect x="140" y="150" width="150" height="60" class="bx"></rect>
+        <text x="154" y="172" class="bt">锴利自研AI工具库</text>
+        <text x="154" y="190" class="bs">9大工具/SKU命名/线稿</text>
+        <text x="154" y="204" class="bs">AI作图/视觉矫正</text>
+
+        <path class="ln" d="M290,180 L336,180"></path>
+
+        <rect x="340" y="150" width="150" height="60" class="bx"></rect>
+        <text x="354" y="172" class="bt">AI作图工作台</text>
+        <text x="354" y="190" class="bs">主图/详情/风格复刻</text>
+        <text x="354" y="204" class="bs">CogView-3生成</text>
+
+        <path class="ln" d="M490,180 L536,180"></path>
+
+        <rect x="540" y="150" width="140" height="60" class="bx"></rect>
+        <text x="554" y="172" class="bt">海外社媒矩阵</text>
+        <text x="554" y="190" class="bs">文案/Hashtags生成</text>
+        <text x="554" y="204" class="bs">AI运营分析</text>
+
+        <rect x="0" y="150" width="130" height="60" class="bx" style="fill:#e7f3f1;stroke:#bfdeda"></rect>
+        <text x="14" y="172" class="bt">客户管理CRM</text>
+        <text x="14" y="190" class="bs">档案/跟进/活动日志</text>
+        <text x="14" y="204" class="bs">AI客户一键分析</text>
+
+        <rect x="0" y="230" width="680" height="50" class="bx" style="fill:#fdf3e2;stroke:#f0dcb4"></rect>
+        <text x="14" y="252" class="bt">支撑层：仪表盘 · 晨间简报 · 今日待办 · 公司知识库 · 团队工作空间 · 模型管理 · 设置中心</text>
+        <text x="14" y="270" class="bs">8节点故障转移 · 5个免费在线模型 · 本地Ollama兜底 · 所有AI功能自动故障转移</text>
+      </svg>
+      <p style="font-size:13.5px;color:var(--ink3);margin-top:2px">底层支撑：<b>8节点故障转移</b>保证AI永不中断；<b>5个免费在线模型</b>零成本使用；<b>本地Ollama</b>断网兜底。</p>
+    </section>
+
+    <!-- AI模型配置总表 -->
+    <section class="card" id="api">
+      <h2><span class="n">③</span>AI模型配置总表</h2>
+      <p class="sub">这是整份说明书最重要的一张表。工作台本身开箱即用，但<b>想让「AI生成」「视觉分析」「图像生成」真正发挥作用，需要AI模型配置正确</b>。当前已配置8个模型，其中5个完全免费。</p>
+      <table>
+        <thead><tr><th style="width:5%">优先级</th><th style="width:18%">模型名称</th><th style="width:12%">供应商</th>
+        <th style="width:8%">类型</th><th style="width:8%">费用</th><th style="width:23%">能力与用途</th><th>不配置会怎样</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><b>Xing4.0-29B</b></td><td>硅基流动</td><td>在线</td><td><span class="badge free">免费</span></td><td>29B MoE大模型，256K上下文，主力文本生成，日常思考工作首选</td><td>主力模型不可用，自动切换到下一个</td></tr>
+          <tr><td>2</td><td><b>Qwen2.5-7B</b></td><td>硅基流动</td><td>在线</td><td><span class="badge free">免费</span></td><td>7B轻量模型，响应速度快，use_lite模式使用</td><td>轻量模式不可用，自动切换</td></tr>
+          <tr><td>3</td><td><b>GLM-4.7-Flash</b></td><td>智谱</td><td>在线</td><td><span class="badge free">免费</span></td><td>深度思考，复杂推理和工具使用能力强</td><td>深度思考任务降级到其他模型</td></tr>
+          <tr><td>4</td><td><b>GLM-4-Flash</b></td><td>智谱</td><td>在线</td><td><span class="badge free">免费</span></td><td>文本生成，语义理解，多轮对话</td><td>文本生成任务降级</td></tr>
+          <tr><td>5</td><td><b>GLM-4.6V-Flash</b></td><td>智谱</td><td>在线</td><td><span class="badge free">免费</span></td><td>视觉理解，图片分析，多模态推理</td><td>所有图片AI分析功能不可用</td></tr>
+          <tr><td>6</td><td><b>Seed-2.1-Turbo</b></td><td>豆包</td><td>在线</td><td><span class="badge opt">付费</span></td><td>备用文本模型，3元入/15元出每百万tokens</td><td>付费备用，不影响免费功能</td></tr>
+          <tr><td>7</td><td><b>GPT-5.5中转</b></td><td>wawapi</td><td>在线</td><td><span class="badge opt">付费</span></td><td>第三方中转备用模型</td><td>付费备用，不影响免费功能</td></tr>
+          <tr><td>8</td><td><b>Qwen2.5:7b</b></td><td>Ollama本地</td><td>本地</td><td><span class="badge ok">本地</span></td><td>断网兜底，需本地安装Ollama并pull模型</td><td>所有在线模型失败时无兜底</td></tr>
+        </tbody>
+      </table>
+      <div class="callout cfg"><b class="t">故障转移工作原理（重要）</b>
+        <ul>
+          <li><b>自动转移</b>：调用AI时按优先级1→8逐个尝试，一个失败自动切下一个，用户无感知。</li>
+          <li><b>在线优先</b>：前7个都是在线模型，全部失败才切第8个本地模型。</li>
+          <li><b>手动切换</b>：侧边栏顶部可手动指定使用某个模型，适合特定场景。</li>
+          <li><b>Trace记录</b>：每次调用（含故障转移）都记录在AI调用Trace页面，可追溯。</li>
+        </ul>
+      </div>
+      <div class="callout info"><b class="t">图像生成专用模型</b>
+        <ul>
+          <li><b>CogView-3-Flash</b>（智谱，免费）：AI作图工作台使用，支持5种比例，1-4张批量生成。</li>
+          <li>图像生成独立于文本故障转移链，有自己的调用逻辑。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ 一、入门与总览 ============ -->
+
+    <div class="page" id="p-login">
+      <div class="hd">
+        <div class="idx">1</div>
+        <h3>登录与密码防护</h3>
+        <span class="grp-tag">入门与总览</span>
+        <span class="badge ok">开箱即用</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>工作台的第一道安全屏障，输入密码后才能进入所有功能。</p>
+        <figure>
+          <div class="placeholder">📸 登录页面截图位置 — 公司Logo + 品牌名称 + 密码输入框 + 进入按钮</div>
+          <figcaption>登录页面：输入密码441723后点击进入</figcaption>
+        </figure>
+        <h3>操作步骤</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">打开工作台地址，看到登录页面。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">在密码输入框中输入 <code>441723</code>。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">点击「进 入」按钮，密码正确则自动进入仪表盘。</div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-content">密码错误会提示「密码错误」，重新输入即可。</div></div>
+        </div>
+        <h3>防护机制</h3>
+        <ul>
+          <li><b>会话保持</b>：登录成功后当前浏览器会话保持登录，刷新不需要重新登录。</li>
+          <li><b>登录日志</b>：每次成功登录记录时间，保存在 <code>data/auth_log.json</code>（最近100条）。</li>
+          <li><b>防护范围</b>：密码是整个工作台的屏障，输入后所有功能照常使用。</li>
+        </ul>
+        <div class="callout warn"><b class="t">修改密码</b>
+          编辑 <code>app.py</code> 第151行的密码判断 <code>if pwd == "441723":</code>，将441723改为新密码，然后重启工作台。
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-dashboard">
+      <div class="hd">
+        <div class="idx">2</div>
+        <h3>仪表盘首页</h3>
+        <span class="grp-tag">入门与总览</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>工作台的控制中心，登录后默认进入，展示今日数据概览、AI引擎状态和快捷入口。</p>
+        <figure>
+          <div class="placeholder">📸 仪表盘截图位置 — 顶部4个metric + AI引擎状态区 + 今日工作建议 + 快捷入口</div>
+          <figcaption>仪表盘首页：数据概览 + AI状态 + 工作建议</figcaption>
+        </figure>
+        <h3>功能模块</h3>
+        <table>
+          <thead><tr><th>模块</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>今日数据概览</td><td>客户总数/待跟进/订单数/待办数 4个metric卡片</td></tr>
+            <tr><td>AI引擎状态</td><td>当前模型/故障转移链节点数/调用数+成功率/平均响应时间</td></tr>
+            <tr><td>故障转移链可视化</td><td>8个模型标签云展示，按优先级排列</td></tr>
+            <tr><td>AI今日工作建议</td><td>综合客户/待办/订单数据，AI生成今日TOP3工作重点</td></tr>
+            <tr><td>快捷入口</td><td>测试连接/进入模型管理/常用功能快速跳转</td></tr>
+          </tbody>
+        </table>
+        <h3>AI今日工作建议</h3>
+        <p>点击「AI生成今日工作建议」按钮，AI综合分析今日待跟进客户、逾期客户、待处理订单、待办任务，生成：</p>
+        <ul>
+          <li>今日TOP3工作重点（按优先级排序）</li>
+          <li>具体行动建议和时间安排</li>
+          <li>需要优先处理的A级客户</li>
+        </ul>
+        <div class="callout info"><b class="t">使用建议</b>
+          每天早上上班第一件事就是生成今日工作建议，合理安排一天的工作优先级。
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-morning">
+      <div class="hd">
+        <div class="idx">3</div>
+        <h3>晨间简报</h3>
+        <span class="grp-tag">入门与总览</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>每天早上快速了解工作状态，AI生成深度简报并可一键转为待办。</p>
+        <figure>
+          <div class="placeholder">📸 晨间简报截图位置 — 顶部统计 + AI简报按钮 + 今日待跟进列表 + 逾期提醒</div>
+          <figcaption>晨间简报：AI深度简报 + 一键转待办</figcaption>
+        </figure>
+        <h3>功能说明</h3>
+        <table>
+          <thead><tr><th>功能</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>顶部统计</td><td>今日待跟进/逾期未跟进/客户总数/已成交 4个指标</td></tr>
+            <tr><td>AI生成今日简报</td><td>轻量模型快速生成基础简报</td></tr>
+            <tr><td>AI深度简报+待办</td><td>深度分析，生成6维度报告，可一键转待办</td></tr>
+            <tr><td>今日待跟进列表</td><td>展示今天需要跟进的客户详情</td></tr>
+            <tr><td>逾期提醒</td><td>展示超过跟进日期的客户</td></tr>
+          </tbody>
+        </table>
+        <h3>AI深度简报6维度</h3>
+        <ol>
+          <li>🎯 今日TOP3工作重点</li>
+          <li>👥 客户跟进策略（A级客户优先）</li>
+          <li>⚠️ 风险提示（逾期客户、管道瓶颈）</li>
+          <li>📈 机会洞察（可推进的报价/成交）</li>
+          <li>✅ 建议今日待办清单（5-8条带优先级）</li>
+        </ol>
+        <h3>一键转待办</h3>
+        <p>生成深度简报后，点击「将AI建议转为今日待办」，系统自动从简报提取待办项，智能判断优先级，添加到「今日待办」页面。</p>
+      </div>
+    </div>
+
+    <!-- ============ 二、客户开发中心 ============ -->
+
+    <div class="page" id="p-customer-center">
+      <div class="hd">
+        <div class="idx">4</div>
+        <h3>客户中心总览</h3>
+        <span class="grp-tag">客户开发中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>客户开发全流程的入口，包含潜在客户分析、背调、开发信、跟进序列等7个子功能。</p>
+        <figure>
+          <div class="placeholder">📸 客户中心截图位置 — 7个子功能Tab + 世界时钟 + 外贸热点 + 展会情报</div>
+          <figcaption>客户中心：7个AI子功能 + 辅助信息</figcaption>
+        </figure>
+        <h3>7个子功能一览</h3>
+        <table>
+          <thead><tr><th>子功能</th><th>用途</th><th>AI增强</th></tr></thead>
+          <tbody>
+            <tr><td>潜在客户分析</td><td>分析客户背景和需求</td><td><span class="badge ai">AI分析</span></td></tr>
+            <tr><td>客户深度背调</td><td>联网调查客户公司信息</td><td><span class="badge ai">AI背调</span></td></tr>
+            <tr><td>开发信生成</td><td>生成个性化外贸开发信</td><td><span class="badge ai">AI生成</span></td></tr>
+            <tr><td>跟进序列</td><td>生成多轮跟进邮件</td><td><span class="badge ai">AI生成</span></td></tr>
+            <tr><td>客户问答</td><td>AI回答客户常见问题</td><td><span class="badge ai">AI回复</span></td></tr>
+            <tr><td>产品推荐</td><td>根据客户需求推荐产品</td><td><span class="badge ai">AI推荐</span></td></tr>
+            <tr><td>产品库</td><td>浏览和管理公司产品</td><td><span class="badge ai">AI推荐</span></td></tr>
+          </tbody>
+        </table>
+        <h3>辅助功能</h3>
+        <ul>
+          <li><b>世界时钟</b>：查看各国当前时间，判断合适的联系时间</li>
+          <li><b>外贸热点</b>：行业新闻和趋势</li>
+          <li><b>展会情报</b>：国内外展会信息</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="page" id="p-prospect">
+      <div class="hd">
+        <div class="idx">5</div>
+        <h3>潜在客户分析</h3>
+        <span class="grp-tag">客户开发中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>输入客户基本信息，AI分析客户背景、需求和跟进策略。</p>
+        <h3>操作步骤</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">填写客户公司名、国家、网站、产品需求。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">点击「AI分析客户」按钮。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">等待5-10秒，AI生成分析报告。</div></div>
+        </div>
+        <h3>分析报告包含</h3>
+        <ul>
+          <li>客户背景判断（公司规模、采购能力）</li>
+          <li>需求分析（可能的产品需求和关注点）</li>
+          <li>跟进策略建议</li>
+          <li>切入点和话术建议</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="page" id="p-research">
+      <div class="hd">
+        <div class="idx">6</div>
+        <h3>客户深度背调</h3>
+        <span class="grp-tag">客户开发中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>对目标客户进行深度背景调查，生成完整的背调报告。</p>
+        <h3>操作步骤</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">输入客户公司名称或网站。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">点击「AI深度背调」按钮。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">等待10-20秒，生成详细背调报告。</div></div>
+        </div>
+        <h3>背调报告包含</h3>
+        <ul>
+          <li>公司基本信息（成立时间、规模、地址）</li>
+          <li>主营业务和产品线</li>
+          <li>目标市场和客户群体</li>
+          <li>采购习惯和供应商偏好</li>
+          <li>跟进策略和切入点建议</li>
+          <li>风险提示</li>
+        </ul>
+        <div class="callout info"><b class="t">背调结果保存</b>
+          背调报告可保存到团队工作空间，也可推送到公司知识库共享。
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-outreach">
+      <div class="hd">
+        <div class="idx">7</div>
+        <h3>开发信生成</h3>
+        <span class="grp-tag">客户开发中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>AI生成个性化外贸开发信，支持中英文，可保存到工作空间。</p>
+        <figure>
+          <div class="placeholder">📸 开发信生成截图位置 — 客户信息表单 + 风格选择 + 生成按钮 + 结果展示</div>
+          <figcaption>开发信生成：AI个性化开发信</figcaption>
+        </figure>
+        <h3>操作步骤</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">填写客户信息：公司名、国家、网站、产品需求。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">选择开发信风格（正式/友好/简洁）。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">点击「生成开发信」按钮，等待5-10秒。</div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-content">AI生成中英文开发信，可复制或保存到工作空间。</div></div>
+        </div>
+        <div class="callout cfg"><b class="t">生成的开发信特点</b>
+          <ul>
+            <li>个性化：根据客户信息定制内容，不是模板群发</li>
+            <li>双语：同时生成英文和中文版</li>
+            <li>可保存：一键保存到个人工作空间，后续可查看和推送</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-followup">
+      <div class="hd">
+        <div class="idx">8</div>
+        <h3>跟进序列</h3>
+        <span class="grp-tag">客户开发中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>生成多轮跟进邮件序列，覆盖初次接触到最后尝试的完整流程。</p>
+        <h3>默认4轮跟进</h3>
+        <ol>
+          <li><b>第一封</b>：初次接触开发信</li>
+          <li><b>第二封</b>：3天后跟进（提供更多信息）</li>
+          <li><b>第三封</b>：7天后跟进（案例分享）</li>
+          <li><b>第四封</b>：14天后跟进（最后尝试）</li>
+        </ol>
+        <h3>操作步骤</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">填写客户信息和之前沟通情况。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">选择跟进轮数（3-5轮）。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">点击「生成跟进序列」，AI生成每封邮件内容和建议发送时间。</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-qa">
+      <div class="hd">
+        <div class="idx">9</div>
+        <h3>客户问答</h3>
+        <span class="grp-tag">客户开发中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>客户提出问题后，AI辅助生成专业回复，支持产品知识、价格、交期等常见问题。</p>
+        <h3>操作步骤</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">输入客户的问题。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">选择问题类型（产品/价格/交期/售后/其他）。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">点击「AI生成回复」，得到专业的中英文回复建议。</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-recommend">
+      <div class="hd">
+        <div class="idx">10</div>
+        <h3>产品推荐</h3>
+        <span class="grp-tag">客户开发中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>根据客户需求描述，AI从产品库中推荐最合适的产品。</p>
+        <h3>操作步骤</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">输入客户需求描述（如"需要高端厨师刀套装"）。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">点击「AI推荐产品」。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">AI分析需求，从产品库匹配推荐3-5个产品，附推荐理由。</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-product-lib">
+      <div class="hd">
+        <div class="idx">11</div>
+        <h3>产品库</h3>
+        <span class="grp-tag">客户开发中心</span>
+        <span class="badge ok">开箱即用</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>浏览和管理公司所有产品，支持按品类筛选和搜索。</p>
+        <h3>功能说明</h3>
+        <ul>
+          <li><b>产品分类</b>：厨刀/户外刀/剪刀/厨房用品等</li>
+          <li><b>产品详情</b>：SKU、材质、规格、价格区间</li>
+          <li><b>搜索</b>：按产品名或关键词搜索</li>
+          <li><b>AI推荐</b>：输入需求快速定位产品</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============ 三、锴利自研AI工具库 ============ -->
+
+    <div class="page" id="p-sku">
+      <div class="hd">
+        <div class="idx">12</div>
+        <h3>SKU命名工具</h3>
+        <span class="grp-tag">锴利自研AI工具库</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>专为刀剪行业定制的SKU命名系统，支持AI智能命名、批量重命名、材质代码表。</p>
+        <figure>
+          <div class="placeholder">📸 SKU命名工具截图位置 — 5个Tab + AI智能命名面板 + 命名结果展示</div>
+          <figcaption>SKU命名工具：5个功能Tab + AI智能命名</figcaption>
+        </figure>
+        <h3>5个功能Tab</h3>
+        <table>
+          <thead><tr><th>Tab</th><th>功能</th></tr></thead>
+          <tbody>
+            <tr><td>产品库命名</td><td>从已有产品库选择，自动生成SKU和图片名</td></tr>
+            <tr><td>自定义生成</td><td>手动选品类+材质+款式号，生成完整命名序列</td></tr>
+            <tr><td>批量重命名</td><td>上传实拍图片，自动按SKU格式重命名，打包ZIP下载</td></tr>
+            <tr><td>材质代码表</td><td>30+材质代码参考，点击快速填入</td></tr>
+            <tr><td>SEO关键词库</td><td>4大品类热门SEO关键词</td></tr>
+          </tbody>
+        </table>
+        <h3>AI智能命名（新增）</h3>
+        <p>展开「AI智能命名」面板，输入产品描述（如"8寸大马士革钢厨师刀，VG10钢芯，黑色G10手柄"），AI自动分析品类、材质并生成：</p>
+        <ul>
+          <li>完整SKU编码</li>
+          <li>图片文件名列表</li>
+          <li>ALT Text（图片替代文本）</li>
+          <li>SEO文件名</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="page" id="p-lineart">
+      <div class="hd">
+        <div class="idx">13</div>
+        <h3>产品线稿工具</h3>
+        <span class="grp-tag">锴利自研AI工具库</span>
+        <span class="badge ok">开箱即用</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>将产品图片转换为线稿图，用于专利申请、产品手册、技术文档。</p>
+        <h3>功能说明</h3>
+        <ul>
+          <li><b>上传图片</b>：支持批量上传产品图片</li>
+          <li><b>参数调节</b>：线稿粗细、对比度、平滑度</li>
+          <li><b>实时预览</b>：调节参数后实时预览效果</li>
+          <li><b>批量导出</b>：一键批量处理所有图片，打包ZIP下载</li>
+          <li><b>单张下载</b>：单张处理后可单独下载PNG</li>
+        </ul>
+        <div class="callout info"><b class="t">批量导出</b>
+          点击「批量导出全部」，系统遍历所有上传图片用当前参数批量处理，打包成ZIP下载，单张失败不影响其他。
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-visual">
+      <div class="hd">
+        <div class="idx">14</div>
+        <h3>全品类视觉矫正</h3>
+        <span class="grp-tag">锴利自研AI工具库</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>批量矫正产品图片的角度、旋转、缩放，AI智能检测最佳参数。</p>
+        <figure>
+          <div class="placeholder">📸 视觉矫正截图位置 — 图片上传 + AI检测按钮 + 参数面板 + 批量处理</div>
+          <figcaption>视觉矫正：AI智能检测角度 + 批量统一处理</figcaption>
+        </figure>
+        <h3>AI智能检测</h3>
+        <p>上传产品图片后，点击「AI智能检测角度与分类」，使用glm-4.6v-flash视觉模型分析，自动推荐：</p>
+        <ul>
+          <li>最佳旋转角度（-180°~180°）</li>
+          <li>产品分类（厨刀/户外刀/剪刀/锅具/托盘）</li>
+          <li>推荐朝向（水平/垂直）</li>
+          <li>推荐缩放百分比</li>
+          <li>推荐理由</li>
+        </ul>
+        <p>检测结果自动应用到全局参数，一键统一所有图片的角度和缩放。</p>
+        <h3>手动参数</h3>
+        <ul>
+          <li>旋转角度：-180°~180°滑块调节</li>
+          <li>翻转：水平/垂直翻转</li>
+          <li>缩放：50%~150%</li>
+          <li>分类：手动选择产品品类</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="page" id="p-prompt">
+      <div class="hd">
+        <div class="idx">15</div>
+        <h3>刀剪产品提示词库</h3>
+        <span class="grp-tag">锴利自研AI工具库</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>37条预设生图提示词 + AI自定义生成，专为刀剪产品优化。</p>
+        <h3>37条预设提示词分类</h3>
+        <table>
+          <thead><tr><th>分类</th><th>数量</th><th>场景</th></tr></thead>
+          <tbody>
+            <tr><td>主图角度</td><td>8条</td><td>正面/侧面/45度/俯视等</td></tr>
+            <tr><td>细节特写</td><td>6条</td><td>刀刃/手柄/铆钉/纹理等</td></tr>
+            <tr><td>场景使用</td><td>10条</td><td>厨房/户外/砧板/食材搭配等</td></tr>
+            <tr><td>材质展示</td><td>5条</td><td>大马士革纹理/木纹手柄等</td></tr>
+            <tr><td>套装展示</td><td>4条</td><td>刀架/套装/礼盒等</td></tr>
+            <tr><td>氛围光影</td><td>4条</td><td>自然光/影棚/暗调等</td></tr>
+          </tbody>
+        </table>
+        <h3>AI生成自定义提示词</h3>
+        <p>输入产品描述和场景需求，AI自动生成3个不同角度的专业生图提示词：</p>
+        <ul>
+          <li>主图角度提示词（80-120词）</li>
+          <li>细节特写提示词</li>
+          <li>场景使用提示词</li>
+        </ul>
+        <p>适合Midjourney/Stable Diffusion/FLUX等生图工具使用。</p>
+      </div>
+    </div>
+
+    <div class="page" id="p-scene">
+      <div class="hd">
+        <div class="idx">16</div>
+        <h3>场景图反推</h3>
+        <span class="grp-tag">锴利自研AI工具库</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>上传参考场景图，AI分析构图/光线/氛围，反推生成适用于自己产品的生图方案。</p>
+        <h3>AI视觉分析增强</h3>
+        <p>使用glm-4.6v-flash真正分析上传的参考场景图，提取：</p>
+        <ul>
+          <li>构图方式（居中/三分法/对角线等）</li>
+          <li>光线方向和强度</li>
+          <li>氛围和色调</li>
+          <li>背景元素</li>
+          <li>拍摄角度</li>
+        </ul>
+        <h3>操作步骤</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">上传参考场景图（竞品图/灵感图）。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">点击「AI分析场景」，等待视觉模型分析。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">输入自己的产品描述。</div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-content">AI生成适用于自己产品的生图提示词和方案。</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-wb">
+      <div class="hd">
+        <div class="idx">17</div>
+        <h3>白平衡校正工具</h3>
+        <span class="grp-tag">锴利自研AI工具库</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>校正产品图片的白平衡，AI智能推荐最佳色温/色调参数。</p>
+        <h3>AI智能推荐</h3>
+        <p>使用glm-4.6v-flash分析图片色彩，推荐：</p>
+        <ul>
+          <li>色温（K值）</li>
+          <li>色调（绿-品红偏移）</li>
+          <li>曝光补偿</li>
+          <li>对比度</li>
+          <li>饱和度</li>
+          <li>色彩预设（日光/阴天/钨丝灯等）</li>
+        </ul>
+        <p>推荐参数可一键应用，也可手动微调。</p>
+        <h3>手动调节</h3>
+        <ul>
+          <li>色温滑块：2000K~10000K</li>
+          <li>色调滑块：-100~+100</li>
+          <li>实时预览调节效果</li>
+          <li>处理后下载PNG</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="page" id="p-raw">
+      <div class="hd">
+        <div class="idx">18</div>
+        <h3>选片与RAW对齐</h3>
+        <span class="grp-tag">锴利自研AI工具库</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>从JPG选片匹配对应的RAW原片，AI智能推荐匹配。</p>
+        <h3>功能说明</h3>
+        <ul>
+          <li><b>上传JPG</b>：批量上传已选好的JPG图片</li>
+          <li><b>上传RAW</b>：上传对应的RAW原片文件夹</li>
+          <li><b>自动匹配</b>：按文件名相似度自动匹配</li>
+          <li><b>AI智能匹配</b>：当有未匹配的JPG时，AI分析文件名相似度推荐匹配</li>
+          <li><b>导出匹配结果</b>：导出匹配清单，复制RAW到指定目录</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="page" id="p-video">
+      <div class="hd">
+        <div class="idx">19</div>
+        <h3>爆款视频反推</h3>
+        <span class="grp-tag">锴利自研AI工具库</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>输入产品类型和视频主题，AI自动生成镜头素材和剪辑脚本。</p>
+        <h3>AI生成镜头素材</h3>
+        <p>输入产品类型和视频主题，AI自动生成3-10个镜头素材，自动填充表单：</p>
+        <ul>
+          <li>镜头编号和时长</li>
+          <li>画面描述</li>
+          <li>运镜方式（推/拉/摇/移/跟）</li>
+          <li>台词/旁白</li>
+          <li>背景音乐建议</li>
+        </ul>
+        <h3>功能说明</h3>
+        <ul>
+          <li><b>分镜脚本</b>：生成完整的分镜脚本表格</li>
+          <li><b>剪辑建议</b>：转场效果、节奏建议</li>
+          <li><b>文案生成</b>：视频标题、描述、标签</li>
+        </ul>
+        <div class="callout warn"><b class="t">视频链接解析</b>
+          目前暂不支持直接解析视频链接。如需反推已有视频，可手动输入视频描述和关键帧信息。
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-aiart">
+      <div class="hd">
+        <div class="idx">20</div>
+        <h3>AI作图工作台</h3>
+        <span class="grp-tag">锴利自研AI工具库</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>一站式AI作图平台，包含AI生图、详情文案、视频脚本、风格复刻、4个图片工具箱。</p>
+        <figure>
+          <div class="placeholder">📸 AI作图工作台截图位置 — 多Tab布局 + 生图参数 + 工具箱 + 结果展示</div>
+          <figcaption>AI作图工作台：生图+文案+脚本+风格复刻+工具箱</figcaption>
+        </figure>
+        <h3>功能总览</h3>
+        <table>
+          <thead><tr><th>子功能</th><th>说明</th><th>AI模型</th></tr></thead>
+          <tbody>
+            <tr><td>AI作图生成</td><td>CogView-3-Flash生成产品图，5种比例，1-4张批量</td><td>CogView-3</td></tr>
+            <tr><td>AI详情文案</td><td>生成中英双语B2B详情页文案</td><td>Xing4.0-29B</td></tr>
+            <tr><td>AI视频脚本</td><td>生成分镜脚本（镜头/时长/画面/台词/运镜）</td><td>Xing4.0-29B</td></tr>
+            <tr><td>风格复刻</td><td>参考图→AI分析风格→生成提示词→生成同款图片</td><td>glm-4.6v + Xing</td></tr>
+            <tr><td>工具箱-改尺寸</td><td>本地PIL处理，保持比例/LANCZOS重采样</td><td>本地</td></tr>
+            <tr><td>工具箱-旋转翻转</td><td>90/180/270度旋转+水平/垂直翻转</td><td>本地</td></tr>
+            <tr><td>工具箱-加水印</td><td>自定义文字/5位置/透明度/字号</td><td>本地</td></tr>
+            <tr><td>工具箱-加文字</td><td>自定义文字/3位置/字号/颜色/半透明背景</td><td>本地</td></tr>
+          </tbody>
+        </table>
+        <h3>AI作图生成操作</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">输入生图提示词（英文效果最佳）。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">选择图片比例（1:1/16:9/4:3/3:4/9:16）。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">选择生成数量（1-4张）。</div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-content">点击「生成图片」，等待10-30秒。</div></div>
+          <div class="step"><div class="step-num">5</div><div class="step-content">生成的图片可下载或继续用工具箱处理。</div></div>
+        </div>
+        <h3>风格复刻闭环</h3>
+        <p>上传参考图 → glm-4.6v-flash分析色调/光影/构图/背景/角度 → Xing4.0-29B生成适用于用户产品的英文生图提示词 → CogView-3生成同款风格图片。形成"参考图→风格分析→提示词→生成图片"完整闭环。</p>
+        <div class="callout warn"><b class="t">画笔涂鸦和橡皮擦</b>
+          画笔涂鸦和橡皮擦功能需要前端画布交互组件，Streamlit原生不支持，暂未实现。
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 四、独立站SEO中心 ============ -->
+
+    <div class="page" id="p-img-seo">
+      <div class="hd">
+        <div class="idx">21</div>
+        <h3>图片SEO命名</h3>
+        <span class="grp-tag">独立站SEO中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>上传产品图片，AI视觉分析后生成SEO友好的图片文件名和ALT文本。</p>
+        <figure>
+          <div class="placeholder">📸 图片SEO截图位置 — 图片上传 + AI视觉分析按钮 + 命名表单 + 结果</div>
+          <figcaption>图片SEO命名：AI视觉分析 + SEO命名生成</figcaption>
+        </figure>
+        <h3>AI视觉分析</h3>
+        <p>上传产品图片后，点击「AI视觉分析图片」，使用glm-4.6v-flash分析：</p>
+        <ul>
+          <li>产品类型</li>
+          <li>主要材质</li>
+          <li>拍摄角度</li>
+          <li>颜色外观</li>
+          <li>产品特点</li>
+        </ul>
+        <p>分析结果可参考用于填写产品信息和生成SEO命名。</p>
+        <h3>SEO命名生成</h3>
+        <ul>
+          <li>图片文件名（英文，含关键词，连字符分隔）</li>
+          <li>ALT Text（图片替代文本，含关键词）</li>
+          <li>Title Text（图片标题）</li>
+          <li>批量生成多张图片的SEO命名</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="page" id="p-listing-seo">
+      <div class="hd">
+        <div class="idx">22</div>
+        <h3>Listing SEO</h3>
+        <span class="grp-tag">独立站SEO中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>AI直接生成完整的22模块SEO内容，一键生成产品页面所有SEO要素。</p>
+        <figure>
+          <div class="placeholder">📸 Listing SEO截图位置 — 产品信息表单 + AI生成按钮 + 22模块结果展示</div>
+          <figcaption>Listing SEO：AI直接生成22模块完整SEO内容</figcaption>
+        </figure>
+        <h3>操作步骤</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">填写产品信息：产品名、品类、材质、卖点、目标关键词。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">上传产品图片（可选，用于AI视觉分析）。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">点击「AI直接生成SEO内容」按钮。</div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-content">等待15-30秒，AI生成完整22模块SEO内容。</div></div>
+          <div class="step"><div class="step-num">5</div><div class="step-content">可下载为文本文件，或复制到网站后台。</div></div>
+        </div>
+        <h3>22模块SEO内容</h3>
+        <div class="grid2">
+          <ul>
+            <li>商品标题（英文）</li>
+            <li>固定链接（URL Slug）</li>
+            <li>产品描述（HTML格式）</li>
+            <li>简短描述</li>
+            <li>产品分类</li>
+            <li>产品属性表</li>
+            <li>主图SEO命名</li>
+            <li>相册图SEO命名（6张）</li>
+            <li>SEO Title（页面标题）</li>
+            <li>Meta Description（描述）</li>
+            <li>焦点关键词</li>
+            <li>关键词密度分析</li>
+          </ul>
+        </div>
+        <div class="callout cfg"><b class="t">与旧版区别</b>
+          旧版只能生成Prompt让用户复制到其他工具，新版直接调用AI生成完整内容，一步到位。
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-seo-table">
+      <div class="hd">
+        <div class="idx">23</div>
+        <h3>SEO表格生成</h3>
+        <span class="grp-tag">独立站SEO中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>AI视觉+文本生成5大板块SEO表格，用于批量产品SEO优化。</p>
+        <h3>5大板块</h3>
+        <ol>
+          <li>产品标题SEO</li>
+          <li>图片文件名SEO</li>
+          <li>ALT Text SEO</li>
+          <li>Meta Description SEO</li>
+          <li>关键词布局表</li>
+        </ol>
+        <h3>操作步骤</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">上传产品图片或输入产品列表。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">点击「AI生成SEO表格」。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">AI生成完整表格，可复制到Excel。</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-blog-seo">
+      <div class="hd">
+        <div class="idx">24</div>
+        <h3>博客SEO</h3>
+        <span class="grp-tag">独立站SEO中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>AI生成博客文章内容和关键词，用于独立站内容营销。</p>
+        <h3>功能说明</h3>
+        <ul>
+          <li><b>关键词研究</b>：输入主题，AI生成相关关键词和搜索意图</li>
+          <li><b>文章大纲</b>：AI生成博客文章结构大纲</li>
+          <li><b>内容生成</b>：AI生成完整博客文章（英文）</li>
+          <li><b>SEO优化</b>：生成Title、Meta Description、内部链接建议</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="page" id="p-seo-strategy">
+      <div class="hd">
+        <div class="idx">25</div>
+        <h3>SEO策略</h3>
+        <span class="grp-tag">独立站SEO中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>内容集群规划 + 技术SEO检查清单，制定整体SEO策略。</p>
+        <h3>功能说明</h3>
+        <ul>
+          <li><b>内容集群规划</b>：AI根据核心关键词生成内容集群（支柱页+集群页）</li>
+          <li><b>技术SEO检查清单</b>：网站技术SEO自查清单</li>
+          <li><b>竞品分析</b>：输入竞品URL，AI分析其SEO策略</li>
+          <li><b>月度SEO计划</b>：AI生成本月SEO执行计划</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="page" id="p-seo-score">
+      <div class="hd">
+        <div class="idx">26</div>
+        <h3>SEO评分卡</h3>
+        <span class="grp-tag">独立站SEO中心</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>SEO健康度评分 + 优化建议，评估当前SEO状态。</p>
+        <h3>评分维度</h3>
+        <ul>
+          <li>页面SEO（标题/描述/关键词）</li>
+          <li>图片SEO（文件名/ALT/尺寸）</li>
+          <li>内容质量（字数/可读性/关键词密度）</li>
+          <li>技术SEO（加载速度/移动端/结构化数据）</li>
+          <li>外链和权威性</li>
+        </ul>
+        <p>AI生成评分报告和具体优化建议，按优先级排序。</p>
+      </div>
+    </div>
+
+    <!-- ============ 五、销售与客户管理 ============ -->
+
+    <div class="page" id="p-pipeline">
+      <div class="hd">
+        <div class="idx">27</div>
+        <h3>销售管道</h3>
+        <span class="grp-tag">销售与客户管理</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>看板可视化展示客户从线索到成交的5个阶段，AI分析管道健康度。</p>
+        <figure>
+          <div class="placeholder">📸 销售管道截图位置 — 5列看板 + 客户卡片 + 转化率进度条 + AI分析按钮</div>
+          <figcaption>销售管道：5阶段看板 + AI管道智能分析</figcaption>
+        </figure>
+        <h3>5个销售阶段</h3>
+        <table>
+          <thead><tr><th>阶段</th><th>说明</th><th>典型动作</th></tr></thead>
+          <tbody>
+            <tr><td>线索 Lead</td><td>刚获取的潜在客户</td><td>初次联系、发送开发信</td></tr>
+            <tr><td>已联系 Contacted</td><td>已经联系过客户</td><td>等待回复、跟进</td></tr>
+            <tr><td>已互动 Engaged</td><td>客户有回复和互动</td><td>需求沟通、报价准备</td></tr>
+            <tr><td>已报价 Quoted</td><td>已经发送报价</td><td>议价、样品寄送</td></tr>
+            <tr><td>成交 Closed</td><td>已经成交的客户</td><td>订单执行、售后维护</td></tr>
+          </tbody>
+        </table>
+        <h3>看板操作</h3>
+        <ul>
+          <li><b>移动阶段</b>：每个客户卡片右侧有「→ 下一阶段」按钮</li>
+          <li><b>查看详情</b>：点击「👁️ 详情」跳转到客户管理</li>
+          <li><b>转化率</b>：页面底部展示各阶段客户占比进度条</li>
+        </ul>
+        <h3>AI管道智能分析</h3>
+        <p>点击「AI分析销售管道」，AI生成6维度报告：</p>
+        <ol>
+          <li>📊 管道健康度评估（行业基准20-30%）</li>
+          <li>⚠️ 瓶颈识别（哪个阶段客户堆积）</li>
+          <li>🎯 本周TOP3推进重点</li>
+          <li>💡 转化率提升建议（3-5条）</li>
+          <li>📈 成交预测（未来30天）</li>
+          <li>🏆 最可能成交的3个客户</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="page" id="p-crm">
+      <div class="hd">
+        <div class="idx">28</div>
+        <h3>客户管理CRM</h3>
+        <span class="grp-tag">销售与客户管理</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>完整的客户关系管理系统，客户档案、跟进记录、活动日志、AI分析。</p>
+        <figure>
+          <div class="placeholder">📸 CRM截图位置 — 统计概览 + 跟进提醒 + 客户列表 + 详情面板 + AI分析按钮</div>
+          <figcaption>客户管理CRM：完整客户档案 + AI一键分析 + 活动日志</figcaption>
+        </figure>
+        <h3>功能总览</h3>
+        <table>
+          <thead><tr><th>功能</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>统计概览</td><td>客户总数/A级/跟进中/今日跟进/逾期 5项指标</td></tr>
+            <tr><td>跟进提醒</td><td>今日+逾期跟进客户列表</td></tr>
+            <tr><td>客户搜索</td><td>按公司名/国家/产品搜索</td></tr>
+            <tr><td>AI客户一键分析</td><td>背景/需求/跟进/报价/风险 5维度分析</td></tr>
+            <tr><td>活动日志</td><td>添加和展示操作记录，自动记录状态变更</td></tr>
+            <tr><td>跟进提醒设置</td><td>1/3/7/14/30天后自动提醒</td></tr>
+            <tr><td>客户详情</td><td>联系人/邮箱/最后联系/下次跟进/备注</td></tr>
+            <tr><td>AI分层分析报告</td><td>综合客户分层数据生成分析和策略</td></tr>
+            <tr><td>AI公池客户分析</td><td>公池客户认领优先级和跟进策略</td></tr>
+          </tbody>
+        </table>
+        <h3>AI客户一键分析</h3>
+        <p>在客户详情页点击「AI一键分析」，AI生成：</p>
+        <ul>
+          <li><strong>背景判断</strong>：客户公司规模、采购能力评估</li>
+          <li><strong>需求分析</strong>：客户可能的产品需求和关注点</li>
+          <li><strong>跟进策略</strong>：推荐的跟进方式和频率</li>
+          <li><strong>报价策略</strong>：建议的报价区间和议价空间</li>
+          <li><strong>风险提示</strong>：可能存在的风险和注意事项</li>
+        </ul>
+        <p>分析结果自动保存到客户活动日志。</p>
+        <h3>客户等级体系</h3>
+        <table>
+          <thead><tr><th>等级</th><th>说明</th><th>跟进优先级</th></tr></thead>
+          <tbody>
+            <tr><td>A级（绿色）</td><td>高价值客户，有明确采购意向</td><td>最高，每周跟进</td></tr>
+            <tr><td>B级（黄色）</td><td>中等价值，有潜在需求</td><td>中等，每2周跟进</td></tr>
+            <tr><td>C级（灰色）</td><td>一般客户，需求不明确</td><td>低，每月跟进</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="page" id="p-market">
+      <div class="hd">
+        <div class="idx">29</div>
+        <h3>市场与产品分析</h3>
+        <span class="grp-tag">销售与客户管理</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>11项AI分析功能，覆盖产品分析、广告分析、视觉内容分析。</p>
+        <h3>功能分类</h3>
+        <table>
+          <thead><tr><th>分类</th><th>功能</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="4">产品分析</td><td>产品竞争力分析</td></tr>
+            <tr><td>竞品对比分析</td></tr>
+            <tr><td>定价策略分析</td></tr>
+            <tr><td>产品卖点提炼</td></tr>
+            <tr><td rowspan="3">广告分析</td><td>广告文案分析</td></tr>
+            <tr><td>投放策略建议</td></tr>
+            <tr><td>ROI预测</td></tr>
+            <tr><td rowspan="4">视觉内容</td><td>主图分析</td></tr>
+            <tr><td>详情页分析</td></tr>
+            <tr><td>视频脚本分析</td></tr>
+            <tr><td>视觉风格建议</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ 六、知识与协作 ============ -->
+
+    <div class="page" id="p-knowledge">
+      <div class="hd">
+        <div class="idx">30</div>
+        <h3>公司知识库</h3>
+        <span class="grp-tag">知识与协作</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>团队共享的知识中心，所有成员生成的优质内容都可推送到这里，支持AI知识问答。</p>
+        <figure>
+          <div class="placeholder">📸 知识库截图位置 — 7个分类文件夹 + AI问答输入框 + 知识列表</div>
+          <figcaption>公司知识库：7大分类 + AI知识问答 + 内容推送</figcaption>
+        </figure>
+        <h3>7大知识分类</h3>
+        <table>
+          <thead><tr><th>分类</th><th>内容</th></tr></thead>
+          <tbody>
+            <tr><td>01_公司介绍</td><td>公司简介、创始人故事、品牌故事</td></tr>
+            <tr><td>02_产品知识</td><td>SKU参数、材质知识、产品规格</td></tr>
+            <tr><td>03_行业知识</td><td>刀剪行业知识、供应链信息</td></tr>
+            <tr><td>04_客户知识</td><td>客户背调、客户分析报告</td></tr>
+            <tr><td>05_SEO知识</td><td>关键词库、SEO模板、优化案例</td></tr>
+            <tr><td>06_营销与客户开发</td><td>开发信存档、客户笔记、背调报告</td></tr>
+            <tr><td>07_团队工作空间</td><td>各成员的工作产出</td></tr>
+          </tbody>
+        </table>
+        <h3>AI知识问答</h3>
+        <p>用自然语言提问，AI基于知识库内容回答：</p>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">在输入框中输入问题，如"大马士革钢和高碳钢有什么区别？"</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">点击「提问」按钮。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">AI搜索知识库相关内容，综合生成回答。</div></div>
+        </div>
+        <h3>内容推送机制</h3>
+        <p>各成员在自己的工作空间生成的开发信、笔记、报告，点击「推送到公司知识库」按钮，内容自动复制到知识库对应分类，全团队共享。</p>
+      </div>
+    </div>
+
+    <div class="page" id="p-team">
+      <div class="hd">
+        <div class="idx">31</div>
+        <h3>团队工作空间</h3>
+        <span class="grp-tag">知识与协作</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>每位团队成员独立的工作空间，生成的内容自动保存，可推送到公司知识库。</p>
+        <h3>功能说明</h3>
+        <table>
+          <thead><tr><th>功能</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>成员信息卡片</td><td>头像、姓名、角色、负责品类</td></tr>
+            <tr><td>联系方式</td><td>企业邮箱、Gmail、WhatsApp、微信</td></tr>
+            <tr><td>社交媒体</td><td>LinkedIn、Facebook等国际社媒链接</td></tr>
+            <tr><td>生成的开发信</td><td>查看、推送、删除自己生成的开发信</td></tr>
+            <tr><td>客户笔记</td><td>新建和查看客户笔记</td></tr>
+            <tr><td>背调报告</td><td>查看自己做的客户背调报告</td></tr>
+            <tr><td>团队统计</td><td>各成员的产出数量统计</td></tr>
+            <tr><td>AI团队工作分析</td><td>AI分析团队效率和任务分配建议</td></tr>
+          </tbody>
+        </table>
+        <h3>AI团队工作分析</h3>
+        <p>点击「AI分析团队工作」，AI生成6维度报告：</p>
+        <ol>
+          <li>团队整体工作效率评估</li>
+          <li>成员工作状态分析</li>
+          <li>本周任务分配建议</li>
+          <li>协作优化建议</li>
+          <li>下周工作目标建议</li>
+          <li>团队亮点和待改进点</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="page" id="p-todo">
+      <div class="hd">
+        <div class="idx">32</div>
+        <h3>今日待办</h3>
+        <span class="grp-tag">知识与协作</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>完整的任务管理系统，支持AI智能生成待办、优先级、分类、筛选。</p>
+        <figure>
+          <div class="placeholder">📸 今日待办截图位置 — 统计概览 + AI生成按钮 + 添加表单 + 待办列表 + 筛选</div>
+          <figcaption>今日待办：AI智能生成 + 优先级分类 + 三维筛选</figcaption>
+        </figure>
+        <h3>功能说明</h3>
+        <table>
+          <thead><tr><th>功能</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>统计概览</td><td>总数/未完成/已完成/完成率</td></tr>
+            <tr><td>AI智能生成待办</td><td>根据客户数据自动生成5-8条带优先级的待办</td></tr>
+            <tr><td>手动添加待办</td><td>输入任务内容，设置优先级和分类</td></tr>
+            <tr><td>优先级</td><td>高/中/低三级</td></tr>
+            <tr><td>分类</td><td>客户跟进/内容创作/订单处理/其他</td></tr>
+            <tr><td>截止日期</td><td>设置任务截止时间</td></tr>
+            <tr><td>三维筛选</td><td>按状态/优先级/分类筛选</td></tr>
+            <tr><td>自动排序</td><td>未完成在前，高优先级在前</td></tr>
+            <tr><td>批量操作</td><td>全部完成/清除已完成/清空全部</td></tr>
+          </tbody>
+        </table>
+        <h3>AI智能生成待办</h3>
+        <p>点击「AI智能生成待办」，AI综合分析今日待跟进客户（A级优先）、逾期未跟进客户、待处理订单、内容创作需求，自动生成5-8条带优先级和分类的待办任务。</p>
+      </div>
+    </div>
+
+    <div class="page" id="p-social">
+      <div class="hd">
+        <div class="idx">33</div>
+        <h3>海外社媒矩阵</h3>
+        <span class="grp-tag">知识与协作</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>管理海外社交媒体内容，AI生成文案和运营分析。</p>
+        <h3>功能说明</h3>
+        <table>
+          <thead><tr><th>功能</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>内容台账</td><td>记录和管理社媒内容</td></tr>
+            <tr><td>AI快速生成社媒文案</td><td>选择品类/平台/内容类型，AI生成Caption+Hashtags</td></tr>
+            <tr><td>LinkedIn内容日历</td><td>B2B内容发布计划</td></tr>
+            <tr><td>AI社媒运营分析</td><td>综合社媒数据生成运营分析和优化建议</td></tr>
+          </tbody>
+        </table>
+        <h3>AI生成社媒文案</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">选择产品品类（厨刀/户外刀/剪刀/厨房用品）。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">选择平台（LinkedIn/Facebook/Instagram/TikTok）。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">选择内容类型（产品展示/工厂实拍/客户案例/行业知识）。</div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-content">输入产品描述。</div></div>
+          <div class="step"><div class="step-num">5</div><div class="step-content">点击「AI生成文案」，生成英文Caption（100-200词）+ 10-15个Hashtags + 建议发布时间。</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 七、订单与经营 ============ -->
+
+    <div class="page" id="p-order">
+      <div class="hd">
+        <div class="idx">34</div>
+        <h3>订单台账</h3>
+        <span class="grp-tag">订单与经营</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>订单管理和经营分析系统，AI生成经营洞察和定价建议。</p>
+        <figure>
+          <div class="placeholder">📸 订单台账截图位置 — 订单列表 + 采购管理 + 收付款 + AI经营分析按钮</div>
+          <figcaption>订单台账：订单/采购/收付款 + AI经营分析 + 定价建议</figcaption>
+        </figure>
+        <h3>功能说明</h3>
+        <table>
+          <thead><tr><th>功能</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>订单录入</td><td>录入新订单信息</td></tr>
+            <tr><td>订单列表</td><td>查看和管理所有订单</td></tr>
+            <tr><td>采购管理</td><td>采购订单跟踪</td></tr>
+            <tr><td>收付款记录</td><td>记录收款和付款</td></tr>
+            <tr><td>定价敏感度测算</td><td>分析价格变动对利润的影响</td></tr>
+            <tr><td>AI经营分析</td><td>综合订单/采购/收付款数据生成经营洞察</td></tr>
+            <tr><td>AI定价建议</td><td>基于成本和市场给出定价建议</td></tr>
+          </tbody>
+        </table>
+        <h3>AI经营分析</h3>
+        <p>点击「AI经营分析」，AI综合分析：</p>
+        <ul>
+          <li>订单趋势（环比/同比）</li>
+          <li>客户贡献度（TOP客户）</li>
+          <li>产品销售排名</li>
+          <li>利润分析</li>
+          <li>现金流状况</li>
+          <li>经营风险提示</li>
+          <li>改进建议</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============ 八、系统与模型 ============ -->
+
+    <div class="page" id="p-model">
+      <div class="hd">
+        <div class="idx">35</div>
+        <h3>模型管理</h3>
+        <span class="grp-tag">系统与模型</span>
+        <span class="badge ok">开箱即用</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>AI系统的控制后台，管理API供应商、查看模型状态、检测健康度、查看调用统计。</p>
+        <figure>
+          <div class="placeholder">📸 模型管理截图位置 — 统计概览 + 故障转移链展示 + 健康检测按钮 + 调用统计 + 最近记录</div>
+          <figcaption>模型管理：8节点故障转移 + 一键健康检测 + 调用统计 + Trace</figcaption>
+        </figure>
+        <h3>功能说明</h3>
+        <table>
+          <thead><tr><th>功能</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>统计概览</td><td>供应商总数/在线API/本地模型/当前使用</td></tr>
+            <tr><td>故障转移链展示</td><td>可视化展示8节点故障转移顺序</td></tr>
+            <tr><td>一键全模型健康检测</td><td>遍历所有在线模型发测试请求，展示状态+响应时间</td></tr>
+            <tr><td>调用统计面板</td><td>每模型调用次数/成功率/平均耗时</td></tr>
+            <tr><td>最近调用记录</td><td>最近15条Trace，可展开查看详情</td></tr>
+            <tr><td>本地模型状态</td><td>Ollama本地模型运行状态</td></tr>
+            <tr><td>API供应商列表</td><td>所有已配置的供应商详情</td></tr>
+          </tbody>
+        </table>
+        <h3>一键健康检测</h3>
+        <p>点击「一键检测所有模型」，系统向故障转移链中的每个在线模型发送测试请求，展示：</p>
+        <ul>
+          <li>模型名称和供应商</li>
+          <li>连接状态（成功/失败）</li>
+          <li>响应时间（毫秒）</li>
+          <li>错误信息（如果失败）</li>
+        </ul>
+        <div class="callout cfg"><b class="t">故障转移链工作原理</b>
+          调用AI时按优先级1→8逐个尝试，一个失败自动切下一个，用户无感知。前7个在线模型全部失败才切第8个本地Ollama。
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-settings">
+      <div class="hd">
+        <div class="idx">36</div>
+        <h3>设置中心</h3>
+        <span class="grp-tag">系统与模型</span>
+        <span class="badge ai">AI增强</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>系统设置和监控中心，管理API供应商、AI用量监控、访问安全分析。</p>
+        <h3>功能说明</h3>
+        <table>
+          <thead><tr><th>功能</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>本地模型状态</td><td>Ollama本地模型运行状态</td></tr>
+            <tr><td>API供应商列表</td><td>所有已配置的AI供应商</td></tr>
+            <tr><td>添加新API中转站</td><td>添加新的AI模型供应商</td></tr>
+            <tr><td>AI用量监控中心</td><td>AI调用统计和用量监控</td></tr>
+            <tr><td>AI调用智能分析</td><td>综合调用数据生成模型使用分析和优化建议</td></tr>
+            <tr><td>访问监控中心</td><td>系统访问日志和安全监控</td></tr>
+            <tr><td>AI访问安全分析</td><td>综合访问数据生成安全分析和防护建议</td></tr>
+          </tbody>
+        </table>
+        <h3>添加新API供应商</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-content">进入「设置中心」→「添加新API中转站」。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">填写供应商名称。</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-content">填写API Base URL（如 https://api.openai.com/v1）。</div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-content">填写API Key。</div></div>
+          <div class="step"><div class="step-num">5</div><div class="step-content">填写模型名称，选择类型（在线/本地）和费用等级（免费/付费）。</div></div>
+          <div class="step"><div class="step-num">6</div><div class="step-content">点击「保存」。</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-trace">
+      <div class="hd">
+        <div class="idx">37</div>
+        <h3>AI调用Trace</h3>
+        <span class="grp-tag">系统与模型</span>
+        <span class="badge ok">开箱即用</span>
+      </div>
+      <div class="bd">
+        <p class="purpose"><b>用途：</b>查看所有AI调用的详细日志，用于调试和分析。</p>
+        <h3>Trace记录包含</h3>
+        <ul>
+          <li><strong>调用时间</strong>：精确到秒</li>
+          <li><strong>使用模型</strong>：实际调用的AI模型</li>
+          <li><strong>任务名称</strong>：调用的功能模块</li>
+          <li><strong>耗时</strong>：AI响应时间（毫秒）</li>
+          <li><strong>输入字符数</strong>：发送给AI的字符数</li>
+          <li><strong>输出字符数</strong>：AI返回的字符数</li>
+          <li><strong>故障转移日志</strong>：如果发生了模型切换，记录切换过程</li>
+          <li><strong>错误信息</strong>：如果调用失败，记录错误原因</li>
+        </ul>
+        <h3>Trace存储</h3>
+        <p>按月份存储在 <code>data/trace/</code> 目录下，文件名格式为 <code>trace_YYYYMM.json</code>。</p>
+      </div>
+    </div>
+
+    <!-- ============ 附录 ============ -->
+
+    <section class="card" id="config">
+      <h2><span class="n">④</span>模型配置详解</h2>
+      <p class="sub">技术人员参考，详细介绍AI模型的配置文件和API方法。</p>
+
+      <h3>配置文件位置</h3>
+      <table>
+        <thead><tr><th>文件</th><th>位置</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>.env</td><td>工作台根目录</td><td>环境变量，API密钥等敏感信息</td></tr>
+          <tr><td>ai_providers.json</td><td>data/目录</td><td>8个供应商的详细配置</td></tr>
+          <tr><td>config.py</td><td>工作台根目录</td><td>17个提供商定义和全局常量</td></tr>
+          <tr><td>ai_client.py</td><td>工作台根目录</td><td>AI客户端v4.0，故障转移+Trace</td></tr>
+        </tbody>
+      </table>
+
+      <h3>.env 关键配置项</h3>
+      <div style="background:#1a1a2e;color:#D4AF37;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:13px;overflow-x:auto;margin:10px 0">
+AI_PROVIDER=siliconflow<br>
+OPENAI_MODEL=XingChenAGI/Xing4.0-29B<br>
+OPENAI_MODEL_LITE=Qwen/Qwen2.5-7B-Instruct<br>
+OPENAI_API_KEY=sk-...<br>
+OPENAI_API_BASE=https://api.siliconflow.cn/v1<br>
+# WooCommerce配置（保留）<br>
+WC_CONSUMER_KEY=ck_...<br>
+WC_CONSUMER_SECRET=cs_...
+      </div>
+
+      <h3>AI客户端核心方法</h3>
+      <table>
+        <thead><tr><th>方法</th><th>参数</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>ai.chat(prompt, use_lite, task_name)</td><td>prompt: 提示词<br>use_lite: 是否用轻量模型<br>task_name: 任务名称</td><td>文本生成，带故障转移</td></tr>
+          <tr><td>ai.generate_image(prompt, size, n)</td><td>prompt: 生图提示词<br>size: 图片尺寸<br>n: 生成数量</td><td>图像生成（CogView-3）</td></tr>
+          <tr><td>ai.chat_with_image(image_url, prompt, task_name)</td><td>image_url: 图片base64或URL<br>prompt: 分析提示词</td><td>视觉理解（glm-4.6v）</td></tr>
+          <tr><td>ai.test_connection()</td><td>-</td><td>测试当前模型连接</td></tr>
+          <tr><td>ai.get_failover_chain()</td><td>-</td><td>获取故障转移链</td></tr>
+          <tr><td>ai.get_recent_traces(limit)</td><td>limit: 返回条数</td><td>获取最近调用记录</td></tr>
+        </tbody>
+      </table>
+
+      <h3>图像生成支持的尺寸</h3>
+      <table>
+        <thead><tr><th>比例</th><th>尺寸</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td>1:1</td><td>1024x1024</td><td>电商主图、社交媒体方图</td></tr>
+          <tr><td>16:9</td><td>1024x576</td><td>横版海报、视频封面</td></tr>
+          <tr><td>4:3</td><td>1024x768</td><td>产品展示图</td></tr>
+          <tr><td>3:4</td><td>768x1024</td><td>竖版海报、小红书</td></tr>
+          <tr><td>9:16</td><td>576x1024</td><td>短视频封面、Story</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" id="faq">
+      <h2><span class="n">⑤</span>常见问题FAQ</h2>
+      <p class="sub">使用过程中遇到问题，先在这里查找答案。</p>
+
+      <h3>Q1: AI调用失败怎么办？</h3>
+      <p><strong>A:</strong> 工作台有8节点故障转移机制，一个模型失败会自动切换到下一个。如果所有在线模型都失败，会切换到本地Ollama模型。如果仍然失败，请检查网络连接。</p>
+
+      <h3>Q2: AI生成速度慢怎么办？</h3>
+      <p><strong>A:</strong> 可以在侧边栏手动切换到轻量模型（Qwen2.5-7B），响应速度更快。或者在调用时使用 use_lite=True 参数。</p>
+
+      <h3>Q3: 图像生成失败怎么办？</h3>
+      <p><strong>A:</strong> 图像生成使用智谱CogView-3-Flash模型，如果失败请检查：1）网络连接；2）API密钥是否有效；3）提示词是否包含违规内容。</p>
+
+      <h3>Q4: 视觉分析（图片理解）失败怎么办？</h3>
+      <p><strong>A:</strong> 视觉分析使用智谱glm-4.6v-flash模型，请确保图片格式为jpg/png/webp，大小不超过10MB。</p>
+
+      <h3>Q5: 如何添加新的AI模型？</h3>
+      <p><strong>A:</strong> 进入「设置中心」→「添加新API中转站」，填写供应商名称、API Base URL、API Key、模型名称等信息即可。</p>
+
+      <h3>Q6: 数据存储在哪里？安全吗？</h3>
+      <p><strong>A:</strong> 所有数据（客户、订单、知识库、Trace）都存储在本地JSON文件中，位于工作台的 data/ 目录下。数据不上传到任何第三方服务器，完全本地存储。</p>
+
+      <h3>Q7: 如何备份工作台数据？</h3>
+      <p><strong>A:</strong> 直接复制整个工作台文件夹即可完成备份。建议定期备份到外部硬盘或云存储。</p>
+
+      <h3>Q8: 工作台支持多用户同时使用吗？</h3>
+      <p><strong>A:</strong> 支持。工作台运行在本地服务器上，同一局域网内的多台设备可以通过 http://你的IP:8501 同时访问。每个用户有独立的浏览器会话。</p>
+
+      <h3>Q9: 忘记密码怎么办？</h3>
+      <p><strong>A:</strong> 访问密码是 441723。如果需要修改，编辑 app.py 第151行的密码判断，然后重启工作台。</p>
+
+      <h3>Q10: 如何重启工作台？</h3>
+      <p><strong>A:</strong> 关闭终端窗口或按 Ctrl+C 停止服务，然后重新双击桌面的启动脚本。</p>
+
+      <h3>Q11: AI生成的内容可以保存吗？</h3>
+      <p><strong>A:</strong> 大部分AI功能都有「保存到知识库」按钮，点击后内容会保存到公司知识库对应分类。部分功能（如开发信）会自动保存到个人工作空间。</p>
+
+      <h3>Q12: 本地Ollama模型如何安装？</h3>
+      <p><strong>A:</strong> 1）从 https://ollama.com 下载安装Ollama；2）执行 ollama pull qwen2.5:7b 下载模型；3）启动工作台后会自动检测本地模型。</p>
+
+      <h3>Q13: 故障转移是怎么工作的？</h3>
+      <p><strong>A:</strong> 调用AI时，系统按优先级1→8逐个尝试模型。如果第一个返回错误或超时，自动切换到第二个，以此类推。只有前7个在线模型全部失败时，才切换到第8个本地Ollama模型。整个过程用户无感知。</p>
+
+      <h3>Q14: 如何查看AI调用记录？</h3>
+      <p><strong>A:</strong> 进入「AI调用Trace」页面，可以查看所有AI调用的详细日志，包括使用的模型、耗时、输入输出字符数、故障转移日志等。</p>
+    </section>
+
+    <footer>
+      <p>📖 KaiLionCrafts AI客户开发工作台 · 完整使用说明书</p>
+      <p>版本：最终完整版 | 更新日期：2026年9月25日 | 共37个页面 | 8个AI模型 | 5个免费在线模型</p>
+      <p>如有问题，请联系工作台管理员</p>
+    </footer>
+  </main>
+</div>
+
+<div class="lb" id="lb" onclick="this.classList.remove('show')">
+  <img id="lb-img" src="" alt="">
+</div>
+<script>
+document.querySelectorAll('figure img').forEach(function(img){
+  img.addEventListener('click',function(){
+    document.getElementById('lb-img').src=this.src;
+    document.getElementById('lb').classList.add('show');
+  });
+});
+</script>
+</body>
+</html>

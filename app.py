@@ -292,6 +292,8 @@ with st.sidebar:
         # 飞书协同已并入公司知识库
         # 管理
         "⚙️ 设置中心",
+        # 帮助
+        "📖 工作台说明书",
     ]
 
     page = st.radio(
@@ -649,6 +651,74 @@ if page == "🏠 仪表盘":
                 st.write(line)
     except Exception:
         pass
+
+    # ===== AI今日工作建议 =====
+    st.markdown("##### 🤖 AI今日工作建议")
+    st.caption("综合客户、待办、订单数据，AI生成今日工作重点")
+    if st.button("✨ 生成今日工作建议", use_container_width=True, key="dash_ai_suggest"):
+        with st.spinner("AI正在分析今日工作重点..."):
+            try:
+                # 收集数据
+                stats = cm.get_statistics()
+                follow_today = cm.get_follow_up_today()
+                overdue = cm.get_overdue_follow_up()
+                
+                follow_text = "\n".join([
+                    f"- [{c.get('grade','C')}级] {c.get('company_name','')} ({c.get('country','')}) - {c.get('status','')}"
+                    for c in follow_today[:5]
+                ]) or "无"
+                overdue_text = "\n".join([
+                    f"- {c.get('company_name','')} - 应跟进: {c.get('next_follow_up','')}"
+                    for c in overdue[:5]
+                ]) or "无"
+                
+                # 待办数据
+                try:
+                    import json as _todo_json
+                    from pathlib import Path as _todo_path
+                    todo_file = _todo_path("data/todo/todos.json")
+                    if todo_file.exists():
+                        todos = _todo_json.loads(todo_file.read_text(encoding="utf-8"))
+                        pending_todos = [t for t in todos if not t.get("done")]
+                        high_todos = [t for t in pending_todos if t.get("priority") == "高"]
+                        todo_text = f"待办{len(pending_todos)}条（高优先级{len(high_todos)}条）"
+                    else:
+                        todo_text = "暂无待办"
+                except:
+                    todo_text = "暂无待办数据"
+                
+                prompt = f"""你是KaiLionCrafts外贸业务助理。请根据以下数据，生成今日工作建议：
+
+## 当前业务数据
+- 客户总数: {stats['total']}
+- A级客户: {stats['by_grade'].get('A', 0)}
+- 跟进中: {stats['by_status'].get('跟进中', 0)}
+- 已成交: {stats['by_pipeline'].get('closed', 0)}
+- 今日待跟进: {len(follow_today)}个
+- 逾期未跟进: {len(overdue)}个
+- 待办事项: {todo_text}
+
+## 今日待跟进客户
+{follow_text}
+
+## 逾期未跟进客户
+{overdue_text}
+
+## 请生成
+1. **今日TOP3优先事项**（按重要性排序）
+2. **客户跟进建议**（针对今日待跟进和逾期客户）
+3. **风险提示**（需要注意的问题）
+4. **今日目标**（可量化的目标）
+
+用中文，简洁专业，控制在300字以内。"""
+                
+                suggestion = ai.chat(prompt, task_name="仪表盘-AI今日建议")
+                st.markdown(suggestion)
+                if ai.last_trace:
+                    t = ai.last_trace
+                    st.caption(f"模型: {t['model'][:25]} | 耗时: {t['elapsed_seconds']}s")
+            except Exception as e:
+                st.error(f"AI生成失败: {e}")
 
     st.markdown("---")
 
@@ -1146,6 +1216,70 @@ elif page == "🖥️ 独立站管理":
         s3.metric("已回复", len([i for i in inquiries if i["status"]=="已回复"]))
         s4.metric("评论", len(comments))
 
+        st.markdown("---")
+        st.markdown("##### 🤖 AI询盘分析")
+        st.caption("基于所有询盘数据，AI生成客户需求洞察和回复策略")
+        if st.button("✨ 生成询盘分析报告", use_container_width=True, key="ai_inquiry_analysis"):
+            if inquiries:
+                with st.spinner("AI正在分析询盘数据..."):
+                    try:
+                        # 统计
+                        from collections import Counter
+                        countries = Counter(i.get("country","未知") for i in inquiries if i.get("country"))
+                        products = Counter(i.get("product_interest","") for i in inquiries if i.get("product_interest"))
+                        sources = Counter(i.get("source","未知") for i in inquiries)
+                        pending = [i for i in inquiries if i["status"]=="待回复"]
+                        
+                        country_text = "\n".join([f"- {c}: {n}条" for c, n in countries.most_common(5)]) or "暂无数据"
+                        product_text = "\n".join([f"- {p}: {n}条" for p, n in products.most_common(5)]) or "暂无数据"
+                        source_text = "\n".join([f"- {s}: {n}条" for s, n in sources.most_common()]) or "暂无数据"
+                        
+                        # 待回复询盘摘要
+                        pending_text = "\n".join([
+                            f"- {i.get('customer_name','')} ({i.get('country','')}): {i.get('product_interest','')[:50]}"
+                            for i in pending[:5]
+                        ]) or "无待回复"
+                        
+                        prompt = f"""你是KaiLionCrafts外贸询盘分析师。请根据以下询盘数据生成分析报告：
+
+## 询盘概览
+- 总询盘: {len(inquiries)}条
+- 待回复: {len(pending)}条
+- 已回复: {len([i for i in inquiries if i['status']=='已回复'])}条
+- 已成交: {len([i for i in inquiries if i['status']=='已成交'])}条
+
+## 国家分布TOP5
+{country_text}
+
+## 产品需求TOP5
+{product_text}
+
+## 来源分布
+{source_text}
+
+## 待回复询盘
+{pending_text}
+
+## 请生成
+1. **客户需求洞察**（热门产品、主要市场、客户类型）
+2. **回复优先级建议**（哪些询盘应优先回复）
+3. **产品策略建议**（根据需求调整产品推广）
+4. **市场机会**（哪些国家/产品有增长潜力）
+5. **风险提示**（需要注意的问题）
+
+用中文，简洁专业，控制在400字以内。"""
+                        
+                        analysis = ai.chat(prompt, task_name="询盘分析-AI")
+                        st.markdown(analysis)
+                        
+                        if ai.last_trace:
+                            t = ai.last_trace
+                            st.caption(f"模型: {t['model'][:25]} | 耗时: {t['elapsed_seconds']}s")
+                    except Exception as e:
+                        st.error(f"AI分析失败: {e}")
+            else:
+                st.info("暂无询盘数据，无法生成分析")
+
     # WooCommerce后台
     st.markdown("---")
     st.markdown("##### 🛒 WooCommerce订单与评论")
@@ -1231,33 +1365,89 @@ elif page == "🌅 晨间简报":
     st.markdown("---")
 
     # AI生成简报
-    if st.button("✨ AI生成今日简报", use_container_width=True, type="primary"):
-        with st.spinner("AI正在生成晨间简报..."):
-            follow_up_text = "\n".join([
-                f"- [{c.get('grade','C')}级] {c.get('company_name','')} ({c.get('country','')}) - {c.get('products','')[:40]}"
-                for c in follow_up_today[:10]
-            ]) or "无"
-            overdue_text = "\n".join([
-                f"- [{c.get('grade','C')}级] {c.get('company_name','')} - 应跟进日期: {c.get('next_follow_up','')}"
-                for c in overdue[:10]
-            ]) or "无"
+    brief_col1, brief_col2 = st.columns([2, 1])
+    with brief_col1:
+        if st.button("✨ AI生成今日简报", use_container_width=True, type="primary"):
+            with st.spinner("AI正在生成晨间简报..."):
+                follow_up_text = "\n".join([
+                    f"- [{c.get('grade','C')}级] {c.get('company_name','')} ({c.get('country','')}) - {c.get('products','')[:40]}"
+                    for c in follow_up_today[:10]
+                ]) or "无"
+                overdue_text = "\n".join([
+                    f"- [{c.get('grade','C')}级] {c.get('company_name','')} - 应跟进日期: {c.get('next_follow_up','')}"
+                    for c in overdue[:10]
+                ]) or "无"
 
-            prompt = MORNING_BRIEF_PROMPT.format(
-                today=datetime.now().strftime("%Y-%m-%d"),
-                follow_up_customers=follow_up_text,
-                overdue_customers=overdue_text,
-                total_customers=stats["total"],
-                grade_a_count=stats["by_grade"].get("A", 0),
-                grade_b_count=stats["by_grade"].get("B", 0),
-                grade_c_count=stats["by_grade"].get("C", 0),
-                lead_count=stats["by_pipeline"].get("lead", 0),
-                contacted_count=stats["by_pipeline"].get("contacted", 0),
-                engaged_count=stats["by_pipeline"].get("engaged", 0),
-                quoted_count=stats["by_pipeline"].get("quoted", 0),
-                closed_count=stats["by_pipeline"].get("closed", 0),
-            )
-            brief = ai.chat(prompt, use_lite=True)
-        st.markdown(brief)
+                prompt = MORNING_BRIEF_PROMPT.format(
+                    today=datetime.now().strftime("%Y-%m-%d"),
+                    follow_up_customers=follow_up_text,
+                    overdue_customers=overdue_text,
+                    total_customers=stats["total"],
+                    grade_a_count=stats["by_grade"].get("A", 0),
+                    grade_b_count=stats["by_grade"].get("B", 0),
+                    grade_c_count=stats["by_grade"].get("C", 0),
+                    lead_count=stats["by_pipeline"].get("lead", 0),
+                    contacted_count=stats["by_pipeline"].get("contacted", 0),
+                    engaged_count=stats["by_pipeline"].get("engaged", 0),
+                    quoted_count=stats["by_pipeline"].get("quoted", 0),
+                    closed_count=stats["by_pipeline"].get("closed", 0),
+                )
+                brief = ai.chat(prompt, use_lite=True)
+            st.markdown(brief)
+    with brief_col2:
+        if st.button("🔥 AI深度简报+待办", use_container_width=True, type="secondary"):
+            with st.spinner("AI正在深度分析并生成待办..."):
+                # 收集更多数据
+                a_grade = [c for c in follow_up_today if c.get('grade') == 'A']
+                b_grade = [c for c in follow_up_today if c.get('grade') == 'B']
+                
+                deep_prompt = f"""你是KaiLionCrafts外贸企业的首席运营官。今天是{datetime.now().strftime('%Y年%m月%d日')}。
+
+【客户数据】
+- 客户总数：{stats['total']}
+- A级客户：{stats['by_grade'].get('A', 0)}，B级：{stats['by_grade'].get('B', 0)}，C级：{stats['by_grade'].get('C', 0)}
+- 今日待跟进：{len(follow_up_today)}个（A级{len(a_grade)}个，B级{len(b_grade)}个）
+- 逾期未跟进：{len(overdue)}个
+- 销售管道：线索{stats['by_pipeline'].get('lead',0)} / 已联系{stats['by_pipeline'].get('contacted',0)} / 已互动{stats['by_pipeline'].get('engaged',0)} / 已报价{stats['by_pipeline'].get('quoted',0)} / 已成交{stats['by_pipeline'].get('closed',0)}
+
+【今日待跟进A级客户】
+{chr(10).join([f"- {c.get('company_name','')} ({c.get('country','')})" for c in a_grade[:5]]) or '无'}
+
+【逾期客户】
+{chr(10).join([f"- {c.get('company_name','')} (逾期{c.get('next_follow_up','')})" for c in overdue[:5]]) or '无'}
+
+请生成深度晨间简报，包含：
+1. 🎯 今日TOP3工作重点（按优先级排序）
+2. 👥 客户跟进策略（A级客户优先处理建议）
+3. ⚠️ 风险提示（逾期客户、管道瓶颈）
+4. 📈 机会洞察（可推进的报价/成交机会）
+5. ✅ 建议今日待办清单（5-8条，每条带优先级：高/中/低）
+
+用中文，简洁专业，适合外贸企业管理者阅读。"""
+                deep_brief = ai.chat(deep_prompt, task_name="晨间深度简报")
+            st.markdown("### 🔥 AI深度晨间简报")
+            st.markdown(deep_brief)
+            
+            # 一键生成待办
+            if st.button("📋 将AI建议转为今日待办", key="brief_to_todo", use_container_width=True):
+                try:
+                    import re as _re
+                    # 从简报中提取待办项
+                    todo_items = _re.findall(r'[-•]\s*(.+?)(?=\n[-•]|\n##|$)', deep_brief, _re.DOTALL)
+                    added = 0
+                    for item in todo_items[:8]:
+                        item = item.strip()
+                        if len(item) > 5 and len(item) < 100:
+                            priority = "高" if any(k in item for k in ["优先", "紧急", "立即", "A级", "重点"]) else "中"
+                            if "todo_manager" in dir():
+                                todo_manager.add_task(item, priority=priority, category="客户跟进")
+                                added += 1
+                    if added > 0:
+                        st.success(f"✅ 已添加 {added} 条待办到今日待办")
+                    else:
+                        st.info("未提取到可转换的待办项，请手动添加")
+                except Exception as e:
+                    st.error(f"转待办失败：{e}")
 
     st.markdown("---")
 
@@ -2923,6 +3113,47 @@ EN: ...
                     save_to_kb_button(report, "客户管理/线索分层", f"客户分层报表_{_dt.now().strftime('%Y%m%d_%H%M')}", "md")
                     st.success("✅ 报表已导出")
 
+                # ===== AI分层分析报告 =====
+                st.markdown("---")
+                st.markdown("**🤖 AI分层分析报告**")
+                st.caption("根据客户分层数据，AI生成分析报告和跟进策略建议")
+                if st.button("✨ 生成AI分层分析报告", key="ai_grade_analysis", use_container_width=True):
+                    with st.spinner("AI正在分析客户分层..."):
+                        try:
+                            a_customers = [c for c in customers_all if c.get("grade") == "A"]
+                            a_text = "\n".join([
+                                f"- {c.get('company_name','')} ({c.get('country','')}) - {c.get('status','')}"
+                                for c in a_customers[:10]
+                            ]) or "无"
+                            from collections import Counter
+                            stage_dist = Counter(c.get("pipeline_stage", "lead") for c in customers_all)
+                            stage_text = "\n".join([f"- {k}: {v}个" for k, v in stage_dist.most_common()])
+                            prompt = f"""你是KaiLionCrafts外贸CRM分析师。请根据以下客户分层数据生成分析报告：
+## 客户分层概览
+- 客户总数: {total}
+- A级（重点）: {grade_counts['A']}个 ({grade_counts['A']/total*100:.1f}%)
+- B级（潜在）: {grade_counts['B']}个 ({grade_counts['B']/total*100:.1f}%)
+- C级（一般）: {grade_counts['C']}个 ({grade_counts['C']/total*100:.1f}%)
+- D级（无效）: {grade_counts['D']}个 ({grade_counts['D']/total*100:.1f}%)
+## A级客户明细
+{a_text}
+## 客户阶段分布
+{stage_text}
+## 请生成
+1. **客户结构健康度评估**
+2. **A级客户跟进策略**
+3. **B/C级客户转化策略**
+4. **D级客户处理建议**
+5. **本月行动建议**（3-5条）
+用中文，简洁专业，400字以内。"""
+                            analysis = ai.chat(prompt, task_name="客户分层分析-AI")
+                            st.markdown(analysis)
+                            if ai.last_trace:
+                                t = ai.last_trace
+                                st.caption(f"模型: {t['model'][:25]} | 耗时: {t['elapsed_seconds']}s")
+                        except Exception as e:
+                            st.error(f"AI分析失败: {e}")
+
             except Exception as e:
                 st.error(f"加载失败：{e}")
 
@@ -3075,6 +3306,68 @@ EN: ...
                     st.dataframe(pd.DataFrame(clean_records[:20]), use_container_width=True, hide_index=True)
                 else:
                     st.info("暂无清洗记录")
+
+                # ===== AI公池客户分析 =====
+                st.markdown("---")
+                st.markdown("**🤖 AI公池客户分析**")
+                st.caption("根据公池客户数据，AI生成认领优先级和跟进策略建议")
+                if st.button("✨ 生成公池客户分析", key="ai_pool_analysis", use_container_width=True):
+                    if pool_customers:
+                        with st.spinner("AI正在分析公池客户..."):
+                            try:
+                                from collections import Counter
+                                pool_countries = Counter(c.get("country", "未知") for c in pool_customers if c.get("country"))
+                                pool_grades = Counter(c.get("grade", "C") for c in pool_customers)
+                                pool_sources = Counter(c.get("source", "未知") for c in pool_customers if c.get("source"))
+                                
+                                country_text = "\n".join([f"- {c}: {n}个" for c, n in pool_countries.most_common(5)]) or "无"
+                                grade_text = "\n".join([f"- {g}级: {n}个" for g, n in pool_grades.most_common()])
+                                source_text = "\n".join([f"- {s}: {n}个" for s, n in pool_sources.most_common(5)]) or "无"
+                                
+                                # 高价值公池客户（A级/B级）
+                                high_value = [c for c in pool_customers if c.get("grade") in ["A", "B"]]
+                                high_value_text = "\n".join([
+                                    f"- {c.get('company_name','')} ({c.get('country','')}) - {c.get('grade','')}级"
+                                    for c in high_value[:10]
+                                ]) or "无高价值客户"
+                                
+                                prompt = f"""你是KaiLionCrafts外贸客户开发专家。请根据以下公池客户数据生成分析报告：
+
+## 公池概览
+- 公池客户总数: {len(pool_customers)}
+- 我名下客户: {len(my_customers)}
+
+## 公池客户等级分布
+{grade_text}
+
+## 公池客户国家分布TOP5
+{country_text}
+
+## 公池客户来源分布TOP5
+{source_text}
+
+## 高价值公池客户（A/B级）
+{high_value_text}
+
+## 请生成
+1. **公池客户价值评估**（整体质量如何，是否值得投入）
+2. **认领优先级建议**（哪些客户应优先认领，为什么）
+3. **高价值客户跟进策略**（针对A/B级客户的跟进建议）
+4. **公池清理建议**（哪些客户可以放弃或冷藏）
+5. **本月行动建议**（3-5条具体行动）
+
+用中文，简洁专业，控制在400字以内。"""
+                                
+                                analysis = ai.chat(prompt, task_name="公池客户分析-AI")
+                                st.markdown(analysis)
+                                
+                                if ai.last_trace:
+                                    t = ai.last_trace
+                                    st.caption(f"模型: {t['model'][:25]} | 耗时: {t['elapsed_seconds']}s")
+                            except Exception as e:
+                                st.error(f"AI分析失败: {e}")
+                    else:
+                        st.info("公池暂无客户，无法生成分析")
 
             except Exception as e:
                 st.error(f"加载失败：{e}")
@@ -4460,6 +4753,83 @@ elif page == "🤖 锴利自研AI工具库":
                 """, unsafe_allow_html=True)
     
                 # 5个Tab
+
+                # AI智能命名
+                with st.expander("🤖 AI智能命名（输入产品描述，自动生成SKU）", expanded=False):
+                    st.markdown("**根据产品描述，AI自动分析品类、材质并生成符合规则的SKU编码**")
+                    ai_col1, ai_col2 = st.columns([3, 1])
+                    with ai_col1:
+                        sku_ai_desc = st.text_area("产品描述", placeholder="如：8寸大马士革钢厨师刀，VG10钢芯，黑色G10手柄，适合专业厨房使用", height=80, key="sku_ai_desc")
+                    with ai_col2:
+                        sku_ai_style = st.text_input("款式号（可选）", placeholder="如：001", key="sku_ai_style")
+                        sku_ai_count = st.number_input("生成图片数", 1, 20, 5, key="sku_ai_count")
+                    if st.button("✨ AI智能生成SKU", key="sku_ai_gen", use_container_width=True, type="primary"):
+                        if not sku_ai_desc:
+                            st.warning("请先填写产品描述")
+                        else:
+                            with st.spinner("AI正在分析产品并生成SKU..."):
+                                try:
+                                    sku_prompt = f"""你是SKU命名专家，服务阳江刀剪厨具出口企业KaiLionCrafts。
+
+SKU格式：KL-品类-材质-款式号
+品类代码：KN(厨刀)、OD(户外刀)、SC(剪刀)、KA(厨房用品)
+常见材质代码：DS(大马士革钢)、SS(不锈钢)、HC(高碳钢)、CE(陶瓷)、TI(钛合金)、CF(碳纤维)、WD(木柄)、PL(塑料柄)
+
+产品描述：{sku_ai_desc}
+款式号：{sku_ai_style or '自动推荐'}
+
+请分析产品，输出JSON：
+{{"category": "品类代码", "category_name": "品类中文名", "material": "材质代码", "material_name": "材质中文名", "style": "款式号(3位数字)", "product_name": "产品英文名", "reason": "分析理由(中文50字)"}}
+只输出JSON，不要解释。"""
+                                    sku_result = ai.chat(sku_prompt, task_name="SKU命名-AI生成")
+                                    import json as _json
+                                    import re as _re
+                                    json_match = _re.search(r'\{.*\}', sku_result, _re.DOTALL)
+                                    if json_match:
+                                        sku_rec = _json.loads(json_match.group())
+                                        cat = sku_rec.get("category", "KN")
+                                        mat = sku_rec.get("material", "SS")
+                                        style = sku_rec.get("style", "001")
+                                        sku_code = f"KL-{cat}-{mat}-{style}"
+                                        
+                                        st.markdown("### 🎯 AI生成结果")
+                                        r1, r2, r3 = st.columns(3)
+                                        with r1:
+                                            st.metric("品类", f"{cat} ({sku_rec.get('category_name','')})")
+                                        with r2:
+                                            st.metric("材质", f"{mat} ({sku_rec.get('material_name','')})")
+                                        with r3:
+                                            st.metric("款式号", style)
+                                        
+                                        st.success(f"**SKU编码：{sku_code}**")
+                                        st.caption(f"💡 {sku_rec.get('reason', '')}")
+                                        
+                                        # 生成图片文件名列表
+                                        st.markdown("#### 📷 图片文件名列表")
+                                        file_list = []
+                                        for i in range(1, sku_ai_count + 1):
+                                            fname = f"{sku_code}-{i:02d}.jpg"
+                                            file_list.append(fname)
+                                        st.code("\n".join(file_list))
+                                        
+                                        # 生成Alt Text和SEO命名
+                                        product_name = sku_rec.get("product_name", "Premium Kitchen Knife")
+                                        alt_text = f"{product_name} - KaiLionCrafts High Quality {sku_rec.get('material_name','Stainless Steel')} {sku_rec.get('category_name','Kitchen Knife')}"
+                                        seo_name = f"{product_name.lower().replace(' ', '-')}-{sku_code.lower()}"
+                                        
+                                        st.markdown("#### 🔤 SEO命名")
+                                        st.code(f"Alt Text: {alt_text}")
+                                        st.code(f"SEO文件名: {seo_name}.jpg")
+                                        
+                                        # 保存到知识库
+                                        save_content = f"SKU: {sku_code}\n品类: {sku_rec.get('category_name','')}\n材质: {sku_rec.get('material_name','')}\n产品名: {product_name}\n图片数: {sku_ai_count}\n\n图片文件:\n" + "\n".join(file_list)
+                                        save_to_kb_button(save_content, "SKU命名", f"AI生成_{sku_code}")
+                                    else:
+                                        st.error("AI返回格式异常")
+                                        st.code(sku_result)
+                                except Exception as e:
+                                    st.error(f"AI生成失败：{e}")
+
                 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔪 产品库命名", "✏️ 自定义生成", "⚡ 批量重命名", "🧱 材质代码表", "📊 SEO关键词库"])
     
                 # ========== Tab1: 产品库命名 ==========
@@ -5283,6 +5653,56 @@ elif page == "🤖 锴利自研AI工具库":
                                         del st.session_state[k]
                                 st.rerun()
     
+
+                    # AI智能检测角度
+                    with st.container(border=True):
+                        st.markdown("**🤖 AI智能检测（glm-4.6v-flash视觉模型）**")
+                        st.caption("使用AI视觉模型分析第一张图片，推荐最佳角度和分类，比传统算法更准确")
+                        ai_cols = st.columns([2, 1])
+                        with ai_cols[0]:
+                            if st.button("✨ AI智能检测角度与分类", key="vc_ai_detect", use_container_width=True, type="primary"):
+                                if uploaded_files:
+                                    with st.spinner("AI正在分析图片..."):
+                                        try:
+                                            import base64 as _b64
+                                            first_file = uploaded_files[0]
+                                            ref_bytes = first_file.getvalue()
+                                            ref_b64 = _b64.b64encode(ref_bytes).decode()
+                                            ref_data_url = f"data:image/{first_file.type.split('/')[-1]};base64,{ref_b64}"
+                                            
+                                            vc_prompt = """请分析这张产品图片，输出以下信息（用JSON格式）：
+1. angle: 推荐旋转角度（-180到180度，0为水平，正数顺时针，负数逆时针）
+2. category: 产品分类（可选：厨刀/户外刀/剪刀/锅具/托盘/其他）
+3. orientation: 推荐朝向（水平/垂直）
+4. scale: 推荐缩放百分比（10-150）
+5. reason: 推荐理由（中文，50字以内）
+只输出JSON，不要解释。"""
+                                            
+                                            vc_result = ai.chat_with_image(ref_data_url, vc_prompt, task_name="视觉矫正-AI检测")
+                                            import json as _json
+                                            import re as _re
+                                            json_match = _re.search(r'\{.*\}', vc_result, _re.DOTALL)
+                                            if json_match:
+                                                vc_rec = _json.loads(json_match.group())
+                                                st.session_state["vc_ga"] = float(vc_rec.get("angle", 0))
+                                                st.session_state["vc_gs"] = int(vc_rec.get("scale", 88))
+                                                st.session_state["vc_ai_category"] = vc_rec.get("category", "未分类")
+                                                st.session_state["vc_ai_reason"] = vc_rec.get("reason", "")
+                                                st.success(f"✅ AI检测完成！角度：{vc_rec.get('angle',0)}° | 分类：{vc_rec.get('category','')} | 缩放：{vc_rec.get('scale',88)}%")
+                                                st.rerun()
+                                            else:
+                                                st.error("AI返回格式异常")
+                                                st.code(vc_result)
+                                        except Exception as e:
+                                            st.error(f"AI检测失败：{e}")
+                                else:
+                                    st.warning("请先上传图片")
+                        with ai_cols[1]:
+                            if "vc_ai_category" in st.session_state:
+                                st.metric("AI分类", st.session_state["vc_ai_category"])
+                            if "vc_ai_reason" in st.session_state:
+                                st.caption(f"💡 {st.session_state['vc_ai_reason']}")
+
                         # 创建slider（按钮已修改session_state，slider会自动读取新值）
                         gc = st.columns(4)
                         with gc[0]:
@@ -5480,6 +5900,50 @@ elif page == "🤖 锴利自研AI工具库":
     
                 # 搜索
                 search = st.text_input("🔍 搜索提示词", placeholder="如: 大马士革、户外、BBQ、Banner...")
+
+                # AI生成自定义提示词
+                with st.expander("🤖 AI生成自定义提示词（根据你的产品和场景自动生成）", expanded=False):
+                    ai_col1, ai_col2 = st.columns(2)
+                    with ai_col1:
+                        pl_product = st.text_input("产品描述", placeholder="如：大马士革钢厨师刀，8寸，黑色手柄", key="pl_ai_product")
+                        pl_scene = st.text_input("使用场景", placeholder="如：现代厨房，木质砧板，自然光", key="pl_ai_scene")
+                    with ai_col2:
+                        pl_style = st.selectbox("风格", ["商业摄影", "生活方式", "极简白底", "户外露营", "工业风", "高端杂志"], key="pl_ai_style")
+                        pl_ratio = st.selectbox("比例", ["1:1", "16:9", "4:3", "3:4", "9:16"], key="pl_ai_ratio")
+                    pl_extra = st.text_area("补充要求（可选）", placeholder="如：突出刀刃细节，浅景深，暖色调...", height=60, key="pl_ai_extra")
+                    if st.button("✨ AI生成提示词", key="pl_ai_gen", use_container_width=True, type="primary"):
+                        if not pl_product:
+                            st.warning("请先填写产品描述")
+                        else:
+                            with st.spinner("AI正在生成提示词..."):
+                                try:
+                                    pl_prompt = f"""你是专业商业产品摄影提示词专家，服务阳江刀剪厨具出口企业。
+
+产品：{pl_product}
+场景：{pl_scene or '专业摄影棚'}
+风格：{pl_style}
+比例：{pl_ratio}
+补充：{pl_extra or '无'}
+
+请生成3个不同角度的生图提示词（英文），每个包含：
+1. 主体描述（产品外观、材质、细节）
+2. 场景与环境
+3. 光线与影调
+4. 构图与镜头
+5. 风格关键词
+6. 质量关键词（8k, ultra detailed, professional等）
+
+每个提示词控制在80-120词，适合Midjourney/Stable Diffusion/FLUX使用。
+在每个提示词前标注角度名称（如：主图角度、细节特写、场景使用）。"""
+                                    pl_result = ai.chat(pl_prompt, task_name="提示词库-AI生成")
+                                    st.markdown("### 🎨 AI生成的提示词")
+                                    st.markdown(pl_result)
+                                    
+                                    # 保存到知识库按钮
+                                    save_to_kb_button(pl_result, "提示词库", f"AI生成提示词_{datetime.now().strftime('%Y%m%d_%H%M')}")
+                                except Exception as e:
+                                    st.error(f"AI生成失败：{e}")
+
     
                 # 收集所有提示词
                 all_prompts = []
@@ -5674,23 +6138,46 @@ elif page == "🤖 锴利自研AI工具库":
                         if not ref_file:
                             st.error("请先上传参考场景图")
                         else:
-                            with st.spinner("AI正在分析参考图..."):
+                            with st.spinner("AI正在视觉分析参考图并反推场景..."):
                                 try:
+                                    import base64 as _b64
+                                    
+                                    # 第一步：使用glm-4.6v-flash视觉模型分析参考场景图
+                                    ref_bytes = ref_file.getvalue()
+                                    ref_b64 = _b64.b64encode(ref_bytes).decode()
+                                    ref_data_url = f"data:image/{ref_file.type.split('/')[-1]};base64,{ref_b64}"
+                                    
+                                    vision_prompt = """请详细分析这张商业产品摄影参考图，提取以下信息（用英文）：
+1. scene: 场景类型（如modern kitchen, outdoor BBQ, wooden table等）
+2. composition: 构图方式（如rule of thirds, center, close-up等）
+3. lighting: 光线类型（如soft window light, studio light, natural sunlight等）
+4. mood: 整体氛围（如premium lifestyle, rustic, minimalist等）
+5. interaction: 人与产品的互动方式（如human hand holding, cutting, placing等）
+6. action: 产品的动作姿态（如cutting vegetables, slicing bread等）
+7. keywords: 5-8个英文关键词描述画面元素
+请用JSON格式输出，字段：scene, composition, lighting, mood, interaction, action, keywords(数组)。只输出JSON，不要解释。"""
+                                    
+                                    vision_result = ai.chat_with_image(ref_data_url, vision_prompt, task_name="场景反推-视觉分析")
+                                    
+                                    # 第二步：基于视觉分析结果+用户选择，生成最终商业场景摄影方案
                                     sys_prompt = (
-                                        "你是专业商业产品摄影导演。根据用户选择的品类与光影氛围，"
+                                        "你是专业商业产品摄影导演。根据视觉分析结果和用户选择的品类与光影氛围，"
                                         "输出一个商业场景摄影方案JSON，字段必须为：interaction(互动类型), "
                                         "scene(场景类型英文), action(动作姿态英文), keywords(英文关键词数组), "
                                         "composition(构图), lighting(光线), mood(氛围)。只输出JSON，不要解释。"
                                     )
                                     user_prompt = (
-                                        f"品类：{category}\n光影氛围：{'、'.join(lighting) if lighting else '商业摄影光效'}\n"
-                                        "请基于以上信息，输出该产品在海外B2B独立站详情页的商业场景摄影方案JSON。"
+                                        f"品类：{category}\n"
+                                        f"光影氛围：{'、'.join(lighting) if lighting else '商业摄影光效'}\n\n"
+                                        f"参考图视觉分析结果：\n{vision_result}\n\n"
+                                        "请基于以上视觉分析和用户选择，优化并输出该产品在海外B2B独立站详情页的商业场景摄影方案JSON。"
                                     )
                                     result = ai.chat(user_prompt, system_prompt=sys_prompt,
-                                                     temperature=0.3, task_name="场景图反推")
+                                                     temperature=0.3, task_name="场景图反推-方案生成")
                                     st.session_state["sr_result"] = result
+                                    st.session_state["sr_vision_result"] = vision_result
                                 except Exception as e:
-                                    st.error(f"调用AI失败：{e}")
+                                    st.error(f"调用AI失败：{e}，使用默认方案")
                                     st.session_state["sr_result"] = '{"interaction":"human hand","scene":"modern Western kitchen","action":"cutting vegetables","keywords":["natural light","wooden board","premium feel"],"composition":"rule of thirds","lighting":"soft window light","mood":"premium lifestyle"}'
     
                 with right_col:
@@ -5724,6 +6211,12 @@ elif page == "🤖 锴利自研AI工具库":
                             st.metric("场景类型", result.get("scene","—"))
                         with m3:
                             st.metric("动作姿态", result.get("action","—"))
+                        
+                        # 视觉分析原始结果
+                        if "sr_vision_result" in st.session_state:
+                            with st.expander("🔍 参考图视觉分析原始结果（glm-4.6v-flash）"):
+                                st.code(st.session_state["sr_vision_result"], language="json")
+                        
                         kw = result.get("keywords", [])
                         tags_html = " ".join([f"<span style='background:#e3f2fd;color:#1565c0;padding:3px 10px;border-radius:10px;font-size:11px;margin:2px;display:inline-block;'>{k}</span>" for k in kw])
                         st.markdown("**关键词：**")
@@ -5789,6 +6282,52 @@ elif page == "🤖 锴利自研AI工具库":
                     """, unsafe_allow_html=True)
                     if st.button("🔵 自动推演白平衡 (AUTO AWB)", key="wb_auto_awb", use_container_width=True, type="primary"):
                         st.session_state["wb_auto"] = True
+                    if st.button("🤖 AI智能推荐参数", key="wb_ai_recommend", use_container_width=True):
+                        wb_files = st.session_state.get("wb_upload", [])
+                        if not wb_files:
+                            st.warning("请先在右侧上传产品图")
+                        else:
+                            with st.spinner("AI正在分析图片色彩..."):
+                                try:
+                                    import base64 as _b64
+                                    first_file = wb_files[0] if isinstance(wb_files, list) else wb_files
+                                    ref_bytes = first_file.getvalue()
+                                    ref_b64 = _b64.b64encode(ref_bytes).decode()
+                                    ref_data_url = f"data:image/{first_file.type.split('/')[-1]};base64,{ref_b64}"
+                                    
+                                    wb_prompt = """请分析这张产品图片的色彩状况，推荐最佳的白平衡和调色参数。
+请用JSON格式输出，字段：
+- temp: 推荐色温（2000-10000，标准5500）
+- tint: 推荐色调（-50到50，0为中性）
+- exposure: 推荐曝光（-100到100，0为标准）
+- contrast: 推荐对比度（-100到100，0为标准）
+- saturation: 推荐饱和度（-100到100，0为标准）
+- preset: 推荐色彩预设（可选：none, coolMetal, portra400, fujiPro, warmCream, japanHighkey, bwClassic, fujiClassic, fujiVelvia, tealOrange, leicaVivid, vividLandscape, cinematic）
+- reason: 推荐理由（中文，50字以内）
+只输出JSON，不要解释。"""
+                                    
+                                    wb_result = ai.chat_with_image(ref_data_url, wb_prompt, task_name="白平衡-AI推荐")
+                                    import json as _json
+                                    try:
+                                        wb_rec = _json.loads(wb_result)
+                                        st.session_state["wb_temp"] = wb_rec.get("temp", 5500)
+                                        st.session_state["wb_tint"] = wb_rec.get("tint", 0)
+                                        st.session_state["wb_exp"] = wb_rec.get("exposure", 0)
+                                        st.session_state["wb_cont"] = wb_rec.get("contrast", 0)
+                                        st.session_state["wb_sat"] = wb_rec.get("saturation", 0)
+                                        st.session_state["wb_preset_key"] = wb_rec.get("preset", "none")
+                                        st.session_state["wb_auto"] = False
+                                        st.session_state["wb_ai_reason"] = wb_rec.get("reason", "")
+                                        st.success(f"✅ AI推荐已应用！理由：{wb_rec.get('reason', '')}")
+                                        st.rerun()
+                                    except:
+                                        st.session_state["wb_ai_raw"] = wb_result
+                                        st.info("AI分析结果（原始）：")
+                                        st.code(wb_result)
+                                except Exception as e:
+                                    st.error(f"AI分析失败：{e}")
+                    if "wb_ai_reason" in st.session_state:
+                        st.caption(f"💡 AI推荐理由：{st.session_state['wb_ai_reason']}")
                     st.button("🎯 吸管手动取色校准", key="wb_picker", use_container_width=True, disabled=True)
     
                     # 专业色彩预设
@@ -6090,6 +6629,62 @@ elif page == "🤖 锴利自研AI工具库":
                         st.download_button("📄 导出CSV", csv_buf.getvalue(), file_name="raw_alignment_report.csv", mime="text/csv")
     
                     # 筛选
+
+                    # AI智能匹配未找到的JPG
+                    if missing:
+                        with st.container(border=True):
+                            st.markdown("**🤖 AI智能匹配（分析文件名相似度）**")
+                            st.caption(f"有 {len(missing)} 张JPG未找到RAW，使用AI分析文件名相似度推荐匹配")
+                            if st.button("✨ AI智能匹配未找到的JPG", key="raw_ai_match", use_container_width=True, type="primary"):
+                                with st.spinner("AI正在分析文件名相似度..."):
+                                    try:
+                                        missing_names = [j.name for j in missing]
+                                        raw_names = [r.name for r in raw_files]
+                                        match_prompt = f"""你是文件匹配专家。请根据文件名相似度，为以下JPG文件推荐最可能匹配的RAW文件。
+
+JPG文件（未匹配）：
+{chr(10).join([f"- {n}" for n in missing_names])}
+
+所有RAW文件：
+{chr(10).join([f"- {n}" for n in raw_names])}
+
+请分析文件名的数字、前缀、后缀相似度，为每个JPG推荐最可能匹配的RAW文件。
+用JSON格式输出，格式：{{"jpg文件名": "推荐的RAW文件名", ...}}
+只输出JSON，不要解释。"""
+                                        match_result = ai.chat(match_prompt, task_name="RAW对齐-AI匹配")
+                                        import json as _json
+                                        import re as _re
+                                        json_match = _re.search(r'\{.*\}', match_result, _re.DOTALL)
+                                        if json_match:
+                                            ai_matches = _json.loads(json_match.group())
+                                            st.markdown("### 🎯 AI推荐匹配结果")
+                                            new_matches = []
+                                            new_missing = []
+                                            for jpg in missing:
+                                                recommended = ai_matches.get(jpg.name, "")
+                                                if recommended:
+                                                    matched_raw = next((r for r in raw_files if r.name == recommended), None)
+                                                    if matched_raw:
+                                                        new_matches.append((jpg, matched_raw))
+                                                        st.success(f"✅ {jpg.name} → {matched_raw.name}")
+                                                    else:
+                                                        new_missing.append(jpg)
+                                                        st.warning(f"⚠️ {jpg.name} → 推荐: {recommended}（但RAW列表中未找到）")
+                                                else:
+                                                    new_missing.append(jpg)
+                                                    st.info(f"ℹ️ {jpg.name} → 无推荐匹配")
+                                            
+                                            # 更新匹配结果
+                                            matches.extend(new_matches)
+                                            missing = new_missing
+                                            st.success(f"AI匹配完成！新增 {len(new_matches)} 个匹配，剩余 {len(missing)} 个未匹配")
+                                            st.rerun()
+                                        else:
+                                            st.error("AI返回格式异常")
+                                            st.code(match_result)
+                                    except Exception as e:
+                                        st.error(f"AI匹配失败：{e}")
+
                     st.markdown("##### 结果筛选")
                     f1, f2, f3 = st.columns(3)
                     filter_choice = "全部"
@@ -6195,6 +6790,45 @@ elif page == "🤖 锴利自研AI工具库":
             with col_left:
                 st.markdown("#### 2️⃣ 我的素材描述")
                 st.caption("按模板填写你的镜头素材（不用上传视频）")
+
+                # AI智能生成镜头素材
+                with st.expander("🤖 AI智能生成镜头素材（一键填充）", expanded=False):
+                    ai_product = st.text_input("产品类型", placeholder="如：厨房刀/剪刀/户外刀/锅具", key="vr_ai_product")
+                    ai_theme = st.text_input("视频主题", placeholder="如：工厂工艺展示/产品使用场景/品牌故事", key="vr_ai_theme")
+                    ai_count = st.slider("生成镜头数量", 3, 10, 6, key="vr_ai_count")
+                    if st.button("✨ AI生成镜头素材", key="vr_ai_gen", use_container_width=True):
+                        if not ai_product:
+                            st.warning("请先填写产品类型")
+                        else:
+                            with st.spinner("AI正在生成镜头素材..."):
+                                try:
+                                    prompt = f"""你是B2B短视频导演，服务阳江刀剪厨具出口企业。
+产品：{ai_product}
+视频主题：{ai_theme}
+请生成{ai_count}个镜头素材，每个镜头包含：
+- dur: 时长（秒，2-8秒）
+- angle: 拍摄角度（特写/航拍/俯拍/平视/侧拍/慢动作特写）
+- content: 拍了什么（具体动作或画面）
+- scene: 场景（车间/办公室/仓库/厨房/户外等）
+- note: 说明（想突出什么）
+
+请用JSON数组格式输出，只输出JSON，不要解释。示例：
+[{{"dur":"3","angle":"特写","content":"锻打刀刃","scene":"车间","note":"突出工艺"}}]"""
+                                    result = ai.chat(prompt, task_name="视频反推-AI生成镜头")
+                                    import json as _json
+                                    import re as _re
+                                    # 提取JSON
+                                    json_match = _re.search(r'\[.*\]', result, _re.DOTALL)
+                                    if json_match:
+                                        shots = _json.loads(json_match.group())
+                                        st.session_state['vr_shots'] = shots
+                                        st.success(f"✅ AI已生成{len(shots)}个镜头素材！")
+                                        st.rerun()
+                                    else:
+                                        st.error("AI返回格式异常，请重试")
+                                        st.code(result)
+                                except Exception as e:
+                                    st.error(f"AI生成失败：{e}")
 
                 # 动态镜头列表
                 if 'vr_shots' not in st.session_state:
@@ -6806,7 +7440,34 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "i
     st.markdown("### 📷 第一步：上传产品图片")
     uploaded_img = st.file_uploader("上传产品白底图/主图", type=['jpg', 'jpeg', 'png', 'webp'], key="image_seo_upload")
     if uploaded_img:
-        st.image(uploaded_img, width=200, caption="上传的产品图")
+        col_img, col_analyze = st.columns([1, 1])
+        with col_img:
+            st.image(uploaded_img, width=200, caption="上传的产品图")
+        with col_analyze:
+            st.markdown("**🔍 AI视觉分析**")
+            st.caption("用glm-4.6v-flash看懂图片，自动识别产品类型/材质/角度")
+            if st.button("🤖 AI分析图片内容", use_container_width=True, key="ai_analyze_image"):
+                with st.spinner("AI正在分析图片..."):
+                    import base64
+                    img_bytes = uploaded_img.getvalue()
+                    img_b64 = base64.b64encode(img_bytes).decode()
+                    data_url = f"data:image/{uploaded_img.type.split('/')[-1]};base64,{img_b64}"
+                    vision_prompt = """请分析这张产品图片，提取以下信息：
+1. 产品类型（如：厨师刀/剪刀/户外刀/锅铲等）
+2. 主要材质（如：不锈钢/大马士革钢/木质手柄等）
+3. 拍摄角度（如：正面/背面/侧面/俯视/细节特写/使用场景）
+4. 颜色和外观特征
+5. 产品特点（如：刀刃纹理/手柄设计/包装等）
+
+用简洁的英文关键词回答，每行一个信息点。"""
+                    vision_result = ai.chat_with_image(data_url, vision_prompt, task_name="图片SEO-视觉分析")
+                    st.session_state['_image_vision_result'] = vision_result
+                    st.success("✅ 图片分析完成！")
+            
+            if st.session_state.get('_image_vision_result'):
+                st.markdown("**AI视觉分析结果：**")
+                st.markdown(st.session_state['_image_vision_result'])
+                st.info("💡 可参考分析结果填写下方产品信息，或直接用于生成SEO命名")
 
     # 第二步：输入SKU和信息
     st.markdown("### 🏷️ 第二步：输入产品信息")
@@ -7026,6 +7687,40 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "l
         if 'seo_prompt' in st.session_state:
             st.markdown("#### SEO内容生成Prompt（复制到豆包专家模式）")
             st.code(st.session_state['seo_prompt'], language=None)
+            
+            # AI直接生成SEO内容
+            st.markdown("---")
+            st.markdown("#### 🚀 或直接用工作台AI生成完整SEO内容")
+            st.caption("直接调用当前AI模型生成22模块完整SEO内容，无需复制到其他工具")
+            if st.button("🤖 AI直接生成SEO内容", use_container_width=True, type="primary", key="ai_gen_seo_content"):
+                if not sku:
+                    st.warning("请先填写产品SKU")
+                else:
+                    with st.spinner("AI正在生成完整SEO内容（约30-60秒）..."):
+                        try:
+                            seo_result = ai.chat(st.session_state['seo_prompt'], 
+                                                task_name=f"SEO内容生成-{sku}")
+                            st.session_state['seo_result'] = seo_result
+                            st.success("✅ SEO内容已生成！")
+                        except Exception as e:
+                            st.error(f"AI生成失败：{e}")
+            
+            if st.session_state.get('seo_result'):
+                st.markdown("---")
+                st.markdown("#### 📄 AI生成的完整SEO内容")
+                st.markdown(st.session_state['seo_result'])
+                st.download_button("📋 下载SEO内容.txt", 
+                    st.session_state['seo_result'], 
+                    file_name=f"SEO_{sku}_{datetime.now().strftime('%Y%m%d')}.txt",
+                    use_container_width=True)
+                # Trace显示
+                if ai.last_trace:
+                    t = ai.last_trace
+                    with st.expander("📜 AI调用Trace"):
+                        tc1, tc2, tc3 = st.columns(3)
+                        tc1.metric("模型", t["model"][:20])
+                        tc2.metric("耗时", f"{t['elapsed_seconds']}s")
+                        tc3.metric("故障转移", f"{t.get('failover_count', 0)}次")
     
     st.markdown("---")
     
@@ -7257,6 +7952,157 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "t
 
     st.markdown("---")
 
+
+    # AI直接生成SEO表格
+    st.markdown("### 🤖 AI直接生成SEO表格（无需复制Prompt）")
+    st.caption("使用AI视觉模型分析图片 + 文本模型生成完整SEO表格内容，直接展示可复制")
+    
+    gen_col1, gen_col2 = st.columns([2, 1])
+    with gen_col1:
+        if st.button("✨ AI直接生成SEO表格", key="seo_table_ai_gen", use_container_width=True, type="primary"):
+            if not uploaded_image:
+                st.warning("请先上传产品图片")
+            else:
+                with st.spinner("AI正在分析图片并生成SEO表格..."):
+                    try:
+                        import base64 as _b64
+                        # 第一步：AI视觉分析图片
+                        img_bytes = uploaded_image.getvalue()
+                        img_b64 = _b64.b64encode(img_bytes).decode()
+                        img_data_url = f"data:image/{uploaded_image.type.split('/')[-1]};base64,{img_b64}"
+                        
+                        vision_prompt = f"""请分析这张产品图片，输出以下信息（用JSON格式）：
+1. product_type: 产品类型（英文）
+2. material: 主要材质（英文）
+3. handle_material: 手柄材质（英文）
+4. size_estimate: 尺寸估算（英文）
+5. color: 颜色（英文）
+6. finish: 表面工艺（英文）
+7. pattern: 纹路/图案特征（英文）
+8. style: 风格描述（10个英文单词）
+9. category_hint: 品类建议（KN厨刀/OD户外刀/SC剪刀/KA厨房用品）
+只输出JSON，不要解释。"""
+                        
+                        vision_result = ai.chat_with_image(img_data_url, vision_prompt, task_name="SEO表格-视觉分析")
+                        import json as _json
+                        import re as _re
+                        json_match = _re.search(r'\{.*\}', vision_result, _re.DOTALL)
+                        if json_match:
+                            img_analysis = _json.loads(json_match.group())
+                        else:
+                            img_analysis = {}
+                        
+                        # 第二步：AI文本生成完整SEO表格
+                        table_prompt = f"""你是KaiLionCrafts（阳江锴利国际贸易）的产品SEO分析师。请根据以下信息生成完整的产品SEO表格。
+
+【产品信息】
+- 品类：{category}
+- 已知SKU：{known_sku or "待生成"}
+- 已知产品名：{known_name or "待识别"}
+- 目标搜索平台：{', '.join(target_platforms)}
+- 需要价格分析：{"是" if need_price else "否"}
+- 需要关键词研究：{"是" if need_kw else "否"}
+
+【AI视觉分析结果】
+- 产品类型：{img_analysis.get('product_type', '未知')}
+- 主要材质：{img_analysis.get('material', '未知')}
+- 手柄材质：{img_analysis.get('handle_material', '未知')}
+- 尺寸估算：{img_analysis.get('size_estimate', '未知')}
+- 颜色：{img_analysis.get('color', '未知')}
+- 表面工艺：{img_analysis.get('finish', '未知')}
+- 纹路特征：{img_analysis.get('pattern', '未知')}
+- 风格描述：{img_analysis.get('style', '未知')}
+
+【公司信息】
+- SKU命名规则：KL-[品类缩写]-[材质缩写]-[序号]（KN=厨刀, SC=剪刀, OD=户外刀, KA=厨房用品；DS=大马士革, HC=高碳钢, SS=不锈钢）
+- 公司定位：阳江专业OEM/ODM源头制造商，10+年出口经验
+- 目标客户：B2B采购商、批发商、Amazon FBA卖家、私标品牌商
+- MOQ：通常100件，现货无门槛
+
+请生成完整SEO表格，包含5大板块，用Markdown表格格式输出：
+
+#### 【基础SKU】
+| 项目 | 内容 |
+|---|---|
+| 完整SKU | |
+| 中文名称 | |
+| 英文名称 | |
+| 品类 | |
+| 价格区间 | |
+| MOQ | |
+
+#### 【识别特征】
+| 项目 | 内容 |
+|---|---|
+| 刀身/主体材质 | |
+| 柄材 | |
+| 尺寸 | |
+| 颜色 | |
+| 表面工艺 | |
+| 纹路/图案 | |
+| 风格描述 | |
+
+#### 【SEO命名】
+| 项目 | 内容 |
+|---|---|
+| SEO图片文件名 | |
+| SEO页面标题 | |
+| ALT TEXT（中/英） | |
+| META描述 | |
+| 核心关键词 | |
+| 长尾关键词（6个） | |
+
+#### 【市场定位】
+| 项目 | 内容 |
+|---|---|
+| 市场定位描述 | |
+| 目标市场 | |
+| 核心卖点USP（6个） | |
+| 竞品品牌参考 | |
+| 建议售价 | |
+| 建议平台 | |
+
+#### 【中英文描述】
+| 项目 | 内容 |
+|---|---|
+| 中文描述（200-300字） | |
+| 英文描述（150-200词） | |
+| AMAZON产品标题 | |
+| 首条BULLET POINT | |
+
+请确保内容专业、准确，适合外贸B2B独立站使用。"""
+                        
+                        table_result = ai.chat(table_prompt, task_name="SEO表格-内容生成")
+                        
+                        st.session_state['seo_table_result'] = table_result
+                        st.session_state['seo_table_img_analysis'] = img_analysis
+                        st.success("✅ AI已生成完整SEO表格！")
+                    except Exception as e:
+                        st.error(f"AI生成失败：{e}")
+    with gen_col2:
+        if st.button("📋 复制表格内容", key="seo_table_copy", use_container_width=True):
+            if 'seo_table_result' in st.session_state:
+                st.success("✅ 已复制到剪贴板（请手动选择文本复制）")
+            else:
+                st.info("请先生成SEO表格")
+    
+    # 显示AI生成的表格
+    if 'seo_table_result' in st.session_state:
+        st.markdown("### 📊 AI生成的SEO表格内容")
+        st.markdown(st.session_state['seo_table_result'])
+        
+        # 显示视觉分析结果
+        if 'seo_table_img_analysis' in st.session_state and st.session_state['seo_table_img_analysis']:
+            with st.expander("🔍 AI视觉分析详情", expanded=False):
+                for k, v in st.session_state['seo_table_img_analysis'].items():
+                    st.markdown(f"- **{k}**: {v}")
+        
+        # 保存到知识库
+        save_content = f"产品SEO表格\n品类: {category}\n\n" + st.session_state['seo_table_result']
+        save_to_kb_button(save_content, "SEO表格", f"SEO表格_{known_sku or '新产品'}_{datetime.now().strftime('%Y%m%d')}")
+    
+    st.markdown("---")
+
     # 第四步：Excel模板下载
     st.markdown("### 📥 第四步：下载SEO表格Excel模板")
 
@@ -7380,6 +8226,78 @@ elif page == "📈 销售管道":
             count = pipeline_data[stage["key"]]["count"]
             pct = count / total * 100
             st.progress(pct / 100, text=f"{stage['name']}: {count}个 ({pct:.0f}%)")
+
+
+    st.markdown("---")
+    
+    # AI管道分析
+    st.subheader("🤖 AI管道智能分析")
+    st.caption("AI分析销售管道瓶颈、转化率、重点客户，给出推进建议")
+    
+    if st.button("✨ AI分析销售管道", key="pipeline_ai_analysis", use_container_width=True, type="primary"):
+        with st.spinner("AI正在分析销售管道..."):
+            try:
+                # 收集管道数据
+                stage_counts = {}
+                stage_customers = {}
+                for stage in PIPELINE_STAGES:
+                    key = stage["key"]
+                    data = pipeline_data[key]
+                    stage_counts[stage["name"]] = data["count"]
+                    stage_customers[stage["name"]] = [
+                        f"{c.get('company_name','')}({c.get('grade','C')}级,{c.get('score',0)}分)"
+                        for c in data["customers"][:5]
+                    ]
+                
+                # 计算转化率
+                total_pipeline = sum(stage_counts.values())
+                lead_count = stage_counts.get("线索", 0)
+                closed_count = stage_counts.get("成交", 0)
+                conversion_rate = (closed_count / lead_count * 100) if lead_count > 0 else 0
+                
+                # 找瓶颈阶段（客户最多的中间阶段）
+                middle_stages = {k: v for k, v in stage_counts.items() if k not in ["线索", "成交"]}
+                bottleneck_stage = max(middle_stages, key=middle_stages.get) if middle_stages else "无"
+                
+                # A级客户分布
+                a_grade_by_stage = {}
+                for stage in PIPELINE_STAGES:
+                    data = pipeline_data[stage["key"]]
+                    a_count = sum(1 for c in data["customers"] if c.get("grade") == "A")
+                    if a_count > 0:
+                        a_grade_by_stage[stage["name"]] = a_count
+                
+                analysis_prompt = f"""你是KaiLionCrafts外贸企业的销售总监。请分析以下销售管道数据，给出专业分析和建议。
+
+【管道数据】
+- 客户总数：{total_pipeline}
+- 各阶段客户数：{stage_counts}
+- 线索到成交转化率：{conversion_rate:.1f}%
+- 瓶颈阶段（客户最多）：{bottleneck_stage}（{middle_stages.get(bottleneck_stage, 0)}个客户）
+- A级客户分布：{a_grade_by_stage}
+
+【各阶段重点客户】
+{chr(10).join([f"{stage}: {', '.join(custs) if custs else '无'}" for stage, custs in stage_customers.items()])}
+
+请生成分析报告，包含：
+1. 📊 管道健康度评估（整体转化率是否健康，行业基准20-30%）
+2. ⚠️ 瓶颈识别（哪个阶段客户堆积，原因分析）
+3. 🎯 本周TOP3推进重点（具体到客户和行动）
+4. 💡 转化率提升建议（3-5条可执行建议）
+5. 📈 成交预测（基于当前管道，预计未来30天成交数量）
+6. 🏆 最可能成交的3个客户（按阶段+评分+等级排序）
+
+用中文，简洁专业，适合外贸销售团队使用。"""
+                
+                analysis_result = ai.chat(analysis_prompt, task_name="销售管道-AI分析")
+                
+                st.markdown(analysis_result)
+                
+                # 保存到知识库
+                save_to_kb_button(analysis_result, "销售分析", f"管道分析_{datetime.now().strftime('%Y%m%d')}")
+                
+            except Exception as e:
+                st.error(f"AI分析失败：{e}")
 
 # ============ 页面10：客户管理 ============
 elif page == "👥 客户管理":
@@ -8132,6 +9050,69 @@ elif page == "📚 公司知识库":
 
         st.markdown("---")
 
+        # ---- AI知识问答 ----
+        st.markdown("##### 🤖 AI知识问答")
+        st.caption("用自然语言提问，AI基于知识库内容智能回答")
+        kb_question = st.text_input(
+            "向知识库提问",
+            placeholder="例如：我们的MOQ是多少？FDA认证有哪些？OEM定制流程是什么？",
+            key="kb_ai_question",
+            label_visibility="collapsed"
+        )
+        if st.button("🔍 AI智能回答", use_container_width=True, key="kb_ai_ask_btn"):
+            if kb_question:
+                with st.spinner("AI正在搜索知识库并生成回答..."):
+                    try:
+                        # 1. 搜索知识库
+                        search_results = kb.search(kb_question, source=src_choice, max_results=8)
+                        
+                        if search_results:
+                            # 2. 构建上下文
+                            context_parts = []
+                            for r in search_results[:5]:
+                                context_parts.append(f"【{r['file']}】\n{r['snippet'][:800]}")
+                            context = "\n\n".join(context_parts)
+                            
+                            # 3. AI生成回答
+                            prompt = f"""你是KaiLionCrafts公司知识库助手。请基于以下知识库内容回答用户问题。
+
+## 用户问题
+{kb_question}
+
+## 知识库参考内容
+{context}
+
+## 回答要求
+1. 基于知识库内容回答，不要编造信息
+2. 如果知识库中没有相关信息，明确说明"知识库中暂无相关信息"
+3. 回答简洁专业，重点突出
+4. 引用来源文件名
+5. 用中文回答
+
+请直接给出回答。"""
+                            
+                            answer = ai.chat(prompt, task_name=f"知识库问答-{kb_question[:20]}")
+                            
+                            st.markdown("##### ✨ AI回答")
+                            st.markdown(answer)
+                            
+                            # 展示参考来源
+                            st.markdown("##### 📚 参考来源")
+                            for i, r in enumerate(search_results[:5], 1):
+                                st.caption(f"{i}. {r['file']}")
+                            
+                            if ai.last_trace:
+                                t = ai.last_trace
+                                st.caption(f"模型: {t['model'][:25]} | 耗时: {t['elapsed_seconds']}s")
+                        else:
+                            st.info("知识库中未找到相关内容，建议换个关键词或查看分类浏览")
+                    except Exception as e:
+                        st.error(f"AI回答失败: {e}")
+            else:
+                st.warning("请输入问题")
+
+        st.markdown("---")
+
         # ---- 按目录浏览（标准化知识库）----
         st.markdown("##### 📂 按目录浏览（标准化知识库 AI优化版）")
         cats = kb.list_categories("standard")
@@ -8628,6 +9609,76 @@ elif page == "👥 团队工作空间":
     st.markdown("---")
     st.caption(f"当前工作空间路径：{workspace_base}")
     
+
+    # AI团队工作分析
+    st.markdown("---")
+    st.subheader("🤖 AI团队工作智能分析")
+    st.caption("AI分析团队成员工作产出、协作效率，给出任务分配和优化建议")
+    
+    if st.button("✨ AI分析团队工作", key="team_ai_analysis", use_container_width=True, type="primary"):
+        with st.spinner("AI正在分析团队工作..."):
+            try:
+                # 收集所有成员的工作数据
+                team_stats = []
+                total_emails = 0
+                total_notes = 0
+                total_reports = 0
+                for mk, m in TEAM_MEMBERS.items():
+                    wd = Path(__file__).parent / "data" / m['workspace_dir']
+                    email_count = len(list((wd / "generated_emails").glob("*.md"))) if (wd / "generated_emails").exists() else 0
+                    note_count = len(list((wd / "customer_notes").glob("*.md"))) if (wd / "customer_notes").exists() else 0
+                    report_count = len(list((wd / "reports").glob("*.md"))) if (wd / "reports").exists() else 0
+                    total_emails += email_count
+                    total_notes += note_count
+                    total_reports += report_count
+                    team_stats.append({
+                        "name": m['name'],
+                        "name_cn": m['name_cn'],
+                        "role": m['role'],
+                        "category": m['category'],
+                        "emails": email_count,
+                        "notes": note_count,
+                        "reports": report_count,
+                        "total": email_count + note_count + report_count
+                    })
+                
+                # 找出产出最多和最少的成员
+                most_active = max(team_stats, key=lambda x: x['total'])
+                least_active = min(team_stats, key=lambda x: x['total'])
+                
+                analysis_prompt = f"""你是KaiLionCrafts外贸企业的团队管理顾问。请分析以下团队工作数据，给出专业分析和建议。
+
+【团队成员数据】
+{chr(10).join([f"- {s['name_cn']}({s['name']}) - {s['role']}，负责{s['category']}：开发信{s['emails']}封，笔记{s['notes']}条，报告{s['reports']}份，总产出{s['total']}项" for s in team_stats])}
+
+【团队汇总】
+- 总开发信：{total_emails}封
+- 总客户笔记：{total_notes}条
+- 总背调报告：{total_reports}份
+- 总产出：{total_emails + total_notes + total_reports}项
+- 最活跃成员：{most_active['name_cn']}（{most_active['total']}项）
+- 产出最少成员：{least_active['name_cn']}（{least_active['total']}项）
+
+请生成分析报告，包含：
+1. 📊 团队整体工作效率评估（产出量是否合理，分工是否均衡）
+2. 👥 成员工作状态分析（每人的优势和需要提升的方向）
+3. 🎯 本周任务分配建议（根据各成员负责品类和当前产出，建议每人重点工作）
+4. 💡 协作优化建议（如何提升团队协作效率，知识库共享）
+5. 📈 下周工作目标建议（具体到每人的产出目标）
+6. 🏆 团队亮点和待改进点
+
+用中文，简洁专业，适合外贸团队管理者使用。"""
+                
+                analysis_result = ai.chat(analysis_prompt, task_name="团队工作-AI分析")
+                
+                st.markdown(analysis_result)
+                
+                # 保存到知识库
+                save_to_kb_button(analysis_result, "团队管理", f"团队分析_{datetime.now().strftime('%Y%m%d')}")
+                
+            except Exception as e:
+                st.error(f"AI分析失败：{e}")
+
 # ============ 模型管理页面（CC Switch风格） ============
 elif page == "🤖 模型管理":
     st.title("🤖 AI模型管理中心")
@@ -9206,6 +10257,55 @@ elif page == "🌍 海外社媒矩阵":
             <br><span style="color:#D4AF37;font-size:13px;">账号 {info['accounts']} · 本月发布 {info['pub_month']} · 播放 {info['views']:,} · 询盘 {info['inquiries']} · 订单 {info['orders']}</span>
             </div>""", unsafe_allow_html=True)
 
+        # ===== AI社媒运营分析 =====
+        st.markdown("---")
+        st.markdown("##### 🤖 AI社媒运营分析")
+        st.caption("根据社媒数据，AI生成运营分析和优化建议")
+        if st.button("✨ 生成社媒运营分析报告", key="ai_social_analysis", use_container_width=True):
+            with st.spinner("AI正在分析社媒运营数据..."):
+                try:
+                    # 收集数据
+                    cat_text = "\n".join([
+                        f"- {cat}: 账号{info['accounts']}个, 本月发布{info['pub_month']}条, 播放{info['views']:,}, 询盘{info['inquiries']}, 订单{info['orders']}"
+                        for cat, info in by_cat.items()
+                    ])
+                    
+                    # 计算转化率
+                    conv_rate = round(s['inquiries'] / s['views'] * 100, 3) if s['views'] > 0 else 0
+                    order_rate = round(s['orders'] / s['inquiries'] * 100, 1) if s['inquiries'] > 0 else 0
+                    
+                    prompt = f"""你是KaiLionCrafts海外社媒运营分析师。请根据以下数据生成分析报告：
+
+## 社媒运营概览
+- 账号总数: {s['accounts']}（活跃{s['active']}）
+- 本月发布: {s['pub_month']}条（累计{s['contents']}条）
+- 总播放: {s['views']:,}
+- 社媒询盘: {s['inquiries']}
+- 社媒订单: {s['orders']}
+- 播放→询盘转化率: {conv_rate}%
+- 询盘→订单转化率: {order_rate}%
+
+## 四大品类表现
+{cat_text}
+
+## 请生成
+1. **运营健康度评估**（发布频率、互动、转化是否健康）
+2. **内容策略建议**（哪些品类应加强，什么内容类型效果好）
+3. **平台优化建议**（哪些平台应重点投入）
+4. **转化漏斗分析**（播放→询盘→订单，哪个环节需优化）
+5. **本月行动建议**（3-5条具体行动）
+
+用中文，简洁专业，控制在400字以内。"""
+                    
+                    analysis = ai.chat(prompt, task_name="社媒运营分析-AI")
+                    st.markdown(analysis)
+                    
+                    if ai.last_trace:
+                        t = ai.last_trace
+                        st.caption(f"模型: {t['model'][:25]} | 耗时: {t['elapsed_seconds']}s")
+                except Exception as e:
+                    st.error(f"AI分析失败: {e}")
+
     with t2:
         # 三级下钻：品类 -> 平台账号 -> 内容记录
         for _k, _d in [("sm_level", "cats"), ("sm_cat", None), ("sm_acc_id", None)]:
@@ -9303,6 +10403,50 @@ elif page == "🌍 海外社媒矩阵":
                     st.info("该账号还没有内容记录，到「🎬 内容台账」新增第一条")
 
     with t3:
+        # ===== AI社媒文案生成器 =====
+        with st.expander("✨ AI快速生成社媒文案", expanded=False):
+            st.caption("根据品类和平台，AI一键生成Caption和Hashtags，复制到下方表单使用")
+            ai_col1, ai_col2 = st.columns(2)
+            with ai_col1:
+                ai_sm_cat = st.selectbox("产品品类", list(sdb.CATEGORIES.keys()), key="ai_sm_cat")
+                ai_sm_plat = st.selectbox("发布平台", sdb.PLATFORMS, key="ai_sm_plat")
+            with ai_col2:
+                ai_sm_type = st.selectbox("内容类型", ["产品展示", "工厂实拍", "使用场景", "客户案例", "行业知识"], key="ai_sm_type")
+                ai_sm_product = st.text_input("产品/主题描述", placeholder="例如：新款大马士革厨刀套装", key="ai_sm_product")
+            
+            if st.button("🤖 生成社媒文案", use_container_width=True, key="ai_gen_social"):
+                if ai_sm_product.strip():
+                    with st.spinner("AI正在生成社媒文案..."):
+                        prompt = f"""你是KaiLionCrafts（阳江锘利匠心）的海外社媒运营专家。
+
+请为以下内容生成社媒文案：
+- 产品品类：{ai_sm_cat}
+- 发布平台：{ai_sm_plat}
+- 内容类型：{ai_sm_type}
+- 产品/主题：{ai_sm_product}
+
+公司背景：KaiLionCrafts是中国阳江的五金刀剪源头工厂，主营厨房刀具、专业剪刀、户外刀具、厨房用品，提供OEM/ODM定制服务。
+
+请生成：
+1. **Caption（平台文案）**：符合{ai_sm_plat}平台风格，英文，100-200词，包含产品卖点、工厂优势、行动号召
+2. **Hashtags**：10-15个相关标签，包含行业大词+产品词+长尾词
+3. **建议发布时间**：根据平台和目标市场（北美/欧洲）给出最佳发布时间
+
+格式清晰，直接输出。"""
+                        result = ai.chat(prompt, task_name=f"AI社媒文案-{ai_sm_plat}")
+                        st.session_state['_ai_social_result'] = result
+                        st.success("✅ 文案已生成，复制到下方表单使用")
+                else:
+                    st.warning("请输入产品/主题描述")
+            
+            if st.session_state.get('_ai_social_result'):
+                st.markdown("---")
+                st.markdown(st.session_state['_ai_social_result'])
+                st.download_button("📋 下载文案.txt", 
+                    st.session_state['_ai_social_result'], 
+                    file_name=f"social_caption_{ai_sm_plat}_{datetime.now().strftime('%Y%m%d')}.txt",
+                    use_container_width=True)
+        
         with st.expander("➕ 新增内容", expanded=False):
             with st.form("new_content"):
                 z1, z2, z3 = st.columns(3)
@@ -9744,6 +10888,74 @@ elif page == "🧾 订单台账":
                 st.error("🔴 账龄超30天未收：" + "、".join(f"{r['客户']}(${r['未收']:,.0f}/{r['账龄天数']}天)" for r in over))
         else:
             st.success("✅ 无未收应收款")
+
+        # ===== AI经营分析 =====
+        st.markdown("##### 🤖 AI经营分析")
+        st.caption("基于订单、采购、收付款数据，AI生成经营洞察和建议")
+        if st.button("✨ 生成经营分析报告", use_container_width=True, key="ai_finance_analysis"):
+            with st.spinner("AI正在分析经营数据..."):
+                try:
+                    # 收集数据
+                    sales_orders = fdb.list_sales_orders()
+                    purchase_orders = fdb.list_purchase_orders()
+                    payments = fdb.list_payments()
+                    receivables = fdb.list_receivables()
+                    
+                    # 统计
+                    total_sales = sum(o["total_amount"] for o in sales_orders)
+                    total_purchase = sum(p["cost_amount"] for p in purchase_orders)
+                    total_received = sum(p["amount"] for p in payments if p["direction"] == "收客户")
+                    total_paid = sum(p["amount"] for p in payments if p["direction"] == "付工厂")
+                    overdue_ar = [r for r in receivables if r["账龄天数"] > 30]
+                    
+                    # 客户排名
+                    from collections import defaultdict
+                    customer_sales = defaultdict(float)
+                    for o in sales_orders:
+                        customer_sales[o.get("customer", "未知")] += o["total_amount"]
+                    top_customers = sorted(customer_sales.items(), key=lambda x: x[1], reverse=True)[:5]
+                    
+                    customer_text = "\n".join([
+                        f"- {c}: ${a:,.0f}" for c, a in top_customers
+                    ]) or "暂无数据"
+                    
+                    prompt = f"""你是KaiLionCrafts外贸财务分析师。请根据以下经营数据生成分析报告：
+
+## 经营概览
+- 订单总数: {len(sales_orders)}
+- 销售总额: ${total_sales:,.0f}
+- 采购总额: ${total_purchase:,.0f}
+- 已收款: ${total_received:,.0f}
+- 已付款: ${total_paid:,.0f}
+- 应收未收: ${s['ar']:,.0f}
+- 应付未付: ${s['ap']:,.0f}
+- 累计毛利: ${s['gross']:,.0f}
+- 本月销售: ${s['m_sales']:,.0f}
+- 本月毛利: ${s['m_gross']:,.0f}
+
+## TOP5客户
+{customer_text}
+
+## 风险提示
+- 逾期应收(>30天): {len(overdue_ar)}笔，共${sum(r['未收'] for r in overdue_ar):,.0f}
+
+## 请生成
+1. **经营健康度评估**（优秀/良好/需改进/危险）
+2. **核心发现**（3-5条关键洞察）
+3. **现金流分析**（应收/应付/回款周期）
+4. **客户结构分析**（集中度风险）
+5. **改进建议**（3-5条具体行动）
+
+用中文，简洁专业，控制在400字以内。"""
+                    
+                    analysis = ai.chat(prompt, task_name="经营分析-AI")
+                    st.markdown(analysis)
+                    
+                    if ai.last_trace:
+                        t = ai.last_trace
+                        st.caption(f"模型: {t['model'][:25]} | 耗时: {t['elapsed_seconds']}s")
+                except Exception as e:
+                    st.error(f"AI分析失败: {e}")
 
         st.markdown("##### ⬇️ 导出")
         exp1, exp2, exp3 = st.columns(3)
@@ -10827,6 +12039,69 @@ elif page == "⚙️ 设置中心":
                 csv = pd.DataFrame(rows).to_csv(index=False).encode("utf-8-sig")
                 st.download_button("📥 导出CSV", csv, f"ai_usage_{now.strftime('%Y%m%d_%H%M')}.csv", "text/csv", use_container_width=True)
 
+                # ===== AI调用智能分析 =====
+                st.markdown("---")
+                st.markdown("##### 🤖 AI调用智能分析")
+                st.caption("根据调用数据，AI生成模型使用分析和优化建议")
+                if st.button("✨ 生成AI调用分析报告", key="ai_usage_analysis", use_container_width=True):
+                    with st.spinner("AI正在分析调用数据..."):
+                        try:
+                            # 收集数据
+                            success_count = sum(1 for t in filtered if t.get("status") == "success")
+                            fail_count = total_req - success_count
+                            success_rate = round(success_count / total_req * 100, 1) if total_req > 0 else 0
+                            
+                            # 模型分布
+                            model_text = "\n".join([
+                                f"- {m}: {cnt}次" for m, cnt in sorted(by_model.items(), key=lambda x: -x[1])[:10]
+                            ])
+                            
+                            # 任务分布
+                            task_text = "\n".join([
+                                f"- {task_name}: {cnt}次" for task_name, cnt in sorted(by_task.items(), key=lambda x: -x[1])[:10]
+                            ])
+                            
+                            # 故障转移统计
+                            failover_count = sum(1 for t in filtered if t.get("failover_count", 0) > 0)
+                            
+                            prompt = f"""你是KaiLionCrafts AI系统运维分析师。请根据以下AI调用数据生成分析报告：
+
+## 调用概览
+- 总请求数: {total_req}
+- 成功: {success_count} ({success_rate}%)
+- 失败: {fail_count}
+- 总Token: {total_tokens:,}
+- 输入Token: {total_prompt:,}
+- 输出Token: {total_completion:,}
+- 平均耗时: {avg_elapsed:.1f}s
+- 估算消费: ¥{est_cost:.4f}
+- 故障转移次数: {failover_count}
+
+## 模型分布TOP10
+{model_text}
+
+## 任务分布TOP10
+{task_text}
+
+## 请生成
+1. **系统健康度评估**（成功率、耗时、稳定性）
+2. **模型使用分析**（哪些模型用得多，是否合理）
+3. **故障转移分析**（故障转移频率，是否需要调整模型优先级）
+4. **成本优化建议**（如何降低Token消耗和费用）
+5. **性能优化建议**（如何提升响应速度和稳定性）
+6. **本月行动建议**（3-5条具体行动）
+
+用中文，简洁专业，控制在500字以内。"""
+                            
+                            analysis = ai.chat(prompt, task_name="AI调用分析-AI")
+                            st.markdown(analysis)
+                            
+                            if ai.last_trace:
+                                t = ai.last_trace
+                                st.caption(f"模型: {t['model'][:25]} | 耗时: {t['elapsed_seconds']}s")
+                        except Exception as e:
+                            st.error(f"AI分析失败: {e}")
+
     elif sc_current == "👥 访问日志":
         st.subheader("👥 访问监控中心")
         st.caption("访问日志 · IP黑名单 · 操作审计")
@@ -10938,6 +12213,63 @@ elif page == "⚙️ 设置中心":
             reversed_ops = list(reversed(op_logs[-50:]))
             op_df = pd.DataFrame(reversed_ops)
             st.dataframe(op_df, use_container_width=True, hide_index=True)
+
+        # ===== AI访问安全分析 =====
+        st.markdown("---")
+        st.markdown("##### 🤖 AI访问安全分析")
+        st.caption("根据访问数据，AI生成安全分析和防护建议")
+        if st.button("✨ 生成访问安全分析报告", key="ai_access_analysis", use_container_width=True):
+            with st.spinner("AI正在分析访问安全数据..."):
+                try:
+                    from collections import Counter
+                    # IP分布
+                    ip_counts = Counter(log.get("ip", "unknown") for log in auth_logs)
+                    top_ips = ip_counts.most_common(10)
+                    ip_text = "\n".join([f"- {ip}: {count}次" for ip, count in top_ips])
+                    
+                    # 操作类型分布
+                    action_counts = Counter(log.get("action", log.get("event", "unknown")) for log in auth_logs)
+                    action_text = "\n".join([f"- {action}: {count}次" for action, count in action_counts.most_common(10)])
+                    
+                    # 可疑IP（访问次数异常多的）
+                    suspicious_ips = [(ip, count) for ip, count in top_ips if count > 20 and ip not in [b.get("ip") for b in blacklist]]
+                    suspicious_text = "\n".join([f"- {ip}: {count}次（建议关注）" for ip, count in suspicious_ips]) or "无明显可疑IP"
+                    
+                    prompt = f"""你是KaiLionCrafts企业系统安全分析师。请根据以下访问数据生成安全分析报告：
+
+## 访问概览
+- 总访问次数: {len(auth_logs)}
+- 今日访问: {today_visits}
+- 黑名单IP数: {len(blacklist)}
+- 操作日志数: {len(op_logs)}
+
+## IP访问分布TOP10
+{ip_text}
+
+## 操作类型分布
+{action_text}
+
+## 可疑IP（访问次数>20且未拉黑）
+{suspicious_text}
+
+## 请生成
+1. **安全状况评估**（整体安全等级：安全/注意/警告/危险）
+2. **访问模式分析**（正常访问 vs 可疑访问）
+3. **可疑IP识别**（哪些IP需要关注或拉黑）
+4. **防护建议**（如何提升系统安全性）
+5. **监控建议**（应该关注哪些指标）
+6. **本月行动建议**（3-5条具体行动）
+
+用中文，简洁专业，控制在400字以内。"""
+                    
+                    analysis = ai.chat(prompt, task_name="访问安全分析-AI")
+                    st.markdown(analysis)
+                    
+                    if ai.last_trace:
+                        t = ai.last_trace
+                        st.caption(f"模型: {t['model'][:25]} | 耗时: {t['elapsed_seconds']}s")
+                except Exception as e:
+                    st.error(f"AI分析失败: {e}")
 
 # ============ AI调用Trace（旧） ============
 elif page == "📜 AI调用Trace":
@@ -11183,6 +12515,22 @@ elif page == "⚙️ 设置":
         st.caption("数据全部存储在本地，不上传任何服务器")
     st.caption(f"工作台目录：{Path(__file__).parent}")
     
+elif page == "📖 工作台说明书":
+    st.title("📖 KaiLionCrafts AI工作台使用说明书")
+    st.caption("完整覆盖37个功能页面 · 从入门到精通 · 小白也能看懂")
+    
+    # 读取HTML说明书文件
+    manual_path = Path(__file__).parent / "KaiLionCrafts_AI工作台使用说明书_专业版.html"
+    if manual_path.exists():
+        with open(manual_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        # 使用components.html嵌入完整HTML说明书
+        import streamlit.components.v1 as components
+        components.html(html_content, height=3000, scrolling=True)
+    else:
+        st.error("❌ 说明书文件未找到，请确认 KaiLionCrafts_AI工作台使用说明书_专业版.html 存在于工作台目录")
+        st.info("说明书文件路径：" + str(manual_path))
+
 # ============ 页脚 ============
 st.markdown("---")
 st.caption(f"KaiLionCrafts AI客户开发工作台 v1.0 | {COMPANY['name_cn']} | 基于阳江刀剪产业知识库")

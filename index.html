@@ -580,6 +580,7 @@ function loadState(){
   S.pipeline2 = DB.load('pipeline2') || null;
   S.emailTemplates = DB.load('emailTemplates') || null;
   S.modelSpeedTest = DB.load('modelSpeedTest') || null;
+  S.contentHistory = DB.load('contentHistory') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -597,7 +598,7 @@ function persist(){
   DB.save('payments',S.payments); DB.save('certifications',S.certifications); DB.save('whatsapp',S.whatsapp);
   DB.save('rfm',S.rfm); DB.save('landingpages',S.landingpages); DB.save('competitors',S.competitors);
   DB.save('productmedia',S.productmedia); DB.save('aisales',S.aisales);
-  DB.save('pipeline',S.pipeline); DB.save('emailTemplates',S.emailTemplates); DB.save('modelSpeedTest',S.modelSpeedTest); DB.save('documents',S.documents);
+  DB.save('pipeline',S.pipeline); DB.save('emailTemplates',S.emailTemplates); DB.save('modelSpeedTest',S.modelSpeedTest); DB.save('contentHistory',S.contentHistory); DB.save('documents',S.documents);
   DB.save('finance',S.finance); DB.save('catalog',S.catalog); DB.save('team',S.team);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
@@ -1460,6 +1461,167 @@ function getModelStats(){
   })).sort((a,b)=>b.total-a.total);
 }
 
+/* V47 多语言营销内容生成器 - 内容类型 */
+const CONTENT_TYPES = [
+  {id:'productDesc', label:'产品描述', icon:'📦', desc:'生成专业的多语言产品描述', prompt:'请为以下产品生成一段专业的{lang}产品描述，200-300字，包含产品特点、材质、使用场景、卖点。产品：{product}，特点：{features}'},
+  {id:'productBullet', label:'产品卖点', icon:'⭐', desc:'提炼产品核心卖点和优势', prompt:'请为以下产品提炼5个核心卖点，用{lang}回答，每个卖点一句话，突出差异化优势。产品：{product}，目标市场：{market}'},
+  {id:'slogan', label:'广告语/标语', icon:'💡', desc:'生成创意广告语和品牌标语', prompt:'请为以下产品生成10个创意{lang}广告语/标语，每个不超过10个单词，要有记忆点和传播力。产品：{product}，品牌：{brand}'},
+  {id:'linkedin', label:'LinkedIn帖子', icon:'💼', desc:'生成LinkedIn专业营销帖子', prompt:'请生成一篇{lang}的LinkedIn营销帖子，150-200字，专业但有亲和力，包含3个相关hashtag。主题：{topic}，产品：{product}'},
+  {id:'facebook', label:'Facebook帖子', icon:'📘', desc:'生成Facebook社交营销帖子', prompt:'请生成一篇{lang}的Facebook营销帖子，100-150字，轻松活泼有吸引力，包含emoji和3个hashtag。主题：{topic}，产品：{product}'},
+  {id:'instagram', label:'Instagram文案', icon:'📷', desc:'生成Instagram图片配文', prompt:'请生成一段{lang}的Instagram图片配文，80-120字，有故事感和视觉感，包含5个相关hashtag。主题：{topic}，产品：{product}'},
+  {id:'blog', label:'博客文章', icon:'📝', desc:'生成SEO友好的博客文章', prompt:'请生成一篇{lang}的博客文章，500-800字，SEO友好，包含标题、3个小标题、引言和结论。主题：{topic}，关键词：{keywords}'},
+  {id:'aboutUs', label:'About Us页面', icon:'🏢', desc:'生成公司介绍页面内容', prompt:'请为以下公司生成一段专业的{lang} About Us页面内容，300-400字，包含公司历史、核心优势、产品线、服务理念。公司：{company}，主营：{product}，成立年份：{year}'},
+  {id:'emailCampaign', label:'邮件营销内容', icon:'📧', desc:'生成营销邮件主题和正文', prompt:'请生成一封{lang}的营销邮件，包含吸引人的邮件主题（subject）和150-200字的正文，有号召力和行动召唤。主题：{topic}，产品：{product}，优惠：{offer}'},
+  {id:'videoScript', label:'短视频脚本', icon:'🎬', desc:'生成产品宣传短视频脚本', prompt:'请生成一个30秒{lang}产品宣传短视频脚本，包含画面描述和旁白台词，分5个镜头，每个镜头6秒。产品：{product}，目标受众：{audience}'}
+];
+
+const CONTENT_LANGS = [
+  {id:'en', label:'English', flag:'🇺🇸'},
+  {id:'zh', label:'中文', flag:'🇨🇳'},
+  {id:'es', label:'Español', flag:'🇪🇸'},
+  {id:'fr', label:'Français', flag:'🇫🇷'},
+  {id:'de', label:'Deutsch', flag:'🇩🇪'},
+  {id:'it', label:'Italiano', flag:'🇮🇹'},
+  {id:'pt', label:'Português', flag:'🇵🇹'},
+  {id:'ru', label:'Русский', flag:'🇷🇺'},
+  {id:'ja', label:'日本語', flag:'🇯🇵'},
+  {id:'ko', label:'한국어', flag:'🇰🇷'},
+  {id:'ar', label:'العربية', flag:'🇸🇦'},
+  {id:'nl', label:'Nederlands', flag:'🇳🇱'}
+];
+
+let currentContentType = 'productDesc';
+let currentContentLang = 'en';
+
+/* V47 选择内容类型 */
+function selectContentType(id){
+  currentContentType = id;
+  document.querySelectorAll('[id^="ctype-"]').forEach(el=>{
+    el.style.background = el.id==='ctype-'+id ? '#1a365d' : '#f0f4f8';
+    el.style.color = el.id==='ctype-'+id ? '#fff' : '#333';
+  });
+  const t = CONTENT_TYPES.find(x=>x.id===id);
+  if(t){
+    const descEl = document.getElementById('contentTypeDesc');
+    if(descEl) descEl.textContent = t.desc;
+  }
+}
+
+/* V47 选择语言 */
+function selectContentLang(id){
+  currentContentLang = id;
+  document.querySelectorAll('[id^="clang-"]').forEach(el=>{
+    el.style.background = el.id==='clang-'+id ? '#c9a961' : '#f0f4f8';
+    el.style.color = el.id==='clang-'+id ? '#fff' : '#333';
+  });
+}
+
+/* V47 生成营销内容 */
+async function generateMarketingContent(){
+  const type = CONTENT_TYPES.find(t=>t.id===currentContentType);
+  if(!type){ toast('请选择内容类型'); return; }
+  const lang = CONTENT_LANGS.find(l=>l.id===currentContentLang);
+  const product = document.getElementById('mcProduct')?.value.trim() || 'stainless steel kitchen scissors';
+  const features = document.getElementById('mcFeatures')?.value.trim() || 'high quality, competitive price, BSCI certified';
+  const topic = document.getElementById('mcTopic')?.value.trim() || 'new product launch';
+  const brand = document.getElementById('mcBrand')?.value.trim() || 'KaiLionCrafts';
+  const company = document.getElementById('mcCompany')?.value.trim() || 'Yangjiang KaiLion International Trade Co., Ltd.';
+  const market = document.getElementById('mcMarket')?.value.trim() || 'North America';
+  const keywords = document.getElementById('mcKeywords')?.value.trim() || 'kitchen scissors, stainless steel';
+  const offer = document.getElementById('mcOffer')?.value.trim() || '10% off for first order';
+  const year = document.getElementById('mcYear')?.value.trim() || '2015';
+  const audience = document.getElementById('mcAudience')?.value.trim() || 'professional buyers and importers';
+  
+  let prompt = type.prompt
+    .replace('{lang}', lang?.label || 'English')
+    .replace('{product}', product)
+    .replace('{features}', features)
+    .replace('{topic}', topic)
+    .replace('{brand}', brand)
+    .replace('{company}', company)
+    .replace('{market}', market)
+    .replace('{keywords}', keywords)
+    .replace('{offer}', offer)
+    .replace('{year}', year)
+    .replace('{audience}', audience);
+  
+  const btn = document.getElementById('mcGenBtn');
+  const result = document.getElementById('mcResult');
+  const status = document.getElementById('mcStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ 生成中...';
+  status.textContent = '正在调用AI生成'+type.label+'('+(lang?.label||'')+')...';
+  result.style.display = 'none';
+  
+  const r = await callAI(prompt, {purpose:'draft'});
+  btn.disabled = false;
+  btn.textContent = '🚀 生成内容';
+  
+  if(r.error){
+    status.innerHTML = '<span style="color:#e53e3e">❌ '+r.error+'</span>';
+    return;
+  }
+  
+  status.innerHTML = '<span style="color:#38a169">✅ 生成完成！'+r.model+' · '+r.latency+'ms'+(r.fallbackCount>0?' · 故障转移'+r.fallbackCount+'次':'')+'</span>';
+  result.style.display = 'block';
+  const output = document.getElementById('mcOutput');
+  output.textContent = r.content;
+  
+  // 保存到历史
+  if(!S.contentHistory) S.contentHistory = [];
+  S.contentHistory.unshift({
+    id: uid(), type: type.id, typeLabel: type.label,
+    lang: currentContentLang, content: r.content,
+    model: r.model, latency: r.latency, createdAt: Date.now()
+  });
+  if(S.contentHistory.length > 20) S.contentHistory = S.contentHistory.slice(0,20);
+  persist();
+  renderContentHistory();
+}
+
+/* V47 复制生成的内容 */
+function copyMarketingContent(){
+  const output = document.getElementById('mcOutput');
+  if(!output || !output.textContent){ toast('没有可复制的内容'); return; }
+  navigator.clipboard.writeText(output.textContent).then(()=>toast('✅ 内容已复制到剪贴板')).catch(()=>{
+    const ta = document.createElement('textarea');
+    ta.value = output.textContent; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('✅ 内容已复制');
+  });
+}
+
+/* V47 渲染内容生成历史 */
+function renderContentHistory(){
+  const el = document.getElementById('contentHistory');
+  if(!el) return;
+  const history = S.contentHistory || [];
+  if(!history.length){ el.innerHTML = '<div style="text-align:center;padding:15px;color:#a0aec0;font-size:12px">暂无生成历史</div>'; return; }
+  el.innerHTML = history.slice(0,8).map(h=>{
+    const time = new Date(h.createdAt);
+    const timeStr = (time.getMonth()+1)+'/'+time.getDate()+' '+String(time.getHours()).padStart(2,'0')+':'+String(time.getMinutes()).padStart(2,'0');
+    return `<div style="padding:8px 10px;background:#f8fafc;border-radius:6px;margin-bottom:6px;cursor:pointer;border:1px solid #e2e8f0" onclick="loadContentHistory('${h.id}')" onmouseover="this.style.borderColor='#c9a961'" onmouseout="this.style.borderColor='#e2e8f0'">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:600;color:#2d3748">${h.typeLabel}</span>
+        <span style="font-size:10px;color:#718096">${timeStr}</span>
+      </div>
+      <div style="font-size:11px;color:#718096;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.content.slice(0,60)}...</div>
+    </div>`;
+  }).join('');
+}
+
+/* V47 加载历史内容 */
+function loadContentHistory(id){
+  const h = (S.contentHistory||[]).find(x=>x.id===id);
+  if(!h) return;
+  const result = document.getElementById('mcResult');
+  const output = document.getElementById('mcOutput');
+  if(result && output){
+    output.textContent = h.content;
+    result.style.display = 'block';
+  }
+  toast('已加载历史内容');
+}
 
 /* V31 AI图像生成 - 支持智谱CogView-3-Flash */
 async function callAIImage(prompt, opts={}){
@@ -6584,6 +6746,126 @@ function viewTools(root){
         <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{piNumber}</code>
         <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{quantity}</code>
         <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{totalAmount}</code>
+      </div>
+    </div>
+  </div>
+  
+  <!-- V47 多语言营销内容生成器面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #dd6b20;background:linear-gradient(135deg,#fffaf0,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>✍️ 多语言营销内容生成器（10种内容类型 · 12种语言 · AI一键生成）</span>
+      <span class="badge" style="background:#dd6b20;color:#fff">新功能 V47</span>
+    </div>
+    <p class="text-sm text-muted mb12">AI生成产品描述/广告语/社媒帖子/博客/邮件营销等多语言营销内容，支持12国语言，一键复制使用</p>
+    
+    <div style="display:grid;grid-template-columns:1fr 280px;gap:16px">
+      <!-- 左侧：配置和生成 -->
+      <div>
+        <!-- 内容类型选择 -->
+        <div class="mb12">
+          <div class="text-xs text-muted mb6" style="font-weight:bold">📋 选择内容类型：</div>
+          <div class="flex gap8" style="flex-wrap:wrap">
+            ${CONTENT_TYPES.map((t,i)=>`<span id="ctype-${t.id}" class="badge" style="cursor:pointer;padding:7px 12px;font-size:12px;${i===0?'background:#1a365d;color:#fff':'background:#f0f4f8;color:#333'}" onclick="selectContentType('${t.id}')">${t.icon} ${t.label}</span>`).join('')}
+          </div>
+          <div id="contentTypeDesc" class="text-xs text-muted mt6" style="color:#718096">生成专业的多语言产品描述</div>
+        </div>
+        
+        <!-- 语言选择 -->
+        <div class="mb12">
+          <div class="text-xs text-muted mb6" style="font-weight:bold">🌍 选择语言：</div>
+          <div class="flex gap8" style="flex-wrap:wrap">
+            ${CONTENT_LANGS.map((l,i)=>`<span id="clang-${l.id}" class="badge" style="cursor:pointer;padding:5px 10px;font-size:11px;${i===0?'background:#c9a961;color:#fff':'background:#f0f4f8;color:#333'}" onclick="selectContentLang('${l.id}')">${l.flag} ${l.label}</span>`).join('')}
+          </div>
+        </div>
+        
+        <!-- 输入字段 -->
+        <div class="form-row mb12">
+          <div>
+            <label class="text-xs text-muted">产品名称 *</label>
+            <input id="mcProduct" class="form-control" value="stainless steel kitchen scissors" placeholder="例如：stainless steel kitchen scissors">
+          </div>
+          <div>
+            <label class="text-xs text-muted">产品特点</label>
+            <input id="mcFeatures" class="form-control" value="high quality, competitive price, BSCI certified" placeholder="产品核心特点">
+          </div>
+        </div>
+        <div class="form-row mb12">
+          <div>
+            <label class="text-xs text-muted">主题/话题</label>
+            <input id="mcTopic" class="form-control" value="new product launch" placeholder="营销主题">
+          </div>
+          <div>
+            <label class="text-xs text-muted">品牌名称</label>
+            <input id="mcBrand" class="form-control" value="KaiLionCrafts" placeholder="品牌名">
+          </div>
+        </div>
+        <div class="form-row mb12">
+          <div>
+            <label class="text-xs text-muted">目标市场</label>
+            <input id="mcMarket" class="form-control" value="North America" placeholder="目标市场">
+          </div>
+          <div>
+            <label class="text-xs text-muted">SEO关键词</label>
+            <input id="mcKeywords" class="form-control" value="kitchen scissors, stainless steel" placeholder="逗号分隔">
+          </div>
+        </div>
+        <div class="form-row mb12">
+          <div>
+            <label class="text-xs text-muted">优惠信息</label>
+            <input id="mcOffer" class="form-control" value="10% off for first order" placeholder="促销优惠">
+          </div>
+          <div>
+            <label class="text-xs text-muted">目标受众</label>
+            <input id="mcAudience" class="form-control" value="professional buyers and importers" placeholder="目标受众">
+          </div>
+        </div>
+        <div class="form-row mb12">
+          <div>
+            <label class="text-xs text-muted">公司名称</label>
+            <input id="mcCompany" class="form-control" value="Yangjiang KaiLion International Trade Co., Ltd." placeholder="公司全称">
+          </div>
+          <div>
+            <label class="text-xs text-muted">成立年份</label>
+            <input id="mcYear" class="form-control" value="2015" placeholder="成立年份">
+          </div>
+        </div>
+        
+        <!-- 生成按钮 -->
+        <div class="flex gap8 items-center mb12">
+          <button id="mcGenBtn" class="btn btn-gold" onclick="generateMarketingContent()">🚀 生成内容</button>
+          <span id="mcStatus" class="text-sm text-muted"></span>
+        </div>
+        
+        <!-- 生成结果 -->
+        <div id="mcResult" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span class="text-xs text-muted" style="font-weight:bold">📄 生成结果：</span>
+            <button class="btn btn-outline btn-sm" onclick="copyMarketingContent()">📋 复制内容</button>
+          </div>
+          <div id="mcOutput" style="background:#f8fafc;padding:14px;border-radius:8px;font-size:13px;line-height:1.8;white-space:pre-wrap;max-height:400px;overflow-y:auto;border:1px solid #e2e8f0"></div>
+        </div>
+      </div>
+      
+      <!-- 右侧：历史记录 -->
+      <div>
+        <div class="text-xs text-muted mb6" style="font-weight:bold">📜 生成历史（最近8条）</div>
+        <div id="contentHistory">
+          ${(() => {
+            const history = S.contentHistory || [];
+            if(!history.length) return '<div style="text-align:center;padding:15px;color:#a0aec0;font-size:12px">暂无生成历史</div>';
+            return history.slice(0,8).map(h=>{
+              const time = new Date(h.createdAt);
+              const timeStr = (time.getMonth()+1)+'/'+time.getDate()+' '+String(time.getHours()).padStart(2,'0')+':'+String(time.getMinutes()).padStart(2,'0');
+              return `<div style="padding:8px 10px;background:#f8fafc;border-radius:6px;margin-bottom:6px;cursor:pointer;border:1px solid #e2e8f0" onclick="loadContentHistory('${h.id}')" onmouseover="this.style.borderColor='#c9a961'" onmouseout="this.style.borderColor='#e2e8f0'">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <span style="font-size:12px;font-weight:600;color:#2d3748">${h.typeLabel}</span>
+                  <span style="font-size:10px;color:#718096">${timeStr}</span>
+                </div>
+                <div style="font-size:11px;color:#718096;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.content.slice(0,50)}...</div>
+              </div>`;
+            }).join('');
+          })()}
+        </div>
       </div>
     </div>
   </div>

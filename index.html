@@ -5981,6 +5981,135 @@ function viewTools(root){
     </div>
   </div>
   
+  <!-- V41 客户跟进SOP与任务提醒中心面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #3182ce;background:linear-gradient(135deg,#ebf8ff,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📋 客户跟进SOP与任务提醒中心（7节点标准流程 · 今日待办 · 逾期预警 · 跟进节奏）</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="badge" style="background:#3182ce;color:#fff">新功能 V41</span>
+        <button class="btn" style="background:#3182ce;color:#fff;font-size:12px;padding:4px 12px" onclick="openAddFollowupTask()">➕ 新增任务</button>
+      </div>
+    </div>
+    <p class="text-sm text-muted mb12">标准化外贸客户跟进7节点SOP，自动生成待办任务，逾期红色预警，今日任务优先处理，让客户跟进不再遗漏</p>
+    
+    <!-- SOP流程展示 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6" style="color:#3182ce;font-weight:bold">📈 标准跟进SOP（7节点）</div>
+      <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+        ${FOLLOWUP_SOP.map((sop,i)=>`
+          <div style="flex:1;min-width:80px;text-align:center;padding:8px 4px;border-radius:6px;background:${sop.color}10;border:1px solid ${sop.color}30">
+            <div style="font-size:16px">${sop.icon}</div>
+            <div style="font-size:10px;color:${sop.color};font-weight:bold">Day ${sop.day}</div>
+            <div style="font-size:10px;color:#666">${sop.title}</div>
+          </div>
+          ${i<FOLLOWUP_SOP.length-1?'<div style="color:#cbd5e0;font-size:14px">→</div>':''}
+        `).join('')}
+      </div>
+    </div>
+    
+    <!-- 快速创建SOP计划 -->
+    <div class="mb12" style="background:#ebf8ff;padding:10px;border-radius:6px;border:1px solid #90cdf4">
+      <div class="text-xs mb6" style="color:#2b6cb0;font-weight:bold">⚡ 快速为客户创建7节点跟进计划</div>
+      <div style="display:flex;gap:8px">
+        <input id="sopCustomerName" class="form-control" placeholder="输入客户名称，如：Michael (USA)" style="flex:1;font-size:12px">
+        <button class="btn" style="background:#3182ce;color:#fff;font-size:12px;padding:4px 16px" onclick="createFollowupPlan(document.getElementById('sopCustomerName').value.trim())">🚀 创建计划</button>
+      </div>
+      <div class="text-xs text-muted mt6" style="font-size:10px">创建后自动生成Day0/3/7/14/30/60/90共7个跟进任务</div>
+    </div>
+    
+    <!-- 任务统计 -->
+    ${(() => {
+      const tasks = S.followupTasks || [];
+      const pendingTasks = tasks.filter(t=>!t.completed);
+      const todayTasks = pendingTasks.filter(t=>{
+        if(!t.dueDate) return false;
+        const today = new Date().toISOString().split('T')[0];
+        return t.dueDate <= today;
+      });
+      const overdueTasks = pendingTasks.filter(t=>{
+        if(!t.dueDate) return false;
+        return new Date(t.dueDate) < new Date(new Date().toISOString().split('T')[0]);
+      });
+      const completedTasks = tasks.filter(t=>t.completed);
+      return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+        <div style="text-align:center;padding:10px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:20px;font-weight:bold;color:#3182ce">${pendingTasks.length}</div>
+          <div style="font-size:11px;color:#666">待办任务</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#fff7ed;border-radius:6px;border:1px solid #fdba74">
+          <div style="font-size:20px;font-weight:bold;color:#dd6b20">${todayTasks.length}</div>
+          <div style="font-size:11px;color:#666">今日到期</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#fff5f5;border-radius:6px;border:1px solid #feb2b2">
+          <div style="font-size:20px;font-weight:bold;color:#e53e3e">${overdueTasks.length}</div>
+          <div style="font-size:11px;color:#666">已逾期</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#f0fff4;border-radius:6px;border:1px solid #9ae6b4">
+          <div style="font-size:20px;font-weight:bold;color:#38a169">${completedTasks.length}</div>
+          <div style="font-size:11px;color:#666">已完成</div>
+        </div>
+      </div>`;
+    })()}
+    
+    <!-- 今日待办任务 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6" style="color:#dd6b20;font-weight:bold">🔥 今日待办（优先处理）</div>
+      ${(() => {
+        const tasks = S.followupTasks || [];
+        const today = new Date().toISOString().split('T')[0];
+        const todayTasks = tasks.filter(t=>!t.completed && t.dueDate && t.dueDate <= today)
+          .sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate));
+        if(!todayTasks.length) return '<div class="text-xs text-muted" style="padding:16px;text-align:center;background:#f8f9fa;border-radius:6px">🎉 今日无待办任务，继续保持！</div>';
+        return todayTasks.slice(0,5).map(t=>{
+          const status = getTaskStatus(t.dueDate, t.completed);
+          return `<div style="padding:10px;background:#fff7ed;border-radius:6px;margin-bottom:6px;border-left:3px solid ${status.color}">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:bold">${t.icon} ${t.title}</div>
+                <div class="text-xs text-muted" style="margin-top:2px">👤 ${t.customer} · ${t.action||''}</div>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span class="badge" style="background:${status.color};color:#fff;font-size:10px;padding:2px 6px">${status.icon} ${status.label}</span>
+                <button class="btn btn-outline" style="font-size:11px;padding:2px 8px;background:#38a169;color:#fff;border-color:#38a169" onclick="completeFollowupTask('${t.id}')">✓ 完成</button>
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      })()}
+    </div>
+    
+    <!-- 全部任务列表 -->
+    <div>
+      <div class="text-xs text-muted mb6" style="color:#3182ce;font-weight:bold">📋 全部跟进任务（按时间排序）</div>
+      ${(() => {
+        const tasks = S.followupTasks || [];
+        if(!tasks.length) return '<div class="text-xs text-muted" style="padding:20px;text-align:center;background:#f8f9fa;border-radius:6px">暂无跟进任务，点击「➕ 新增任务」或为客户创建SOP计划</div>';
+        const sorted = [...tasks].sort((a,b)=>{
+          if(a.completed !== b.completed) return a.completed ? 1 : -1;
+          return new Date(a.dueDate||0) - new Date(b.dueDate||0);
+        });
+        return `<div style="max-height:350px;overflow-y:auto">
+          ${sorted.map(t=>{
+            const status = getTaskStatus(t.dueDate, t.completed);
+            return `<div style="padding:8px;background:${t.completed?'#f8f9fa':'#fff'};border-radius:6px;margin-bottom:4px;border:1px solid #e2e8f0;opacity:${t.completed?'0.6':'1'}">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="flex:1">
+                  <div style="font-size:12px;font-weight:${t.completed?'normal':'bold'};text-decoration:${t.completed?'line-through':'none'}">${t.icon} ${t.title}</div>
+                  <div class="text-xs text-muted" style="margin-top:2px">👤 ${t.customer} · 截止: ${t.dueDate||'未设置'}</div>
+                </div>
+                <div style="display:flex;gap:4px;align-items:center">
+                  <span class="badge" style="background:${status.color};color:#fff;font-size:10px;padding:2px 6px">${status.label}</span>
+                  ${!t.completed?`<button class="btn btn-outline" style="font-size:10px;padding:2px 6px" onclick="completeFollowupTask('${t.id}')">✓</button>`:''}
+                  <button class="btn btn-outline" style="font-size:10px;padding:2px 6px;color:#e53e3e" onclick="deleteFollowupTask('${t.id}')">🗑️</button>
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      })()}
+    </div>
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -7476,6 +7605,131 @@ function clearAllData(){
   });
   toast('✅ 数据已清空，页面即将刷新');
   setTimeout(()=>location.reload(), 1500);
+}
+
+/* V41 客户跟进SOP与任务提醒中心 */
+const FOLLOWUP_SOP = [
+  {day:0, title:'首次开发信', action:'发送个性化开发信，附上产品目录', icon:'✉️', color:'#3182ce'},
+  {day:3, title:'首次跟进', action:'如果未回复，发送跟进邮件，强调产品优势', icon:'📧', color:'#3182ce'},
+  {day:7, title:'二次跟进', action:'发送WhatsApp消息，询问是否收到邮件，建立联系', icon:'💬', color:'#dd6b20'},
+  {day:14, title:'三次跟进', action:'发送新产品/优惠信息，提供价值，保持存在感', icon:'📢', color:'#d69e2e'},
+  {day:30, title:'月度跟进', action:'发送节日问候/行业资讯，维护客户关系', icon:'🎁', color:'#805ad5'},
+  {day:60, title:'季度回访', action:'电话/视频沟通，了解需求变化，推进合作', icon:'📞', color:'#38a169'},
+  {day:90, title:'长期维护', action:'定期发送新品/案例，保持长期联系', icon:'🤝', color:'#319795'}
+];
+
+/* 初始化跟进任务 */
+if(!S.followupTasks) S.followupTasks = [];
+
+/* 添加跟进任务 */
+function addFollowupTask(task){
+  if(!S.followupTasks) S.followupTasks = [];
+  task.id = task.id || uid();
+  task.createdAt = task.createdAt || Date.now();
+  task.completed = task.completed || false;
+  S.followupTasks.unshift(task);
+  DB.save('followupTasks', S.followupTasks);
+  return task;
+}
+
+/* 完成跟进任务 */
+function completeFollowupTask(id){
+  const task = S.followupTasks.find(t=>t.id===id);
+  if(!task) return;
+  task.completed = true;
+  task.completedAt = Date.now();
+  DB.save('followupTasks', S.followupTasks);
+  toast('✅ 跟进任务已完成');
+  viewTools(document.getElementById('mainContent'));
+}
+
+/* 删除跟进任务 */
+function deleteFollowupTask(id){
+  S.followupTasks = S.followupTasks.filter(t=>t.id!==id);
+  DB.save('followupTasks', S.followupTasks);
+  toast('任务已删除');
+  viewTools(document.getElementById('mainContent'));
+}
+
+/* 为客户创建SOP跟进计划 */
+function createFollowupPlan(customerName, customerId){
+  if(!customerName){ toast('请输入客户名称'); return; }
+  const now = Date.now();
+  FOLLOWUP_SOP.forEach((sop, idx)=>{
+    const dueDate = new Date(now + sop.day * 24 * 60 * 60 * 1000);
+    addFollowupTask({
+      customer: customerName,
+      customerId: customerId || '',
+      title: sop.title,
+      action: sop.action,
+      icon: sop.icon,
+      color: sop.color,
+      day: sop.day,
+      dueDate: dueDate.toISOString().split('T')[0],
+      stage: idx
+    });
+  });
+  toast('✅ 已为「'+customerName+'」创建7节点跟进计划');
+  viewTools(document.getElementById('mainContent'));
+}
+
+/* 打开新增跟进任务弹窗 */
+function openAddFollowupTask(){
+  const customers = S.customers || [];
+  openModal(`
+    <div class="modal-head"><h3>➕ 新增跟进任务</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="mb8"><label class="text-xs text-muted">客户名称 *</label>
+        ${customers.length ? `<select id="ftCustomer" class="form-control"><option value="">-- 选择客户 --</option>${customers.slice(0,50).map(c=>`<option value="${c.name}">${c.name}${c.country?' ('+c.country+')':''}</option>`).join('')}</select>` : `<input id="ftCustomer" class="form-control" placeholder="客户名称">`}
+      </div>
+      <div class="mb8"><label class="text-xs text-muted">任务标题 *</label><input id="ftTitle" class="form-control" placeholder="如：发送开发信/电话跟进/寄样品"></div>
+      <div class="mb8"><label class="text-xs text-muted">具体动作</label><textarea id="ftAction" class="form-control" rows="2" placeholder="具体要做什么..."></textarea></div>
+      <div class="mb8"><label class="text-xs text-muted">截止日期 *</label><input id="ftDueDate" class="form-control" type="date" value="${new Date().toISOString().split('T')[0]}"></div>
+      <div class="mb8"><label class="text-xs text-muted">优先级</label><select id="ftPriority" class="form-control"><option value="high">🔴 高优先级</option><option value="medium" selected>🟡 中优先级</option><option value="low">🟢 低优先级</option></select></div>
+      <div class="flex gap8">
+        <button class="btn" style="background:#3182ce;color:#fff" onclick="saveFollowupTask()">💾 保存任务</button>
+        <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      </div>
+    </div>
+  `);
+}
+
+/* 保存跟进任务 */
+function saveFollowupTask(){
+  const customer = document.getElementById('ftCustomer').value.trim();
+  const title = document.getElementById('ftTitle').value.trim();
+  const dueDate = document.getElementById('ftDueDate').value;
+  if(!customer || !title || !dueDate){ toast('请填写客户名称、任务标题和截止日期'); return; }
+  const priority = document.getElementById('ftPriority').value;
+  const priorityMap = {high:{icon:'🔴',color:'#e53e3e'},medium:{icon:'🟡',color:'#d69e2e'},low:{icon:'🟢',color:'#38a169'}};
+  const p = priorityMap[priority];
+  addFollowupTask({
+    customer: customer,
+    title: title,
+    action: document.getElementById('ftAction').value,
+    icon: p.icon,
+    color: p.color,
+    dueDate: dueDate,
+    priority: priority
+  });
+  closeModal();
+  toast('✅ 跟进任务已添加');
+  viewTools(document.getElementById('mainContent'));
+}
+
+/* 计算任务状态 */
+function getTaskStatus(dueDate, completed){
+  if(completed) return {label:'已完成',color:'#38a169',icon:'✅'};
+  if(!dueDate) return {label:'未设置',color:'#718096',icon:'📋'};
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  const due = new Date(dueDate);
+  const diffDays = Math.ceil((due - now) / (1000*60*60*24));
+  if(diffDays < 0) return {label:`逾期${Math.abs(diffDays)}天`,color:'#e53e3e',icon:'⚠️'};
+  if(diffDays === 0) return {label:'今天到期',color:'#dd6b20',icon:'🔥'};
+  if(diffDays <= 3) return {label:`${diffDays}天后`,color:'#d69e2e',icon:'⏰'};
+  if(diffDays <= 7) return {label:`${diffDays}天后`,color:'#3182ce',icon:'📅'};
+  return {label:`${diffDays}天后`,color:'#718096',icon:'📋'};
 }
 
 /* V20 端到端获客流水线 */

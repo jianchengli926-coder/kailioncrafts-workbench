@@ -1867,6 +1867,66 @@ function getCommStats(){
   return stats;
 }
 
+/* V48.2 基于沟通历史生成AI回复建议 */
+async function generateReplySuggestion(cid){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c) return;
+  const comms = getCustomerCommunications(cid);
+  if(!comms.length){ toast('暂无沟通记录，无法生成建议'); return; }
+  
+  // 构建沟通历史摘要
+  const historyText = comms.slice(0,5).map(r=>{
+    const type = COMM_TYPES.find(t=>t.id===r.type)?.label || r.type;
+    const date = new Date(r.createdAt).toLocaleDateString();
+    return `[${date} ${type}] ${r.content.substring(0,200)}`;
+  }).join('\n');
+  
+  const prompt = `你是一位资深外贸业务员助手。请根据以下客户沟通历史，给出下一步跟进的回复建议。
+
+客户公司：${c.company}
+客户国家：${c.country}
+客户产品：${c.products}
+客户评分：${c.scores.total}分（${c.scores.grade}级）
+当前状态：${c.status}
+
+最近沟通历史：
+${historyText}
+
+请给出：
+1. 客户当前意向分析（1-2句话）
+2. 下一步最佳跟进方式（邮件/WhatsApp/电话）
+3. 具体的回复话术建议（50-80词，英文）
+4. 跟进时机建议
+
+请用中文回复分析，英文回复话术。`;
+
+  try {
+    const result = await callAI([{role:'user', content:prompt}], {timeout:60000});
+    const suggestion = result.content || result.text || JSON.stringify(result);
+    window._lastReplySuggestion = suggestion;
+    
+    openModal(`
+      <div class="modal-head">
+        <h3>🤖 AI 回复建议 - ${esc(c.company)}</h3>
+        <span class="modal-close" onclick="closeModal()">×</span>
+      </div>
+      <div class="modal-body">
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:16px;margin-bottom:16px">
+          <div style="font-size:12px;color:#0369a1;margin-bottom:8px">💡 基于 ${comms.length} 条沟通记录分析生成</div>
+          <div style="font-size:13px;line-height:1.8;white-space:pre-wrap;color:#1e293b">${esc(suggestion)}</div>
+        </div>
+        <div class="flex gap8 justify-end">
+          <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+          <button class="btn btn-gold" onclick="copyText(window._lastReplySuggestion);toast('已复制到剪贴板')">📋 复制建议</button>
+          <button class="btn btn-primary" onclick="closeModal();go('drafts');editDraftForCustomer('${cid}')">✉️ 去写开发信</button>
+        </div>
+      </div>
+    `);
+  } catch(e) {
+    toast('AI生成失败：' + (e.message||e));
+  }
+}
+
 /* V31 AI图像生成 - 支持智谱CogView-3-Flash */
 async function callAIImage(prompt, opts={}){
   opts = opts||{};
@@ -2862,6 +2922,7 @@ function viewCustomers(root){
   if(custFilter.country) list = list.filter(c=>c.country===custFilter.country);
   if(custFilter.source) list = list.filter(c=>c.source===custFilter.source);
   if(custFilter.status) list = list.filter(c=>c.status===custFilter.status);
+  if(custFilter.tag) list = list.filter(c=>(c.tags||[]).includes(custFilter.tag));
   if(custFilter.view==='new') list = list.filter(c=>!c.isOld);
   if(custFilter.view==='old') list = list.filter(c=>c.isOld);
   if(custFilter.q){ const q=custFilter.q.toLowerCase(); list = list.filter(c=>(c.company+c.contact.email+c.products).toLowerCase().includes(q)); }
@@ -2889,14 +2950,17 @@ function viewCustomers(root){
         <select class="form-control" style="width:130px" onchange="custFilter.source=this.value;custFilter.page=1;renderView()">
           <option value="">全部来源</option>${sources.map(c=>`<option ${custFilter.source===c?'selected':''}>${c}</option>`).join('')}
         </select>
+        <select class="form-control" style="width:140px" onchange="custFilter.tag=this.value;custFilter.page=1;renderView()">
+          <option value="">全部标签</option>${PRESET_TAGS.map(t=>`<option value="${t.label}" ${custFilter.tag===t.label?'selected':''}>${t.label}</option>`).join('')}
+        </select>
       </div>
       <button class="btn btn-primary" onclick="openCustomerForm()">＋ 添加客户</button>
     </div>
     ${custFilter.q?`<div class="mb16 text-sm">搜索 “<b>${esc(custFilter.q)}</b>” 共 ${list.length} 条 <a class="text-gold" style="cursor:pointer" onclick="custFilter.q='';routeParams.q='';renderView()">清除</a></div>`:''}
     <div class="card">
       <div class="table-wrap"><table class="tbl">
-        <colgroup><col style="width:4%"><col style="width:20%"><col style="width:7%"><col style="width:6%"><col style="width:15%"><col style="width:16%"><col style="width:10%"><col style="width:10%"><col style="width:12%"></colgroup>
-        <thead><th><input type="checkbox" onchange="toggleAllCust(this.checked)"></th><th>公司</th><th>国家</th><th>等级</th><th>主营产品</th><th>决策人邮箱</th><th>距上次跟进</th><th>下次跟进</th><th>状态</th></tr></thead>
+        <colgroup><col style="width:4%"><col style="width:18%"><col style="width:6%"><col style="width:5%"><col style="width:13%"><col style="width:14%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:12%"></colgroup>
+        <thead><th><input type="checkbox" onchange="toggleAllCust(this.checked)"></th><th>公司</th><th>国家</th><th>等级</th><th>主营产品</th><th>决策人邮箱</th><th>距上次跟进</th><th>下次跟进</th><th>标签</th><th>状态</th></tr></thead>
         <tbody>
         ${pageList.length? pageList.map(c=>`
           <tr style="cursor:pointer" onclick="openCustomerDetail('${c.id}')">
@@ -2908,9 +2972,10 @@ function viewCustomers(root){
             <td class="text-sm mono">${esc(c.contact.email)}</td>
             <td>${followDaysBadge(c)}</td>
             <td class="text-sm">${fmtDay(c.nextFollowUp)}</td>
+            <td>${(c.tags||[]).slice(0,2).map(t=>`<span class="badge badge-gold" style="font-size:10px;padding:2px 6px;margin:1px">${t.length>6?t.substring(0,6)+"…":t}</span>`).join("")||"<span class='text-muted text-sm'>-</span>"}</td>
             <td><span class="badge ${c.status==='已回复'?'badge-a':c.status==='跟进中'?'badge-blue':c.status==='待跟进'?'badge-gold':'badge-gray'}">${esc(c.status)}</span>${!c.owner?'<button class="btn btn-gold btn-sm" style="margin-left:6px" onclick="event.stopPropagation();claimCust(\''+c.id+'\')">领取</button>':''}</td>
           </tr>`).join('')
-        : `<tr><td colspan="9"><div class="empty"><div class="big">🔍</div><p>没有符合条件的客户</p></div></td></tr>`}
+        : `<tr><td colspan="10"><div class="empty"><div class="big">🔍</div><p>没有符合条件的客户</p></div></td></tr>`}
         </tbody>
       </table></div>
       ${pager(list.length, custFilter.page, CUST_PAGE, 'gotoCustPage')}
@@ -3109,7 +3174,10 @@ function openCustomerDetail(cid){
       <div class="card card-pad mb16" style="border-left:4px solid #3182ce">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
           <span>📝 沟通记录时间线</span>
-          <button class="btn btn-gold btn-sm" onclick="openAddCommunication('${cid}')">➕ 添加记录</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="generateReplySuggestion('${cid}')" style="font-size:11px">🤖 AI回复建议</button>
+            <button class="btn btn-gold btn-sm" onclick="openAddCommunication('${cid}')">➕ 添加记录</button>
+          </div>
         </div>
         ${(() => {
           const comms = getCustomerCommunications(cid);

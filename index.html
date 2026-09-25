@@ -2878,7 +2878,7 @@ function renderView(){
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, devplans:viewDevPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
-    seo:viewSEO, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings};
+    seo:viewSEO, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, pipeline:viewPipeline, outreach:viewOutreach};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
@@ -7294,6 +7294,103 @@ function mediaQuote(){
 /* V11 AI业务员（AI Agent模块追加区块） */
 
 /* V12 销售漏斗 */
+
+/* V63 触达中心页面 */
+function viewOutreach(root){
+  const sentEmails = S.drafts.filter(d=>d.status==='已发送' || d.status==='发送').length;
+  const totalEmails = S.drafts.length;
+  const replyRate = S.customers.filter(c=>c.status==='已回复').length;
+  const communications = (S.communications||[]).length;
+  
+  root.innerHTML = `
+    <div style="background:linear-gradient(120deg,var(--primary),#2c5282);color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:17px">📤 多渠道触达中心</div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:4px">邮件 · WhatsApp · 领英 · 电话，统一管理客户触达，跟踪送达率和回复率</div>
+    </div>
+    
+    <!-- 触达统计 -->
+    <div class="stat-grid" style="margin-bottom:16px">
+      <div class="stat-card"><span class="stat-icon">📧</span>
+        <div class="stat-label">开发信总数</div><div class="stat-value">${totalEmails}</div>
+        <div class="stat-trend up">已发送 ${sentEmails} 封</div></div>
+      <div class="stat-card gold"><span class="stat-icon">💬</span>
+        <div class="stat-label">沟通记录</div><div class="stat-value">${communications}</div>
+        <div class="stat-trend up">多渠道沟通历史</div></div>
+      <div class="stat-card"><span class="stat-icon">✅</span>
+        <div class="stat-label">已回复客户</div><div class="stat-value">${replyRate}</div>
+        <div class="stat-trend ${replyRate>0?'up':'down'}">回复率 ${Math.round(replyRate/Math.max(S.customers.length,1)*100)}%</div></div>
+      <div class="stat-card gold"><span class="stat-icon">🎯</span>
+        <div class="stat-label">待触达客户</div><div class="stat-value">${S.customers.filter(c=>c.status!=='已回复').length}</div>
+        <div class="stat-trend down">需要持续跟进</div></div>
+    </div>
+    
+    <!-- 触达渠道 -->
+    <div class="card card-pad mb16">
+      <div class="card-title">📊 触达渠道管理</div>
+      <div class="grid-4" style="gap:12px;margin-top:12px">
+        <div style="background:linear-gradient(135deg,#ebf8ff,#bee3f8);padding:16px;border-radius:10px;text-align:center;cursor:pointer" onclick="go('drafts')">
+          <div style="font-size:32px">📧</div>
+          <div style="font-weight:700;margin-top:8px">邮件开发</div>
+          <div class="text-sm text-muted" style="margin-top:4px">${totalEmails}封开发信</div>
+          <div class="text-xs" style="color:#2b6cb0;margin-top:8px">点击进入 →</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#c6f6d5,#9ae6b4);padding:16px;border-radius:10px;text-align:center;cursor:pointer" onclick="toast('WhatsApp触达功能：在客户详情页点击WhatsApp按钮')">
+          <div style="font-size:32px">💬</div>
+          <div style="font-weight:700;margin-top:8px">WhatsApp</div>
+          <div class="text-sm text-muted" style="margin-top:4px">即时消息触达</div>
+          <div class="text-xs" style="color:#276749;margin-top:8px">客户详情页使用 →</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#e9d8fd,#d6bcfa);padding:16px;border-radius:10px;text-align:center;cursor:pointer" onclick="go('linkedin')">
+          <div style="font-size:32px">💼</div>
+          <div style="font-weight:700;margin-top:8px">领英拓客</div>
+          <div class="text-sm text-muted" style="margin-top:4px">社交平台触达</div>
+          <div class="text-xs" style="color:#553c9a;margin-top:8px">点击进入 →</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#fefcbf,#fef3c7);padding:16px;border-radius:10px;text-align:center;cursor:pointer" onclick="toast('电话触达：在沟通记录中记录电话沟通内容')">
+          <div style="font-size:32px">📞</div>
+          <div style="font-weight:700;margin-top:8px">电话沟通</div>
+          <div class="text-sm text-muted" style="margin-top:4px">直接电话联系</div>
+          <div class="text-xs" style="color:#975a16;margin-top:8px">沟通记录使用 →</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 触达效果分析 -->
+    <div class="card card-pad mb16">
+      <div class="card-title">📈 触达效果分析</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px">
+        <div style="background:#f7fafc;padding:14px;border-radius:8px">
+          <div class="text-sm text-muted">邮件发送量</div>
+          <div style="font-size:24px;font-weight:700;color:#2b6cb0;margin-top:4px">${sentEmails}</div>
+          <div class="text-xs text-muted" style="margin-top:4px">累计发送开发信</div>
+        </div>
+        <div style="background:#f7fafc;padding:14px;border-radius:8px">
+          <div class="text-sm text-muted">客户回复率</div>
+          <div style="font-size:24px;font-weight:700;color:#276749;margin-top:4px">${Math.round(replyRate/Math.max(S.customers.length,1)*100)}%</div>
+          <div class="text-xs text-muted" style="margin-top:4px">${replyRate}/${S.customers.length} 客户已回复</div>
+        </div>
+        <div style="background:#f7fafc;padding:14px;border-radius:8px">
+          <div class="text-sm text-muted">平均沟通次数</div>
+          <div style="font-size:24px;font-weight:700;color:#975a16;margin-top:4px">${(communications/Math.max(S.customers.length,1)).toFixed(1)}</div>
+          <div class="text-xs text-muted" style="margin-top:4px">每客户平均沟通</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 快捷操作 -->
+    <div class="card card-pad">
+      <div class="card-title">⚡ 快捷操作</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn btn-primary" onclick="go('drafts')">✉️ 写开发信</button>
+        <button class="btn btn-gold" onclick="go('customers')">👥 选择客户群发</button>
+        <button class="btn btn-outline" onclick="go('schedule')">📅 查看跟进日程</button>
+        <button class="btn btn-outline" onclick="go('activity')">📋 查看触达日志</button>
+      </div>
+    </div>
+  `;
+}
+
+
 function viewPipeline(root){
   const stages=[
     ['📥 新线索',39,'100%',''],

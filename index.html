@@ -561,6 +561,7 @@ function loadState(){
   S.workflows = DB.load('workflows') || null;
   S.tools = DB.load('tools') || null;
   S.pipeline2 = DB.load('pipeline2') || null;
+  S.emailTemplates = DB.load('emailTemplates') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -578,7 +579,7 @@ function persist(){
   DB.save('payments',S.payments); DB.save('certifications',S.certifications); DB.save('whatsapp',S.whatsapp);
   DB.save('rfm',S.rfm); DB.save('landingpages',S.landingpages); DB.save('competitors',S.competitors);
   DB.save('productmedia',S.productmedia); DB.save('aisales',S.aisales);
-  DB.save('pipeline',S.pipeline); DB.save('documents',S.documents);
+  DB.save('pipeline',S.pipeline); DB.save('emailTemplates',S.emailTemplates); DB.save('documents',S.documents);
   DB.save('finance',S.finance); DB.save('catalog',S.catalog); DB.save('team',S.team);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
@@ -6299,6 +6300,103 @@ function viewTools(root){
     </div>
   </div>
   
+  <!-- V45 邮件模板库与话术中心面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #319795;background:linear-gradient(135deg,#f0fdfa,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📧 邮件模板库与话术中心（8大场景 · 16+优质模板 · 变量替换 · AI生成）</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="badge" style="background:#319795;color:#fff">新功能 V45</span>
+        <button class="btn" style="background:#319795;color:#fff;font-size:12px;padding:4px 12px" onclick="openAddEmailTemplate()">➕ 自定义模板</button>
+        <button class="btn btn-outline btn-sm" onclick="aiGenerateEmailTemplate()">🤖 AI生成</button>
+      </div>
+    </div>
+    <p class="text-sm text-muted mb12">外贸全流程邮件模板，覆盖首次开发/跟进/报价/催单/节日/售后/应对拒绝，支持变量一键替换，可复制可编辑</p>
+    
+    <!-- 分类筛选标签 -->
+    <div class="mb12">
+      <div class="flex gap8" style="flex-wrap:wrap">
+        <span id="etcat-all" class="badge" style="cursor:pointer;padding:6px 14px;font-size:12px;background:#319795;color:#fff" onclick="filterEmailTemplates('all')">📋 全部</span>
+        ${EMAIL_TEMPLATE_CATS.map(c=>`<span id="etcat-${c.id}" class="badge" style="cursor:pointer;padding:6px 14px;font-size:12px;background:#f0f4f8;color:#333" onclick="filterEmailTemplates('${c.id}')">${c.icon} ${c.label}</span>`).join('')}
+      </div>
+    </div>
+    
+    <!-- 模板统计 -->
+    ${(() => {
+      const all = getAllEmailTemplates();
+      const favCount = all.filter(t=>t.favorite).length;
+      const customCount = (S.emailTemplates||[]).length;
+      return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+        <div style="text-align:center;padding:8px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:18px;font-weight:bold;color:#319795">${all.length}</div>
+          <div style="font-size:10px;color:#666">模板总数</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:#fffbeb;border-radius:6px;border:1px solid #fbd38d">
+          <div style="font-size:18px;font-weight:bold;color:#d69e2e">${favCount}</div>
+          <div style="font-size:10px;color:#666">收藏模板</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:#ebf8ff;border-radius:6px;border:1px solid #90cdf4">
+          <div style="font-size:18px;font-weight:bold;color:#3182ce">${customCount}</div>
+          <div style="font-size:10px;color:#666">自定义模板</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:#f0fff4;border-radius:6px;border:1px solid #9ae6b4">
+          <div style="font-size:18px;font-weight:bold;color:#38a169">8</div>
+          <div style="font-size:10px;color:#666">场景分类</div>
+        </div>
+      </div>`;
+    })()}
+    
+    <!-- 模板列表 -->
+    <div id="emailTemplateList">
+      ${(() => {
+        const all = getAllEmailTemplates();
+        return all.map(t => {
+          const cat = EMAIL_TEMPLATE_CATS.find(c=>c.id===t.cat);
+          const isCustom = t.id.startsWith('custom_');
+          return `<div id="etpl-${t.id}" style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:8px;background:#fff;transition:all .15s" onmouseover="this.style.borderColor='#319795'" onmouseout="this.style.borderColor='#e2e8f0'">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+              <div style="flex:1">
+                <span style="font-size:13px;font-weight:bold;color:#2d3748">${t.favorite?'⭐ ':''}${t.title}</span>
+                <div style="margin-top:4px">
+                  <span class="badge" style="font-size:10px;background:#e6fffa;color:#319795">${cat?cat.icon+' '+cat.label:t.cat}</span>
+                  <span class="badge" style="font-size:10px;background:#f0f4f8;color:#666;margin-left:4px">${t.lang==='en'?'EN':'中文'}</span>
+                  ${isCustom?'<span class="badge" style="font-size:10px;background:#fef5e7;color:#dd6b20;margin-left:4px">自定义</span>':''}
+                  <span class="badge" style="font-size:10px;background:#f7fafc;color:#999;margin-left:4px">使用${t.usage||0}次</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:4px;flex-shrink:0;margin-left:8px">
+                <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px" onclick="previewEmailTemplate('${t.id}')">👁 预览</button>
+                <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px" onclick="copyEmailTemplate('${t.id}')">📋 复制</button>
+                <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px" onclick="toggleTemplateFavorite('${t.id}')">${t.favorite?'💔':'❤️'}</button>
+                ${isCustom?`<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px;color:#e53e3e" onclick="deleteCustomTemplate('${t.id}')">🗑</button>`:''}
+              </div>
+            </div>
+            <div style="font-size:11px;color:#666;background:#f8fafc;padding:6px 10px;border-radius:4px;margin-top:6px">
+              <b>主题：</b>${t.subject?.slice(0,80)||'(无主题)'}
+            </div>
+          </div>`;
+        }).join('');
+      })()}
+    </div>
+    
+    <!-- 变量说明 -->
+    <div class="mt12" style="background:#f8fafc;padding:10px 14px;border-radius:6px;border:1px solid #e2e8f0">
+      <div class="text-xs text-muted mb4" style="font-weight:bold;color:#319795">📝 支持的变量（复制后自动替换）：</div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{clientName}</code>
+        <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{company}</code>
+        <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{product}</code>
+        <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{price}</code>
+        <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{moq}</code>
+        <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{myName}</code>
+        <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{myCompany}</code>
+        <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{myEmail}</code>
+        <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{piNumber}</code>
+        <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{quantity}</code>
+        <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:3px;border:1px solid #e2e8f0">{totalAmount}</code>
+      </div>
+    </div>
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -6306,6 +6404,248 @@ function viewTools(root){
         ${c[1].map(t=>`<span class="badge badge-blue" style="cursor:pointer" onclick="toast('打开 ${t}（演示）')">${t}</span>`).join('')}
       </div></div>`).join('')}
   </div>`;
+}
+
+/* V45 邮件模板库 - 辅助函数 */
+let currentEmailCatFilter = 'all';
+
+function filterEmailTemplates(cat){
+  currentEmailCatFilter = cat;
+  // 更新标签样式
+  document.querySelectorAll('[id^="etcat-"]').forEach(el=>{
+    el.style.background = el.id==='etcat-'+cat ? '#319795' : '#f0f4f8';
+    el.style.color = el.id==='etcat-'+cat ? '#fff' : '#333';
+  });
+  // 筛选显示
+  const all = getAllEmailTemplates();
+  const filtered = cat==='all' ? all : all.filter(t=>t.cat===cat);
+  const list = document.getElementById('emailTemplateList');
+  if(list){
+    list.innerHTML = filtered.map(t => {
+      const c = EMAIL_TEMPLATE_CATS.find(x=>x.id===t.cat);
+      const isCustom = t.id.startsWith('custom_');
+      return `<div id="etpl-${t.id}" style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:8px;background:#fff">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div style="flex:1">
+            <span style="font-size:13px;font-weight:bold;color:#2d3748">${t.favorite?'⭐ ':''}${t.title}</span>
+            <div style="margin-top:4px">
+              <span class="badge" style="font-size:10px;background:#e6fffa;color:#319795">${c?c.icon+' '+c.label:t.cat}</span>
+              <span class="badge" style="font-size:10px;background:#f0f4f8;color:#666;margin-left:4px">${t.lang==='en'?'EN':'中文'}</span>
+              ${isCustom?'<span class="badge" style="font-size:10px;background:#fef5e7;color:#dd6b20;margin-left:4px">自定义</span>':''}
+            </div>
+          </div>
+          <div style="display:flex;gap:4px;flex-shrink:0;margin-left:8px">
+            <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px" onclick="previewEmailTemplate('${t.id}')">👁 预览</button>
+            <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px" onclick="copyEmailTemplate('${t.id}')">📋 复制</button>
+            <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px" onclick="toggleTemplateFavorite('${t.id}')">${t.favorite?'💔':'❤️'}</button>
+            ${isCustom?`<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px;color:#e53e3e" onclick="deleteCustomTemplate('${t.id}')">🗑</button>`:''}
+          </div>
+        </div>
+        <div style="font-size:11px;color:#666;background:#f8fafc;padding:6px 10px;border-radius:4px;margin-top:6px">
+          <b>主题：</b>${t.subject?.slice(0,80)||'(无主题)'}
+        </div>
+      </div>`;
+    }).join('') || '<div style="text-align:center;padding:20px;color:#999">该分类暂无模板</div>';
+  }
+}
+
+function previewEmailTemplate(id){
+  const t = getAllEmailTemplates().find(x=>x.id===id);
+  if(!t) return;
+  const preview = replaceTemplateVars(t.content || '');
+  openModal(`
+    <div class="modal-head"><h3>📧 ${t.title}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div style="margin-bottom:12px;padding:10px;background:#f0f4f8;border-radius:6px">
+        <div class="text-xs text-muted mb2"><b>邮件主题：</b></div>
+        <div style="font-size:13px;font-weight:bold">${replaceTemplateVars(t.subject||'')}</div>
+      </div>
+      <div class="text-xs text-muted mb4"><b>邮件正文（变量已替换为示例值）：</b></div>
+      <div style="background:#f8fafc;padding:14px;border-radius:6px;font-size:13px;line-height:1.8;white-space:pre-wrap;max-height:400px;overflow-y:auto;border:1px solid #e2e8f0">${preview}</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+      <button class="btn btn-gold" onclick="copyEmailTemplate('${t.id}');closeModal()">📋 复制到剪贴板</button>
+    </div>`);
+}
+
+function copyEmailTemplate(id){
+  const t = getAllEmailTemplates().find(x=>x.id===id);
+  if(!t) return;
+  // 增加使用次数
+  if(t.id.startsWith('custom_')){
+    const idx = (S.emailTemplates||[]).findIndex(x=>x.id===id);
+    if(idx>=0){ S.emailTemplates[idx].usage = (S.emailTemplates[idx].usage||0)+1; persist(); }
+  }
+  const fullText = (t.subject?'Subject: '+replaceTemplateVars(t.subject)+'\n\n':'') + replaceTemplateVars(t.content||'');
+  navigator.clipboard.writeText(fullText).then(()=>{
+    toast('✅ 模板已复制到剪贴板（变量已替换）');
+  }).catch(()=>{
+    // 降级方案
+    const ta = document.createElement('textarea');
+    ta.value = fullText; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('✅ 模板已复制到剪贴板');
+  });
+}
+
+function toggleTemplateFavorite(id){
+  const all = getAllEmailTemplates();
+  const t = all.find(x=>x.id===id);
+  if(!t) return;
+  if(t.id.startsWith('custom_')){
+    const idx = (S.emailTemplates||[]).findIndex(x=>x.id===id);
+    if(idx>=0){ S.emailTemplates[idx].favorite = !S.emailTemplates[idx].favorite; persist(); }
+  } else {
+    // 内置模板的收藏状态存在localStorage
+    let favs = JSON.parse(localStorage.getItem('builtinTemplateFavs')||'{}');
+    favs[id] = !favs[id];
+    localStorage.setItem('builtinTemplateFavs', JSON.stringify(favs));
+    t.favorite = favs[id];
+  }
+  toast(t.favorite?'❤️ 已收藏':'💔 已取消收藏');
+  // 刷新当前视图
+  if(currentView==='tools') viewTools(document.getElementById('mainContent'));
+}
+
+function openAddEmailTemplate(){
+  openModal(`
+    <div class="modal-head"><h3>➕ 新增自定义邮件模板</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div>
+          <label class="text-xs text-muted">模板名称 *</label>
+          <input id="newTplTitle" class="form-control" placeholder="例如：大客户专属开发信">
+        </div>
+        <div>
+          <label class="text-xs text-muted">分类 *</label>
+          <select id="newTplCat" class="form-control">
+            ${EMAIL_TEMPLATE_CATS.map(c=>`<option value="${c.id}">${c.icon} ${c.label}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-row mt12">
+        <div>
+          <label class="text-xs text-muted">语言</label>
+          <select id="newTplLang" class="form-control">
+            <option value="en">英文</option>
+            <option value="zh">中文</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-muted">邮件主题（支持变量）</label>
+          <input id="newTplSubject" class="form-control" placeholder="例如：{product} - Best Price from {myCompany}">
+        </div>
+      </div>
+      <div class="mt12">
+        <label class="text-xs text-muted">邮件正文 *（支持 {clientName} {product} {price} 等变量）</label>
+        <textarea id="newTplContent" class="form-control" rows="8" placeholder="Hi {clientName},\n\nWe are a professional {product} manufacturer..."></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-gold" onclick="saveCustomTemplate()">💾 保存模板</button>
+    </div>`);
+}
+
+function saveCustomTemplate(){
+  const title = document.getElementById('newTplTitle').value.trim();
+  const cat = document.getElementById('newTplCat').value;
+  const lang = document.getElementById('newTplLang').value;
+  const subject = document.getElementById('newTplSubject').value.trim();
+  const content = document.getElementById('newTplContent').value.trim();
+  if(!title || !content){ toast('请填写模板名称和正文'); return; }
+  if(!S.emailTemplates) S.emailTemplates = [];
+  S.emailTemplates.push({
+    id:'custom_'+uid(), cat, title, lang, subject, content,
+    favorite:false, usage:0, createdAt:new Date().toISOString()
+  });
+  persist();
+  closeModal();
+  toast('✅ 自定义模板已保存');
+  if(currentView==='tools') viewTools(document.getElementById('mainContent'));
+}
+
+function deleteCustomTemplate(id){
+  confirmDlg('确定删除这个自定义模板吗？', ()=>{
+    S.emailTemplates = (S.emailTemplates||[]).filter(t=>t.id!==id);
+    persist();
+    toast('已删除');
+    if(currentView==='tools') viewTools(document.getElementById('mainContent'));
+  });
+}
+
+async function aiGenerateEmailTemplate(){
+  openModal(`
+    <div class="modal-head"><h3>🤖 AI生成邮件模板</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div>
+          <label class="text-xs text-muted">模板分类</label>
+          <select id="aiTplCat" class="form-control">
+            ${EMAIL_TEMPLATE_CATS.map(c=>`<option value="${c.id}">${c.icon} ${c.label}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-muted">语言</label>
+          <select id="aiTplLang" class="form-control">
+            <option value="en">英文</option>
+            <option value="zh">中文</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt12">
+        <label class="text-xs text-muted">描述你需要的模板（例如：针对美国厨房用品进口商的开发信，强调BSCI认证和快速交期）</label>
+        <textarea id="aiTplDesc" class="form-control" rows="3" placeholder="描述模板的用途、目标客户、重点强调的卖点..."></textarea>
+      </div>
+      <div id="aiTplResult" class="mt12" style="display:none">
+        <div class="text-xs text-muted mb4"><b>AI生成结果：</b></div>
+        <div id="aiTplOutput" style="background:#f8fafc;padding:12px;border-radius:6px;font-size:12px;white-space:pre-wrap;max-height:300px;overflow-y:auto;border:1px solid #e2e8f0"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button id="aiTplGenBtn" class="btn btn-gold" onclick="doAiGenerateTemplate()">🚀 生成模板</button>
+    </div>`);
+}
+
+async function doAiGenerateTemplate(){
+  const cat = document.getElementById('aiTplCat').value;
+  const lang = document.getElementById('aiTplLang').value;
+  const desc = document.getElementById('aiTplDesc').value.trim();
+  if(!desc){ toast('请描述你需要的模板'); return; }
+  const catLabel = EMAIL_TEMPLATE_CATS.find(c=>c.id===cat)?.label || '';
+  const btn = document.getElementById('aiTplGenBtn');
+  btn.disabled = true; btn.textContent = '⏳ 生成中...';
+  const prompt = `请为外贸业务员生成一封${lang==='en'?'英文':'中文'}的${catLabel}邮件模板。
+要求：
+1. 邮件主题和正文都要写
+2. 使用变量占位符，如 {clientName} {company} {product} {price} {moq} {myName} {myCompany} {myEmail}
+3. 专业、简洁、有说服力
+4. 针对场景：${desc}
+5. 格式：先写Subject: 然后空一行写正文
+6. 不要加任何解释，直接输出邮件内容`;
+  const r = await callAI(prompt, {purpose:'draft'});
+  btn.disabled = false; btn.textContent = '🚀 生成模板';
+  if(r.error){ toast('生成失败: '+r.error); return; }
+  const resultDiv = document.getElementById('aiTplResult');
+  const output = document.getElementById('aiTplOutput');
+  resultDiv.style.display = 'block';
+  output.textContent = r.content;
+  // 自动保存为自定义模板
+  const lines = r.content.split('\n');
+  let subject = '', body = r.content;
+  if(lines[0].toLowerCase().startsWith('subject:')){
+    subject = lines[0].substring(8).trim();
+    body = lines.slice(1).join('\n').trim();
+  }
+  if(!S.emailTemplates) S.emailTemplates = [];
+  S.emailTemplates.push({
+    id:'custom_'+uid(), cat, title:'AI生成-'+catLabel+(lang==='en'?'(EN)':'(中文)'),
+    lang, subject, content:body, favorite:false, usage:0, createdAt:new Date().toISOString()
+  });
+  persist();
+  toast('✅ AI模板已生成并保存到自定义模板');
 }
 
 /* AI生图 - 选择模板 */
@@ -7930,6 +8270,323 @@ const OPPORTUNITY_STAGES = [
   {id:'negotiation', name:'谈判', icon:'🤝', color:'#d69e2e', winRate:75},
   {id:'won', name:'成交', icon:'🎉', color:'#38a169', winRate:100}
 ];
+
+/* V45 邮件模板库 - 内置模板 */
+const EMAIL_TEMPLATE_CATS = [
+  {id:'first', label:'首次开发信', icon:'✉️'},
+  {id:'followup1', label:'跟进信(未回复)', icon:'📨'},
+  {id:'followup2', label:'跟进信(已回复)', icon:'💬'},
+  {id:'quote', label:'报价/PI信', icon:'💰'},
+  {id:'urging', label:'催单/催付款', icon:'⏰'},
+  {id:'holiday', label:'节日问候', icon:'🎄'},
+  {id:'aftersale', label:'售后/回访', icon:'🔧'},
+  {id:'rejection', label:'应对拒绝', icon:'🛡️'}
+];
+
+const BUILTIN_EMAIL_TEMPLATES = [
+  {id:'bt1', cat:'first', title:'产品价值型开发信(英文)', lang:'en', favorite:true, usage:0,
+   subject:'{product} Manufacturer - Competitive Price & BSCI Audit',
+   content:`Hi {clientName},
+
+I noticed your company specializes in {industry}. We are a professional {product} manufacturer from Yangjiang, China, with 15+ years experience.
+
+Why choose us:
+• BSCI/ISO audited factory, serving brands like {competitor}
+• Competitive price: {price} MOQ {moq}pcs
+• 20-day lead time, OEM/ODM welcome
+• Free samples available
+
+Could I send you our latest catalog? Looking forward to your reply.
+
+Best regards,
+{myName}
+{myCompany}
+{myEmail}`},
+
+  {id:'bt2', cat:'first', title:'痛点切入型开发信(英文)', lang:'en', favorite:true, usage:0,
+   subject:'Tired of quality issues with {product}? Let us help.',
+   content:`Dear {clientName},
+
+Many importers tell us their biggest pain points with {product} suppliers:
+1. Inconsistent quality between batches
+2. Missed delivery deadlines
+3. Poor communication
+
+We solve all three. Our factory has:
+• Zero-defect rate in last 12 months (3rd party inspection)
+• 98% on-time delivery record
+• Dedicated English-speaking account manager
+
+Would you be open to a 15-minute call to discuss your needs?
+
+Best,
+{myName}
+{myCompany}`},
+
+  {id:'bt3', cat:'first', title:'简洁型开发信(英文)', lang:'en', favorite:false, usage:0,
+   subject:'{product} Supplier from China',
+   content:`Hi {clientName},
+
+Quick intro: we manufacture {product} in China.
+
+Key specs:
+• Price: from {price}
+• MOQ: {moq}pcs
+• Lead time: 20 days
+• Certifications: BSCI, ISO9001
+
+Catalog attached. Let me know if any items interest you.
+
+Regards,
+{myName}`},
+
+  {id:'bt4', cat:'followup1', title:'3天跟进-提供价值(英文)', lang:'en', favorite:true, usage:0,
+   subject:'Re: {product} - Additional info for you',
+   content:`Hi {clientName},
+
+Following up on my previous email about {product}. I thought you might find this useful:
+
+• Attached: our latest product catalog (2024 edition)
+• Price list for your reference
+• Case study: how we helped a US client reduce cost by 18%
+
+No pressure to reply. Just wanted to make sure you have the information. If now is not a good time, when would be better?
+
+Best regards,
+{myName}`},
+
+  {id:'bt5', cat:'followup1', title:'7天跟进-最后通知(英文)', lang:'en', favorite:false, usage:0,
+   subject:'Last follow-up: {product} pricing',
+   content:`Dear {clientName},
+
+This is my last follow-up email regarding {product}. I understand you may be busy or it may not be the right time.
+
+If you are interested, I can offer:
+• Special introductory pricing for first order
+• Free sample shipping
+• Priority production slot
+
+If not, I wish you all the best. Feel free to reach out anytime in the future.
+
+Best regards,
+{myName}
+{myCompany}`},
+
+  {id:'bt6', cat:'followup2', title:'已回复后跟进-报价跟进(英文)', lang:'en', favorite:true, usage:0,
+   subject:'Re: Quotation for {product}',
+   content:`Hi {clientName},
+
+Just checking if you had a chance to review the quotation I sent on {date}. 
+
+I understand pricing is important. If our price is above your target, please let me know your target price and quantity. I will do my best to find a solution that works for both sides.
+
+Looking forward to your feedback.
+
+Best regards,
+{myName}`},
+
+  {id:'bt7', cat:'quote', title:'正式报价信(英文)', lang:'en', favorite:true, usage:0,
+   subject:'Quotation: {product} - {myCompany}',
+   content:`Dear {clientName},
+
+Thank you for your inquiry. Please find our quotation below:
+
+Product: {product}
+Unit Price: {price} (FOB {port})
+MOQ: {moq} pcs
+Lead Time: 20-25 days after deposit
+Payment: 30% T/T deposit, 70% before shipment
+Packaging: {packaging}
+Certifications: BSCI, ISO9001, FDA/LFGB
+
+Validity: 30 days
+
+PI attached. Please review and let me know if you have any questions.
+
+Best regards,
+{myName}
+{myCompany}
+{myEmail}`},
+
+  {id:'bt8', cat:'quote', title:'PI发送确认信(英文)', lang:'en', favorite:false, usage:0,
+   subject:'Proforma Invoice #{piNumber} - {product}',
+   content:`Hi {clientName},
+
+Please find attached the Proforma Invoice #{piNumber} for your order.
+
+Order details:
+• Product: {product}
+• Quantity: {quantity} pcs
+• Total amount: {totalAmount}
+• Payment terms: 30% deposit, 70% balance before shipment
+• Bank details: attached
+
+Please arrange the deposit at your convenience. Once received, we will start production immediately.
+
+Best regards,
+{myName}`},
+
+  {id:'bt9', cat:'urging', title:'催定金(英文)', lang:'en', favorite:false, usage:0,
+   subject:'Payment status for PI #{piNumber}',
+   content:`Dear {clientName},
+
+Hope you are doing well. I am writing to follow up on the deposit for PI #{piNumber}.
+
+We have reserved the production slot for your order. To ensure we can meet your delivery timeline, please arrange the 30% deposit ({depositAmount}) at your earliest convenience.
+
+Once payment is confirmed, we will start production immediately and keep you updated on progress.
+
+Best regards,
+{myName}`},
+
+  {id:'bt10', cat:'urging', title:'催尾款(英文)', lang:'en', favorite:false, usage:0,
+   subject:'Balance payment - Order #{orderNumber} ready for shipment',
+   content:`Hi {clientName},
+
+Good news! Your order #{orderNumber} has been completed and passed final inspection.
+
+Order summary:
+• Product: {product}
+• Quantity: {quantity} pcs
+• Balance due: {balanceAmount}
+• Ready to ship: yes
+
+Please arrange the balance payment. Once received, we will ship the goods immediately and send you the tracking number.
+
+Photos of finished goods attached for your reference.
+
+Best regards,
+{myName}`},
+
+  {id:'bt11', cat:'holiday', title:'圣诞节问候(英文)', lang:'en', favorite:true, usage:0,
+   subject:'Merry Christmas from {myCompany}!',
+   content:`Dear {clientName},
+
+Wishing you and your family a Merry Christmas and a Happy New Year!
+
+Thank you for your support and partnership this year. We look forward to continuing our collaboration in 2025.
+
+Please note our holiday schedule:
+• Office closed: Dec 25 - Jan 1
+• Resume: Jan 2
+
+For any urgent matters, please contact me at {myPhone}.
+
+Best wishes,
+{myName}
+{myCompany}`},
+
+  {id:'bt12', cat:'holiday', title:'新年问候(英文)', lang:'en', favorite:false, usage:0,
+   subject:'Happy New Year 2025!',
+   content:`Dear {clientName},
+
+Happy New Year! Wishing you a prosperous and successful 2025.
+
+Thank you for your business last year. We are excited to continue working with you and hope to achieve even more together this year.
+
+New year, new opportunities. Let us know how we can better serve you in 2025.
+
+Warm regards,
+{myName}
+{myCompany}`},
+
+  {id:'bt13', cat:'aftersale', title:'到货后回访(英文)', lang:'en', favorite:true, usage:0,
+   subject:'How is your order? - Quality check',
+   content:`Hi {clientName},
+
+I hope the goods have arrived safely. I am writing to check on the quality and your satisfaction with the order.
+
+Could you please let me know:
+1. Did the goods arrive in good condition?
+2. Is the quality meeting your expectations?
+3. Any feedback or suggestions for improvement?
+
+Your feedback is very important to us. If there are any issues, please let me know and we will resolve them promptly.
+
+Best regards,
+{myName}`},
+
+  {id:'bt14', cat:'aftersale', title:'复购提醒(英文)', lang:'en', favorite:false, usage:0,
+   subject:'Time to reorder? - {product} stock check',
+   content:`Dear {clientName},
+
+It has been about {months} months since your last order. I hope the products have been selling well for you.
+
+Based on your previous order quantity ({quantity} pcs), you may be running low on stock. We currently have:
+• Available stock: {stock} pcs
+• Production lead time: 20 days
+• Special offer: 5% discount for repeat orders over {moq} pcs
+
+Would you like to place a reorder now to avoid stockout?
+
+Best regards,
+{myName}`},
+
+  {id:'bt15', cat:'rejection', title:'应对价格太高(英文)', lang:'en', favorite:true, usage:0,
+   subject:'Re: Price discussion - Let us find a solution',
+   content:`Hi {clientName},
+
+Thank you for your honest feedback about the price. I understand price is a key factor.
+
+Let me explain our pricing:
+• We use {material} material (not cheaper alternatives)
+• Each unit passes 3-point quality inspection
+• BSCI audited factory with ethical labor
+• 98% on-time delivery (industry average 85%)
+
+However, I want to make this work. Options:
+1. Increase quantity to {moq2} pcs → {discount}% discount
+2. Simplify packaging → save {savings} per unit
+3. Slightly different material spec → meet your target price
+
+Which option works best for you?
+
+Best regards,
+{myName}`},
+
+  {id:'bt16', cat:'rejection', title:'应对"我们已有供应商"(英文)', lang:'en', favorite:false, usage:0,
+   subject:'No need to switch - just be your backup supplier',
+   content:`Dear {clientName},
+
+I completely understand you have an existing supplier. I am not asking you to switch.
+
+Instead, I would like to be your backup supplier. Benefits:
+1. Price comparison reference - use our quote to negotiate with your current supplier
+2. Emergency backup - if your supplier has quality/delivery issues, we can step in
+3. New product development - we can quote on items your supplier doesn't make
+
+No commitment required. Can I send you our catalog for your reference?
+
+Best regards,
+{myName}
+{myCompany}`}
+];
+
+/* 获取邮件模板列表（内置+自定义） */
+function getAllEmailTemplates(){
+  const custom = S.emailTemplates || [];
+  return [...BUILTIN_EMAIL_TEMPLATES, ...custom];
+}
+
+/* 替换模板变量 */
+function replaceTemplateVars(text, vars={}){
+  const defaults = {
+    clientName:'Dear', company:'Your Company', product:'our products',
+    myName:'Leo', myCompany:'KaiLionCrafts', myEmail:'leo@kailioncrafts.com',
+    myPhone:'+86 xxx', price:'$1.50', moq:'500', moq2:'1000',
+    discount:'5', savings:'$0.10', industry:'kitware', competitor:'brand X',
+    date:'today', piNumber:'PI001', orderNumber:'ORD001', quantity:'500',
+    totalAmount:'$750', depositAmount:'$225', balanceAmount:'$525',
+    port:'Shenzhen', packaging:'color box', stock:'1000', months:'3'
+  };
+  const v = {...defaults, ...vars};
+  let result = text;
+  for(const [key,val] of Object.entries(v)){
+    result = result.replace(new RegExp('\{'+key+'\}','g'), val);
+  }
+  return result;
+}
+
 
 if(!S.opportunities) S.opportunities = [];
 

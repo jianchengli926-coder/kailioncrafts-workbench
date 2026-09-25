@@ -2836,6 +2836,42 @@ function getReplyRate(){
   return Math.round((replied / S.customers.length) * 100);
 }
 
+
+
+/* V62 标签云统计函数 */
+function getTagCloudHTML(){
+  const tagCounts = {};
+  S.customers.forEach(c=>{
+    (c.tags||[]).forEach(t=>{
+      tagCounts[t] = (tagCounts[t]||0) + 1;
+    });
+  });
+  
+  const tagsWithCount = PRESET_TAGS.map(t=>({
+    ...t,
+    count: tagCounts[t.label] || 0
+  })).filter(t=>t.count > 0).sort((a,b)=>b.count - a.count);
+  
+  if(!tagsWithCount.length){
+    return '<div class="text-sm text-muted" style="padding:10px">暂无标签数据，在客户详情页添加标签后这里会显示统计</div>';
+  }
+  
+  const maxCount = Math.max(...tagsWithCount.map(t=>t.count));
+  
+  return tagsWithCount.map(t=>{
+    const size = 11 + (t.count / maxCount) * 6;
+    const isActive = custFilter.tag === t.label;
+    return `
+      <span class="badge" style="cursor:pointer;padding:6px 14px;font-size:${size}px;background:${isActive?t.color:'#fff'};color:${isActive?'#fff':t.color};border:1px solid ${t.color};border-radius:20px;font-weight:${isActive?'700':'500'};transition:all 0.2s" 
+        onclick="custFilter.tag='${isActive?'':t.label}';custFilter.page=1;renderView()"
+        onmouseover="this.style.background='${t.color}';this.style.color='#fff'"
+        onmouseout="this.style.background='${isActive?t.color:'#fff'}';this.style.color='${isActive?'#fff':t.color}'">
+        ${t.label} <span style="opacity:0.7;font-size:${size-2}px">(${t.count})</span>
+      </span>
+    `;
+  }).join('');
+}
+
 function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
@@ -3691,6 +3727,16 @@ function viewCustomers(root){
         </select>
       </div>
       <button class="btn btn-primary" onclick="openCustomerForm()">＋ 添加客户</button>
+    </div>
+    <!-- V62 标签云统计 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fafbfc,#f0f4f8);border:none">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span>🏷️ 标签云统计</span>
+        <span class="text-sm text-muted">点击标签快速筛选客户</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${getTagCloudHTML()}
+      </div>
     </div>
     ${custFilter.q?`<div class="mb16 text-sm">搜索 “<b>${esc(custFilter.q)}</b>” 共 ${list.length} 条 <a class="text-gold" style="cursor:pointer" onclick="custFilter.q='';routeParams.q='';renderView()">清除</a></div>`:''}
     <div class="card">

@@ -522,6 +522,34 @@ function fmtDay(iso){ if(!iso) return '-'; let d=new Date(iso); if(isNaN(d.getTi
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function toast(msg,type){ type=type||'ok'; const root=document.getElementById('toastRoot'); const t=document.createElement('div'); t.className='toast '+type; t.innerHTML=(type==='ok'?'✓ ':type==='err'?'✕ ':'ℹ ')+esc(msg); root.appendChild(t); setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},2200); }
 
+/* ---------- V74 全局错误处理 - 捕获所有运行时错误 ---------- */
+window.onerror = function(msg, url, line, col, err){
+  try{
+    const detail = '错误: ' + msg + ' | 位置: ' + (url||'').split('/').pop() + ':' + line + ':' + col;
+    console.error('[全局错误]', detail, err);
+    // 记录到操作日志
+    if(typeof logAction === 'function') logAction('error', '全局错误捕获', detail.slice(0,200));
+    // 友好提示（避免重复提示）
+    if(!window._lastErrorTime || Date.now() - window._lastErrorTime > 3000){
+      window._lastErrorTime = Date.now();
+      if(typeof toast === 'function') toast('页面遇到小问题，功能仍可正常使用', 'err');
+    }
+  }catch(e){ console.error('错误处理本身出错:', e); }
+  return false; // 不阻止默认错误输出
+};
+window.onunhandledrejection = function(event){
+  try{
+    const reason = event.reason ? (event.reason.message || String(event.reason)) : '未知';
+    console.error('[未处理Promise拒绝]', reason);
+    if(typeof logAction === 'function') logAction('error', 'Promise异常', reason.slice(0,200));
+    if(!window._lastRejectTime || Date.now() - window._lastRejectTime > 3000){
+      window._lastRejectTime = Date.now();
+      if(typeof toast === 'function') toast('异步操作异常，已自动恢复', 'err');
+    }
+  }catch(e){ console.error('Promise错误处理出错:', e); }
+};
+console.log('%c✅ 全局错误处理已启用', 'color:#0f7b3f;font-weight:bold');
+
 /* ---------- 全局状态 ---------- */
 let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null };
 function loadState(){

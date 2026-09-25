@@ -5331,6 +5331,77 @@ function viewTools(root){
     </div>` : ''}
   </div>
   
+  <!-- V33 WhatsApp营销助手面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #25D366;background:linear-gradient(135deg,#f0fff4,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>💬 WhatsApp 营销助手（AI话术生成 · 10国语言）</span>
+      <span class="badge" style="background:#25D366;color:#fff">新功能 V33</span>
+    </div>
+    <p class="text-sm text-muted mb12">8大外贸场景话术模板 + AI个性化生成 + 10国语言 + 发送节奏SOP，复制即可发送</p>
+    
+    <!-- 发送节奏SOP -->
+    <div class="mb12" style="background:#f0fff4;padding:10px;border-radius:6px">
+      <div class="text-xs" style="color:#276749;font-weight:bold;margin-bottom:6px">📅 WhatsApp跟进节奏SOP（参考）</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${WA_RHYTHM.map(r=>`<span class="badge" style="background:#fff;color:#276749;border:1px solid #9ae6b4;font-size:11px" title="${r.note}">${r.day}: ${r.action}</span>`).join('')}
+      </div>
+    </div>
+    
+    <!-- 场景模板选择 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">选择话术场景：</div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        ${WA_TEMPLATES.map(t=>`<span id="watpl-${t.id}" class="badge" style="cursor:pointer;padding:6px 12px;font-size:12px;${t.id==='opening'?'background:#25D366;color:#fff':'background:#f0f4f8;color:#333'}" onclick="selectWATemplate('${t.id}')">${t.icon} ${t.label}</span>`).join('')}
+      </div>
+    </div>
+    
+    <!-- 客户信息输入 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">客户信息（可选，AI会据此个性化，如：Michael from Kitchen Universe, USA, buying kitchen shears）：</div>
+      <input id="waCustomerInfo" class="form-control" placeholder="客户姓名/公司/国家/采购产品等信息...">
+    </div>
+    
+    <!-- 语言选择 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">生成语言：</div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        ${WA_LANGUAGES.map((l,i)=>`<label style="cursor:pointer;font-size:12px"><input type="radio" name="waLang" value="${l.id}" ${i===0?'checked':''}> ${l.label}</label>`).join('')}
+      </div>
+    </div>
+    
+    <!-- 生成按钮 -->
+    <div class="flex gap8 items-center">
+      <button id="waGenBtn" class="btn" style="background:#25D366;color:#fff" onclick="runWAGenerate()">✨ AI生成话术</button>
+      <span id="waStatus" class="text-sm text-muted"></span>
+    </div>
+    
+    <!-- 生成结果 -->
+    <div id="waResult" class="mt12" style="display:none">
+      <div class="text-xs text-muted mb6">📋 生成结果（点击复制到WhatsApp）：</div>
+      <div id="waResultContent" style="background:#f8fafc;padding:12px;border-radius:6px;font-size:14px;line-height:1.8;white-space:pre-wrap;position:relative">
+      </div>
+      <div class="flex gap8 mt8">
+        <button class="btn btn-outline" onclick="copyWAMessage(document.getElementById('waResultContent').textContent)">📋 复制话术</button>
+        <button class="btn btn-outline" onclick="runWAGenerate()">🔄 重新生成</button>
+      </div>
+    </div>
+    
+    <!-- 历史记录 -->
+    ${(S.waHistory && S.waHistory.length) ? `
+    <div class="mt16">
+      <div class="text-xs text-muted mb6" style="display:flex;justify-content:space-between">
+        <span>📜 话术历史（最近${Math.min(S.waHistory.length,10)}条）</span>
+        <span style="cursor:pointer;color:#25D366" onclick="clearWAHistory()">清空</span>
+      </div>
+      <div style="max-height:200px;overflow-y:auto">
+        ${S.waHistory.slice(0,10).map(h=>`<div style="padding:8px;background:#f8fafc;border-radius:4px;margin-bottom:6px;cursor:pointer;border-left:3px solid #25D366" onclick="showWAHistory('${h.id}')">
+          <div class="text-xs" style="color:#666">${h.template} · ${WA_LANGUAGES.find(l=>l.id===h.language)?WA_LANGUAGES.find(l=>l.id===h.language).label:h.language}</div>
+          <div style="font-size:12px;color:#333;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.content.slice(0,80)}...</div>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -5501,6 +5572,148 @@ function clearVisionHistory(){
   DB.save('visionHistory', S.visionHistory);
   viewTools(document.getElementById('mainContent'));
   toast('已清空视觉分析历史');
+}
+
+/* V33 WhatsApp营销助手 - 话术模板与AI生成 */
+const WA_TEMPLATES = [
+  {id:'opening',icon:'👋',label:'首次开场白',desc:'加好友后第一句话，建立联系',
+   prompt:'你是外贸业务员，刚加上客户WhatsApp。请写一条简短友好的开场白（英文，不超过30词），包含：1)自我介绍（Leo from KaiLionCrafts, Yangjiang cutlery factory）2)说明来意（看到客户在做厨房用品/刀具）3)低门槛问题（是否需要目录或报价）。语气自然，不要太正式。'},
+  {id:'followup',icon:'🔄',label:'跟进提醒',desc:'发了开发信后WhatsApp提醒',
+   prompt:'你是外贸业务员，3天前给客户发了开发信，现在用WhatsApp跟进。请写一条简短消息（英文，不超过25词），包含：1)提醒之前发过邮件 2)提供价值（附上产品目录链接或热门产品图）3)询问是否有时间看看。语气轻松，不要催。'},
+  {id:'quote',icon:'💰',label:'报价跟进',desc:'发了报价后跟进客户反馈',
+   prompt:'你是外贸业务员，给客户发了报价单2天了，现在用WhatsApp跟进。请写一条简短消息（英文，不超过30词），包含：1)确认客户收到报价 2)询问是否有疑问 3)提供调整选项（数量/规格/包装）。专业但友好。'},
+  {id:'sample',icon:'📦',label:'样品邀请',desc:'邀请客户申请免费样品',
+   prompt:'你是外贸业务员，想邀请客户申请样品测试。请写一条WhatsApp消息（英文，不超过30词），包含：1)提出样品测试建议 2)说明样品政策（免费样品，客户付运费）3)询问寄样地址。有吸引力但不强迫。'},
+  {id:'reminder',icon:'⏰',label:'催单/付款',desc:'礼貌催促订单或付款',
+   prompt:'你是外贸业务员，客户确认了订单但还没付定金。请写一条礼貌的WhatsApp催款消息（英文，不超过25词），包含：1)确认订单细节 2)提醒付款流程 3)说明付款后安排生产。保持友好，给客户台阶。'},
+  {id:'festival',icon:'🎉',label:'节日问候',desc:'圣诞节/新年/感恩节等节日祝福',
+   prompt:'你是外贸业务员，节日给客户发WhatsApp祝福。请写一条温暖的节日问候（英文，不超过20词），包含：1)节日祝福 2)简短感谢支持 3)不推销产品。真诚自然，不要模板感太强。'},
+  {id:'reactivate',icon:'🔥',label:'失联唤醒',desc:'很久没联系的客户重新激活',
+   prompt:'你是外贸业务员，有个客户3个月没回复了，想重新激活。请写一条WhatsApp消息（英文，不超过30词），包含：1)问候近况 2)提供新价值（新品/价格调整/行业资讯）3)低门槛问题。不要提之前没回复的事。'},
+  {id:'custom',icon:'✨',label:'自定义',desc:'自由输入生成要求',prompt:''}
+];
+
+const WA_LANGUAGES = [
+  {id:'en',label:'🇺🇸 English',flag:'🇺🇸'},
+  {id:'de',label:'🇩🇪 Deutsch',flag:'🇩🇪'},
+  {id:'es',label:'🇪🇸 Español',flag:'🇪🇸'},
+  {id:'fr',label:'🇫🇷 Français',flag:'🇫🇷'},
+  {id:'it',label:'🇮🇹 Italiano',flag:'🇮🇹'},
+  {id:'pt',label:'🇵🇹 Português',flag:'🇵🇹'},
+  {id:'ja',label:'🇯🇵 日本語',flag:'🇯🇵'},
+  {id:'ko',label:'🇰🇷 한국어',flag:'🇰🇷'},
+  {id:'ar',label:'🇸🇦 العربية',flag:'🇸🇦'},
+  {id:'ru',label:'🇷🇺 Русский',flag:'🇷🇺'}
+];
+
+/* WhatsApp发送节奏SOP */
+const WA_RHYTHM = [
+  {day:'Day 0',action:'加好友 + 开场白',template:'opening',note:'通过客户名片/展会/邮件签名获取WhatsApp号'},
+  {day:'Day 1',action:'发产品目录 + 热门产品图',template:'followup',note:'不要连发，间隔至少2小时'},
+  {day:'Day 3',action:'跟进邮件/报价',template:'quote',note:'如果已发邮件，WhatsApp提醒查看'},
+  {day:'Day 7',action:'邀请样品测试',template:'sample',note:'有回复的客户优先邀请样品'},
+  {day:'Day 14',action:'提供新价值（新品/行情）',template:'reactivate',note:'没回复的客户用新价值唤醒'},
+  {day:'Day 30',action:'节日问候/月度资讯',template:'festival',note:'保持弱联系，不推销'}
+];
+
+/* 生成WhatsApp话术 */
+async function generateWAMessage(templateId, customerInfo, language){
+  const tpl = WA_TEMPLATES.find(t=>t.id===templateId);
+  if(!tpl) return {content:null, error:'未找到模板'};
+  let prompt = tpl.prompt;
+  if(customerInfo){
+    prompt += '\n\n客户信息：' + customerInfo;
+  }
+  if(language && language !== 'en'){
+    const langName = WA_LANGUAGES.find(l=>l.id===language);
+    prompt += '\n\n请用' + (langName?langName.label:language) + '回复。';
+  }
+  const result = await callAI([{role:'user',content:prompt}], {purpose:'whatsapp_msg'});
+  if(result.error) return {content:null, error:result.error};
+  // 保存历史
+  if(!S.waHistory) S.waHistory = [];
+  S.waHistory.unshift({id:uid(),template:tpl.label,customerInfo:customerInfo||'',language:language||'en',content:result.content,t:Date.now()});
+  if(S.waHistory.length>50) S.waHistory = S.waHistory.slice(0,50);
+  DB.save('waHistory', S.waHistory);
+  return {content:result.content, model:result.model, latency:result.latency};
+}
+
+/* 复制WhatsApp话术到剪贴板 */
+function copyWAMessage(text){
+  navigator.clipboard.writeText(text).then(()=>toast('✅ 已复制到剪贴板，可粘贴到WhatsApp')).catch(()=>{
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('✅ 已复制到剪贴板');
+  });
+}
+
+/* WhatsApp - 选择模板 */
+function selectWATemplate(id){
+  WA_TEMPLATES.forEach(t=>{
+    const el = document.getElementById('watpl-'+t.id);
+    if(el) el.style.cssText = `cursor:pointer;padding:6px 12px;font-size:12px;${t.id===id?'background:#25D366;color:#fff':'background:#f0f4f8;color:#333'}`;
+  });
+}
+
+/* WhatsApp - 执行生成 */
+async function runWAGenerate(){
+  const templateEl = document.querySelector('[id^="watpl-"]');
+  // 找到当前选中的模板
+  let selectedTemplate = 'opening';
+  WA_TEMPLATES.forEach(t=>{
+    const el = document.getElementById('watpl-'+t.id);
+    if(el && el.style.background === 'rgb(37, 211, 102)') selectedTemplate = t.id;
+  });
+  const customerInfo = document.getElementById('waCustomerInfo').value.trim();
+  const langEl = document.querySelector('input[name="waLang"]:checked');
+  const language = langEl ? langEl.value : 'en';
+  const btn = document.getElementById('waGenBtn');
+  const status = document.getElementById('waStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ 生成中...';
+  status.textContent = 'AI正在生成个性化话术...';
+  const result = await generateWAMessage(selectedTemplate, customerInfo, language);
+  btn.disabled = false;
+  btn.textContent = '✨ AI生成话术';
+  if(result.error){
+    status.innerHTML = '<span style="color:#e53e3e">❌ '+result.error+'</span>';
+    return;
+  }
+  status.innerHTML = `<span style="color:#25D366">✅ 生成完成！${result.latency}ms · ${result.model}</span>`;
+  const resultDiv = document.getElementById('waResult');
+  const resultContent = document.getElementById('waResultContent');
+  resultDiv.style.display = 'block';
+  resultContent.textContent = result.content;
+  // 刷新历史
+  setTimeout(()=>viewTools(document.getElementById('mainContent')), 500);
+}
+
+/* WhatsApp - 显示历史 */
+function showWAHistory(id){
+  const item = (S.waHistory||[]).find(h=>h.id===id);
+  if(!item) return;
+  openModal(`
+    <div class="modal-head"><h3>💬 历史话术</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="text-xs text-muted mb6">场景：${item.template} · 语言：${WA_LANGUAGES.find(l=>l.id===item.language)?WA_LANGUAGES.find(l=>l.id===item.language).label:item.language}</div>
+      ${item.customerInfo?`<div class="text-xs text-muted mb6">客户信息：${item.customerInfo}</div>`:''}
+      <div style="background:#f8fafc;padding:12px;border-radius:6px;font-size:14px;line-height:1.8;white-space:pre-wrap;max-height:300px;overflow-y:auto">${item.content}</div>
+      <div class="flex gap8 mt12">
+        <button class="btn" style="background:#25D366;color:#fff" onclick="copyWAMessage(\`${item.content.replace(/`/g,'\\`').replace(/\$/g,'\\$')}\`);closeModal()">📋 复制话术</button>
+      </div>
+    </div>
+  `);
+}
+
+/* WhatsApp - 清空历史 */
+function clearWAHistory(){
+  if(!confirm('确定清空所有WhatsApp话术历史？')) return;
+  S.waHistory = [];
+  DB.save('waHistory', S.waHistory);
+  viewTools(document.getElementById('mainContent'));
+  toast('已清空WhatsApp话术历史');
 }
 
 /* V20 端到端获客流水线 */

@@ -182,6 +182,13 @@ input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;outlin
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 .grid-3-2{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
 .grid-12{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+.grid-6{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;margin-bottom:16px}
+.text-xs{font-size:11.5px;line-height:1.5}
+.mb4{margin-bottom:4px}.mb8{margin-bottom:8px}.mb12{margin-bottom:12px}.mb16{margin-bottom:16px}.mb24{margin-bottom:24px}
+.mt4{margin-top:4px}.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mt24{margin-top:24px}
+.gap4{gap:4px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}
 
 /* ============ 表格 ============ */
 .table-wrap{overflow-x:auto}
@@ -1579,7 +1586,7 @@ function viewDashboard(root){
       <div class="card card-pad" style="cursor:pointer" onclick="go('outreach')"><div class="stat-label">📤 本月触达</div><div class="stat-value">245</div><div class="text-sm text-muted">邮件156+WA89</div></div>
       <div class="card card-pad" style="cursor:pointer" onclick="go('inbox')"><div class="stat-label">💬 回复客户</div><div class="stat-value" style="color:var(--green)">23</div><div class="text-sm text-muted">9%回复率</div></div>
       <div class="card card-pad" style="cursor:pointer" onclick="go('pipeline')"><div class="stat-label">💰 在跟商机</div><div class="stat-value">28</div><div class="text-sm text-muted">¥1.8M</div></div>
-      <div class="card card-pad" style="cursor:pointer" onclick="go('settings')"><div class="stat-label">💵 API预算</div><div class="stat-value">¥'+getMonthApiCost()+'</div><div class="text-sm text-muted">'+Math.round(getMonthApiCost()/((S.settings&&S.settings.apiBudget)||200)*100)+'%·¥'+((S.settings&&S.settings.apiBudget)||200)+'预算</div></div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go('settings')"><div class="stat-label">💵 API预算</div><div class="stat-value">¥${getMonthApiCost()}</div><div class="text-sm text-muted">${Math.round(getMonthApiCost()/((S.settings&&S.settings.apiBudget)||200)*100)}%·¥${((S.settings&&S.settings.apiBudget)||200)}预算</div></div>
     </div>
 
     <div class="card card-pad mb16" style="border-left:3px solid var(--warning)">
@@ -5061,7 +5068,12 @@ function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.set
   seedExtra();
   if(DB.load('theme')==='dark') document.body.classList.add('dark');
   if(!S.customers || !S.customers.length){ seedData(); }
-  go('dashboard');
+  // 延迟到所有script块加载完成后再渲染，避免第二个script块中的函数未定义
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',()=>go('dashboard'));
+  } else {
+    setTimeout(()=>go('dashboard'),0);
+  }
 })();
 
 </script>
@@ -5081,8 +5093,7 @@ function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.set
   </div>
 </div>
 
-
-
+<script>
 function renderApiUsage(){
   const el = document.getElementById('apiUsagePanel');
   if(!el) return;
@@ -5272,7 +5283,7 @@ function renderSearchResults(){
       <td><span class="badge badge-blue">${r.type}</span></td>
       <td class="text-xs">${r.size}</td>
       <td class="text-xs">${r.phone||''}<br>${r.email||''}</td>
-      <td><div style="display:flex;align-items:center;gap:6px"><div style="background:#e2e8f0;height:6px;width:50px;border-radius:3px;overflow:hidden"><div style="width:${r.match}%;height:100%;background:${r.match>=80?'var(--success)':r.match>=60?'var(--gold)':'var(--muted)';border-radius:3px"></div></div><span class="text-xs fw700">${r.match}%</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div style="background:#e2e8f0;height:6px;width:50px;border-radius:3px;overflow:hidden"><div style="width:${r.match}%;height:100%;background:${r.match>=80?'var(--success)':r.match>=60?'var(--gold)':'var(--muted)'};border-radius:3px"></div></div><span class="text-xs fw700">${r.match}%</span></div></td>
       <td class="text-xs">${r.source==='map'?'🗺️地图':r.source==='customs'?'📊海关':'🔗社媒'}</td>
       <td><button class="btn btn-sm btn-outline" onclick="viewResultDetail(${i})">详情</button> <button class="btn btn-sm btn-success" onclick="importSingleResult(${i})">导入</button></td>
     </tr>`).join('')}
@@ -6294,7 +6305,7 @@ function draftSend(){
   ${!smtpReady?`<div class="card card-pad mb16" style="background:#fff5f5;border-left:4px solid var(--red)">
     <div class="fw700 mb8" style="color:var(--red)">⚠️ SMTP未配置</div>
     <div class="text-sm mb12">请先前往「设置」页面配置SMTP邮件发送信息，配置后即可批量自动发送开发信。</div>
-    <button class="btn btn-primary btn-sm" onclick="navTo('settings')">⚙️ 前往配置SMTP</button>
+    <button class="btn btn-primary btn-sm" onclick="go('settings')">⚙️ 前往配置SMTP</button>
   </div>`:''}
   <div class="flex gap8 mb16">
     <button class="btn ${sendTab==='queue'?'btn-gold':'btn-outline'}" onclick="sendTab='queue';renderView()">📋 待审核队列(${pending.length})</button>
@@ -6495,7 +6506,6 @@ function loadDemoMails(){
   toast(`已加载 ${demos.length} 封演示开发信到审核队列`);
   renderView();
 }
-function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function nowStr(){const d=new Date();return todayStr()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 
 
@@ -6566,7 +6576,7 @@ function globalMapView(){
 }
 function showRegionDetail(name){
   const details={
-    '北美':{market:'成熟市场，工业商超采购商资源丰富，体量巨大',buyers:'Walmart/Target/Home Depot/Lowe's等大型零售商，Amazon卖家，独立经销商',strategy:'重点开发线下经销商和零售商，注重产品认证（FDA/LFGB），价格敏感但量大',language:'英语为主，墨西哥需西班牙语',best:'Q4旺季前（9-11月）备货期'},
+    '北美':{market:'成熟市场，工业商超采购商资源丰富，体量巨大',buyers:'Walmart/Target/Home Depot/Lowe\'s等大型零售商，Amazon卖家，独立经销商',strategy:'重点开发线下经销商和零售商，注重产品认证（FDA/LFGB），价格敏感但量大',language:'英语为主，墨西哥需西班牙语',best:'Q4旺季前（9-11月）备货期'},
     '欧洲':{market:'消费力强，优质采购商集中，值得深耕',buyers:'德国专业经销商、英国连锁超市、法国进口商、荷兰贸易公司',strategy:'注重品质和认证（CE/LFGB/REACH），MOQ适中，重视长期合作关系',language:'德语/英语/法语/意大利语/西班牙语',best:'春季展会后（3-5月）和秋季采购季（9-10月）'},
     '东南亚':{market:'市场增速快，轻工日用品需求旺盛',buyers:'越南新兴进口商、泰国连锁商超、马来西亚华人贸易商、印尼分销商',strategy:'价格敏感，适合中低端产品，小批量多频次，注重交期',language:'英语+当地语言，华人客户可用中文',best:'开斋节后（4-5月）和年末采购季'},
     '中东':{market:'高端市场，大型采购商比较多，推荐使用阿拉伯文检索',buyers:'阿联酋大型进口商、沙特分销商、卡塔尔政府采购、以色列专业采购',strategy:'注重品质和品牌，价格不敏感，喜欢高端包装，重视个人关系',language:'阿拉伯语+英语，以色列用希伯来语/英语',best:'斋月前后（2-4月）和古尔邦节前'},
@@ -7179,6 +7189,7 @@ function copyMultiLangResult(){
   const text = result.innerText;
   navigator.clipboard.writeText(text).then(()=>toast('已复制到剪贴板')).catch(()=>toast('复制失败，请手动选择','error'));
 }
+</script>
 
 </body>
 </html>

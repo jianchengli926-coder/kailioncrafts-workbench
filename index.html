@@ -579,6 +579,7 @@ function loadState(){
   S.tools = DB.load('tools') || null;
   S.pipeline2 = DB.load('pipeline2') || null;
   S.emailTemplates = DB.load('emailTemplates') || null;
+  S.modelSpeedTest = DB.load('modelSpeedTest') || null;
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -596,7 +597,7 @@ function persist(){
   DB.save('payments',S.payments); DB.save('certifications',S.certifications); DB.save('whatsapp',S.whatsapp);
   DB.save('rfm',S.rfm); DB.save('landingpages',S.landingpages); DB.save('competitors',S.competitors);
   DB.save('productmedia',S.productmedia); DB.save('aisales',S.aisales);
-  DB.save('pipeline',S.pipeline); DB.save('emailTemplates',S.emailTemplates); DB.save('documents',S.documents);
+  DB.save('pipeline',S.pipeline); DB.save('emailTemplates',S.emailTemplates); DB.save('modelSpeedTest',S.modelSpeedTest); DB.save('documents',S.documents);
   DB.save('finance',S.finance); DB.save('catalog',S.catalog); DB.save('team',S.team);
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
@@ -1350,6 +1351,115 @@ async function callAI(messages, opts={}){
   return {content:null,usage:{},error:errMsg, mock:false, model:'全部失败', fallbackCount:chain.length};
 }
 function aiUsage(u){ return u&&u.total_tokens?`消耗 tokens: prompt ${u.prompt_tokens||'?'} + completion ${u.completion_tokens||'?'} = ${u.total_tokens}`:''; }
+
+/* V46 模型测速中心 - 测试单个模型 */
+async function testSingleModel(cfg){
+  const t0 = performance.now();
+  try{
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=>controller.abort(), 15000);
+    let r, j;
+    if(cfg.type==='gemini'){
+      const headers = {'Content-Type':'application/json','x-goog-api-key':b64dec(cfg.apiKey)};
+      const body = { contents: [{role:'user',parts:[{text:'Hi'}]}] };
+      const url = cfg.baseURL.replace(/\s+$/,'')+'/models/'+cfg.model+':generateContent';
+      r = await fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+    } else {
+      const headers = {'Content-Type':'application/json'};
+      if(cfg.type!=='ollama' || b64dec(cfg.apiKey)) headers['Authorization']='Bearer '+b64dec(cfg.apiKey);
+      const body = { model:cfg.model, messages:[{role:'user',content:'Hi'}], temperature:0.1, max_tokens:10 };
+      r = await fetch(cfg.baseURL.replace(/\s+$/,'').replace(/\$/,'')+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+    }
+    clearTimeout(timeoutId);
+    const latency = Math.round(performance.now()-t0);
+    if(!r.ok) return {cfg, ok:false, latency, error:'HTTP '+r.status};
+    return {cfg, ok:true, latency, error:null};
+  }catch(e){
+    return {cfg, ok:false, latency:Math.round(performance.now()-t0), error:e.name+': '+e.message.slice(0,50)};
+  }
+}
+
+/* V46 模型测速中心 - 批量测速 */
+let speedTestRunning = false;
+async function runModelSpeedTest(){
+  if(speedTestRunning) return;
+  speedTestRunning = true;
+  const cfgs = (S.apis||[]).filter(a=>a.enabled && a.caps && (a.caps.assistant||a.caps.lead||a.caps.draft) && !a.model.toLowerCase().includes('cogview'));
+  const results = [];
+  const listEl = document.getElementById('speedTestResults');
+  const btn = document.getElementById('speedTestBtn');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 测速中...'; }
+  for(let i=0;i<cfgs.length;i++){
+    if(listEl){
+      listEl.innerHTML = `<div style="text-align:center;padding:20px;color:#666">正在测试 ${i+1}/${cfgs.length}: ${cfgs[i].name}...</div>`;
+    }
+    const r = await testSingleModel(cfgs[i]);
+    results.push(r);
+    // 实时更新
+    if(listEl){
+      const sorted = [...results].sort((a,b)=>{
+        if(a.ok && !b.ok) return -1;
+        if(!a.ok && b.ok) return 1;
+        return a.latency - b.latency;
+      });
+      listEl.innerHTML = renderSpeedTestResults(sorted);
+    }
+  }
+  speedTestRunning = false;
+  if(btn){ btn.disabled=false; btn.textContent='🚀 重新测速'; }
+  // 保存测速结果
+  S.modelSpeedTest = { time: Date.now(), results: results.map(r=>({id:r.cfg.id, model:r.cfg.model, name:r.cfg.name, ok:r.ok, latency:r.latency, error:r.error})) };
+  persist();
+}
+
+/* V46 渲染测速结果 */
+function renderSpeedTestResults(results){
+  if(!results.length) return '<div style="text-align:center;padding:20px;color:#999">暂无测速结果</div>';
+  return results.map((r,idx)=>{
+    const cfg = r.cfg || (S.apis||[]).find(a=>a.id===r.id);
+    if(!cfg) return '';
+    const isFast = r.ok && r.latency < 800;
+    const isMedium = r.ok && r.latency >= 800 && r.latency < 2000;
+    const rankColor = idx===0?'#d69e2e':idx===1?'#718096':idx===2?'#c05621':'#a0aec0';
+    return `<div style="display:flex;align-items:center;padding:10px 12px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px">
+      <div style="width:28px;height:28px;border-radius:50%;background:${rankColor};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:bold;flex-shrink:0;margin-right:10px">${idx+1}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:#2d3748;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cfg.name}</div>
+        <div style="font-size:11px;color:#718096;margin-top:2px">${cfg.model} · ${cfg.type==='ollama'?'本地':cfg.type==='gemini'?'Gemini':cfg.type==='zhipu'?'智谱':cfg.type==='siliconflow'?'硅基流动':'在线'}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-left:10px">
+        ${r.ok ? `
+          <div style="font-size:16px;font-weight:700;color:${isFast?'#38a169':isMedium?'#d69e2e':'#e53e3e'}">${r.latency}<span style="font-size:11px;font-weight:400">ms</span></div>
+          <div style="font-size:10px;color:${isFast?'#38a169':isMedium?'#d69e2e':'#e53e3e'}">${isFast?'⚡ 极速':isMedium?'👍 正常':'🐢 较慢'}</div>
+        ` : `
+          <div style="font-size:13px;font-weight:600;color:#e53e3e">❌ 失败</div>
+          <div style="font-size:10px;color:#e53e3e;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.error||''}">${r.error||'连接失败'}</div>
+        `}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* V46 模型调用统计 */
+function getModelStats(){
+  const logs = S.apiLogs || [];
+  const stats = {};
+  logs.forEach(log=>{
+    const model = log.model || 'unknown';
+    if(!stats[model]) stats[model] = { total:0, success:0, error:0, totalLatency:0, totalTokens:0, totalCost:0 };
+    stats[model].total++;
+    if(log.status==='success'){ stats[model].success++; stats[model].totalLatency += log.latency||0; }
+    else stats[model].error++;
+    stats[model].totalTokens += (log.inputTokens||0)+(log.outputTokens||0);
+    stats[model].totalCost += log.cost||0;
+  });
+  return Object.entries(stats).map(([model,s])=>({
+    model, ...s,
+    successRate: s.total?Math.round(s.success/s.total*100):0,
+    avgLatency: s.success?Math.round(s.totalLatency/s.success):0
+  })).sort((a,b)=>b.total-a.total);
+}
+
 
 /* V31 AI图像生成 - 支持智谱CogView-3-Flash */
 async function callAIImage(prompt, opts={}){
@@ -3783,6 +3893,70 @@ function renderApiSettings(){
           </td>
         </tr>`).join('')}</tbody>
     </table></div>
+  </div>
+  
+  <!-- V46 模型测速中心 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #3182ce">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🚀 模型测速中心（一键测试所有启用模型 · 延迟对比 · 健康状态）</span>
+      <button id="speedTestBtn" class="btn btn-primary btn-sm" onclick="runModelSpeedTest()">🚀 一键测速</button>
+    </div>
+    <p class="text-sm text-muted mb12">测试所有启用的文本模型，按响应速度排序，帮助你选择最快的模型。本地模型需要先启动Ollama服务。</p>
+    <div id="speedTestResults">
+      ${(() => {
+        const saved = S.modelSpeedTest;
+        if(saved && saved.results && saved.results.length){
+          const timeAgo = Math.round((Date.now()-saved.time)/60000);
+          return `<div style="margin-bottom:10px;font-size:11px;color:#718096">📊 上次测速：${timeAgo<1?'刚刚':timeAgo+'分钟前'} · 点击「一键测速」重新测试</div>` + renderSpeedTestResults(saved.results);
+        }
+        return '<div style="text-align:center;padding:30px;color:#a0aec0"><div style="font-size:36px;margin-bottom:10px">📡</div>点击上方「🚀 一键测速」按钮，测试所有启用模型的响应速度</div>';
+      })()}
+    </div>
+  </div>
+  
+  <!-- V46 模型调用统计 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #805ad5">
+    <div class="card-title">📊 模型调用统计（调用次数 · 成功率 · 平均延迟 · 消耗Tokens）</div>
+    <p class="text-sm text-muted mb12">统计所有AI功能的模型调用情况，帮助你了解各模型的使用频率和稳定性</p>
+    ${(() => {
+      const stats = getModelStats();
+      if(!stats.length) return '<div style="text-align:center;padding:20px;color:#a0aec0">暂无调用记录，使用AI功能后会自动统计</div>';
+      const totalCalls = stats.reduce((s,x)=>s+x.total,0);
+      const totalSuccess = stats.reduce((s,x)=>s+x.success,0);
+      const totalTokens = stats.reduce((s,x)=>s+x.totalTokens,0);
+      return `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+        <div style="text-align:center;padding:10px;background:#ebf8ff;border-radius:6px">
+          <div style="font-size:20px;font-weight:bold;color:#3182ce">${totalCalls}</div>
+          <div style="font-size:11px;color:#666">总调用次数</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#f0fff4;border-radius:6px">
+          <div style="font-size:20px;font-weight:bold;color:#38a169">${totalCalls?Math.round(totalSuccess/totalCalls*100):0}%</div>
+          <div style="font-size:11px;color:#666">总体成功率</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#faf5ff;border-radius:6px">
+          <div style="font-size:20px;font-weight:bold;color:#805ad5">${(totalTokens/1000).toFixed(1)}K</div>
+          <div style="font-size:11px;color:#666">消耗Tokens</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#fffbeb;border-radius:6px">
+          <div style="font-size:20px;font-weight:bold;color:#d69e2e">${stats.length}</div>
+          <div style="font-size:11px;color:#666">使用模型数</div>
+        </div>
+      </div>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>模型</th><th>调用次数</th><th>成功</th><th>失败</th><th>成功率</th><th>平均延迟</th><th>消耗Tokens</th></tr></thead>
+        <tbody>${stats.map(s=>`
+          <tr>
+            <td class="mono text-sm"><b>${s.model}</b></td>
+            <td>${s.total}</td>
+            <td style="color:#38a169">${s.success}</td>
+            <td style="color:${s.error?'#e53e3e':'#999'}">${s.error}</td>
+            <td><span class="badge" style="background:${s.successRate>=90?'#f0fff4':s.successRate>=70?'#fffbeb':'#fff5f5'};color:${s.successRate>=90?'#276749':s.successRate>=70?'#92400e':'#9b2c2c'}">${s.successRate}%</span></td>
+            <td>${s.avgLatency?s.avgLatency+'ms':'-'}</td>
+            <td class="mono">${s.totalTokens.toLocaleString()}</td>
+          </tr>`).join('')}</tbody>
+      </table></div>`;
+    })()}
   </div>`;
 }
 function openApiForm(aid){

@@ -19,6 +19,17 @@ const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
 
+// ============ 全局异常保护（防止进程崩溃退出）============
+process.on('uncaughtException', (err) => {
+  console.error(`[${new Date().toLocaleString('zh-CN')}] [FATAL] 未捕获异常:`, err.message);
+  console.error(err.stack);
+  // 不退出进程，继续运行（launchd会在真正崩溃时自动重启）
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error(`[${new Date().toLocaleString('zh-CN')}] [WARN] 未处理的Promise拒绝:`, reason);
+});
+
 // ============ 配置 ============
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 允许局域网访问

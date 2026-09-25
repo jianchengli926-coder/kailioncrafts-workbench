@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KaiLion AI 作图工作台 · 一站式电商AI内容创作</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%235046E5'/><path d='M12 5l1.8 4.4L18 11l-4.2 1.6L12 17l-1.8-4.4L6 11l4.2-1.6z' fill='white'/></svg>">
+<style>
+/* ============ 设计令牌（浅色，对齐 51aic） ============ */
+:root{
+  --bg:#F6F7FB; --panel:#FFFFFF; --panel-2:#F1F2F8;
+  --text:#14181F; --text-2:#5B6472; --text-3:#9AA3B2;
+  --line:#E6E8F0; --line-2:#D3D7E3;
+  --brand:#5046E5; --brand-hover:#4338CA; --brand-soft:#EEEDFC; --brand-soft-2:#D9D5FB;
+  --ok:#10B981; --ok-soft:#E6F7F0; --warn:#F59E0B; --warn-soft:#FFF6E5; --err:#EF4444; --err-soft:#FDECEC;
+  --r-lg:16px; --r-md:12px; --r-sm:8px;
+  --shadow:0 2px 10px rgba(20,24,31,.05); --shadow-pop:0 18px 48px rgba(20,24,31,.16);
+  --font:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,-apple-system,sans-serif;
+  --side-w:76px; --top-h:58px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button,input,textarea,select{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+img{display:block;max-width:100%}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#D6DAE6;border-radius:99px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+.muted{color:var(--text-2)} .small{font-size:12px}
+.ic{width:20px;height:20px;flex:none} .ic svg{width:100%;height:100%;display:block}
+
+/* ============ 布局骨架 ============ */
+.app{display:flex;height:100vh;overflow:hidden}
+.side{width:var(--side-w);flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 8px}
+.brandmark{width:38px;height:38px;border-radius:11px;background:var(--brand);display:grid;place-items:center;color:#fff;margin-bottom:8px}
+.brandmark .ic{width:22px;height:22px}
+.navitem{width:100%;border-radius:var(--r-md);display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 2px;color:var(--text-2);transition:.15s}
+.navitem span{font-size:10px}
+.navitem:hover{background:var(--panel-2);color:var(--text)}
+.navitem.on{background:var(--brand-soft);color:var(--brand)}
+.navitem.on span{font-weight:600}
+.navspacer{flex:1}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:var(--top-h);flex:none;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;gap:14px}
+.crumb{font-size:16px;font-weight:600} .crumb small{font-weight:400;color:var(--text-2);margin-left:8px;font-size:13px}
+.topright{display:flex;align-items:center;gap:10px}
+.statusdot{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);background:var(--panel-2);padding:6px 11px;border-radius:99px}
+.dot{width:8px;height:8px;border-radius:50%;background:#C4CAD6}
+.dot.ok{background:var(--ok)} .dot.err{background:var(--err)}
+.work{flex:1;overflow:auto;padding:24px 28px}
+.wrap{max-width:1280px;margin:0 auto}
+
+/* ============ 通用组件 ============ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;border-radius:var(--r-sm);font-size:14px;font-weight:600;transition:.15s;white-space:nowrap}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-pri{background:var(--brand);color:#fff} .btn-pri:hover:not(:disabled){background:var(--brand-hover)}
+.btn-ghost{background:#fff;border:1px solid var(--line-2)} .btn-ghost:hover{border-color:var(--text-3)}
+.btn-sm{padding:7px 14px;font-size:13px} .btn-block{width:100%}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:99px;font-size:13px;background:var(--panel);border:1px solid var(--line);color:var(--text-2);transition:.13s;white-space:nowrap}
+.chip:hover{border-color:var(--brand-soft-2);color:var(--brand)}
+.chip.on{background:var(--brand-soft);border-color:transparent;color:var(--brand);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:20px}
+.card+.card{margin-top:16px}
+.ctitle{font-size:14px;font-weight:600;margin-bottom:12px}
+.field{display:flex;flex-direction:column;gap:7px}
+.flabel{font-size:13px;font-weight:600;color:var(--text-2)}
+.input,.textarea,.select{width:100%;border:1px solid var(--line);background:var(--panel-2);border-radius:var(--r-sm);padding:10px 12px;outline:0;font-size:14px}
+.input:focus,.textarea:focus,.select:focus{border-color:var(--brand);background:#fff}
+.textarea{resize:vertical;min-height:84px;line-height:1.6}
+.upload{border:1.5px dashed var(--line-2);border-radius:var(--r-md);background:var(--panel-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:20px;text-align:center;cursor:pointer;transition:.15s;min-height:110px}
+.upload:hover{border-color:var(--brand);background:var(--brand-soft)}
+.upload b{font-size:13px;font-weight:500} .upload span{font-size:11px;color:var(--text-3)}
+.upload.has{padding:0;overflow:hidden;border-style:solid} .upload.has img{width:100%;height:170px;object-fit:cover}
+.upload.has .upcap{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.6));color:#fff;font-size:11px;padding:14px 10px 8px}
+.slider-row{display:flex;align-items:center;gap:12px}
+.slider-row input[type=range]{flex:1;accent-color:var(--brand)}
+.slider-val{font-size:12px;font-weight:600;min-width:38px;text-align:right;color:var(--brand)}
+
+/* 比例可视化选择 */
+.ratio-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:8px}
+.ratio-opt{border:1.5px solid var(--line);border-radius:var(--r-sm);padding:9px 4px;text-align:center;cursor:pointer;transition:.13s;background:var(--panel)}
+.ratio-opt:hover{border-color:var(--brand-soft-2)}
+.ratio-opt.on{border-color:var(--brand);background:var(--brand-soft)}
+.ratio-box{margin:0 auto 5px;background:#C9CEE0;border-radius:2px}
+.ratio-opt small{font-size:10px;color:var(--text-2)}
+.ratio-opt.on small{color:var(--brand);font-weight:600}
+
+/* 模型卡片 */
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.model-card{border:1.5px solid var(--line);border-radius:var(--r-md);padding:12px;cursor:pointer;transition:.13s;background:var(--panel)}
+.model-card:hover{border-color:var(--brand-soft-2)}
+.model-card.on{border-color:var(--brand);background:var(--brand-soft)}
+.model-card b{display:block;font-size:13px} .model-card small{font-size:11px;color:var(--text-2)}
+
+/* 结果网格 + 悬停操作 */
+.result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.result-item{position:relative;border-radius:var(--r-md);overflow:hidden;background:var(--panel-2);border:1px solid var(--line)}
+.result-item img{width:100%;aspect-ratio:1/1;object-fit:cover}
+.result-item .ph{aspect-ratio:1/1;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:600}
+.result-bar{position:absolute;inset:auto 0 0 0;display:flex;gap:4px;justify-content:center;padding:8px;background:linear-gradient(transparent,rgba(0,0,0,.78));opacity:0;transition:.15s}
+.result-item:hover .result-bar{opacity:1}
+.result-bar button{width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center}
+.result-bar button:hover{background:rgba(255,255,255,.32)}
+.result-bar .ic{width:16px;height:16px}
+.empty{border:1.5px dashed var(--line-2);border-radius:var(--r-md);padding:48px 20px;text-align:center;color:var(--text-3)}
+.empty .ic{width:36px;height:36px;margin:0 auto 10px}
+
+/* toast / modal */
+.toasts{position:fixed;right:22px;bottom:22px;z-index:200;display:flex;flex-direction:column;gap:9px}
+.toast{background:var(--text);color:#fff;border-radius:11px;padding:11px 16px;font-size:13px;box-shadow:var(--shadow-pop);max-width:340px;animation:tin .2s}
+.toast.err{background:var(--err)} .toast.ok{background:var(--ok)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}}
+.modal{position:fixed;inset:0;z-index:150;display:grid;place-items:center;padding:22px}
+.modal-mask{position:absolute;inset:0;background:rgba(20,24,31,.45)}
+.modal-box{position:relative;background:var(--panel);border-radius:var(--r-lg);box-shadow:var(--shadow-pop);width:100%;max-width:560px;max-height:88vh;overflow:auto;padding:24px;display:flex;flex-direction:column;gap:14px}
+.modal-head{display:flex;align-items:center;gap:10px}
+.modal-head b{font-size:16px} .modal-x{margin-left:auto;color:var(--text-2);font-size:22px;line-height:1;padding:4px 10px;border-radius:8px}
+.modal-x:hover{background:var(--panel-2)}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid .full{grid-column:1/-1}
+
+/* 两栏工作区 */
+.cols{display:grid;grid-template-columns:380px 1fr;gap:18px;align-items:start}
+@media(max-width:1080px){.cols{grid-template-columns:1fr}}
+.tool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.tool-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:14px;text-align:left;transition:.15s;cursor:pointer}
+.tool-card:hover{border-color:var(--brand-soft-2);box-shadow:var(--shadow);transform:translateY(-2px)}
+.tool-ic{width:38px;height:38px;border-radius:10px;background:var(--brand-soft);display:grid;place-items:center;margin-bottom:9px}
+.tool-ic .ic{width:20px;height:20px}
+.tool-card b{font-size:13px;display:block} .tool-card small{font-size:11px;color:var(--text-2)}
+
+/* 首页 */
+.home-hero{text-align:center;padding:36px 0 26px}
+.home-hero h1{font-size:30px;font-weight:700} .home-hero p{margin-top:10px;color:var(--text-2)}
+.home-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-top:22px}
+.home-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:20px;cursor:pointer;transition:.15s;text-align:left}
+.home-card:hover{border-color:var(--brand-soft-2);box-shadow:var(--shadow);transform:translateY(-2px)}
+.home-card .tool-ic{margin-bottom:12px}
+.home-card h3{font-size:15px} .home-card p{font-size:12px;color:var(--text-2);margin-top:5px}
+
+/* 详情页画布 */
+.detail-canvas{background:#fff;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.detail-block{padding:24px;border-bottom:1px solid #F0F1F5}
+.detail-block [contenteditable]{outline:0;border-radius:4px;padding:2px 4px}
+.detail-block [contenteditable]:hover{background:var(--panel-2)}
+.detail-block [contenteditable]:focus{background:#fff;box-shadow:0 0 0 2px var(--brand-soft-2)}
+
+/* 画板 */
+.canvas-wrap{background:#fff;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+canvas{display:block;background:#fff;touch-action:none;cursor:crosshair}
+.spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+@media(max-width:768px){
+  .work{padding:14px} .form-grid{grid-template-columns:1fr}
+  .home-hero h1{font-size:22px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side"></aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="crumb" id="crumb">首页<small id="crumbSub"></small></div>
+      <div class="topright">
+        <span class="statusdot"><span class="dot" id="apiDot"></span><span id="apiDotTxt">未配置模型</span></span>
+        <button class="btn btn-ghost btn-sm" id="btnSettings">模型设置</button>
+      </div>
+    </header>
+    <div class="work" id="work"><div class="wrap" id="wrap"></div></div>
+  </div>
+</div>
+<div class="toasts" id="toasts"></div>
+<div id="modalRoot"></div>
+<script>
+/* ============================================================
+   KaiLion AI 作图工作台 · 单文件版
+   架构：ICONS 图标 / DATA 数据 / DB 本地资产 / MODEL 模型层
+        UI 渲染 / ROUTER 路由。加功能优先改 DATA。
+   ============================================================ */
+
+/* ---------- 1. 图标库（内联 SVG，不用 emoji） ---------- */
+const ICONS = {
+  home:'<path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+  image:'<rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.6" fill="currentColor"/><path d="M4 17l4.5-4.5 3.5 3.5L16 12l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+  layers:'<rect x="4" y="3" width="16" height="18" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  stack:'<path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h8A2.5 2.5 0 0 1 17 8.5v9A2.5 2.5 0 0 1 14.5 20h-8A2.5 2.5 0 0 1 4 17.5v-9Z" stroke="currentColor" stroke-width="1.6"/><path d="M8 3.5h9.5A2.5 2.5 0 0 1 20 6v9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  video:'<rect x="3" y="5" width="13" height="14" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M16 10.5l5-3v9l-5-3v-3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+  grid:'<rect x="3.5" y="3.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6"/>',
+  folder:'<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2c.5 0 1 .2 1.3.6l1 1.2h6.5A2.5 2.5 0 0 1 20 9.3v8.2A2.5 2.5 0 0 1 17.5 20h-12A2.5 2.5 0 0 1 3 17.5v-10Z" stroke="currentColor" stroke-width="1.6"/>',
+  wand:'<path d="M5 19L15.5 8.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14 4l.9 2.1L17 7l-2.1.9L14 10l-.9-2.1L11 7l2.1-.9L14 4Z" fill="currentColor"/>',
+  upload:'<path d="M12 16V5m0 0L8 9m4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 15v2.5A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  download:'<path d="M12 4v11m0 0l-4-4m4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v1.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  refresh:'<path d="M4 12a8 8 0 1 1 2.5 5.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M4 8v4.5h4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  zoom:'<circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  trash:'<path d="M5 7h14M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 7l.7 12a1 1 0 0 0 1 .9h6.6a1 1 0 0 0 1-.9L17 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
+  brush:'<path d="M4 18c3-7 6-9 8-6s-2 5 1 5 5-3 7-8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  eraser:'<rect x="3.5" y="12" width="17" height="8" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M9 10.5l6-1.3M11 6.5l3.5-.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  undo:'<path d="M9 7L4 12l5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12h9a6 6 0 0 1 6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  spark:'<path d="M12 2l2.6 6.4L21 11l-6.4 2.6L12 20l-2.6-6.4L3 11l6.4-2.6L12 2Z" fill="currentColor"/>',
+  settings:'<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>',
+  shirt:'<path d="M9 3l3 2 3-2 4 3-2 3v10a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V9L5 6l4-3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+  white:'<rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" stroke-width="1.6"/><circle cx="15.5" cy="8.5" r="1.6" fill="currentColor"/>',
+  camera:'<rect x="3" y="7" width="18" height="13" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M8 7l1.5-3h5L16 7" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="13" r="3" stroke="currentColor" stroke-width="1.6"/>',
+};
+
+/* ---------- 2. 业务数据（加功能优先改这里） ---------- */
+const NAV = [
+  {id:'home',  label:'首页',     icon:'home'},
+  {id:'image', label:'AI作图',   icon:'image'},
+  {id:'detail',label:'AI详情图', icon:'layers'},
+  {id:'style', label:'风格复刻', icon:'stack'},
+  {id:'video', label:'AI视频',   icon:'video'},
+  {id:'tools', label:'工具箱',   icon:'grid'},
+  {id:'assets',label:'资产库',   icon:'folder'},
+];
+
+/* 作图模式（对齐 51aic） */
+const MODES = ['Agent自由创作','主图套图','精修白底图','AI试衣','万物穿戴','商品替换','图片翻译','去水印','姿势裂变','商品换色','商品精修','海报设计'];
+
+/* 技能模板：选一个 → 填变量 → 自动拼提示词 */
+const SKILLS = [
+  {id:'white', name:'精修白底图', needImg:true, tpl:'保持产品外观与细节完全不变，去除所有背景与杂物，替换为纯净白色摄影棚背景，均匀柔和打光，轻微倒影，专业电商主图质感，高清锐利。', vars:[]},
+  {id:'scene', name:'生活场景图', needImg:true, tpl:'将{product}放入{scene}场景中，自然柔光，真实使用环境，产品仍是视觉中心，浅景深，生活方式商业摄影，高分辨率。', vars:[
+    {k:'product', label:'产品', type:'text', ph:'如：不锈钢厨房剪刀'},
+    {k:'scene', label:'场景', type:'select', opts:['明亮家庭厨房','专业餐厅后厨','户外露营木桌','现代办公桌面','北欧风餐桌']}]},
+  {id:'model', name:'模特使用场景', needImg:true, tpl:'一位{model}正在{action}{product}，{env}环境，人物自然真实，产品清晰可见且与参考图外观完全一致，专业生活方式摄影。', vars:[
+    {k:'model', label:'模特', type:'select', opts:['年轻亚洲女性','欧美男性厨师','欧美女性','专业理发师']},
+    {k:'product', label:'产品', type:'text', ph:'如：厨房剪刀'},
+    {k:'action', label:'动作', type:'select', opts:['使用','展示','握持','操作']},
+    {k:'env', label:'环境', type:'select', opts:['明亮厨房','自然光餐厅','现代工作室','户外']}]},
+  {id:'poster', name:'促销海报', needImg:false, tpl:'为{product}设计一张电商促销海报，顶部主标题，底部限时优惠信息，排版简洁高级留白充足，主色调{color}，产品居中突出，商业海报设计。', vars:[
+    {k:'product', label:'产品', type:'text', ph:'如：奶咖色女士手提包'},
+    {k:'color', label:'主色调', type:'select', opts:['高级灰','莫兰迪粉','克莱因蓝','黑金','奶油白']}]},
+  {id:'sell', name:'卖点图', needImg:true, tpl:'生成一张电商卖点图，{product}居中主视觉，四周分布4个卖点模块配简洁图标，{lang}文案，排版清晰，适合{platform}。', vars:[
+    {k:'product', label:'产品', type:'text', ph:'如：无叶塔式风扇'},
+    {k:'lang', label:'语言', type:'select', opts:['中文','English','日本語','Deutsch','Español']},
+    {k:'platform', label:'平台', type:'select', opts:['淘宝/天猫','京东','Amazon','TikTok Shop','TEMU']}]},
+];
+
+/* 比例 → OpenAI/seedream size */
+const RATIOS = [
+  {id:'1:1', name:'1:1 方图', w:1, h:1, size:'1024x1024'},
+  {id:'3:4', name:'3:4 竖版', w:3, h:4, size:'1024x1536'},
+  {id:'4:3', name:'4:3 横版', w:4, h:3, size:'1536x1024'},
+  {id:'9:16',name:'9:16 竖屏', w:9,h:16,size:'768x1344'},
+  {id:'16:9',name:'16:9 横屏', w:16,h:9,size:'1344x768'},
+  {id:'2:3', name:'2:3', w:2, h:3, size:'1024x1536'},
+];
+
+const PLATFORMS = ['淘宝/天猫','京东','拼多多','Amazon','TikTok Shop','TEMU','独立站'];
+const LANGS = ['简体中文','English','日本語','한국어','Deutsch','Français','Español'];
+
+/* 详情页模块模板（来自 Claude 版，含合规提示） */
+const DETAIL_BLOCKS = [
+  {id:'hero',     name:'首屏主视觉', p:'产品居中大图，突出品牌与核心卖点，视觉冲击力强。'},
+  {id:'sell',     name:'核心卖点',   p:'用图标和短句展示3-4个核心卖点，产品图与文字排版清晰均衡。'},
+  {id:'material', name:'材质工艺',   p:'展示材质和工艺细节，局部特写，配简短说明。'},
+  {id:'scene',    name:'使用场景',   p:'展示产品在真实使用场景中的画面。'},
+  {id:'detail',   name:'细节特写',   p:'多个局部放大细节图拼版，突出做工与质感。'},
+  {id:'size',     name:'尺寸规格',   p:'展示尺寸标注图，数据必须使用真实参数。'},
+  {id:'compare',  name:'对比图',     p:'与普通产品对比突出优势，不贬低具体品牌。'},
+  {id:'package',  name:'包装展示',   p:'展示包装、礼盒、配件，体现送礼与收纳价值。'},
+  {id:'trust',    name:'品质保障',   p:'展示质检与品质承诺。认证标识必须真实，不得虚构。'},
+  {id:'cta',      name:'询盘引导',   p:'结尾页引导询盘，展示联系方式与合作流程。'},
+];
+
+const VIDEO_TYPES = ['商品口播','带货视频','商品测评','促销短视频'];
+const VIDEO_LENS = ['10秒','15秒','30秒'];
+
+const TOOLS = [
+  {id:'brush', name:'画笔涂鸦', icon:'brush', desc:'自由画线、箭头、标注'},
+  {id:'eraser',name:'橡皮擦',   icon:'eraser',desc:'擦除局部内容'},
+  {id:'resize',name:'改尺寸',   icon:'zoom',  desc:'自定义图片宽高'},
+  {id:'rotate',name:'旋转翻转', icon:'refresh',desc:'翻转 / 旋转角度'},
+  {id:'water', name:'加水印',   icon:'camera',desc:'文字水印防盗图'},
+  {id:'text',  name:'加文字',   icon:'image', desc:'添加促销文案'},
+];
+
+/* ---------- 3. 工具函数 ---------- */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const el=(t,c,h)=>{const n=document.createElement(t);if(c)n.className=c;if(h!=null)n.innerHTML=h;return n;};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const icon=(k,c='ic')=>`<span class="${c}" data-ic="${k}"></span>`;
+function paint(root=document){ $$('[data-ic]',root).forEach(n=>{const b=ICONS[n.dataset.ic];if(b)n.innerHTML=`<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">${b}</svg>`;}); }
+function toast(msg,type=''){const t=el('div','toast '+type,esc(msg));$('#toasts').appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='.3s';setTimeout(()=>t.remove(),300);},3000);}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function fileToB64(file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>rej(new Error('读取文件失败'));fr.readAsDataURL(file);});}
+function shrinkB64(dataUrl,maxSide=1280,quality=.88){return new Promise(res=>{const img=new Image();img.onload=()=>{const s=Math.min(1,maxSide/Math.max(img.width,img.height));if(s===1)return res(dataUrl);const c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',quality));};img.src=dataUrl;});}
+
+/* ---------- 4. 配置 + IndexedDB 资产 ---------- */
+const DEFAULT_CFG={base:'https://ark.cn-beijing.volces.com/api/v3',key:'',imageModel:'doubao-seedream-4-0',chatModel:'doubao-1.5-pro-32k',visionModel:'doubao-1.5-vision-pro',sdBase:'http://127.0.0.1:7860'};
+function loadCfg(){try{return Object.assign({},DEFAULT_CFG,JSON.parse(localStorage.getItem('kl_cfg')||'{}'));}catch(e){return {...DEFAULT_CFG};}}
+function saveCfg(c){localStorage.setItem('kl_cfg',JSON.stringify(c));refreshDot();}
+let cfg=loadCfg();
+
+const DB={open(){return new Promise((res,rej)=>{const rq=indexedDB.open('kailion_db',1);rq.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains('assets'))d.createObjectStore('assets',{keyPath:'id'});};rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error);});},
+async put(rec){const d=await this.open();return new Promise((res,rej)=>{const tx=d.transaction('assets','readwrite');tx.objectStore('assets').put(rec);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});},
+async list(){const d=await this.open();return new Promise(res=>{const r=d.transaction('assets').objectStore('assets').getAll();r.onsuccess=()=>res((r.result||[]).sort((a,b)=>(b.time||'').localeCompare(a.time||'')));});},
+async del(id){const d=await this.open();return new Promise(res=>{const r=d.transaction('assets','readwrite').delete(id);r.onsuccess=()=>res();});}};
+
+/* ---------- 5. 模型调用层 ---------- */
+async function chat(messages,model){
+  const base=(cfg.base||'').replace(/\/$/,'');
+  const r=await fetch(base+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},body:JSON.stringify({model:model||cfg.chatModel,messages,temperature:.7})});
+  if(!r.ok){const t=await r.text();throw new Error('聊天模型错误 HTTP '+r.status+' '+t.slice(0,120));}
+  const j=await r.json();return j.choices[0].message.content;
+}
+/* 视觉分析：把参考图 b64 发给 vision 模型，返回风格描述 */
+async function visionAnalyze(imgB64,question){
+  const base=(cfg.base||'').replace(/\/$/,'');
+  const msgs=[{role:'user',content:[{type:'text',text:question},{type:'image_url',image_url:{url:imgB64}}]}];
+  const r=await fetch(base+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},body:JSON.stringify({model:cfg.visionModel,messages:msgs,max_tokens:800})});
+  if(!r.ok){const t=await r.text();throw new Error('视觉模型错误 HTTP '+r.status+' '+t.slice(0,120));}
+  const j=await r.json();return j.choices[0].message.content;
+}
+/* 生图：OpenAI 兼容 /images/generations（支持图生图），或本地 SD WebUI */
+async function generateImage({prompt,negative,size,n,refB64,provider}){
+  if(provider==='sdwebui'){
+    const base=(cfg.sdBase||'').replace(/\/$/,'');
+    const body=refB64?{prompt,negative_prompt:negative||'',init_images:[refB64.split(',')[1]],width:size.w,height:size.h,steps:25}:{prompt,negative_prompt:negative||'',width:size.w,height:size.h,steps:25};
+    const r=await fetch(base+(refB64?'/sdapi/v1/img2img':'/sdapi/v1/txt2img'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok)throw new Error('SD WebUI 错误 HTTP '+r.status);
+    const j=await r.json();return (j.images||[]).map(b=>({b64:'data:image/png;base64,'+b}));
+  }
+  const base=(cfg.base||'').replace(/\/$/,'');
+  const payload={model:cfg.imageModel,prompt,size:size.id,n:n||1,response_format:'b64_json'};
+  if(refB64){payload.image=refB64;payload.size=size.id;}
+  const r=await fetch(base+'/images/generations',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},body:JSON.stringify(payload)});
+  if(!r.ok){const t=await r.text();throw new Error('生图模型错误 HTTP '+r.status+' '+t.slice(0,150));}
+  const j=await r.json();
+  return (j.data||[]).map(d=>d.b64_json?{b64:'data:image/png;base64,'+d.b64_json}:{url:d.url});
+}
+function refreshDot(){
+  const dot=$('#apiDot'),txt=$('#apiDotTxt');
+  if(!cfg.base||!cfg.key){dot.className='dot';txt.textContent='未配置模型';}
+  else{dot.className='dot ok';txt.textContent=cfg.imageModel||'已配置';}
+}
+/* ---------- 6. 通用 UI 组件 ---------- */
+function openModal(box){
+  const root=$('#modalRoot');root.innerHTML='';
+  const mask=el('div','modal-mask');const m=el('div','modal');
+  box.style.maxHeight='86vh';m.appendChild(mask);m.appendChild(box);root.appendChild(m);
+  mask.onclick=()=>{root.innerHTML='';};paint(box);
+}
+function closeModal(){$('#modalRoot').innerHTML='';}
+function downloadData(b64url,name){
+  const a=document.createElement('a');a.download=name||('kailion_'+Date.now()+'.png');a.href=b64url;a.click();
+}
+function saveAsset(b64,kind){
+  return DB.put({id:'a'+Date.now()+Math.floor(Math.random()*999),kind:kind||'image',b64,time:new Date().toISOString()});
+}
+/* 上传区 */
+function uploadZone(hint,cb){
+  const z=el('div','upload');z.innerHTML=icon('upload')+'<b>点击或拖拽上传图片</b><span>'+esc(hint||'JPG / PNG，单张 ≤ 10MB')+'</span>';
+  const inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.hidden=true;
+  z.onclick=()=>inp.click();
+  z.ondragover=e=>{e.preventDefault();z.style.borderColor='var(--brand)';};
+  z.ondragleave=()=>{z.style.borderColor='';};
+  z.ondrop=e=>{e.preventDefault();z.style.borderColor='';const f=e.dataTransfer.files[0];if(f)cb(f,z);};
+  inp.onchange=()=>{const f=inp.files[0];if(f)cb(f,z);};
+  z.appendChild(inp);return z;
+}
+/* 结果网格（悬停：下载/放大/存资产） */
+function renderResults(host,items){
+  host.innerHTML='';
+  if(!items||!items.length){host.innerHTML='<div class="empty">'+icon('image')+'<div>暂无结果</div></div>';return;}
+  const g=el('div','result-grid');
+  items.forEach(it=>{
+    const fig=el('figure','result-item');
+    const ph=el('div','ph');ph.style.background=(it.gradient||'linear-gradient(135deg,#6D63F0,#4338CA)');ph.textContent=it.label||'';
+    const inner=it.b64?`<img src="${it.b64}" alt="结果">`:(it.url?`<img src="${it.url}" alt="结果">`:ph.outerHTML);
+    fig.innerHTML=inner;
+    const bar=el('div','result-bar');
+    bar.innerHTML=`<button title="下载">${icon('download')}</button><button title="放大">${icon('zoom')}</button><button title="存入资产库">${icon('folder')}</button>`;
+    bar.children[0].onclick=()=>{const u=it.b64||it.url;downloadData(u);toast('已开始下载','ok');};
+    bar.children[1].onclick=()=>{const box=el('div','modal-box');box.style.maxWidth='880px';box.innerHTML=`<div class="modal-head"><b>预览</b><button class="modal-x">×</button></div><img src="${it.b64||it.url}" style="width:100%;border-radius:10px">`;box.querySelector('.modal-x').onclick=closeModal;openModal(box);};
+    bar.children[2].onclick=async()=>{if(it.b64){await saveAsset(it.b64,'image');toast('已存入资产库','ok');}else toast('远程图片无法转存，请先下载');};
+    fig.appendChild(bar);g.appendChild(fig);
+  });
+  host.appendChild(g);
+}
+
+/* ---------- 7. 设置弹窗 ---------- */
+function openSettings(){
+  const c=cfg;
+  const box=el('div','modal-box');
+  box.innerHTML=`<div class="modal-head"><b>${icon('settings')} 模型设置</b><button class="modal-x">×</button></div>
+  <div class="muted small">配置保存在本机浏览器，不上传服务器。生图走 OpenAI 兼容接口（豆包 Ark / GPT-Image / 任意中转），本地 SD 走 WebUI。</div>
+  <div class="form-grid">
+    <div class="field full"><span class="flabel">API Base（OpenAI 兼容，以 /api/v3 或 /v1 结尾）</span><input class="input" id="setBase" value="${esc(c.base)}"></div>
+    <div class="field full"><span class="flabel">API Key</span><input class="input" id="setKey" type="password" value="${esc(c.key)}" placeholder="sk-..."></div>
+    <div class="field"><span class="flabel">生图模型</span><input class="input" id="setImg" value="${esc(c.imageModel)}" placeholder="doubao-seedream-4-0 / gpt-image-1"></div>
+    <div class="field"><span class="flabel">对话模型</span><input class="input" id="setChat" value="${esc(c.chatModel)}" placeholder="doubao-1.5-pro-32k"></div>
+    <div class="field"><span class="flabel">视觉模型</span><input class="input" id="setVision" value="${esc(c.visionModel)}" placeholder="doubao-1.5-vision-pro"></div>
+    <div class="field"><span class="flabel">本地 SD WebUI 地址</span><input class="input" id="setSd" value="${esc(c.sdBase)}" placeholder="http://127.0.0.1:7860"></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-ghost" id="setTest">测试连接</button>
+    <button class="btn btn-pri" id="setSave">保存</button>
+  </div>`;
+  box.querySelector('.modal-x').onclick=closeModal;
+  box.querySelector('#setSave').onclick=()=>{
+    cfg={base:box.querySelector('#setBase').value.trim(),key:box.querySelector('#setKey').value.trim(),
+      imageModel:box.querySelector('#setImg').value.trim(),chatModel:box.querySelector('#setChat').value.trim(),
+      visionModel:box.querySelector('#setVision').value.trim(),sdBase:box.querySelector('#setSd').value.trim()};
+    saveCfg(cfg);closeModal();toast('设置已保存','ok');
+  };
+  box.querySelector('#setTest').onclick=async(e)=>{
+    const btn=e.currentTarget;btn.textContent='测试中…';
+    try{await chat([{role:'user',content:'ping，回复ok'}]);toast('连接成功','ok');}
+    catch(err){toast('连接失败：'+err.message,'err');}
+    btn.textContent='测试连接';
+  };
+  openModal(box);
+}
+$('#btnSettings').onclick=openSettings;
+
+/* ---------- 8. 视图渲染 ---------- */
+function renderHome(){
+  const w=$('#wrap');
+  const cards=[
+    {id:'image',icon:'image',t:'AI作图',d:'12种电商模式 + 技能模板，一键生成主图/场景/海报'},
+    {id:'detail',icon:'layers',t:'AI详情图',d:'上传产品图，AI规划模块、写文案、导出长图'},
+    {id:'style',icon:'stack',t:'风格复刻',d:'视觉模型解析爆款风格，迁移到你的产品'},
+    {id:'video',icon:'video',t:'AI视频',d:'商品口播/带货脚本与分镜生成'},
+    {id:'tools',icon:'grid',t:'工具箱',d:'画笔/橡皮/尺寸/水印等轻量修图'},
+    {id:'assets',icon:'folder',t:'资产库',d:'本机 IndexedDB 保存的所有作品'},
+  ];
+  w.innerHTML=`<div class="home-hero"><h1>一站式电商 AI 内容创作工作台</h1><p>接入豆包 / GPT / 本地模型，商品图 · 详情页 · 风格复刻 · 视频脚本</p></div>
+  <div class="home-grid">${cards.map(c=>`<button class="home-card" data-go="${c.id}"><span class="tool-ic">${icon(c.icon)}</span><h3>${c.t}</h3><p>${c.d}</p></button>`).join('')}</div>`;
+  $$('[data-go]',w).forEach(b=>b.onclick=()=>location.hash='#/'+b.dataset.go);
+}
+
+/* --- AI 作图 --- */
+let imgState={skill:SKILLS[1],ratio:RATIOS[0],count:1,model:null,refs:[]};
+function renderImage(){
+  const w=$('#wrap');w.className='wrap';
+  w.innerHTML=`<div class="cols"><div>
+    <div class="card">
+      <div class="ctitle">作图模式</div>
+      <div class="chips" id="mChips">${MODES.map((m,i)=>`<button class="chip ${i===0?'on':''}" data-m="${esc(m)}">${esc(m)}</button>`).join('')}</div>
+    </div>
+    <div class="card">
+      <div class="ctitle">技能模板（选一个自动拼提示词）</div>
+      <div class="chips" id="skillChips">${SKILLS.map((s,i)=>`<button class="chip ${i===1?'on':''}" data-s="${s.id}">${s.name}</button>`).join('')}</div>
+      <div id="skillVars" style="margin-top:12px;display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">提示词</div>
+      <textarea class="textarea" id="pos" placeholder="描述你要生成的图片，或用技能模板自动填充"></textarea>
+      <div style="height:10px"></div>
+      <span class="flabel">反向提示词</span>
+      <textarea class="textarea" id="neg" style="min-height:56px" placeholder="模糊，低质量，水印，文字错误"></textarea>
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <div class="ctitle">参数</div>
+      <span class="flabel">比例</span>
+      <div class="ratio-grid" id="ratioG">${RATIOS.map((r,i)=>`<div class="ratio-opt ${i===0?'on':''}" data-r="${r.id}"><div class="ratio-box" style="width:${Math.min(34,34*r.w/r.h)}px;height:${Math.min(34,34*r.h/r.w)}px"></div><small>${r.name}</small></div>`).join('')}</div>
+      <div style="height:14px"></div>
+      <span class="flabel">数量：<b id="cntV">${imgState.count}</b> 张</span>
+      <div class="slider-row"><input type="range" id="cnt" min="1" max="4" value="${imgState.count}"><span class="slider-val" id="cntV2">${imgState.count}</span></div>
+      <div style="height:14px"></div>
+      <span class="flabel">参考图（图生图，可选）</span>
+      <div id="refZone"></div>
+    </div>
+    <button class="btn btn-pri btn-block" id="genBtn" style="margin-top:14px;height:46px">立即生成</button>
+    <div class="card"><div class="ctitle">结果</div><div id="resBox"></div></div>
+  </div></div>`;
+
+  /* 模式 chips */
+  $$('#mChips .chip',w).forEach(c=>c.onclick=()=>{$$('#mChips .chip',w).forEach(x=>x.classList.remove('on'));c.classList.add('on');});
+  /* 技能 */
+  function drawVars(){
+    const host=$('#skillVars');host.innerHTML='';
+    imgState.skill.vars.forEach(v=>{
+      const f=el('div','field');
+      f.innerHTML=`<span class="flabel">${v.label}</span>`;
+      const inp=v.type==='select'
+        ?`<select class="select" data-v="${v.k}">${v.opts.map(o=>`<option>${o}</option>`).join('')}</select>`
+        :`<input class="input" data-v="${v.k}" placeholder="${v.ph||''}">`;
+      f.insertAdjacentHTML('beforeend',inp);host.appendChild(f);
+    });
+    if(!imgState.skill.vars.length)host.innerHTML='<div class="muted small">该技能无需变量，直接写提示词即可。</div>';
+  }
+  $$('#skillChips .chip',w).forEach(c=>c.onclick=()=>{$$('#skillChips .chip',w).forEach(x=>x.classList.remove('on'));c.classList.add('on');imgState.skill=SKILLS.find(s=>s.id===c.dataset.s);drawVars();});
+  drawVars();
+  /* 比例 */
+  $$('#ratioG .ratio-opt',w).forEach(o=>o.onclick=()=>{$$('#ratioG .ratio-opt',w).forEach(x=>x.classList.remove('on'));o.classList.add('on');imgState.ratio=RATIOS.find(r=>r.id===o.dataset.r);});
+  /* 数量 */
+  const cnt=$('#cnt');
+  cnt.oninput=()=>{$('#cntV').textContent=cnt.value;$('#cntV2').textContent=cnt.value;imgState.count=+cnt.value;};
+  /* 参考图 */
+  const rz=$('#refZone');
+  rz.appendChild(uploadZone('上传产品/参考图做图生图',async(f,z)=>{const b=await shrinkB64(await fileToB64(f));imgState.refs=[b];z.classList.add('has');z.innerHTML=`<img src="${b}"><span class="upcap">${esc(f.name)} · 已载入</span>`;}));
+  /* 生成 */
+  $('#genBtn').onclick=async(e)=>{
+    const btn=e.currentTarget;
+    let prompt=$('#pos').value.trim();
+    /* 技能模板拼提示词 */
+    const vars={};$$('#skillVars [data-v]',w).forEach(i=>vars[i.dataset.v]=i.value.trim());
+    if(!prompt){prompt=imgState.skill.tpl.replace(/\{(\w+)\}/g,(m,k)=>vars[k]||'');}
+    if(!prompt){toast('请写提示词或选择技能模板','err');return;}
+    const negative=$('#neg').value.trim();
+    btn.disabled=true;btn.innerHTML='<span class="spin"></span> 生成中…';renderResults($('#resBox'),[]);
+    try{
+      const out=await generateImage({prompt,negative,size:imgState.ratio,n:imgState.count,refB64:imgState.refs[0]});
+      renderResults($('#resBox'),out.map(o=>o.b64||{url:o.url,gradient:'linear-gradient(135deg,#60A5FA,#3B82F6)',label:'网络结果'}));
+      out.forEach(o=>{if(o.b64)saveAsset(o.b64,'image');});
+      toast('生成完成','ok');
+    }catch(err){toast('生成失败：'+err.message,'err');$('#resBox').innerHTML='<div class="empty">'+esc(err.message)+'</div>';}
+    btn.disabled=false;btn.textContent='立即生成';
+  };
+}
+
+/* --- AI 详情图 --- */
+function renderDetail(){
+  const w=$('#wrap');
+  w.innerHTML=`<div class="cols"><div>
+    <div class="card"><div class="ctitle">产品图</div><div id="dPro"></div></div>
+    <div class="card">
+      <div class="field"><span class="flabel">产品名称</span><input class="input" id="dName" placeholder="如：阳江不锈钢厨房剪刀"></div>
+      <div style="height:10px"></div>
+      <div class="field"><span class="flabel">核心卖点 / 要求</span><textarea class="textarea" id="dBrief" placeholder="如：锋利耐用、人体工学手柄、食品级材质"></textarea></div>
+      <div style="height:10px"></div>
+      <div class="field"><span class="flabel">目标平台</span><select class="select" id="dPlat">${PLATFORMS.map(p=>`<option>${p}</option>`).join('')}</select></div>
+      <div style="height:10px"></div>
+      <div class="field"><span class="flabel">语言</span><select class="select" id="dLang">${LANGS.map(p=>`<option>${p}</option>`).join('')}</select></div>
+      <div style="height:10px"></div>
+      <span class="flabel">选择详情模块（可多选）</span>
+      <div class="chips" id="dBlocks">${DETAIL_BLOCKS.map((b,i)=>`<button class="chip ${i<4?'on':''}" data-b="${b.id}">${b.name}</button>`).join('')}</div>
+    </div>
+    <button class="btn btn-pri btn-block" id="dGen">AI 规划并生成长图方案</button>
+  </div>
+  <div class="card"><div class="ctitle">详情长图预览（点击文字可直接编辑）</div><div class="detail-canvas" id="dCanvas"><div class="empty">填入信息后点击生成，AI 会按所选模块输出可编辑长图文案。</div></div>
+  <div style="height:12px"></div><button class="btn btn-ghost btn-sm" id="dExport">导出为 HTML 文件</button></div></div>`;
+  const pr=$('#dPro');let prodB64=null;
+  pr.appendChild(uploadZone('上传产品图',async(f,z)=>{const b=await shrinkB64(await fileToB64(f));prodB64=b;z.classList.add('has');z.innerHTML=`<img src="${b}"><span class="upcap">产品图已载入</span>`;}));
+  $$('#dBlocks .chip').forEach(c=>c.onclick=()=>c.classList.toggle('on'));
+  $('#dGen').onclick=async(e)=>{
+    const btn=e.currentTarget;btn.disabled=true;btn.innerHTML='<span class="spin"></span> 规划中…';
+    const sel=$$('#dBlocks .chip.on').map(c=>c.dataset.b);
+    const blocks=DETAIL_BLOCKS.filter(b=>sel.includes(b.id));
+    const prompt=`你是电商详情页策划。产品：${$('#dName').value||'某商品'}。平台：${$('#dPlat').value}。语言：${$('#dLang').value}。要求：${$('#dBrief').value||'突出卖点与品质'}。请为以下模块各写一段2-3句的详情文案（${$('#dLang').value}），严格按JSON数组返回，每项含 id 与 text，模块：${blocks.map(b=>b.id+'-'+b.p).join('；')}。只返回JSON。`;
+    try{
+      const raw=await chat([{role:'user',content:prompt}]);
+      let arr=[];try{arr=JSON.parse((raw.match(/\[[\s\S]*\]/)||['[]'])[0]);}catch(_){arr=[{id:'hero',text:raw}];}
+      const map=Object.fromEntries(arr.map(a=>[a.id,a.text]));
+      const cv=$('#dCanvas');cv.innerHTML=blocks.map(b=>`<div class="detail-block"><h3 style="font-size:15px;margin-bottom:8px">${b.name}</h3><p contenteditable="true" style="font-size:13px;line-height:1.8;color:#333">${esc(map[b.id]||b.p)}</p></div>`).join('');
+      toast('方案已生成，可直接编辑','ok');
+    }catch(err){toast('生成失败：'+err.message,'err');}
+    btn.disabled=false;btn.textContent='AI 规划并生成长图方案';
+  };
+  $('#dExport').onclick=()=>{
+    const html=`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>${esc($('#dName').value||'详情图')}</title><style>body{font-family:sans-serif;max-width:750px;margin:0 auto;background:#f2f3f7}.b{background:#fff;margin:12px;padding:24px}.b h3{font-size:18px;margin-bottom:8px}.b p{font-size:14px;line-height:1.9;color:#333}</style></head><body>${$$('#dCanvas .detail-block').map(b=>`<div class="b"><h3>${b.querySelector('h3').textContent}</h3><p>${b.querySelector('p').innerText}</p></div>`).join('')}</body></html>`;
+    const blob=new Blob([html],{type:'text/html'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='detail_'+Date.now()+'.html';a.click();
+  };
+}
+
+/* --- 风格复刻 --- */
+function renderStyle(){
+  const w=$('#wrap');
+  w.innerHTML=`<div class="cols"><div>
+    <div class="card"><div class="ctitle">参考风格图（爆款设计）</div><div id="sRef"></div></div>
+    <div class="card"><div class="ctitle">你的产品图</div><div id="sPro"></div></div>
+    <div class="card"><span class="flabel">比例</span><div class="chips" id="sRatio">${RATIOS.slice(0,3).map((r,i)=>`<button class="chip ${i===0?'on':''}" data-r="${r.id}">${r.name}</button>`).join('')}</div>
+    <div style="height:10px"></div><span class="flabel">补充要求（选填）</span><textarea class="textarea" id="sExtra" placeholder="保持品牌主色，模特替换为目标客群"></textarea></div>
+    <button class="btn btn-pri btn-block" id="sGen">视觉分析并复刻</button>
+  </div>
+  <div class="card"><div class="ctitle">风格基因分析</div><div id="sAnalysis" class="muted small">上传参考图后，视觉模型会解析其构图、配色、氛围。</div></div>
+  <div class="card"><div class="ctitle">复刻结果</div><div id="sRes"></div></div></div>`;
+  let refB=null,prodB=null;
+  const up=(id,cb)=>{const host=$(id);host.appendChild(uploadZone('上传图片',async(f,z)=>{const b=await shrinkB64(await fileToB64(f));z.classList.add('has');z.innerHTML=`<img src="${b}"><span class="upcap">已载入</span>`;cb(b);}));};
+  up('#sRef',b=>refB=b);up('#sPro',b=>prodB=b);
+  $$('#sRatio .chip').forEach(c=>c.onclick=()=>{$$('#sRatio .chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');});
+  $('#sGen').onclick=async(e)=>{
+    if(!refB||!prodB){toast('请同时上传参考风格图和你的产品图','err');return;}
+    const btn=e.currentTarget;btn.disabled=true;btn.innerHTML='<span class="spin"></span> 分析中…';
+    try{
+      const gene=await visionAnalyze(refB,'分析这张电商参考图的风格基因：构图布局、主色调、光影氛围、模特/场景风格，3-5句话。');
+      $('#sAnalysis').textContent=gene;
+      const prompt=`参考以下风格基因复刻一张电商图：${gene}。将产品替换为我的产品（保持其外观与参考图产品一致）。补充：${$('#sExtra').value||'保持品牌调性'}。真实商业摄影，高清。`;
+      const out=await generateImage({prompt,size:RATIOS[0],n:1,refB64:prodB});
+      renderResults($('#sRes'),out.map(o=>o.b64||{url:o.url}));
+      out.forEach(o=>o.b64&&saveAsset(o.b64,'style'));toast('复刻完成','ok');
+    }catch(err){toast('失败：'+err.message,'err');}
+    btn.disabled=false;btn.textContent='视觉分析并复刻';
+  };
+}
+
+/* --- AI 视频（脚本+分镜） --- */
+function renderVideo(){
+  const w=$('#wrap');
+  w.innerHTML=`<div class="cols"><div class="card">
+    <div class="ctitle">视频类型</div>
+    <div class="chips" id="vType">${VIDEO_TYPES.map((t,i)=>`<button class="chip ${i===0?'on':''}">${t}</button>`).join('')}</div>
+    <div style="height:12px"></div>
+    <div class="field"><span class="flabel">产品 / 主题</span><input class="input" id="vTopic" placeholder="如：便携榨汁杯"></div>
+    <div style="height:10px"></div>
+    <div class="field"><span class="flabel">脚本要求</span><textarea class="textarea" id="vBrief" placeholder="突出卖点、目标人群、风格"></textarea></div>
+    <div style="height:10px"></div>
+    <div class="chips" id="vLen">${VIDEO_LENS.map((t,i)=>`<button class="chip ${i===0?'on':''}">${t}</button>`).join('')}</div>
+    <div style="height:10px"></div>
+    <div class="chips" id="vLang">${['中文','English'].map((t,i)=>`<button class="chip ${i===0?'on':''}">${t}</button>`).join('')}</div>
+    <button class="btn btn-pri btn-block" id="vGen" style="margin-top:14px">生成脚本与分镜</button>
+  </div>
+  <div class="card"><div class="ctitle">脚本 / 分镜</div><div id="vOut" class="muted small">生成后在此输出口播文案与逐镜画面描述，可复制使用。</div></div></div>`;
+  const bind=(id,cls)=>{const g=$(id);$$('.'+cls,g).forEach((c,i)=>c.onclick=()=>{$$('.'+cls,g).forEach(x=>x.classList.remove('on'));c.classList.add('on');});};
+  /* chips 单独 class 冲突，改用手动 */
+  $('#vGen').onclick=async(e)=>{
+    const btn=e.currentTarget;btn.disabled=true;btn.innerHTML='<span class="spin"></span> 生成中…';
+    const type=$('#vType .on')?.textContent||'商品口播';const len=$('#vLen .on')?.textContent||'10秒';const lang=$('#vLang .on')?.textContent||'中文';
+    const prompt=`为「${$('#vTopic').value||'某产品'}」写一个${len}的${type}短视频脚本，语言${lang}，要求：${$('#vBrief').value||''}。输出：1)口播文案 2)分镜表（镜头/画面/时长/字幕）。简洁实用。`;
+    try{const t=await chat([{role:'user',content:prompt}]);$('#vOut').innerHTML='<pre style="white-space:pre-wrap;font-family:inherit;line-height:1.8">'+esc(t)+'</pre>';toast('脚本已生成','ok');}
+    catch(err){toast('失败：'+err.message,'err');}
+    btn.disabled=false;btn.textContent='生成脚本与分镜';
+  };
+}
+
+/* --- 工具箱（Canvas） --- */
+let cvCtx,brushSize=6,brushColor='#5046E5',hist=[];
+function renderTools(){
+  const w=$('#wrap');
+  w.innerHTML=`<div class="tool-grid" id="tGrid" style="margin-bottom:16px"></div>
+  <div class="card">
+    <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-ghost btn-sm" id="tLoad">打开图片</button>
+      <label class="chip">画笔 <input type="range" id="tSize" min="2" max="40" value="${brushSize}" style="width:90px;accent-color:var(--brand)"></label>
+      <label class="chip">颜色 <input type="color" id="tColor" value="${brushColor}" style="width:36px;height:26px;border:0;cursor:pointer"></label>
+      <button class="btn btn-ghost btn-sm" id="tUndo">${icon('undo')} 撤销</button>
+      <button class="btn btn-ghost btn-sm" id="tWipe">清空</button>
+      <button class="btn btn-pri btn-sm" id="tSave">${icon('download')} 下载PNG</button>
+    </div>
+    <div class="canvas-wrap" style="margin-top:12px"><canvas id="tc" width="1000" height="700"></canvas></div>
+  </div>`;
+  $$('#tGrid').forEach(g=>{});
+  const tg=$('#tGrid');TOOLS.forEach(t=>{const c=el('button','tool-card');c.innerHTML=`<span class="tool-ic">${icon(t.icon)}</span><b>${t.name}</b><small>${t.desc}</small>`;c.onclick=()=>toast('已选工具：'+t.name);tg.appendChild(c);});
+  const cv=$('#tc');cvCtx=cv.getContext('2d');cvCtx.fillStyle='#fff';cvCtx.fillRect(0,0,cv.width,cv.height);
+  function snap(){hist.push(cvCtx.getImageData(0,0,cv.width,cv.height));if(hist.length>30)hist.shift();}
+  let drawing=false;snap();
+  cv.onmousedown=e=>{drawing=true;snap();cvCtx.beginPath();cvCtx.moveTo(pos(cv,e).x,pos(cv,e).y);};
+  cv.onmousemove=e=>{if(!drawing)return;const p=pos(cv,e);cvCtx.lineTo(p.x,p.y);cvCtx.strokeStyle=brushColor;cvCtx.lineWidth=brushSize;cvCtx.lineCap='round';cvCtx.stroke();};
+  ['mouseup','mouseleave'].forEach(ev=>cv.addEventListener(ev,()=>drawing=false));
+  function pos(c,e){const r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*c.width/r.width,y:(e.clientY-r.top)*c.height/r.height};}
+  $('#tSize').oninput=e=>brushSize=+e.target.value;
+  $('#tColor').oninput=e=>brushColor=e.target.value;
+  $('#tUndo').onclick=()=>{if(hist.length)cvCtx.putImageData(hist.pop(),0,0);};
+  $('#tWipe').onclick=()=>{cvCtx.fillStyle='#fff';cvCtx.fillRect(0,0,cv.width,cv.height);snap();};
+  $('#tLoad').onclick=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.onchange=()=>{const f=inp.files[0];const im=new Image();im.onload=()=>{cvCtx.drawImage(im,0,0,cv.width,cv.height);snap();};im.src=URL.createObjectURL(f);};inp.click();};
+  $('#tSave').onclick=()=>{const a=document.createElement('a');a.download='edit_'+Date.now()+'.png';a.href=cv.toDataURL('image/png');a.click();saveAsset(cv.toDataURL('image/png'),'tool');};
+}
+
+/* --- 资产库 --- */
+async function renderAssets(){
+  const w=$('#wrap');w.innerHTML=`<div class="card"><div class="ctitle">资产库（本机保存）</div><div class="result-grid" id="ag"></div></div>`;
+  const list=await DB.list();
+  const host=$('#ag');
+  if(!list.length){host.innerHTML='<div class="empty">暂无作品，生成的图片会自动保存到这里</div>';return;}
+  list.forEach(it=>{
+    const fig=el('figure','result-item');fig.innerHTML=`<img src="${it.b64}">`;
+    const bar=el('div','result-bar');bar.innerHTML=`<button title="下载">${icon('download')}</button><button title="删除">${icon('trash')}</button>`;
+    bar.children[0].onclick=()=>downloadData(it.b64);
+    bar.children[1].onclick=async()=>{await DB.del(it.id);renderAssets();toast('已删除','ok');};
+    fig.appendChild(bar);host.appendChild(fig);
+  });
+}
+
+/* ---------- 9. 路由 ---------- */
+const TITLES={home:'首页',image:'AI作图',detail:'AI详情图',style:'风格复刻',video:'AI视频',tools:'工具箱',assets:'资产库'};
+function renderSide(active){
+  const s=$('#side');s.innerHTML=`<a class="brandmark" href="#/home" title="KaiLion AI">${icon('spark')}</a>`;
+  NAV.forEach(n=>{const a=el('a','navitem'+(n.id===active?' on':''));a.href='#/'+n.id;a.innerHTML=icon(n.icon)+'<span>'+n.label+'</span>';s.appendChild(a);});
+  const sp=el('div','navspacer');s.appendChild(sp);
+  paint(s);
+}
+function route(){
+  const key=(location.hash.replace(/^#\/?/,'')||'home');
+  $('#crumb').childNodes[0].nodeValue=TITLES[key]||'首页';
+  $('#crumbSub').textContent='';
+  renderSide(key);
+  if(key==='home')renderHome();
+  else if(key==='image')renderImage();
+  else if(key==='detail')renderDetail();
+  else if(key==='style')renderStyle();
+  else if(key==='video')renderVideo();
+  else if(key==='tools')renderTools();
+  else if(key==='assets')renderAssets();
+  else renderHome();
+  paint($('#wrap'));
+}
+window.addEventListener('hashchange',route);
+refreshDot();route();
+</script>
+</body>
+</html>

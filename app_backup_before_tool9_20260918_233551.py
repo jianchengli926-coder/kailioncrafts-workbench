@@ -20,7 +20,6 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import io
 import os
-import base64
 import json as _json
 
 from config import (
@@ -401,34 +400,6 @@ with st.sidebar:
             page = "🤖 模型管理"
 
     st.markdown("---")
-    
-    # ============ AI快速问答（侧边栏全局可用） ============
-    with st.expander("💬 AI快速问答", expanded=False):
-        st.caption("任何页面都能快速提问，无需切换")
-        quick_q = st.text_area("你的问题", height=80, key="sidebar_quick_q", 
-                               placeholder="例如：帮我写一封跟进德国客户的邮件...")
-        col_q1, col_q2 = st.columns(2)
-        with col_q1:
-            if st.button("🚀 发送", use_container_width=True, key="sidebar_quick_send"):
-                if quick_q.strip():
-                    with st.spinner("AI思考中..."):
-                        quick_a = ai.chat(quick_q, task_name="侧边栏快速问答")
-                    st.session_state['_sidebar_quick_answer'] = quick_a
-                else:
-                    st.warning("请输入问题")
-        with col_q2:
-            if st.button("🗑 清空", use_container_width=True, key="sidebar_quick_clear"):
-                if '_sidebar_quick_answer' in st.session_state:
-                    del st.session_state['_sidebar_quick_answer']
-                st.rerun()
-        if st.session_state.get('_sidebar_quick_answer'):
-            st.markdown("---")
-            st.markdown("**🤖 AI回答：**")
-            st.markdown(st.session_state['_sidebar_quick_answer'])
-            if ai.last_trace:
-                st.caption(f"模型: {ai.last_trace.get('model','?')} | {ai.last_trace.get('elapsed_seconds','?')}s")
-
-    st.markdown("---")
     st.caption("Trust First · Value Second · Price Last")
     st.caption("信任为先 · 价值为本 · 价格为末")
     if ai.is_configured():
@@ -649,55 +620,6 @@ if page == "🏠 仪表盘":
                 st.write(line)
     except Exception:
         pass
-
-    st.markdown("---")
-
-    # AI引擎状态概览
-    st.markdown("##### 🤖 AI引擎状态")
-    try:
-        from ai_client import ai as _dash_ai
-        _chain = _dash_ai.get_failover_chain()
-        _traces = _dash_ai.get_recent_traces(limit=50)
-        _online_count = sum(1 for e in _chain if e['type'] == 'online')
-        _local_count = sum(1 for e in _chain if e['type'] == 'local')
-        _total_calls = len(_traces)
-        _success_calls = sum(1 for t in _traces if t.get('status') == 'success')
-        _success_rate = round(_success_calls / _total_calls * 100, 1) if _total_calls > 0 else 0
-        _avg_time = round(sum(t.get('elapsed_seconds', 0) for t in _traces) / _total_calls, 1) if _total_calls > 0 else 0
-        
-        col_ai1, col_ai2, col_ai3, col_ai4 = st.columns(4)
-        with col_ai1:
-            st.metric("当前模型", getattr(_dash_ai, 'model', '?')[:20])
-        with col_ai2:
-            st.metric("故障转移链", f"{len(_chain)}节点", delta=f"{_online_count}在线+{_local_count}本地")
-        with col_ai3:
-            st.metric("近期调用", _total_calls, delta=f"成功率{_success_rate}%")
-        with col_ai4:
-            st.metric("平均响应", f"{_avg_time}s")
-        
-        # 故障转移链简要展示
-        _chain_html = '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:8px;">'
-        for _i, _ep in enumerate(_chain[:6]):
-            _tc = "#4caf50" if _ep['type'] == 'online' else "#ff9800"
-            _chain_html += f'<span style="background:#f5f5f5;padding:3px 8px;border-radius:4px;font-size:11px;border-left:2px solid {_tc};">{_ep["label"].split("/")[-1]}</span>'
-            if _i < min(len(_chain), 6) - 1:
-                _chain_html += '<span style="color:#999;font-size:10px;">→</span>'
-        if len(_chain) > 6:
-            _chain_html += f'<span style="color:#999;font-size:11px;">+{len(_chain)-6}更多</span>'
-        _chain_html += '</div>'
-        st.markdown(_chain_html, unsafe_allow_html=True)
-        
-        col_aibtn1, col_aibtn2 = st.columns(2)
-        with col_aibtn1:
-            if st.button("🔌 测试AI连接", use_container_width=True, key="dash_test_ai"):
-                _ok, _msg = _dash_ai.test_connection()
-                (st.success if _ok else st.error)(_msg)
-        with col_aibtn2:
-            if st.button("⚙️ 进入模型管理", use_container_width=True, key="dash_goto_model"):
-                st.session_state['main_nav'] = "🤖 模型管理"
-                st.rerun()
-    except Exception as _e:
-        st.caption(f"AI状态加载中... ({_e})")
 
     st.markdown("---")
 
@@ -1292,15 +1214,6 @@ elif page == "👥 客户中心":
     <div style="color:rgba(255,243,224,.6);font-size:13px;">客户分析 · 客户开发 · 智能问答 · 客户管理（CRM）</div>
     </div>
     """, unsafe_allow_html=True)
-
-    # 跳转CRM工作台（独立站）
-    with st.container(border=True):
-        _c1, _c2 = st.columns([3, 1])
-        with _c1:
-            st.markdown("**🏢 锘利企业客户管理CRM工作台**")
-            st.caption("独立部署的企业CRM系统 · 更专注的客户管理 · 一键跳转")
-        with _c2:
-            st.link_button("打开CRM工作台 ↗", "https://crm.kailioncrafts.com", use_container_width=True, type="primary")
 
     cc_sections = {
         "🎯 客户分析": "客户背调 · 智能分析",
@@ -4288,7 +4201,6 @@ elif page == "🤖 锴利自研AI工具库":
         {"id": "white_balance", "name": "白平衡校正工具", "icon": "🌈", "category": "图片处理", "description": "图片白平衡自动校正", "status": "✅ 已上线", "features": "上传产品图→自动白平衡→对比预览→下载"},
         {"id": "raw_alignment", "name": "选片与RAW对齐", "icon": "📸", "category": "图片处理", "description": "JPG选片匹配RAW原片", "status": "✅ 已上线", "features": "批量上传JPG选片+RAW原片→自动匹配"},
         {"id": "video_reverse", "name": "爆款视频反推", "icon": "🎬", "category": "视频解析", "description": "丢爆款视频→反推分镜→生成剪辑脚本", "status": "✅ 已上线", "features": "链接解析/上传视频→反推分镜表→结合素材+要求→输出剪辑脚本"},
-        {"id": "ai_image_studio", "name": "AI作图工作台", "icon": "🖌️", "category": "AI生图", "description": "一站式电商AI作图·主图/详情/风格复刻", "status": "✅ 已上线", "features": "接豆包/GPT/本地模型·主图/详情图/风格复刻·导出HTML"},
     ]
 
     # 统计
@@ -4374,15 +4286,14 @@ elif page == "🤖 锴利自研AI工具库":
             "white_balance": "https://238d6a7f38e545179657add9775cb030.app.workbuddy.host",
             "raw_alignment": "https://58c26070f39e4dcd872cddf189e2519a.app.workbuddy.host",
             "video_reverse": "https://video-reverse-prompt.app.workbuddy.host/",
-            "ai_image_studio": "https://www.51aic.com/",
         }
         _html_url = _html_links.get(tool_id)
         if _html_url:
             with st.container(border=True):
                 _c1, _c2 = st.columns([3, 1])
                 with _c1:
-                    st.markdown("**🌐 原AI作图工作台网址**")
-                    st.caption("跳转至51aic在线版 · 含全部原始功能；下方为本机 Streamlit 原生版")
+                    st.markdown("**🌐 原HTML工具（完整版）**")
+                    st.caption("WorkBuddy 公网部署版 · 含全部原始功能；下方为本机 Streamlit 原生版")
                 with _c2:
                     st.link_button("打开原工具 ↗", _html_url, use_container_width=True, type="primary")
 
@@ -5037,55 +4948,7 @@ elif page == "🤖 锴利自研AI工具库":
                             )
                         with col2:
                             if st.button("⚡ 批量导出全部", use_container_width=True):
-                                if len(uploaded_files) == 0:
-                                    st.warning("请先上传图片")
-                                else:
-                                    with st.spinner(f"正在批量处理 {len(uploaded_files)} 张图片..."):
-                                        zip_buf = io.BytesIO()
-                                        with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-                                            for uf in uploaded_files:
-                                                try:
-                                                    _img = Image.open(uf).convert('RGB')
-                                                    if brightness != 1.0:
-                                                        _enh = ImageEnhance.Brightness(_img)
-                                                        _img = _enh.enhance(brightness)
-                                                    if contrast != 1.0:
-                                                        _enh = ImageEnhance.Contrast(_img)
-                                                        _img = _enh.enhance(contrast)
-                                                    _gray = ImageOps.grayscale(_img)
-                                                    _inv = ImageOps.invert(_gray)
-                                                    _blur_r = 30 - (paper_texture / 100 * 20)
-                                                    _blur = _inv.filter(ImageFilter.GaussianBlur(_blur_r))
-                                                    _res = Image.composite(_gray, _blur, ImageOps.invert(_blur))
-                                                    _res = Image.eval(_res, lambda x: int(x * (ink_depth / 2.4)))
-                                                    for _ in range(multi_stroke - 1):
-                                                        _edge = _gray.filter(ImageFilter.FIND_EDGES)
-                                                        _res = Image.blend(_res, _edge, 0.05 * edge_strength)
-                                                    if invert:
-                                                        _res = ImageOps.invert(_res)
-                                                    if show_grid:
-                                                        _draw = ImageDraw.Draw(_res)
-                                                        _w, _h = _res.size
-                                                        for _x in range(0, _w, 50):
-                                                            _draw.line([(_x, 0), (_x, _h)], fill=200, width=1)
-                                                        for _y in range(0, _h, 50):
-                                                            _draw.line([(0, _y), (_w, _y)], fill=200, width=1)
-                                                    _img_buf = io.BytesIO()
-                                                    _res.save(_img_buf, format='PNG')
-                                                    _fname = uf.name.rsplit('.', 1)[0] + '_lineart.png'
-                                                    zf.writestr(_fname, _img_buf.getvalue())
-                                                except Exception as e:
-                                                    st.warning(f"{uf.name} 处理失败: {e}")
-                                        zip_buf.seek(0)
-                                        st.success(f"✅ 已打包 {len(uploaded_files)} 张线稿")
-                                        st.download_button(
-                                            "📥 下载ZIP压缩包",
-                                            zip_buf.getvalue(),
-                                            file_name="lineart_batch.zip",
-                                            mime="application/zip",
-                                            use_container_width=True,
-                                            type="primary"
-                                        )
+                                st.info("批量导出功能开发中，敬请期待！")
     
                 st.markdown("---")
     
@@ -6304,373 +6167,6 @@ elif page == "🤖 锴利自研AI工具库":
 
             st.caption("💡 点击上方「保存到知识库」按钮，结果会自动存档到 data/kb_output/视频反推/ 文件夹")
 
-        elif tool_id == 'ai_image_studio':
-            st.markdown("""
-            <div style="text-align:center; margin-bottom:24px;">
-                <div style="display:inline-block; font-family:monospace; font-size:11px; letter-spacing:3px; color:#B8860B; border:1px solid #D4AF37; padding:5px 14px; border-radius:3px; margin-bottom:12px; font-weight:600;">
-                    KAILIONCRAFTS · 一站式电商 AI 作图工作台
-                </div>
-                <h2 style="font-family:serif; font-size:28px; font-weight:700; color:#1a1a2e; margin:10px 0 8px 0;">
-                    🖌️ AI<span style="color:#B8860B;">作图工作台</span>
-                </h2>
-                <div style="font-size:13px; color:#666; line-height:1.6;">
-                    接豆包 / GPT / 本地模型 · 主图 · 详情图 · 风格复刻 · 提示词自动拼装 · 导出HTML
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # ========== 第9个工具：AI作图工作台（Streamlit原生版） ==========
-            # 数据定义（对齐51aic）
-            _MODES = ['Agent自由创作','主图套图','精修白底图','AI试衣','万物穿戴','商品替换','图片翻译','去水印','姿势裂变','商品换色','商品精修','海报设计']
-            _SKILLS = [
-                {'id':'white', 'name':'精修白底图', 'needImg':True, 'tpl':'保持产品外观与细节完全不变，去除所有背景与杂物，替换为纯净白色摄影棚背景，均匀柔和打光，轻微倒影，专业电商主图质感，高清锐利。', 'vars':[]},
-                {'id':'scene', 'name':'生活场景图', 'needImg':True, 'tpl':'将{product}放入{scene}场景中，自然柔光，真实使用环境，产品仍是视觉中心，浅景深，生活方式商业摄影，高分辨率。', 'vars':[
-                    {'k':'product', 'label':'产品', 'type':'text', 'ph':'如：不锈钢厨房剪刀'},
-                    {'k':'scene', 'label':'场景', 'type':'select', 'opts':['明亮家庭厨房','专业餐厅后厨','户外露营木桌','现代办公桌面','北欧风餐桌']}]},
-                {'id':'model', 'name':'模特使用场景', 'needImg':True, 'tpl':'一位{model}正在{action}{product}，{env}环境，人物自然真实，产品清晰可见且与参考图外观完全一致，专业生活方式摄影。', 'vars':[
-                    {'k':'model', 'label':'模特', 'type':'select', 'opts':['年轻亚洲女性','欧美男性厨师','欧美女性','专业理发师']},
-                    {'k':'product', 'label':'产品', 'type':'text', 'ph':'如：厨房剪刀'},
-                    {'k':'action', 'label':'动作', 'type':'select', 'opts':['使用','展示','握持','操作']},
-                    {'k':'env', 'label':'环境', 'type':'select', 'opts':['明亮厨房','自然光餐厅','现代工作室','户外']}]},
-                {'id':'poster', 'name':'促销海报', 'needImg':False, 'tpl':'为{product}设计一张电商促销海报，顶部主标题，底部限时优惠信息，排版简洁高级留白充足，主色调{color}，产品居中突出，商业海报设计。', 'vars':[
-                    {'k':'product', 'label':'产品', 'type':'text', 'ph':'如：奶咖色女士手提包'},
-                    {'k':'color', 'label':'主色调', 'type':'select', 'opts':['高级灰','莫兰迪粉','克莱因蓝','黑金','奶油白']}]},
-                {'id':'sell', 'name':'卖点图', 'needImg':True, 'tpl':'生成一张电商卖点图，{product}居中主视觉，四周分布4个卖点模块配简洁图标，{lang}文案，排版清晰，适合{platform}。', 'vars':[
-                    {'k':'product', 'label':'产品', 'type':'text', 'ph':'如：无叶塔式风扇'},
-                    {'k':'lang', 'label':'语言', 'type':'select', 'opts':['中文','English','日本語','Deutsch','Español']},
-                    {'k':'platform', 'label':'平台', 'type':'select', 'opts':['淘宝/天猫','京东','Amazon','TikTok Shop','TEMU']}]},
-            ]
-            _RATIOS = ['1:1 方图','3:4 竖版','4:3 横版','9:16 竖屏','16:9 横屏','2:3']
-            _DETAIL_BLOCKS = [
-                {'id':'hero', 'name':'首屏主视觉', 'p':'产品居中大图，突出品牌与核心卖点，视觉冲击力强。'},
-                {'id':'sell', 'name':'核心卖点', 'p':'用图标和短句展示3-4个核心卖点，产品图与文字排版清晰均衡。'},
-                {'id':'material', 'name':'材质工艺', 'p':'展示材质和工艺细节，局部特写，配简短说明。'},
-                {'id':'scene', 'name':'使用场景', 'p':'展示产品在真实使用场景中的画面。'},
-                {'id':'detail', 'name':'细节特写', 'p':'多个局部放大细节图拼版，突出做工与质感。'},
-                {'id':'size', 'name':'尺寸规格', 'p':'展示尺寸标注图，数据必须使用真实参数。'},
-                {'id':'compare', 'name':'对比图', 'p':'与普通产品对比突出优势，不贬低具体品牌。'},
-                {'id':'package', 'name':'包装展示', 'p':'展示包装、礼盒、配件，体现送礼与收纳价值。'},
-                {'id':'trust', 'name':'品质保障', 'p':'展示质检与品质承诺。认证标识必须真实，不得虚构。'},
-                {'id':'cta', 'name':'询盘引导', 'p':'结尾页引导询盘，展示联系方式与合作流程。'},
-            ]
-            _VIDEO_TYPES = ['商品口播','带货视频','商品测评','促销短视频']
-            _VIDEO_LENS = ['10秒','15秒','30秒']
-            _TOOL_LIST = [
-                {'name':'画笔涂鸦', 'desc':'自由画线、箭头、标注'},
-                {'name':'橡皮擦', 'desc':'擦除局部内容'},
-                {'name':'改尺寸', 'desc':'自定义图片宽高'},
-                {'name':'旋转翻转', 'desc':'翻转 / 旋转角度'},
-                {'name':'加水印', 'desc':'文字水印防盗图'},
-                {'name':'加文字', 'desc':'添加促销文案'},
-            ]
-
-            # 视图切换
-            _view = st.radio("功能模块", ["AI作图", "AI详情图", "风格复刻", "AI视频", "工具箱", "资产库"], horizontal=True, key="ais_view")
-
-            if _view == "AI作图":
-                st.markdown("#### 🎨 AI作图")
-                _mode = st.selectbox("作图模式", _MODES, key="ais_mode")
-                _skill_names = [x['name'] for x in _SKILLS]
-                _skill_idx = st.selectbox("技能模板（选一个自动拼提示词）", range(len(_skill_names)), format_func=lambda i: _skill_names[i], key="ais_skill")
-                _skill = _SKILLS[_skill_idx]
-
-                st.markdown("---")
-                st.markdown("#### 📝 变量填写")
-                _vars = {}
-                for _v in _skill['vars']:
-                    if _v['type'] == 'text':
-                        _vars[_v['k']] = st.text_input(_v['label'], placeholder=_v.get('ph',''), key=f"ais_v_{_v['k']}")
-                    else:
-                        _vars[_v['k']] = st.selectbox(_v['label'], _v['opts'], key=f"ais_v_{_v['k']}")
-
-                _col1, _col2 = st.columns(2)
-                with _col1:
-                    _ratio = st.selectbox("画面比例", _RATIOS, key="ais_ratio")
-                with _col2:
-                    _count = st.slider("生成数量", 1, 4, 1, key="ais_count")
-
-                if _skill.get('needImg'):
-                    st.file_uploader("📤 上传产品图（白底图最佳）", type=["png","jpg","jpeg","webp"], key="ais_refimg")
-
-                # 自动拼提示词
-                _prompt = _skill['tpl']
-                for _k, _v in _vars.items():
-                    _prompt = _prompt.replace('{'+_k+'}', _v)
-                st.markdown("#### ✏️ 提示词（可手动编辑）")
-                _prompt_edit = st.text_area("提示词", value=_prompt, height=180, key="ais_prompt")
-
-                if st.button("🚀 生成图片", type="primary", use_container_width=True, key="ais_gen"):
-                    # 比例映射到CogView-3-Flash支持的尺寸
-                    ratio_map = {
-                        '1:1 方图': '1024x1024',
-                        '3:4 竖版': '1024x1536',
-                        '4:3 横版': '1536x1024',
-                        '9:16 竖屏': '1024x1792',
-                        '16:9 横屏': '1792x1024',
-                        '2:3': '1024x1536',
-                    }
-                    size = ratio_map.get(_ratio, '1024x1024')
-                    with st.spinner(f"🎨 AI正在生成图片（{_count}张，{size}，CogView-3-Flash免费模型）..."):
-                        for gen_idx in range(_count):
-                            result = ai.generate_image(_prompt_edit, size=size, task_name=f"AI作图-{_skill['name']}")
-                            if result['success']:
-                                st.markdown(f"**图片 {gen_idx+1}/{_count}**（模型：{result['model']}，{size}）")
-                                st.image(result['url'], use_container_width=True)
-                                st.markdown(f"[🔗 打开原图]({result['url']})")
-                            else:
-                                st.error(f"图片 {gen_idx+1} 生成失败：{result['error']}")
-                            if gen_idx < _count - 1:
-                                st.markdown("---")
-
-            elif _view == "AI详情图":
-                st.markdown("#### 📋 AI详情图")
-                st.markdown("选择详情页模块，AI自动生成文案+排版建议")
-                _block_names = [b['name'] for b in _DETAIL_BLOCKS]
-                _selected = st.multiselect("选择模块", _block_names, default=["首屏主视觉","核心卖点","材质工艺"], key="ais_blocks")
-                if _selected:
-                    for _bn in _selected:
-                        _b = next(x for x in _DETAIL_BLOCKS if x['name']==_bn)
-                        with st.expander(f"{_b['name']}", expanded=False):
-                            st.write(_b['p'])
-                if st.button("🤖 AI写详情文案", type="primary", key="ais_gen_detail"):
-                    if not _selected:
-                        st.warning("请先选择至少一个详情页模块")
-                    else:
-                        _blocks_desc = "\n".join([f"- {b['name']}: {b['p']}" for b in _DETAIL_BLOCKS if b['name'] in _selected])
-                        _detail_prompt = f"""你是KaiLionCrafts（锴利匠心）的电商详情页文案专家，主营阳江五金刀剪（厨房刀具、专业剪刀、户外刀具、厨房用品）。
-请为以下详情页模块生成专业的英文+中文双语文案：
-
-{_blocks_desc}
-
-要求：
-1. 每个模块单独输出，标注模块名称
-2. 英文为主，中文为辅
-3. 突出CE/FDA认证、源头工厂、50把起MOQ、OEM/ODM能力
-4. 文案简洁有力，适合B2B独立站
-5. 直接输出文案，不要解释"""
-                        with st.spinner("🤖 AI正在生成详情文案..."):
-                            _detail_result = ai.chat(_detail_prompt, task_name="AI详情文案生成")
-                        st.markdown("#### ✅ 生成结果")
-                        st.markdown(_detail_result)
-
-            elif _view == "风格复刻":
-                st.markdown("#### 🎨 风格复刻")
-                st.markdown("上传参考图，AI（glm-4.6v-flash）解析其视觉风格，生成适用于你产品的生图提示词")
-                _style_img = st.file_uploader("📤 上传参考风格图", type=["png","jpg","jpeg","webp"], key="ais_style_ref")
-                _style_product = st.text_input("产品名称", placeholder="如：不锈钢厨房剪刀", key="ais_style_product")
-                if st.button("🔍 分析风格 + 生成提示词", type="primary", key="ais_style_gen"):
-                    if not _style_img:
-                        st.warning("请先上传参考风格图")
-                    elif not _style_product:
-                        st.warning("请填写产品名称")
-                    else:
-                        # 转base64
-                        _img_bytes = _style_img.getvalue()
-                        _img_b64 = base64.b64encode(_img_bytes).decode()
-                        _mime = _style_img.type or "image/png"
-                        _data_url = f"data:{_mime};base64,{_img_b64}"
-                        # 展示上传的图
-                        st.image(_style_img, caption="参考风格图", width=300)
-                        # 第一步：AI分析风格
-                        with st.spinner("🔍 glm-4.6v-flash 正在分析图片风格..."):
-                            _analysis = ai.chat_with_image(
-                                _data_url,
-                                "请详细分析这张图片的视觉风格，包括：1)整体色调和配色 2)光影效果 3)构图方式 4)背景风格 5)产品呈现角度 6)后期处理风格（如滤镜、锐化程度）。用简洁的条目列出。",
-                                task_name="风格复刻-风格分析"
-                            )
-                        st.markdown("#### 📊 风格分析结果")
-                        st.markdown(_analysis)
-                        # 第二步：基于风格生成适用于用户产品的提示词
-                        with st.spinner("✏️ 正在生成适用于你产品的生图提示词..."):
-                            _style_prompt = ai.chat(
-                                f"""基于以下视觉风格分析，为产品「{_style_product}」生成一个AI生图提示词（英文），要求保持参考图的风格特征，但产品替换为{_style_product}。
-
-风格分析：
-{_analysis}
-
-请输出：
-1. 英文生图提示词（适合Midjourney/DALL-E/CogView）
-2. 中文说明（解释这个提示词如何复刻参考风格）""",
-                                task_name="风格复刻-提示词生成"
-                            )
-                        st.markdown("#### ✏️ 生成的生图提示词")
-                        st.markdown(_style_prompt)
-                        # 第三步：提供一键生成按钮
-                        st.session_state['_style_generated_prompt'] = _style_prompt
-                        st.success("✅ 风格分析完成！可复制提示词到「AI作图」页面生成图片")
-
-            elif _view == "AI视频":
-                st.markdown("#### 🎬 AI视频脚本")
-                st.markdown("商品口播 / 带货视频 / 测评 / 促销短视频，AI生成分镜脚本")
-                _vtype = st.selectbox("视频类型", _VIDEO_TYPES, key="ais_vtype")
-                _vlens = st.selectbox("时长", _VIDEO_LENS, key="ais_vlens")
-                st.text_area("产品描述/卖点", height=100, key="ais_vdesc", placeholder="描述你的产品特点和想突出的卖点...")
-                if st.button("🎬 生成视频脚本", type="primary", key="ais_vgen"):
-                    _vdesc_val = st.session_state.get('ais_vdesc', '')
-                    if not _vdesc_val:
-                        st.warning("请先填写产品描述/卖点")
-                    else:
-                        _video_prompt = f"""你是KaiLionCrafts的短视频脚本专家。
-请为以下产品生成一个{_vlens}的{_vtype}分镜脚本：
-
-产品描述/卖点：{_vdesc_val}
-
-要求：
-1. 按时间轴输出分镜（镜头编号、时长、画面、台词/字幕、运镜）
-2. 适合TikTok/YouTube Shorts/Instagram Reels
-3. 开头3秒要有钩子
-4. 突出产品核心卖点和使用场景
-5. 结尾有行动号召（CTA）
-6. 直接输出脚本分镜列表"""
-                        with st.spinner("🎬 AI正在生成视频脚本..."):
-                            _video_result = ai.chat(_video_prompt, task_name=f"AI视频脚本-{_vtype}")
-                        st.markdown("#### ✅ 生成结果")
-                        st.markdown(_video_result)
-
-            elif _view == "工具箱":
-                st.markdown("#### 🧰 工具箱（本地图片处理，PIL实现）")
-                from PIL import Image as PILImage, ImageDraw, ImageFont
-                
-                # 改尺寸
-                with st.expander("📐 改尺寸", expanded=False):
-                    st.write("自定义图片宽高，保持比例或强制拉伸")
-                    _rs_img = st.file_uploader("上传图片", type=["png","jpg","jpeg","webp"], key="tool_rs_img")
-                    if _rs_img:
-                        _rs_pil = PILImage.open(io.BytesIO(_rs_img.getvalue()))
-                        st.image(_rs_pil, caption=f"原图：{_rs_pil.size[0]}x{_rs_pil.size[1]}", width=200)
-                        _rs_w, _rs_h = _rs_pil.size
-                        col_rs1, col_rs2 = st.columns(2)
-                        with col_rs1:
-                            _rs_new_w = st.number_input("宽度(px)", min_value=1, max_value=8000, value=_rs_w, key="tool_rs_w")
-                        with col_rs2:
-                            _rs_new_h = st.number_input("高度(px)", min_value=1, max_value=8000, value=_rs_h, key="tool_rs_h")
-                        _rs_keep_ratio = st.checkbox("保持宽高比", value=True, key="tool_rs_ratio")
-                        if st.button("🔄 调整尺寸", key="tool_rs_btn"):
-                            if _rs_keep_ratio:
-                                ratio = min(_rs_new_w/_rs_w, _rs_new_h/_rs_h)
-                                _rs_new_w = int(_rs_w * ratio)
-                                _rs_new_h = int(_rs_h * ratio)
-                            _rs_out = _rs_pil.resize((int(_rs_new_w), int(_rs_new_h)), PILImage.LANCZOS)
-                            _rs_buf = io.BytesIO()
-                            _rs_out.save(_rs_buf, format="PNG")
-                            st.image(_rs_out, caption=f"结果：{_rs_new_w}x{_rs_new_h}", use_container_width=True)
-                            st.download_button("⬇️ 下载PNG", _rs_buf.getvalue(), file_name="resized.png", mime="image/png", key="tool_rs_dl")
-                
-                # 旋转翻转
-                with st.expander("🔄 旋转翻转", expanded=False):
-                    st.write("旋转90/180/270度，或水平/垂直翻转")
-                    _rot_img = st.file_uploader("上传图片", type=["png","jpg","jpeg","webp"], key="tool_rot_img")
-                    if _rot_img:
-                        _rot_pil = PILImage.open(io.BytesIO(_rot_img.getvalue()))
-                        st.image(_rot_pil, caption="原图", width=200)
-                        _rot_action = st.selectbox("操作", ["旋转90°(顺时针)", "旋转180°", "旋转270°(顺时针)", "水平翻转", "垂直翻转"], key="tool_rot_action")
-                        if st.button("🔄 执行", key="tool_rot_btn"):
-                            if _rot_action == "旋转90°(顺时针)":
-                                _rot_out = _rot_pil.rotate(-90, expand=True)
-                            elif _rot_action == "旋转180°":
-                                _rot_out = _rot_pil.rotate(180, expand=True)
-                            elif _rot_action == "旋转270°(顺时针)":
-                                _rot_out = _rot_pil.rotate(90, expand=True)
-                            elif _rot_action == "水平翻转":
-                                _rot_out = _rot_pil.transpose(PILImage.FLIP_LEFT_RIGHT)
-                            else:
-                                _rot_out = _rot_pil.transpose(PILImage.FLIP_TOP_BOTTOM)
-                            _rot_buf = io.BytesIO()
-                            _rot_out.save(_rot_buf, format="PNG")
-                            st.image(_rot_out, caption="结果", use_container_width=True)
-                            st.download_button("⬇️ 下载PNG", _rot_buf.getvalue(), file_name="rotated.png", mime="image/png", key="tool_rot_dl")
-                
-                # 加水印
-                with st.expander("💧 加水印", expanded=False):
-                    st.write("添加文字水印防盗图")
-                    _wm_img = st.file_uploader("上传图片", type=["png","jpg","jpeg","webp"], key="tool_wm_img")
-                    if _wm_img:
-                        _wm_pil = PILImage.open(io.BytesIO(_wm_img.getvalue())).convert("RGBA")
-                        st.image(_wm_pil, caption="原图", width=200)
-                        _wm_text = st.text_input("水印文字", value="KaiLionCrafts", key="tool_wm_text")
-                        col_wm1, col_wm2 = st.columns(2)
-                        with col_wm1:
-                            _wm_pos = st.selectbox("位置", ["右下角", "左下角", "右上角", "左上角", "居中"], key="tool_wm_pos")
-                        with col_wm2:
-                            _wm_opacity = st.slider("透明度", 10, 100, 40, key="tool_wm_opacity")
-                        _wm_size = st.slider("字号", 12, 120, 36, key="tool_wm_size")
-                        if st.button("💧 添加水印", key="tool_wm_btn"):
-                            _wm_layer = PILImage.new("RGBA", _wm_pil.size, (255,255,255,0))
-                            _wm_draw = ImageDraw.Draw(_wm_layer)
-                            try:
-                                _wm_font = ImageFont.truetype("/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc", _wm_size)
-                            except:
-                                _wm_font = ImageFont.load_default()
-                            _wm_bbox = _wm_draw.textbbox((0,0), _wm_text, font=_wm_font)
-                            _wm_tw, _wm_th = _wm_bbox[2]-_wm_bbox[0], _wm_bbox[3]-_wm_bbox[1]
-                            _wm_margin = 20
-                            if _wm_pos == "右下角":
-                                _wm_xy = (_wm_pil.size[0]-_wm_tw-_wm_margin, _wm_pil.size[1]-_wm_th-_wm_margin)
-                            elif _wm_pos == "左下角":
-                                _wm_xy = (_wm_margin, _wm_pil.size[1]-_wm_th-_wm_margin)
-                            elif _wm_pos == "右上角":
-                                _wm_xy = (_wm_pil.size[0]-_wm_tw-_wm_margin, _wm_margin)
-                            elif _wm_pos == "左上角":
-                                _wm_xy = (_wm_margin, _wm_margin)
-                            else:
-                                _wm_xy = ((_wm_pil.size[0]-_wm_tw)//2, (_wm_pil.size[1]-_wm_th)//2)
-                            _wm_draw.text(_wm_xy, _wm_text, font=_wm_font, fill=(255,255,255,int(_wm_opacity*2.55)))
-                            _wm_out = PILImage.alpha_composite(_wm_pil, _wm_layer).convert("RGB")
-                            _wm_buf = io.BytesIO()
-                            _wm_out.save(_wm_buf, format="PNG")
-                            st.image(_wm_out, caption="结果", use_container_width=True)
-                            st.download_button("⬇️ 下载PNG", _wm_buf.getvalue(), file_name="watermarked.png", mime="image/png", key="tool_wm_dl")
-                
-                # 加文字
-                with st.expander("✏️ 加文字", expanded=False):
-                    st.write("在图片上添加促销文案")
-                    _tx_img = st.file_uploader("上传图片", type=["png","jpg","jpeg","webp"], key="tool_tx_img")
-                    if _tx_img:
-                        _tx_pil = PILImage.open(io.BytesIO(_tx_img.getvalue())).convert("RGBA")
-                        st.image(_tx_pil, caption="原图", width=200)
-                        _tx_text = st.text_area("文字内容", height=80, key="tool_tx_text")
-                        col_tx1, col_tx2, col_tx3 = st.columns(3)
-                        with col_tx1:
-                            _tx_pos = st.selectbox("位置", ["顶部居中", "底部居中", "居中"], key="tool_tx_pos")
-                        with col_tx2:
-                            _tx_size = st.slider("字号", 12, 200, 48, key="tool_tx_size")
-                        with col_tx3:
-                            _tx_color = st.color_picker("颜色", "#FFFFFF", key="tool_tx_color")
-                        _tx_bg = st.checkbox("添加半透明背景条", value=True, key="tool_tx_bg")
-                        if st.button("✏️ 添加文字", key="tool_tx_btn"):
-                            _tx_layer = PILImage.new("RGBA", _tx_pil.size, (255,255,255,0))
-                            _tx_draw = ImageDraw.Draw(_tx_layer)
-                            try:
-                                _tx_font = ImageFont.truetype("/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc", _tx_size)
-                            except:
-                                _tx_font = ImageFont.load_default()
-                            _tx_bbox = _tx_draw.textbbox((0,0), _tx_text, font=_tx_font)
-                            _tx_tw, _tx_th = _tx_bbox[2]-_tx_bbox[0], _tx_bbox[3]-_tx_bbox[1]
-                            if _tx_pos == "顶部居中":
-                                _tx_xy = ((_tx_pil.size[0]-_tx_tw)//2, 30)
-                            elif _tx_pos == "底部居中":
-                                _tx_xy = ((_tx_pil.size[0]-_tx_tw)//2, _tx_pil.size[1]-_tx_th-30)
-                            else:
-                                _tx_xy = ((_tx_pil.size[0]-_tx_tw)//2, (_tx_pil.size[1]-_tx_th)//2)
-                            if _tx_bg:
-                                _tx_draw.rectangle([_tx_xy[0]-20, _tx_xy[1]-10, _tx_xy[0]+_tx_tw+20, _tx_xy[1]+_tx_th+10], fill=(0,0,0,128))
-                            _tx_rgb = tuple(int(_tx_color.lstrip('#')[i:i+2], 16) for i in (0,2,4))
-                            _tx_draw.text(_tx_xy, _tx_text, font=_tx_font, fill=(*_tx_rgb, 255))
-                            _tx_out = PILImage.alpha_composite(_tx_pil, _tx_layer).convert("RGB")
-                            _tx_buf = io.BytesIO()
-                            _tx_out.save(_tx_buf, format="PNG")
-                            st.image(_tx_out, caption="结果", use_container_width=True)
-                            st.download_button("⬇️ 下载PNG", _tx_buf.getvalue(), file_name="text_added.png", mime="image/png", key="tool_tx_dl")
-                
-                # 画笔涂鸦和橡皮擦（需要前端画布，暂不支持）
-                with st.expander("🎨 画笔涂鸦 / 🧽 橡皮擦", expanded=False):
-                    st.info("这两个功能需要前端画布交互支持，当前版本暂未实现。可使用「改尺寸」「旋转翻转」「加水印」「加文字」功能。")
-
-            elif _view == "资产库":
-                st.markdown("#### 📁 资产库")
-                st.info("本地存储的所有生成图片，可导出、重命名、删除")
-                st.markdown("*（资产库数据存储在浏览器本地IndexedDB中）*")
-
         # 知识库连接说明（所有工具都显示）
         with st.expander("📚 本工具连接的公司知识库", expanded=False):
             kb_map = {
@@ -7383,174 +6879,51 @@ elif page == "📈 销售管道":
 
 # ============ 页面10：客户管理 ============
 elif page == "👥 客户管理":
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
-    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · CRM</div>
-    <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">客户管理（CRM）</h2>
-    <div style="color:rgba(255,243,224,.6);font-size:13px;">AI客户分析 · 跟进记录 · 活动日志 · 销售管道</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("👥 客户管理（CRM）")
+    st.caption("管理所有潜在客户和跟进记录")
 
-    # ===== 统计概览 =====
-    stats = cm.get_statistics()
-    s1, s2, s3, s4, s5 = st.columns(5)
-    s1.metric("客户总数", stats["total"])
-    s2.metric("A级客户", stats["by_grade"].get("A", 0))
-    s3.metric("跟进中", stats["by_status"].get("跟进中", 0))
-    s4.metric("今日跟进", stats["follow_up_today"])
-    s5.metric("逾期跟进", stats["overdue_follow_up"], delta="需处理")
-
-    st.markdown("---")
-
-    # ===== 今日跟进提醒 =====
-    follow_today = cm.get_follow_up_today()
-    overdue = cm.get_overdue_follow_up()
-    if follow_today or overdue:
-        with st.expander(f"⏰ 跟进提醒（今日{len(follow_today)}条 / 逾期{len(overdue)}条）", expanded=True):
-            if overdue:
-                st.error("**逾期未跟进：**")
-                for c in overdue[:5]:
-                    st.caption(f"🔴 {c.get('company_name','?')} | 计划跟进: {c.get('next_follow_up','')} | {c.get('status','')}")
-            if follow_today:
-                st.warning("**今日需跟进：**")
-                for c in follow_today[:5]:
-                    st.caption(f"🟡 {c.get('company_name','?')} | {c.get('status','')} | {c.get('country','')}")
-
-    # ===== 筛选 =====
     col1, col2, col3 = st.columns(3)
     with col1:
         grade_filter = st.selectbox("按等级筛选", ["全部", "A", "B", "C", "D"])
     with col2:
         status_filter = st.selectbox("按状态筛选", ["全部", "新客户", "跟进中", "已报价", "已成交", "已流失"])
     with col3:
-        search_keyword = st.text_input("搜索客户", placeholder="公司名/国家/产品...")
+        st.metric("客户总数", len(cm.list_customers()))
 
     customers = cm.list_customers(
-        grade=None if grade_filter == "全部" else grade_filter,
-        status=None if status_filter == "全部" else status_filter,
+    grade=None if grade_filter == "全部" else grade_filter,
+    status=None if status_filter == "全部" else status_filter,
     )
-    if search_keyword:
-        kw = search_keyword.lower()
-        customers = [c for c in customers if kw in str(c.get("company_name","")).lower() 
-                     or kw in str(c.get("country","")).lower() 
-                     or kw in str(c.get("products","")).lower()]
-
-    st.markdown(f"##### 📋 客户列表（{len(customers)}个）")
 
     if customers:
         for c in customers:
             grade = c.get("grade", "C")
-            grade_color = {"A": "🔴", "B": "🟠", "C": "🟡", "D": "⚪"}.get(grade, "⚪")
-            status_color = {"新客户": "🆕", "跟进中": "🔄", "已报价": "💰", "已成交": "✅", "已流失": "❌"}.get(c.get("status",""), "❓")
-            
-            with st.expander(f"{grade_color} {c.get('company_name', '未知')} | {grade}级 | {c.get('score', 0)}分 | {status_color}{c.get('status','')} | {c.get('country', '')}"):
-                # ===== 客户基本信息 =====
-                info_col1, info_col2 = st.columns([2, 1])
-                with info_col1:
-                    st.markdown("**📋 基本信息**")
+            with st.expander(f"{c.get('company_name', '未知')} | {grade}级 | {c.get('score', 0)}分 | {c.get('country', '')}"):
+                col1, col2 = st.columns([3, 1])
+                with col1:
                     st.write(f"**官网：** {c.get('website', '无')}")
-                    st.write(f"**联系人：** {c.get('contact_person', '无')}")
-                    st.write(f"**邮箱：** {c.get('email', '无')}")
                     st.write(f"**主营：** {c.get('products', '无')}")
+                    st.write(f"**状态：** {c.get('status', '新客户')}")
                     st.write(f"**添加时间：** {c.get('created_at', '')[:10]}")
-                    if c.get("last_contact"):
-                        st.write(f"**最后联系：** {c.get('last_contact', '')[:10]}")
-                    if c.get("next_follow_up"):
-                        st.write(f"**下次跟进：** {c.get('next_follow_up', '')}")
-                    if c.get("notes"):
-                        st.write(f"**备注：** {c.get('notes', '')}")
-                
-                with info_col2:
-                    st.markdown("**⚙️ 操作**")
-                    # 状态更新
+                    if c.get("analysis"):
+                        with st.expander("查看AI分析"):
+                            st.markdown(c["analysis"])
+                    if c.get("emails"):
+                        st.write(f"**邮件记录：** {len(c['emails'])}封")
+                        for e in c["emails"][-3:]:
+                            st.caption(f"- [{e['type']}] {e['subject'][:50]}")
+                with col2:
                     new_status = st.selectbox("更新状态",
                         ["新客户", "跟进中", "已报价", "已成交", "已流失"],
                         index=["新客户", "跟进中", "已报价", "已成交", "已流失"].index(c.get("status", "新客户")),
                         key=f"status_{c['id']}")
-                    if st.button("💾 更新状态", key=f"update_{c['id']}", use_container_width=True):
+                    if st.button("更新", key=f"update_{c['id']}"):
                         cm.update_customer(c["id"], {"status": new_status})
-                        cm.add_activity(c["id"], "状态变更", f"状态更新为: {new_status}")
                         st.success("已更新！")
                         st.rerun()
-                    
-                    # 跟进提醒设置
-                    st.markdown("**⏰ 跟进提醒**")
-                    follow_days = st.selectbox("几天后跟进", [1, 3, 7, 14, 30], index=1, key=f"follow_days_{c['id']}")
-                    if st.button("📅 设置跟进", key=f"set_follow_{c['id']}", use_container_width=True):
-                        cm.set_next_follow_up(c["id"], days=follow_days)
-                        cm.add_activity(c["id"], "设置提醒", f"设置{follow_days}天后跟进")
-                        st.success(f"已设置{follow_days}天后跟进")
-                        st.rerun()
-                    
-                    # 删除
-                    if two_step_delete("🗑️ 删除客户", f"del_{c['id']}", "删除该客户及其跟进记录，不可恢复") == "yes":
+                    if two_step_delete("🗑️ 删除", f"del_{c['id']}", "删除该客户及其跟进记录，不可恢复") == "yes":
                         cm.delete_customer(c["id"])
                         st.rerun()
-
-                st.markdown("---")
-                
-                # ===== AI客户分析 =====
-                st.markdown("**🤖 AI客户分析**")
-                if c.get("analysis"):
-                    with st.expander("查看已有AI分析", expanded=False):
-                        st.markdown(c["analysis"])
-                if st.button("🔍 一键AI分析客户", key=f"ai_analyze_{c['id']}", use_container_width=True):
-                    with st.spinner("AI正在分析客户..."):
-                        prompt = f"""请对以下外贸客户进行深度分析，并给出跟进策略：
-
-客户信息：
-- 公司：{c.get('company_name', '未知')}
-- 国家：{c.get('country', '未知')}
-- 官网：{c.get('website', '无')}
-- 主营产品：{c.get('products', '未知')}
-- 客户等级：{c.get('grade', 'C')}
-- 当前状态：{c.get('status', '新客户')}
-- 评分：{c.get('score', 0)}分
-
-请分析：
-1. 客户背景判断（公司类型、采购能力、市场定位）
-2. 潜在需求分析（可能需要什么产品）
-3. 跟进策略建议（第一封邮件怎么写、切入点是什么）
-4. 报价策略建议
-5. 风险提示
-
-用中文输出，结构清晰。"""
-                        analysis = ai.chat(prompt, task_name=f"AI客户分析-{c.get('company_name','')}")
-                        cm.update_customer(c["id"], {"analysis": analysis})
-                        cm.add_activity(c["id"], "AI分析", "完成客户AI深度分析")
-                        st.success("AI分析完成！")
-                        st.rerun()
-
-                st.markdown("---")
-                
-                # ===== 活动日志 =====
-                st.markdown("**📝 活动日志**")
-                activities = c.get("activities", [])
-                if activities:
-                    for act in reversed(activities[-10:]):
-                        st.caption(f"[{act.get('created_at','')[:16]}] [{act.get('type','')}] {act.get('description','')}")
-                else:
-                    st.caption("暂无活动记录")
-                
-                # 添加活动
-                with st.expander("➕ 添加活动记录", expanded=False):
-                    act_type = st.selectbox("活动类型", ["电话", "邮件", "会议", "样品", "报价", "其他"], key=f"act_type_{c['id']}")
-                    act_desc = st.text_area("活动描述", height=60, key=f"act_desc_{c['id']}")
-                    if st.button("💾 记录活动", key=f"add_act_{c['id']}"):
-                        if act_desc.strip():
-                            cm.add_activity(c["id"], act_type, act_desc)
-                            st.success("活动已记录")
-                            st.rerun()
-
-                st.markdown("---")
-                
-                # ===== 邮件记录 =====
-                if c.get("emails"):
-                    st.markdown(f"**✉️ 邮件记录（{len(c['emails'])}封）**")
-                    for e in c["emails"][-5:]:
-                        with st.expander(f"[{e.get('type','')}] {e.get('subject','')[:50]}"):
-                            st.caption(f"发送时间: {e.get('sent_at','')[:16]}")
-                            st.markdown(e.get("body", ""))
     else:
         st.info("没有符合条件的客户")
 
@@ -8648,139 +8021,6 @@ elif page == "🤖 模型管理":
     
     st.markdown("---")
     
-    # 故障转移链展示
-    st.subheader("🔄 故障转移链（自动兜底顺序）")
-    try:
-        from ai_client import ai as _ai_client
-        chain = _ai_client.get_failover_chain()
-        if chain:
-            chain_html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">'
-            for i, ep in enumerate(chain):
-                type_color = "#4caf50" if ep['type'] == 'online' else "#ff9800"
-                type_label = "在线" if ep['type'] == 'online' else "本地"
-                chain_html += f'<span style="background:#f5f5f5;padding:6px 12px;border-radius:6px;font-size:13px;border-left:3px solid {type_color};">'
-                chain_html += f'<b>{i+1}.</b> {ep["label"]} <small style="color:{type_color}">[{type_label}]</small>'
-                chain_html += '</span>'
-                if i < len(chain) - 1:
-                    chain_html += '<span style="color:#999;">→</span>'
-            chain_html += '</div>'
-            st.markdown(chain_html, unsafe_allow_html=True)
-            st.caption("规则：在线模型优先，逐个尝试；全部在线模型失败后自动切换到本地模型兜底")
-        else:
-            st.info("未配置故障转移链")
-    except Exception:
-        st.caption("故障转移链加载中...")
-    
-    st.markdown("---")
-    
-    # 一键全模型健康检测
-    st.subheader("🩺 模型健康检测")
-    col_hc1, col_hc2 = st.columns([3, 1])
-    with col_hc1:
-        st.caption("一键测试故障转移链中所有在线模型的可用性和响应速度")
-    with col_hc2:
-        if st.button("🔍 一键检测所有模型", type="primary", use_container_width=True, key="health_check_all"):
-            st.session_state['_health_results'] = None
-            try:
-                from ai_client import ai as _ai_hc
-                chain = _ai_hc.get_failover_chain()
-                hc_results = []
-                for ep in chain:
-                    if ep['type'] != 'online':
-                        hc_results.append({'label': ep['label'], 'type': 'local', 'status': 'skipped', 'elapsed': 0, 'error': '本地模型跳过'})
-                        continue
-                    t0 = time.time()
-                    try:
-                        resp = requests.post(
-                            f"{ep['base_url']}/chat/completions",
-                            headers={"Authorization": f"Bearer {ep['api_key']}", "Content-Type": "application/json"},
-                            json={"model": ep['model'], "messages": [{"role": "user", "content": "hi"}], "max_tokens": 5},
-                            timeout=15,
-                        )
-                        elapsed = time.time() - t0
-                        if resp.status_code == 200:
-                            hc_results.append({'label': ep['label'], 'type': 'online', 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
-                        else:
-                            hc_results.append({'label': ep['label'], 'type': 'online', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code}"})
-                    except Exception as e:
-                        elapsed = time.time() - t0
-                        hc_results.append({'label': ep['label'], 'type': 'online', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': str(e)[:60]})
-                st.session_state['_health_results'] = hc_results
-            except Exception as e:
-                st.error(f"检测失败: {e}")
-    if st.session_state.get('_health_results'):
-        hc_results = st.session_state['_health_results']
-        ok_c = sum(1 for r in hc_results if r['status'] == 'ok')
-        fail_c = sum(1 for r in hc_results if r['status'] == 'fail')
-        skip_c = sum(1 for r in hc_results if r['status'] == 'skipped')
-        col_ha, col_hb, col_hc = st.columns(3)
-        with col_ha: st.metric("✅ 正常", ok_c)
-        with col_hb: st.metric("❌ 异常", fail_c)
-        with col_hc: st.metric("⏭️ 跳过", skip_c)
-        for r in hc_results:
-            if r['status'] == 'ok':
-                st.success(f"✅ {r['label']} — {r['elapsed']}s")
-            elif r['status'] == 'fail':
-                st.error(f"❌ {r['label']} — {r['elapsed']}s — {r['error']}")
-            else:
-                st.info(f"⏭️ {r['label']} — {r['error']}")
-    st.markdown("---")
-    
-    # 调用统计面板
-    st.subheader("📊 模型调用统计")
-    try:
-        from ai_client import ai as _ai_stats
-        traces = _ai_stats.get_recent_traces(limit=200)
-        if traces:
-            model_stats = {}
-            for t in traces:
-                m = t.get('model', 'unknown')
-                if m not in model_stats:
-                    model_stats[m] = {'count': 0, 'success': 0, 'total_time': 0}
-                model_stats[m]['count'] += 1
-                if t.get('status') == 'success':
-                    model_stats[m]['success'] += 1
-                model_stats[m]['total_time'] += t.get('elapsed_seconds', 0)
-            stat_rows = []
-            for m, s in sorted(model_stats.items(), key=lambda x: -x[1]['count']):
-                avg_t = round(s['total_time'] / s['count'], 2) if s['count'] > 0 else 0
-                sr = round(s['success'] / s['count'] * 100, 1) if s['count'] > 0 else 0
-                stat_rows.append({'模型': m, '调用次数': s['count'], '成功': s['success'], '成功率': f"{sr}%", '平均耗时': f"{avg_t}s"})
-            st.dataframe(stat_rows, use_container_width=True, hide_index=True)
-            st.caption(f"基于最近 {len(traces)} 条调用记录统计")
-        else:
-            st.info("暂无调用记录，使用AI功能后这里会显示统计")
-    except Exception as e:
-        st.caption(f"统计加载中... ({e})")
-    st.markdown("---")
-    
-    # 最近调用记录
-    st.subheader("📋 最近调用记录")
-    try:
-        from ai_client import ai as _ai_trace
-        recent = _ai_trace.get_recent_traces(limit=15)
-        if recent:
-            for t in recent:
-                icon = "✅" if t.get('status') == 'success' else "❌"
-                fo = f" 🔄故障转移x{t['failover_count']}" if t.get('failover_count', 0) > 0 else ""
-                with st.expander(f"{icon} [{t.get('time','?')}] {t.get('task','未命名')} — {t.get('model','?')} — {t.get('elapsed_seconds','?')}s{fo}", expanded=False):
-                    st.write(f"**模型**: {t.get('model','?')}")
-                    st.write(f"**提供商**: {t.get('provider','?')}")
-                    st.write(f"**状态**: {t.get('status','?')}")
-                    st.write(f"**耗时**: {t.get('elapsed_seconds','?')}s")
-                    st.write(f"**输入字符**: {t.get('prompt_chars','?')}")
-                    st.write(f"**输出字符**: {t.get('completion_chars','?')}")
-                    if t.get('failover'):
-                        st.write(f"**故障转移**: {', '.join(t['failover'])}")
-                    if t.get('error'):
-                        st.write(f"**错误**: {t['error']}")
-        else:
-            st.info("暂无调用记录")
-    except Exception as e:
-        st.caption(f"记录加载中... ({e})")
-    
-    st.markdown("---")
-    
     # 本地Ollama状态
     st.subheader("💻 本地模型状态")
     ollama_models = detect_ollama_models()
@@ -8811,9 +8051,6 @@ elif page == "🤖 模型管理":
         is_active = p['id'] == active_id
         card_bg = "#e8f5e9" if is_active else "#ffffff"
         border_color = "#4caf50" if is_active else "#e0e0e0"
-        tier = p.get('tier', 'unknown')
-        tier_labels = {'free': ('免费', '#4caf50'), 'paid': ('付费', '#ff9800'), 'local': ('本地', '#2196f3')}
-        tier_text, tier_color = tier_labels.get(tier, ('未知', '#999'))
 
         with st.container():
             st.markdown(f"""
@@ -8821,8 +8058,7 @@ elif page == "🤖 模型管理":
                 border-left:4px solid {border_color}; margin-bottom:12px;">
         <strong>{'✅ ' if is_active else ''}{p['name']}</strong>
         <span style="float:right; color:#666; font-size:12px;">
-            {p['type']} | {len(p['models'])}个模型 | 
-            <span style="color:{tier_color};font-weight:bold;">[{tier_text}]</span>
+            {p['type']} | {len(p['models'])}个模型
         </span>
         <br>
         <small style="color:#888;">{p['base_url']}</small>
@@ -8964,13 +8200,13 @@ elif page == "🤖 模型管理":
     - 认证：Bearer Token
     """)
     
-# ============ 页面：今日待办（增强版） ============
+# ============ 页面：今日待办 ============
 elif page == "📋 今日待办":
     st.markdown("""
     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
     <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · TODO</div>
     <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">今日待办</h2>
-    <div style="color:rgba(255,243,224,.6);font-size:13px;">优先级 · 分类 · 截止日期 · AI智能生成</div>
+    <div style="color:rgba(255,243,224,.6);font-size:13px;">今天要跟进的客户、要发的邮件、要做的事</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -8981,201 +8217,25 @@ elif page == "📋 今日待办":
     else:
         todos = []
     
-    # 向后兼容：给旧数据补全字段
-    for t in todos:
-        t.setdefault("priority", "中")
-        t.setdefault("category", "其他")
-        t.setdefault("due_date", "")
-        t.setdefault("created_at", t.get("date", datetime.now().strftime("%Y-%m-%d")))
-    
-    # ===== 统计概览 =====
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    today_todos = [t for t in todos if t.get("date") == today_str or not t.get("date")]
-    pending = [t for t in todos if not t.get("done")]
-    done = [t for t in todos if t.get("done")]
-    high_pending = [t for t in pending if t.get("priority") == "高"]
-    
-    s1, s2, s3, s4 = st.columns(4)
-    s1.metric("待办总数", len(todos))
-    s2.metric("未完成", len(pending), delta=f"高优先级 {len(high_pending)}")
-    s3.metric("已完成", len(done))
-    completion_rate = f"{len(done)/len(todos)*100:.0f}%" if todos else "0%"
-    s4.metric("完成率", completion_rate)
-    
-    st.markdown("---")
-    
-    # ===== AI智能生成待办 =====
-    with st.expander("🤖 AI智能生成待办", expanded=False):
-        st.caption("根据客户数据和业务节奏，AI自动建议今日待办")
-        ai_todo_prompt = st.text_area("告诉AI你的情况（可选）", height=60, 
-            placeholder="例如：这周有3个德国客户要跟进，还有2个样品要发...",
-            key="ai_todo_prompt")
-        if st.button("✨ AI生成今日待办", use_container_width=True, key="ai_gen_todo"):
-            with st.spinner("AI正在分析并生成待办..."):
-                # 获取客户数据
-                try:
-                    customers = cm.list_customers()
-                    customer_summary = "\n".join([
-                        f"- {c.get('company_name','?')} | {c.get('grade','?')}级 | {c.get('status','?')} | {c.get('country','?')}"
-                        for c in customers[:15]
-                    ])
-                except:
-                    customer_summary = "暂无客户数据"
-                
-                prompt = f"""你是一个外贸业务助理。根据以下信息，生成5-8条今日待办事项：
-
-用户补充说明：{ai_todo_prompt or '无'}
-
-当前客户情况：
-{customer_summary}
-
-请生成今日待办，每条包含：
-- 任务内容（具体可执行）
-- 优先级（高/中/低）
-- 分类（客户跟进/内容创作/订单处理/其他）
-
-格式：每行一条，用 | 分隔：任务内容 | 优先级 | 分类
-只输出待办列表，不要其他解释。"""
-                result = ai.chat(prompt, task_name="AI智能待办生成")
-                
-                # 解析AI生成的待办
-                new_count = 0
-                for line in result.strip().split("\n"):
-                    line = line.strip()
-                    if not line or "|" not in line:
-                        continue
-                    parts = [p.strip() for p in line.split("|")]
-                    if len(parts) >= 2:
-                        task = parts[0].lstrip("0123456789.- ")
-                        priority = parts[1] if parts[1] in ["高","中","低"] else "中"
-                        category = parts[2] if len(parts) >= 3 and parts[2] in ["客户跟进","内容创作","订单处理","其他"] else "其他"
-                        todos.append({
-                            "task": task,
-                            "done": False,
-                            "date": today_str,
-                            "priority": priority,
-                            "category": category,
-                            "due_date": "",
-                            "created_at": today_str
-                        })
-                        new_count += 1
-                
-                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
-                st.success(f"✅ AI已生成 {new_count} 条待办")
-                st.rerun()
-    
-    # ===== 添加待办 =====
-    st.subheader("➕ 添加待办")
-    with st.form("add_todo_form", clear_on_submit=True):
-        c1, c2, c3, c4 = st.columns([3, 1, 1, 1])
-        with c1:
-            new_todo = st.text_input("任务内容", placeholder="例如：跟进德国客户Hans的OEM询价")
-        with c2:
-            new_priority = st.selectbox("优先级", ["高", "中", "低"], index=1)
-        with c3:
-            new_category = st.selectbox("分类", ["客户跟进", "内容创作", "订单处理", "其他"])
-        with c4:
-            new_due = st.date_input("截止日期", value=None)
-        submitted = st.form_submit_button("➕ 添加待办", use_container_width=True)
-    
-    if submitted and new_todo.strip():
-        todos.append({
-            "task": new_todo.strip(),
-            "done": False,
-            "date": today_str,
-            "priority": new_priority,
-            "category": new_category,
-            "due_date": new_due.strftime("%Y-%m-%d") if new_due else "",
-            "created_at": today_str
-        })
+    c1, c2 = st.columns([3,1])
+    with c1:
+        new_todo = st.text_input("添加待办事项", placeholder="例如：跟进德国客户Hans的OEM询价")
+    with c2:
+        if st.button("➕ 添加", use_container_width=True):
+            if new_todo.strip():
+                todos.append({"task": new_todo.strip(), "done": False, "date": datetime.now().strftime("%Y-%m-%d")})
         todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
         st.rerun()
     
     st.markdown("---")
-    
-    # ===== 筛选 =====
-    f1, f2, f3 = st.columns(3)
-    with f1:
-        filter_status = st.selectbox("状态筛选", ["全部", "未完成", "已完成"], key="todo_filter_status")
-    with f2:
-        filter_priority = st.selectbox("优先级筛选", ["全部", "高", "中", "低"], key="todo_filter_priority")
-    with f3:
-        filter_category = st.selectbox("分类筛选", ["全部", "客户跟进", "内容创作", "订单处理", "其他"], key="todo_filter_category")
-    
-    # 应用筛选
-    filtered = todos
-    if filter_status == "未完成":
-        filtered = [t for t in filtered if not t.get("done")]
-    elif filter_status == "已完成":
-        filtered = [t for t in filtered if t.get("done")]
-    if filter_priority != "全部":
-        filtered = [t for t in filtered if t.get("priority") == filter_priority]
-    if filter_category != "全部":
-        filtered = [t for t in filtered if t.get("category") == filter_category]
-    
-    # 排序：未完成在前，高优先级在前
-    priority_order = {"高": 0, "中": 1, "低": 2}
-    filtered.sort(key=lambda x: (x.get("done", False), priority_order.get(x.get("priority", "中"), 1)))
-    
-    st.markdown(f"##### 📋 待办列表（{len(filtered)}条）")
-    
-    # ===== 待办列表 =====
     _changed = False
-    if not filtered:
-        st.info("暂无待办事项，添加一条或让AI帮你生成吧！")
-    else:
-        for i, t in enumerate(filtered):
-            # 找到原始索引
-            orig_idx = todos.index(t)
-            priority_color = {"高": "🔴", "中": "🟡", "低": "🟢"}.get(t.get("priority", "中"), "⚪")
-            category_icon = {"客户跟进": "👥", "内容创作": "✍️", "订单处理": "📦", "其他": "📌"}.get(t.get("category", "其他"), "📌")
-            
-            col_cb, col_task, col_meta, col_del = st.columns([1, 5, 3, 1])
-            with col_cb:
-                cb = st.checkbox("", value=t.get("done", False), key=f"todo_cb_{orig_idx}")
-                if cb != t.get("done"):
-                    todos[orig_idx]["done"] = cb
-                    _changed = True
-            with col_task:
-                if t.get("done"):
-                    st.markdown(f"~~{t['task']}~~")
-                else:
-                    st.markdown(f"**{t['task']}**")
-            with col_meta:
-                meta_parts = [f"{priority_color}{t.get('priority','中')}", f"{category_icon}{t.get('category','其他')}"]
-                if t.get("due_date"):
-                    meta_parts.append(f"📅{t['due_date']}")
-                st.caption(" · ".join(meta_parts))
-            with col_del:
-                if st.button("🗑", key=f"todo_del_{orig_idx}", help="删除"):
-                    todos.pop(orig_idx)
-                    _changed = True
-                    st.rerun()
-    
+    for i, t in enumerate(todos):
+        cb = st.checkbox(t["task"], value=t["done"], key=f"todo_{i}")
+        if cb != t["done"]:
+            todos[i]["done"] = cb
+            _changed = True
     if _changed:
         todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
-    
-    # ===== 批量操作 =====
-    if todos:
-        st.markdown("---")
-        b1, b2, b3 = st.columns(3)
-        with b1:
-            if st.button("✅ 全部标记完成", use_container_width=True):
-                for t in todos:
-                    t["done"] = True
-                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
-                st.rerun()
-        with b2:
-            if st.button("🧹 清除已完成", use_container_width=True):
-                todos = [t for t in todos if not t.get("done")]
-                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
-                st.rerun()
-        with b3:
-            if st.button("🗑 清空全部", use_container_width=True):
-                if two_step_delete("确认清空", "clear_all_todos", "将删除所有待办，不可恢复") == "yes":
-                    todos = []
-                    todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
-                    st.rerun()
     
 # ============ 页面：订单台账 ============
 elif page == "🌍 海外社媒矩阵":

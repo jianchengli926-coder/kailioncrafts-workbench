@@ -335,16 +335,26 @@ ALL_PROVIDERS = {
         "signup_url": "https://dashscope.console.aliyun.com/apiKey",
     },
     "zhipu": {
-        "name": "智谱清言（GLM）",
+        "name": "智谱GLM（免费模型）",
         "base_url": "https://open.bigmodel.cn/api/paas/v4",
         "models": [
-            {"name": "glm-4-plus", "desc": "GLM-4 Plus（旗舰）"},
-            {"name": "glm-4", "desc": "GLM-4"},
-            {"name": "glm-4-air", "desc": "GLM-4 Air（轻量高速）"},
-            {"name": "glm-4-flash", "desc": "GLM-4 Flash（免费/极快）"},
-            {"name": "glm-4v", "desc": "GLM-4V（视觉理解）"},
+            {"name": "glm-4.7-flash", "desc": "GLM-4.7 Flash（深度思考/复杂推理，免费）"},
+            {"name": "glm-4-flash", "desc": "GLM-4 Flash（文本生成/多轮对话，免费）"},
+            {"name": "glm-4.6v-flash", "desc": "GLM-4.6V Flash（视觉理解/多模态，免费）"},
+            {"name": "cogview-3-flash", "desc": "CogView-3 Flash（图像生成，免费）"},
         ],
         "signup_url": "https://open.bigmodel.cn/usercenter/apikeys",
+    },
+    "siliconflow": {
+        "name": "硅基流动（SiliconFlow）",
+        "base_url": "https://api.siliconflow.cn/v1",
+        "models": [
+            {"name": "XingChenAGI/Xing4.0-29B", "desc": "星尘Xing4.0-29B（电信/29B MoE/免费/256K）"},
+            {"name": "deepseek-ai/DeepSeek-V4-Flash", "desc": "DeepSeek V4 Flash（免费）"},
+            {"name": "Qwen/Qwen2.5-72B-Instruct", "desc": "Qwen2.5 72B（免费）"},
+            {"name": "meta-llama/Llama-3.3-70B-Instruct", "desc": "Llama 3.3 70B（免费）"},
+        ],
+        "signup_url": "https://cloud.siliconflow.cn/account/ak",
     },
     "ernie": {
         "name": "文心一言（百度）",

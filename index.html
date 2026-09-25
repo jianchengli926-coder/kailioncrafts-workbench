@@ -1844,6 +1844,7 @@ function filterCustomersByTag(tagLabel){
   }
   renderView();
   initNotifications();
+  initShortcuts();
 }
 
 /* V48 获取标签统计 */
@@ -2477,6 +2478,131 @@ function getGradeBar(grade, count, total){
       </div>
     </div>
   `;
+}
+
+
+
+/* V59 工作台快捷键支持 */
+const SHORTCUTS = [
+  {keys:'g d', desc:'数据看板', action:()=>go('dashboard')},
+  {keys:'g c', desc:'客户列表', action:()=>go('customers')},
+  {keys:'g e', desc:'开发信', action:()=>go('drafts')},
+  {keys:'g s', desc:'跟进日程', action:()=>go('schedule')},
+  {keys:'g p', desc:'产品管理', action:()=>go('products')},
+  {keys:'g k', desc:'知识库', action:()=>go('knowledge')},
+  {keys:'g t', desc:'工具箱', action:()=>go('tools')},
+  {keys:'g r', desc:'业绩战报', action:()=>go('reports')},
+  {keys:'g a', desc:'操作日志', action:()=>go('activity')},
+  {keys:'g i', desc:'询盘管理', action:()=>go('inquiry')},
+  {keys:'g o', desc:'订单管理', action:()=>go('orders')},
+  {keys:'/', desc:'搜索客户', action:()=>{go('customers');setTimeout(()=>{const input=document.querySelector('input[placeholder*="搜索"]');if(input)input.focus();},300);}},
+  {keys:'n', desc:'新建客户', action:()=>toast('新建客户（请在客户列表点击新增）')},
+  {keys:'?', desc:'显示快捷键帮助', action:()=>showShortcutHelp()},
+  {keys:'Escape', desc:'关闭弹窗/抽屉', action:()=>{closeModal();closeDrawer();}},
+];
+
+let shortcutBuffer = '';
+let shortcutTimer = null;
+
+function initShortcuts(){
+  document.addEventListener('keydown', function(e){
+    // 不在输入框中触发单键快捷键
+    const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
+    
+    // Escape 总是生效
+    if(e.key === 'Escape'){
+      closeModal();
+      closeDrawer();
+      return;
+    }
+    
+    // ? 显示帮助
+    if(e.key === '?' && !isInput){
+      e.preventDefault();
+      showShortcutHelp();
+      return;
+    }
+    
+    // 输入框中不触发其他快捷键
+    if(isInput) return;
+    
+    // g + 字母 导航快捷键
+    if(e.key === 'g'){
+      shortcutBuffer = 'g';
+      clearTimeout(shortcutTimer);
+      shortcutTimer = setTimeout(()=>{shortcutBuffer='';}, 1000);
+      return;
+    }
+    
+    if(shortcutBuffer === 'g' && /^[a-z]$/i.test(e.key)){
+      e.preventDefault();
+      const key = 'g ' + e.key.toLowerCase();
+      const shortcut = SHORTCUTS.find(s=>s.keys===key);
+      if(shortcut){
+        shortcut.action();
+        toast(`快捷键: ${shortcut.desc}`);
+      }
+      shortcutBuffer = '';
+      clearTimeout(shortcutTimer);
+      return;
+    }
+    
+    // 单键快捷键
+    const singleKey = e.key.toLowerCase();
+    const shortcut = SHORTCUTS.find(s=>s.keys===singleKey && s.keys.length===1);
+    if(shortcut && !isInput){
+      e.preventDefault();
+      shortcut.action();
+    }
+  });
+}
+
+function showShortcutHelp(){
+  const navShortcuts = SHORTCUTS.filter(s=>s.keys.startsWith('g '));
+  const otherShortcuts = SHORTCUTS.filter(s=>!s.keys.startsWith('g ') && s.keys !== 'Escape');
+  openModal(`
+    <div class="modal-head">
+      <h3>⌨️ 键盘快捷键</h3>
+      <span class="modal-close" onclick="closeModal()">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="card card-pad mb16" style="background:#f0f4f8">
+        <div class="card-title">🧭 页面导航（按 g 然后按对应字母）</div>
+        <div class="grid-3" style="gap:8px;margin-top:8px">
+          ${navShortcuts.map(s=>`
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fff;border-radius:6px">
+              <kbd style="background:#1a365d;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;font-family:monospace">g</kbd>
+              <span style="color:#cbd5e0">+</span>
+              <kbd style="background:#1a365d;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;font-family:monospace">${s.keys.split(' ')[1]}</kbd>
+              <span class="text-sm">${s.desc}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="card card-pad">
+        <div class="card-title">⚡ 常用操作</div>
+        <div class="grid-2" style="gap:8px;margin-top:8px">
+          ${otherShortcuts.map(s=>`
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f7f9fc;border-radius:6px">
+              <kbd style="background:#2d3748;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;font-family:monospace;min-width:40px;text-align:center">${s.keys === '/' ? '/' : s.keys.toUpperCase()}</kbd>
+              <span class="text-sm">${s.desc}</span>
+            </div>
+          `).join('')}
+          <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f7f9fc;border-radius:6px">
+            <kbd style="background:#2d3748;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;font-family:monospace;min-width:60px;text-align:center">Esc</kbd>
+            <span class="text-sm">关闭弹窗/抽屉</span>
+          </div>
+        </div>
+      </div>
+      <div class="text-sm text-muted mt16" style="text-align:center">
+        💡 提示：按 <b>g</b> 键进入导航模式，然后按对应字母快速跳转页面<br>
+        按 <b>?</b> 键随时显示此帮助页面
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" onclick="closeModal()">知道了</button>
+    </div>
+  `);
 }
 
 function renderView(){
@@ -5102,6 +5228,7 @@ function viewSettings(root){
           <div class="btn-row">
             <button class="btn btn-outline" onclick="exportData()">导出全部数据 (JSON)</button>
         <button class="btn btn-outline" onclick="requestNotificationPermission()">🔔 开启桌面通知</button>
+        <button class="btn btn-outline" onclick="showShortcutHelp()">⌨️ 快捷键</button>
             <button class="btn btn-outline" onclick="toast('请选择 JSON 文件导入')">导入数据</button>
             <button class="btn btn-danger" onclick="resetData()">重置演示数据</button>
           </div>

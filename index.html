@@ -1267,6 +1267,16 @@ function getMonthApiCost(){
   return Math.round(S.apiLogs.filter(l=>l.time&&l.time.slice(0,7)===ym).reduce((a,l)=>a+(l.cost||0),0)*100)/100;
 }
 /* V42 模型故障转移：按优先级排序，在线模型优先，本地模型兜底 */
+/* V73 模型失败缓存 - 避免重复等待超时（5分钟内失败的模型自动跳过） */
+const modelFailCache = new Map();
+const FAIL_CACHE_TTL = 5 * 60 * 1000;
+function markModelFailed(cfgId, error){ modelFailCache.set(cfgId, {time: Date.now(), error: error||'unknown'}); }
+function isModelRecentlyFailed(cfgId){
+  const cached = modelFailCache.get(cfgId);
+  if(!cached) return false;
+  if(Date.now() - cached.time > FAIL_CACHE_TTL){ modelFailCache.delete(cfgId); return false; }
+  return true;
+}
 function getFallbackChain(opts={}){
   const cfgs = (S.apis||[]).filter(a=>a.enabled && a.caps && (a.caps.assistant||a.caps.lead||a.caps.draft));
   if(!cfgs.length) return [];
@@ -1305,13 +1315,20 @@ async function callAI(messages, opts={}){
   const errors = [];
   for(let i=0;i<chain.length;i++){
     const cfg = chain[i];
+    // V73 跳过最近5分钟内失败过的模型（本地模型除外，本地模型总是最后兜底）
+    if(cfg.type!=='ollama' && isModelRecentlyFailed(cfg.id)){
+      errors.push(cfg.name+': 近期失败已跳过(5分钟缓存)');
+      continue;
+    }
     if(spent>=budget && cfg.type!=='ollama'){
       errors.push(cfg.name+': 预算已用完');
       continue;
     }
     try{
       const controller = new AbortController();
-      const timeoutId = setTimeout(()=>controller.abort(), 45000);
+      // V73 差异化超时：Gemini网络不稳定用15秒快速失败，其他模型用30秒
+      const timeoutMs = cfg.type==='gemini' ? 15000 : 30000;
+      const timeoutId = setTimeout(()=>controller.abort(), timeoutMs);
       let r, j;
       if(cfg.type==='gemini'){
         // Gemini API格式适配
@@ -1353,6 +1370,8 @@ async function callAI(messages, opts={}){
     }catch(e){
       errors.push(cfg.name+': '+e.message);
       logApiCall(cfg.model,opts.purpose||'general',0,0,0,'error');
+      // V73 记录失败缓存（本地模型不记录，因为本地模型总是最后兜底）
+      if(cfg.type!=='ollama') markModelFailed(cfg.id, e.message);
       continue;
     }
   }

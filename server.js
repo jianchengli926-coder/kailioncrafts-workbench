@@ -114,7 +114,7 @@ async function checkOnlineAPI(name, url) {
       port: parsedUrl.port || 443,
       path: parsedUrl.pathname + parsedUrl.search,
       method: 'GET',
-      timeout: 5000,
+      timeout: 3000,  // V73 缩短到3秒，避免Gemini网络超时拖慢健康检查
       headers: { 'Content-Type': 'application/json' }
     };
     const req = https.request(options, (res) => {

@@ -5834,6 +5834,71 @@ function viewTools(root){
     </div>
   </div>
   
+  <!-- V39 产品库管理面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #38a169;background:linear-gradient(135deg,#f0fff4,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📚 产品库管理（6大分类 · 成本/包装/MOQ/HS编码 · 一键填充报价）</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="badge" style="background:#38a169;color:#fff">新功能 V39</span>
+        <button class="btn" style="background:#38a169;color:#fff;font-size:12px;padding:4px 12px" onclick="openProductForm()">➕ 新增产品</button>
+      </div>
+    </div>
+    <p class="text-sm text-muted mb12">保存常用产品信息，报价时一键填充，与报价计算器和订单管理紧密配合，避免重复输入</p>
+    
+    <!-- 产品统计和分类筛选 -->
+    ${(() => {
+      const products = S.products || [];
+      const totalCost = products.reduce((sum,p)=>sum+Number(p.cost||0),0);
+      return `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <span class="badge" style="background:#38a169;color:#fff">产品总数: ${products.length}</span>
+        <span class="badge" style="background:#ebf8ff;color:#3182ce">平均成本: ¥${products.length?(totalCost/products.length).toFixed(2):'0.00'}</span>
+        ${PRODUCT_CATEGORIES.map(c=>{
+          const count = products.filter(p=>p.category===c.id).length;
+          return count>0?`<span class="badge" style="background:${c.color}15;color:${c.color};border:1px solid ${c.color}30">${c.label}: ${count}</span>`:'';
+        }).join('')}
+      </div>`;
+    })()}
+    
+    <!-- 产品列表 -->
+    <div>
+      ${(S.products && S.products.length) ? `
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
+          ${S.products.map(p=>{
+            const cat = PRODUCT_CATEGORIES.find(c=>c.id===p.category) || PRODUCT_CATEGORIES[5];
+            return `<div style="padding:12px;background:#fff;border-radius:8px;border:1px solid #e2e8f0;border-top:3px solid ${cat.color}">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+                <div style="flex:1">
+                  <b style="font-size:13px">${p.name}</b>
+                  ${p.model?`<div class="text-xs text-muted">型号: ${p.model}</div>`:''}
+                </div>
+                <span class="badge" style="background:${cat.color}15;color:${cat.color};font-size:10px;padding:2px 6px">${cat.label}</span>
+              </div>
+              <div style="font-size:11px;color:#666;line-height:1.6;margin-bottom:8px">
+                ${p.material?`<div>材质: ${p.material}</div>`:''}
+                ${p.spec?`<div>规格: ${p.spec}</div>`:''}
+                ${p.cost?`<div>成本: <b style="color:#e53e3e">¥${Number(p.cost).toFixed(2)}</b>${p.packaging?' + 包装 ¥'+Number(p.packaging).toFixed(2):''}</div>`:''}
+                ${p.moq?`<div>MOQ: ${p.moq} pcs</div>`:''}
+                ${p.hsCode?`<div>HS编码: ${p.hsCode}</div>`:''}
+              </div>
+              ${p.desc?`<div class="text-xs text-muted" style="background:#f8f9fa;padding:6px;border-radius:4px;margin-bottom:8px">${p.desc}</div>`:''}
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-outline" style="font-size:11px;padding:4px 8px;flex:1;background:#f0fff4;color:#38a169;border-color:#9ae6b4" onclick="fillProductToQuote('${p.id}')">💰 填充报价</button>
+                <button class="btn btn-outline" style="font-size:11px;padding:4px 8px" onclick="openProductForm('${p.id}')">✏️ 编辑</button>
+                <button class="btn btn-outline" style="font-size:11px;padding:4px 8px;color:#e53e3e" onclick="if(confirm('确定删除此产品？')){deleteProduct('${p.id}');viewTools(document.getElementById('mainContent'));toast('产品已删除')}">🗑️</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      ` : `
+        <div style="text-align:center;padding:40px;color:#999">
+          <div style="font-size:40px;margin-bottom:8px">📚</div>
+          <div>产品库为空，点击「➕ 新增产品」开始管理产品</div>
+          <div class="text-xs text-muted" style="margin-top:8px">添加产品后，报价时可一键填充产品信息和成本</div>
+        </div>
+      `}
+    </div>
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -7059,6 +7124,127 @@ function saveLogistics(orderId){
   closeModal();
   toast('✅ 物流信息已保存');
   setTimeout(()=>viewOrderDetail(orderId),300);
+}
+
+/* V39 产品库管理 */
+const PRODUCT_CATEGORIES = [
+  {id:'scissors',label:'✂️ 厨房剪刀',color:'#3182ce'},
+  {id:'knife',label:'🔪 厨师刀/刀具',color:'#e53e3e'},
+  {id:'beauty',label:'💅 美容工具',color:'#805ad5'},
+  {id:'bbq',label:'🔥 BBQ工具',color:'#dd6b20'},
+  {id:'garden',label:'🌿 园林工具',color:'#38a169'},
+  {id:'other',label:'📦 其他',color:'#718096'}
+];
+
+/* 初始化产品数据 */
+if(!S.products) S.products = [];
+
+/* 添加产品 */
+function addProduct(product){
+  if(!S.products) S.products = [];
+  product.id = product.id || uid();
+  product.createdAt = product.createdAt || Date.now();
+  S.products.unshift(product);
+  DB.save('products', S.products);
+  return product;
+}
+
+/* 更新产品 */
+function updateProduct(id, updates){
+  const idx = S.products.findIndex(p=>p.id===id);
+  if(idx>=0){
+    S.products[idx] = {...S.products[idx], ...updates};
+    DB.save('products', S.products);
+    return S.products[idx];
+  }
+  return null;
+}
+
+/* 删除产品 */
+function deleteProduct(id){
+  S.products = S.products.filter(p=>p.id!==id);
+  DB.save('products', S.products);
+}
+
+/* 打开新增/编辑产品弹窗 */
+function openProductForm(editId){
+  const product = editId ? S.products.find(p=>p.id===editId) : null;
+  openModal(`
+    <div class="modal-head"><h3>${product?'✏️ 编辑产品':'➕ 新增产品'}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div style="display:flex;gap:8px" class="mb8">
+        <div style="flex:1"><label class="text-xs text-muted">产品名称 *</label><input id="pName" class="form-control" value="${product?product.name:''}" placeholder="如：8.5寸厨房剪刀"></div>
+        <div style="width:120px"><label class="text-xs text-muted">型号</label><input id="pModel" class="form-control" value="${product?product.model:''}" placeholder="KS-001"></div>
+      </div>
+      <div class="mb8"><label class="text-xs text-muted">产品分类</label><select id="pCategory" class="form-control">
+        ${PRODUCT_CATEGORIES.map(c=>`<option value="${c.id}" ${product&&product.category===c.id?'selected':''}>${c.label}</option>`).join('')}
+      </select></div>
+      <div style="display:flex;gap:8px" class="mb8">
+        <div style="flex:1"><label class="text-xs text-muted">材质</label><input id="pMaterial" class="form-control" value="${product?product.material:''}" placeholder="3Cr13不锈钢"></div>
+        <div style="flex:1"><label class="text-xs text-muted">规格</label><input id="pSpec" class="form-control" value="${product?product.spec:''}" placeholder="8.5寸/21.5cm"></div>
+      </div>
+      <div style="display:flex;gap:8px" class="mb8">
+        <div style="flex:1"><label class="text-xs text-muted">单位成本(¥)</label><input id="pCost" class="form-control" type="number" step="0.01" value="${product?product.cost:''}" placeholder="5.50"></div>
+        <div style="flex:1"><label class="text-xs text-muted">包装成本(¥)</label><input id="pPackaging" class="form-control" type="number" step="0.01" value="${product?product.packaging:''}" placeholder="0.80"></div>
+      </div>
+      <div style="display:flex;gap:8px" class="mb8">
+        <div style="flex:1"><label class="text-xs text-muted">MOQ起订量</label><input id="pMoq" class="form-control" type="number" value="${product?product.moq:1000}" placeholder="1000"></div>
+        <div style="flex:1"><label class="text-xs text-muted">HS编码</label><input id="pHsCode" class="form-control" value="${product?product.hsCode:''}" placeholder="82130000"></div>
+      </div>
+      <div class="mb8"><label class="text-xs text-muted">产品图片URL</label><input id="pImage" class="form-control" value="${product?product.image:''}" placeholder="https://..."></div>
+      <div class="mb8"><label class="text-xs text-muted">产品描述/卖点</label><textarea id="pDesc" class="form-control" rows="2" placeholder="产品特点、卖点、认证等...">${product?product.desc:''}</textarea></div>
+      <div class="flex gap8">
+        <button class="btn" style="background:#3182ce;color:#fff" onclick="saveProduct('${editId||''}')">💾 保存产品</button>
+        <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      </div>
+    </div>
+  `);
+}
+
+/* 保存产品 */
+function saveProduct(editId){
+  const name = document.getElementById('pName').value.trim();
+  if(!name){ toast('请填写产品名称'); return; }
+  const data = {
+    name: name,
+    model: document.getElementById('pModel').value,
+    category: document.getElementById('pCategory').value,
+    material: document.getElementById('pMaterial').value,
+    spec: document.getElementById('pSpec').value,
+    cost: document.getElementById('pCost').value,
+    packaging: document.getElementById('pPackaging').value,
+    moq: document.getElementById('pMoq').value,
+    hsCode: document.getElementById('pHsCode').value,
+    image: document.getElementById('pImage').value,
+    desc: document.getElementById('pDesc').value
+  };
+  if(editId){
+    updateProduct(editId, data);
+    toast('✅ 产品已更新');
+  } else {
+    addProduct(data);
+    toast('✅ 产品已添加');
+  }
+  closeModal();
+  viewTools(document.getElementById('mainContent'));
+}
+
+/* 产品填充到报价计算器 */
+function fillProductToQuote(productId){
+  const product = S.products.find(p=>p.id===productId);
+  if(!product) return;
+  // 滚动到报价计算器并填充
+  document.getElementById('qProductName').value = product.name;
+  document.getElementById('qModel').value = product.model;
+  document.getElementById('qMaterial').value = product.material;
+  document.getElementById('qSpec').value = product.spec;
+  if(product.cost) document.getElementById('qProductCost').value = product.cost;
+  if(product.packaging) document.getElementById('qPackagingCost').value = product.packaging;
+  if(product.moq) document.getElementById('qQuantity').value = product.moq;
+  toast('✅ 已填充产品信息到报价计算器');
+  // 滚动到报价计算器
+  const quotePanel = document.querySelector('[onclick*="runCalculate"]')?.closest('.card');
+  if(quotePanel) quotePanel.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 /* V20 端到端获客流水线 */

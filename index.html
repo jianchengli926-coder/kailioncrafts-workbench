@@ -1247,6 +1247,63 @@ async function callAI(messages, opts={}){
   }
 }
 function aiUsage(u){ return u&&u.total_tokens?`消耗 tokens: prompt ${u.prompt_tokens||'?'} + completion ${u.completion_tokens||'?'} = ${u.total_tokens}`:''; }
+
+/* V31 AI图像生成 - 支持智谱CogView-3-Flash */
+async function callAIImage(prompt, opts={}){
+  opts = opts||{};
+  let cfgs = (S.apis||[]).filter(a=>a.enabled && a.model && a.model.toLowerCase().includes('cogview'));
+  if(!cfgs.length){
+    const zhipuCfgs = (S.apis||[]).filter(a=>a.enabled && a.type==='zhipu');
+    if(!zhipuCfgs.length) return {images:[], error:'未启用图像生成模型，请在设置中启用CogView-3-Flash', mock:true};
+    cfgs = [{...zhipuCfgs[0], model:'cogview-3-flash'}];
+  }
+  let cfg = cfgs[0];
+  if(opts.modelConfigId) cfg = cfgs.find(a=>a.id===opts.modelConfigId)||cfg;
+  const t0 = performance.now();
+  try{
+    const headers = {'Content-Type':'application/json'};
+    if(cfg.type!=='ollama' || b64dec(cfg.apiKey)) headers['Authorization']='Bearer '+b64dec(cfg.apiKey);
+    const size = opts.size || '1024x1024';
+    const n = opts.n || 1;
+    const body = { model: cfg.model, prompt: prompt, size: size, n: n, response_format: 'url' };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=>controller.abort(), 120000);
+    const base = cfg.baseURL.replace(/\s+$/,'').replace(/\/$/,'');
+    const r = await fetch(base+'/images/generations',{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+    clearTimeout(timeoutId);
+    if(!r.ok){ const txt = await r.text(); return {images:[],error:'HTTP '+r.status+' '+txt.slice(0,300),model:cfg.model}; }
+    const j = await r.json();
+    const images = (j.data||[]).map(d=>d.url||d.b64_json).filter(Boolean);
+    const latency = Math.round(performance.now()-t0);
+    if(!S.imageHistory) S.imageHistory = [];
+    S.imageHistory.unshift({id:uid(),prompt:prompt,size:size,images:images,t:Date.now(),model:cfg.model,latency:latency});
+    if(S.imageHistory.length>50) S.imageHistory = S.imageHistory.slice(0,50);
+    DB.save('imageHistory', S.imageHistory);
+    logApiCall(cfg.model,'image_gen',prompt.length,0,0,'success');
+    return {images:images, model:cfg.model, latency:latency, error:null};
+  }catch(e){
+    return {images:[],error:'网络/CORS错误: '+e.message, model:cfg.model};
+  }
+}
+
+/* AI生图场景模板 */
+const IMAGE_TEMPLATES = [
+  {id:'product',icon:'🔪',label:'产品效果图',desc:'五金刀剪/厨房工具产品渲染图',prompt:'Professional product photography of {product}, studio lighting, white background, high detail, commercial quality, 4k'},
+  {id:'lifestyle',icon:'🏠',label:'生活场景图',desc:'产品在真实使用场景中的展示',prompt:'Lifestyle photo of {product} being used in a modern kitchen, warm lighting, professional food photography style, high resolution'},
+  {id:'social',icon:'📱',label:'社媒营销图',desc:'LinkedIn/Facebook/Instagram推广配图',prompt:'Eye-catching social media marketing image for {product}, bold typography space, modern design, vibrant colors, professional advertising style'},
+  {id:'email',icon:'✉️',label:'开发信配图',desc:'外贸开发信中的产品展示图',prompt:'Clean professional product showcase image of {product}, elegant composition, soft shadows, suitable for email marketing, white background'},
+  {id:'exhibition',icon:'🎪',label:'展会海报',desc:'展会宣传海报/横幅设计',prompt:'Trade show exhibition banner design for {product}, professional corporate style, company branding space, modern layout, high impact visual'},
+  {id:'catalog',icon:'📖',label:'产品目录图',desc:'产品目录/画册内页配图',prompt:'Product catalog page layout for {product}, clean minimalist design, professional industrial photography, grid composition, print ready'},
+  {id:'gift',icon:'🎁',label:'礼品套装图',desc:'礼品套装/组合产品展示',prompt:'Premium gift set photography of {product}, elegant packaging, luxury presentation, dark background, studio lighting, commercial quality'},
+  {id:'custom',icon:'✨',label:'自定义',desc:'自由输入提示词',prompt:''}
+];
+
+const IMAGE_SIZES = [
+  {id:'1024x1024',label:'1:1 方形 (1024×1024)'},
+  {id:'1024x1792',label:'9:16 竖版 (1024×1792)'},
+  {id:'1792x1024',label:'16:9 横版 (1792×1024)'}
+];
+
 function seedExtra(){
   if(!S.apis || !S.apis.length) S.apis = defaultApis();
   if(!S.prompts) S.prompts = defaultPrompts();
@@ -1414,7 +1471,7 @@ function renderView(){
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, devplans:viewDevPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
-    seo:viewSEO, reports:viewReports, agents:viewAgents, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, settings:viewSettings};
+    seo:viewSEO, reports:viewReports, agents:viewAgents, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
@@ -5077,7 +5134,7 @@ function runWf(){
   next();
 }
 
-/* V18 外贸工具箱 */
+/* V18 外贸工具箱 + V31 AI生图 */
 function viewTools(root){
   const cats=[
     ['🔍 找客户',['Apollo.io','Hunter.io','Snov.io','ZoomInfo']],
@@ -5095,8 +5152,71 @@ function viewTools(root){
     ['🎬 视频制作',['Canva','CapCut']],
     ['📸 图片处理',['Canva','Remove.bg','TinyPNG']]
   ];
+  const history = S.imageHistory || [];
   root.innerHTML=`
   <div class="page-head"><h2>🧰 外贸工具箱</h2><p class="sub">14类·100+工具·找客户/写开发信/查海关/做图片</p></div>
+  
+  <!-- V31 AI生图面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #c9a961;background:linear-gradient(135deg,#fefcf7,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🎨 AI 智能生图（CogView-3-Flash · 免费）</span>
+      <span class="badge badge-gold">新功能 V31</span>
+    </div>
+    <p class="text-sm text-muted mb12">一键生成产品效果图/营销配图/社媒图/展会海报，8大外贸场景模板</p>
+    
+    <!-- 场景模板选择 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">选择场景模板：</div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        ${IMAGE_TEMPLATES.map(t=>`<span id="imgtpl-${t.id}" class="badge" style="cursor:pointer;padding:6px 12px;font-size:12px;${t.id==='product'?'background:#1a365d;color:#fff':'background:#f0f4f8;color:#333'}" onclick="selectImgTemplate('${t.id}')">${t.icon} ${t.label}</span>`).join('')}
+      </div>
+    </div>
+    
+    <!-- 产品关键词输入 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">产品/主题关键词（模板中会自动替换）：</div>
+      <input id="imgProduct" class="form-control" placeholder="例如：stainless steel kitchen scissors, kitchen knife set, BBQ tools..." value="stainless steel kitchen scissors">
+    </div>
+    
+    <!-- 提示词编辑 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">提示词（可手动编辑优化）：</div>
+      <textarea id="imgPrompt" class="form-control" rows="3" style="font-family:monospace;font-size:12px">Professional product photography of stainless steel kitchen scissors, studio lighting, white background, high detail, commercial quality, 4k</textarea>
+    </div>
+    
+    <!-- 尺寸选择 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">图片尺寸：</div>
+      <div class="flex gap8">
+        ${IMAGE_SIZES.map((s,i)=>`<label style="cursor:pointer;font-size:12px"><input type="radio" name="imgSize" value="${s.id}" ${i===0?'checked':''}> ${s.label}</label>`).join('')}
+      </div>
+    </div>
+    
+    <!-- 生成按钮 -->
+    <div class="flex gap8 items-center">
+      <button id="imgGenBtn" class="btn btn-gold" onclick="runImageGen()">🎨 生成图片</button>
+      <span id="imgGenStatus" class="text-sm text-muted"></span>
+    </div>
+    
+    <!-- 生成结果 -->
+    <div id="imgResult" class="mt16" style="display:none">
+      <div class="text-xs text-muted mb6">生成结果（点击图片可在新标签打开）：</div>
+      <div id="imgResultGrid" class="grid-3"></div>
+    </div>
+    
+    <!-- 历史记录 -->
+    ${history.length ? `
+    <div class="mt16">
+      <div class="text-xs text-muted mb6" style="display:flex;justify-content:space-between">
+        <span>📜 历史记录（最近${Math.min(history.length,12)}条）</span>
+        <span style="cursor:pointer;color:#c9a961" onclick="clearImgHistory()">清空</span>
+      </div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        ${history.slice(0,12).map(h=>h.images&&h.images[0]?`<div style="width:80px;height:80px;border-radius:6px;overflow:hidden;cursor:pointer;border:1px solid #e2e8f0" title="${h.prompt.slice(0,50)}" onclick="window.open('${h.images[0]}','_blank')"><img src="${h.images[0]}" style="width:100%;height:100%;object-fit:cover"></div>`:'').join('')}
+      </div>
+    </div>` : ''}
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -5104,6 +5224,68 @@ function viewTools(root){
         ${c[1].map(t=>`<span class="badge badge-blue" style="cursor:pointer" onclick="toast('打开 ${t}（演示）')">${t}</span>`).join('')}
       </div></div>`).join('')}
   </div>`;
+}
+
+/* AI生图 - 选择模板 */
+function selectImgTemplate(id){
+  const tpl = IMAGE_TEMPLATES.find(t=>t.id===id);
+  if(!tpl) return;
+  // 更新选中样式
+  IMAGE_TEMPLATES.forEach(t=>{
+    const el = document.getElementById('imgtpl-'+t.id);
+    if(el) el.style.cssText = `cursor:pointer;padding:6px 12px;font-size:12px;${t.id===id?'background:#1a365d;color:#fff':'background:#f0f4f8;color:#333'}`;
+  });
+  // 更新提示词
+  const product = document.getElementById('imgProduct').value || 'product';
+  const promptEl = document.getElementById('imgPrompt');
+  if(tpl.prompt){
+    promptEl.value = tpl.prompt.replace('{product}', product);
+  } else {
+    promptEl.value = '';
+    promptEl.focus();
+  }
+}
+
+/* AI生图 - 执行生成 */
+async function runImageGen(){
+  const prompt = document.getElementById('imgPrompt').value.trim();
+  if(!prompt){ toast('请输入提示词'); return; }
+  const sizeEl = document.querySelector('input[name="imgSize"]:checked');
+  const size = sizeEl ? sizeEl.value : '1024x1024';
+  const btn = document.getElementById('imgGenBtn');
+  const status = document.getElementById('imgGenStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ 生成中...';
+  status.textContent = '正在调用CogView-3-Flash，约10-30秒...';
+  const result = await callAIImage(prompt, {size:size});
+  btn.disabled = false;
+  btn.textContent = '🎨 生成图片';
+  if(result.error){
+    status.innerHTML = '<span style="color:#e53e3e">❌ '+result.error+'</span>';
+    return;
+  }
+  status.innerHTML = `<span style="color:#38a169">✅ 生成成功！${result.images.length}张 · ${result.latency}ms · ${result.model}</span>`;
+  const resultDiv = document.getElementById('imgResult');
+  const grid = document.getElementById('imgResultGrid');
+  resultDiv.style.display = 'block';
+  grid.innerHTML = result.images.map((url,i)=>`
+    <div style="border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;background:#f8f9fa">
+      <img src="${url}" style="width:100%;cursor:pointer" onclick="window.open('${url}','_blank')" alt="生成图片${i+1}">
+      <div style="padding:6px;text-align:center">
+        <a href="${url}" download="ai-image-${Date.now()}-${i}.png" style="font-size:11px;color:#c9a961;text-decoration:none">⬇ 下载</a>
+      </div>
+    </div>`).join('');
+  // 刷新历史记录
+  setTimeout(()=>viewTools(document.getElementById('mainContent')), 500);
+}
+
+/* 清空生图历史 */
+function clearImgHistory(){
+  if(!confirm('确定清空所有AI生图历史记录？')) return;
+  S.imageHistory = [];
+  DB.save('imageHistory', S.imageHistory);
+  viewTools(document.getElementById('mainContent'));
+  toast('已清空生图历史');
 }
 
 /* V20 端到端获客流水线 */

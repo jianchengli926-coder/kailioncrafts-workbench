@@ -5899,6 +5899,88 @@ function viewTools(root){
     </div>
   </div>
   
+  <!-- V40 数据导出与备份中心面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #d69e2e;background:linear-gradient(135deg,#fffbeb,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>💾 数据导出与备份中心（CSV导出 · JSON全量备份 · 导入恢复 · 数据安全）</span>
+      <span class="badge" style="background:#d69e2e;color:#fff">新功能 V40</span>
+    </div>
+    <p class="text-sm text-muted mb12">所有数据存储在浏览器本地，定期导出备份防止数据丢失。支持CSV格式导出到Excel，JSON全量备份可随时导入恢复</p>
+    
+    <!-- 数据统计 -->
+    ${(() => {
+      const customers = S.customers || [];
+      const orders = S.orders || [];
+      const products = S.products || [];
+      const totalRecords = customers.length + orders.length + products.length;
+      return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+        <div style="text-align:center;padding:12px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:24px;font-weight:bold;color:#3182ce">${customers.length}</div>
+          <div style="font-size:11px;color:#666">👥 客户数据</div>
+        </div>
+        <div style="text-align:center;padding:12px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:24px;font-weight:bold;color:#805ad5">${orders.length}</div>
+          <div style="font-size:11px;color:#666">📦 订单数据</div>
+        </div>
+        <div style="text-align:center;padding:12px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:24px;font-weight:bold;color:#38a169">${products.length}</div>
+          <div style="font-size:11px;color:#666">📚 产品数据</div>
+        </div>
+        <div style="text-align:center;padding:12px;background:#fffbeb;border-radius:6px;border:1px solid #fbd38d">
+          <div style="font-size:24px;font-weight:bold;color:#d69e2e">${totalRecords}</div>
+          <div style="font-size:11px;color:#666">📊 数据总量</div>
+        </div>
+      </div>`;
+    })()}
+    
+    <!-- CSV导出 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6" style="color:#d69e2e;font-weight:bold">📤 CSV格式导出（可用Excel打开）</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" style="background:#3182ce;color:#fff" onclick="exportCustomersCSV()">👥 导出客户数据</button>
+        <button class="btn" style="background:#805ad5;color:#fff" onclick="exportOrdersCSV()">📦 导出订单数据</button>
+        <button class="btn" style="background:#38a169;color:#fff" onclick="exportProductsCSV()">📚 导出产品数据</button>
+      </div>
+      <div class="text-xs text-muted mt6" style="font-size:10px">CSV文件包含UTF-8 BOM，可直接用Excel/WPS打开，中文不乱码</div>
+    </div>
+    
+    <!-- JSON全量备份 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6" style="color:#d69e2e;font-weight:bold">🔒 JSON全量备份（包含所有数据，可导入恢复）</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn" style="background:#d69e2e;color:#fff" onclick="exportAllJSON()">💾 一键全量备份</button>
+        <button class="btn btn-outline" style="color:#3182ce;border-color:#90cdf4" onclick="importBackup()">📥 导入备份恢复</button>
+        <span class="text-xs text-muted">建议每周备份一次，换电脑/清缓存前务必备份</span>
+      </div>
+    </div>
+    
+    <!-- 备份包含内容 -->
+    <div class="mb12" style="background:#fffbeb;padding:10px;border-radius:6px;border:1px solid #fbd38d">
+      <div class="text-xs" style="color:#92400e;font-weight:bold;margin-bottom:6px">📦 全量备份包含以下数据：</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;font-size:11px;color:#92400e">
+        <div>✓ 客户台账数据</div>
+        <div>✓ 订单管理数据</div>
+        <div>✓ 产品库数据</div>
+        <div>✓ API模型配置</div>
+        <div>✓ 开发信历史</div>
+        <div>✓ WhatsApp历史</div>
+        <div>✓ 客户画像历史</div>
+        <div>✓ 翻译历史</div>
+        <div>✓ 回复分析历史</div>
+        <div>✓ AI生图历史</div>
+        <div>✓ AI识图历史</div>
+        <div>✓ 流水线数据</div>
+      </div>
+    </div>
+    
+    <!-- 危险操作 -->
+    <div style="border-top:1px solid #fbd38d;padding-top:12px">
+      <div class="text-xs text-muted mb6" style="color:#e53e3e;font-weight:bold">⚠️ 危险操作</div>
+      <button class="btn btn-outline" style="color:#e53e3e;border-color:#feb2b2" onclick="clearAllData()">🗑️ 清空所有数据（不可恢复）</button>
+      <div class="text-xs text-muted mt6" style="font-size:10px;color:#e53e3e">清空后所有客户、订单、产品数据将被删除，请先导出备份！</div>
+    </div>
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -7245,6 +7327,155 @@ function fillProductToQuote(productId){
   // 滚动到报价计算器
   const quotePanel = document.querySelector('[onclick*="runCalculate"]')?.closest('.card');
   if(quotePanel) quotePanel.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+/* V40 数据导出与备份中心 */
+
+/* 导出CSV */
+function exportCSV(filename, headers, rows){
+  const csv = [headers.join(','), ...rows.map(r=>r.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(','))].join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('✅ 已导出 '+filename);
+}
+
+/* 导出客户数据 */
+function exportCustomersCSV(){
+  const customers = S.customers || [];
+  if(!customers.length){ toast('暂无客户数据'); return; }
+  const headers = ['客户名称','国家/地区','邮箱','电话','WhatsApp','网站','来源','等级','状态','产品需求','备注','创建时间','最后跟进'];
+  const rows = customers.map(c=>[
+    c.name||'', c.country||'', c.email||'', c.phone||'', c.whatsapp||'',
+    c.website||'', c.source||'', c.grade||'', c.status||'', c.product||'',
+    c.remark||'', c.createdAt?new Date(c.createdAt).toLocaleDateString():'',
+    c.lastFollow?new Date(c.lastFollow).toLocaleDateString():''
+  ]);
+  exportCSV('锴利外贸_客户数据_'+new Date().toISOString().split('T')[0]+'.csv', headers, rows);
+}
+
+/* 导出订单数据 */
+function exportOrdersCSV(){
+  const orders = S.orders || [];
+  if(!orders.length){ toast('暂无订单数据'); return; }
+  const stageMap = {pending:'待确认',production:'生产中',qc:'质检中',ready:'待发货',shipped:'已发货',completed:'已完成'};
+  const headers = ['客户名称','产品名称','数量','金额(USD)','贸易术语','交货日期','付款方式','订单阶段','已收款','未收款','创建时间','备注'];
+  const rows = orders.map(o=>{
+    const totalPaid = (o.payments||[]).reduce((sum,p)=>sum+Number(p.amount||0),0);
+    return [
+      o.customer||'', o.product||'', o.quantity||'', o.amount||'',
+      o.incoterm||'', o.deliveryDate||'', o.paymentMethod||'',
+      stageMap[o.stage]||o.stage||'', totalPaid.toFixed(2),
+      (Number(o.amount||0)-totalPaid).toFixed(2),
+      o.createdAt?new Date(o.createdAt).toLocaleDateString():'', o.remark||''
+    ];
+  });
+  exportCSV('锴利外贸_订单数据_'+new Date().toISOString().split('T')[0]+'.csv', headers, rows);
+}
+
+/* 导出产品数据 */
+function exportProductsCSV(){
+  const products = S.products || [];
+  if(!products.length){ toast('暂无产品数据'); return; }
+  const catMap = {scissors:'厨房剪刀',knife:'厨师刀/刀具',beauty:'美容工具',bbq:'BBQ工具',garden:'园林工具',other:'其他'};
+  const headers = ['产品名称','型号','分类','材质','规格','单位成本(¥)','包装成本(¥)','MOQ','HS编码','产品描述','创建时间'];
+  const rows = products.map(p=>[
+    p.name||'', p.model||'', catMap[p.category]||p.category||'',
+    p.material||'', p.spec||'', p.cost||'', p.packaging||'',
+    p.moq||'', p.hsCode||'', p.desc||'',
+    p.createdAt?new Date(p.createdAt).toLocaleDateString():''
+  ]);
+  exportCSV('锴利外贸_产品数据_'+new Date().toISOString().split('T')[0]+'.csv', headers, rows);
+}
+
+/* 导出全部数据JSON备份 */
+function exportAllJSON(){
+  const backup = {
+    version: 'V40',
+    exportTime: new Date().toISOString(),
+    data: {
+      customers: S.customers || [],
+      orders: S.orders || [],
+      products: S.products || [],
+      apis: S.apis || [],
+      emailHistory: S.emailHistory || [],
+      whatsappHistory: S.whatsappHistory || [],
+      profileHistory: S.profileHistory || [],
+      translateHistory: S.translateHistory || [],
+      replyHistory: S.replyHistory || [],
+      imageHistory: S.imageHistory || [],
+      visionHistory: S.visionHistory || [],
+      pipeline: S.pipeline || [],
+      settings: S.settings || {}
+    }
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '锴利外贸工作台_全量备份_'+new Date().toISOString().split('T')[0]+'.json';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('✅ 全量备份已导出，请妥善保存');
+}
+
+/* 导入JSON备份 */
+function importBackup(){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const backup = JSON.parse(ev.target.result);
+        if(!backup.data){ toast('无效的备份文件'); return; }
+        if(!confirm('导入备份将覆盖当前所有数据，确定继续？')) return;
+        const d = backup.data;
+        if(d.customers) S.customers = d.customers;
+        if(d.orders) S.orders = d.orders;
+        if(d.products) S.products = d.products;
+        if(d.apis) S.apis = d.apis;
+        if(d.emailHistory) S.emailHistory = d.emailHistory;
+        if(d.whatsappHistory) S.whatsappHistory = d.whatsappHistory;
+        if(d.profileHistory) S.profileHistory = d.profileHistory;
+        if(d.translateHistory) S.translateHistory = d.translateHistory;
+        if(d.replyHistory) S.replyHistory = d.replyHistory;
+        if(d.imageHistory) S.imageHistory = d.imageHistory;
+        if(d.visionHistory) S.visionHistory = d.visionHistory;
+        if(d.pipeline) S.pipeline = d.pipeline;
+        if(d.settings) S.settings = d.settings;
+        // 保存到localStorage
+        Object.keys(d).forEach(key=>DB.save(key, d[key]));
+        toast('✅ 备份已导入，页面即将刷新');
+        setTimeout(()=>location.reload(), 1500);
+      } catch(err) {
+        toast('❌ 备份文件解析失败: '+err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+/* 清空所有数据 */
+function clearAllData(){
+  if(!confirm('⚠️ 确定清空所有数据？此操作不可恢复！\n建议先导出备份。')) return;
+  if(!confirm('再次确认：真的要清空所有客户、订单、产品数据吗？')) return;
+  const keys = ['customers','orders','products','emailHistory','whatsappHistory','profileHistory','translateHistory','replyHistory','imageHistory','visionHistory','pipeline'];
+  keys.forEach(k=>{
+    localStorage.removeItem('kailion_'+k);
+    S[k] = k==='customers'||k==='orders'||k==='products'?[]:undefined;
+  });
+  toast('✅ 数据已清空，页面即将刷新');
+  setTimeout(()=>location.reload(), 1500);
 }
 
 /* V20 端到端获客流水线 */

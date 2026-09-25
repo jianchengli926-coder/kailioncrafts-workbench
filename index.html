@@ -184,6 +184,7 @@ input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;outlin
 .grid-12{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
 .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+.grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
 .grid-6{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;margin-bottom:16px}
 .text-xs{font-size:11.5px;line-height:1.5}
 .mb4{margin-bottom:4px}.mb8{margin-bottom:8px}.mb12{margin-bottom:12px}.mb16{margin-bottom:16px}.mb24{margin-bottom:24px}
@@ -1580,6 +1581,102 @@ function viewDashboard(root){
       </div>
       ${unreadInbox?`<span class="badge badge-gold" style="cursor:pointer" onclick="go('inbox')">${unreadInbox} 封客户回复待处理</span>`:''}
     </div>
+
+    <!-- V30.0 今天先做最重要的事 NEXT BEST ACTIONS -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#0f172a,#1e3a5f);color:#fff;border:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;letter-spacing:2px;opacity:.6;margin-bottom:4px">NEXT BEST ACTIONS</div>
+          <div style="font-size:20px;font-weight:800">今天，先做最重要的事。</div>
+          <div style="font-size:12px;opacity:.7;margin-top:4px">平台已按影响排序，可发送状态和客户匹配度排序顺序。</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:32px;font-weight:800;color:var(--gold)">${pendingDrafts + followDue}</div>
+          <div style="font-size:11px;opacity:.6">开发就绪度</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1;background:rgba(255,255,255,.06);border-radius:8px;padding:12px 14px;cursor:pointer" onclick="go('drafts')">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="background:var(--gold);color:#000;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px">01</span>
+            <span style="font-size:13px;font-weight:600">${pendingDrafts} 封开发信可以发送</span>
+          </div>
+          <div style="font-size:11px;opacity:.6">送到预定并确认收件邮箱</div>
+        </div>
+        <div style="flex:1;background:rgba(255,255,255,.06);border-radius:8px;padding:12px 14px;cursor:pointer" onclick="go('customers')">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="background:#4299e1;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px">02</span>
+            <span style="font-size:13px;font-weight:600">${S.customers.filter(c=>c.scores.grade==='A').length} 家高匹配客户待开发</span>
+          </div>
+          <div style="font-size:11px;opacity:.6">核验证据生成个性化开发信</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- V30.0 5个核心统计卡片 -->
+    <div class="grid-5 mb16">
+      <div class="card card-pad" style="cursor:pointer" onclick="go('customers')">
+        <div class="stat-label">📋 全部线索</div>
+        <div class="stat-value">${total}</div>
+        <div class="text-sm text-muted">已写入平台</div>
+      </div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go('customers')">
+        <div class="stat-label">⭐ 高匹配</div>
+        <div class="stat-value" style="color:var(--gold)">${S.customers.filter(c=>c.scores.grade==='A').length}</div>
+        <div class="text-sm text-muted">匹配度 80 分以上</div>
+      </div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go('customers')">
+        <div class="stat-label">📧 可联系</div>
+        <div class="stat-value" style="color:var(--green)">${S.customers.filter(c=>c.email).length}</div>
+        <div class="text-sm text-muted">邮箱与证据均已确认</div>
+      </div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go('schedule')">
+        <div class="stat-label">⏰ 今日待跟进</div>
+        <div class="stat-value" style="color:var(--warning)">${followDue}</div>
+        <div class="text-sm text-muted">今天到期及逾期</div>
+      </div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go('devplans')">
+        <div class="stat-label">🔄 进行中</div>
+        <div class="stat-value" style="color:#4299e1">${plansRunning}</div>
+        <div class="text-sm text-muted">后台 AI 拉取任务</div>
+      </div>
+    </div>
+
+    <!-- V30.0 开发漏斗可视化 -->
+    <div class="card card-pad mb16">
+      <div class="card-title">🔄 开发漏斗 DEVELOPMENT PIPELINE</div>
+      <div style="display:flex;gap:0;margin-top:12px">
+        <div style="flex:1;text-align:center;padding:14px 8px;background:linear-gradient(180deg,#ebf8ff,#bee3f8);border-radius:8px 0 0 8px;position:relative">
+          <div style="font-size:20px;margin-bottom:4px">📥</div>
+          <div style="font-size:13px;font-weight:700;color:#2b6cb0">导入客户来源</div>
+          <div style="font-size:11px;color:#4a5568;margin-top:4px">海关数据或 AI 搜索</div>
+          <div style="font-size:18px;font-weight:800;color:#2b6cb0;margin-top:6px">${total}</div>
+          <div style="position:absolute;right:-12px;top:50%;transform:translateY(-50%);font-size:20px;color:#a0aec0;z-index:2">▶</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:14px 8px;background:linear-gradient(180deg,#fefcbf,#faf089);position:relative">
+          <div style="font-size:20px;margin-bottom:4px">🔍</div>
+          <div style="font-size:13px;font-weight:700;color:#975a16">筛选与核验</div>
+          <div style="font-size:11px;color:#4a5568;margin-top:4px">合并重复公司，保留证据</div>
+          <div style="font-size:18px;font-weight:800;color:#975a16;margin-top:6px">${S.customers.filter(c=>c.scores.grade==='A'||c.scores.grade==='B').length}</div>
+          <div style="position:absolute;right:-12px;top:50%;transform:translateY(-50%);font-size:20px;color:#a0aec0;z-index:2">▶</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:14px 8px;background:linear-gradient(180deg,#c6f6d5,#9ae6b4);position:relative">
+          <div style="font-size:20px;margin-bottom:4px">✉️</div>
+          <div style="font-size:13px;font-weight:700;color:#276749">个性化开发</div>
+          <div style="font-size:11px;color:#4a5568;margin-top:4px">Skill 生成，人工确认发送</div>
+          <div style="font-size:18px;font-weight:800;color:#276749;margin-top:6px">${pendingDrafts + S.drafts.filter(d=>d.status==='已发送').length}</div>
+          <div style="position:absolute;right:-12px;top:50%;transform:translateY(-50%);font-size:20px;color:#a0aec0;z-index:2">▶</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:14px 8px;background:linear-gradient(180deg,#e9d8fd,#d6bcfa);border-radius:0 8px 8px 0">
+          <div style="font-size:20px;margin-bottom:4px">🔄</div>
+          <div style="font-size:13px;font-weight:700;color:#553c9a">持续跟进</div>
+          <div style="font-size:11px;color:#4a5568;margin-top:4px">自动安排下一次行动</div>
+          <div style="font-size:18px;font-weight:800;color:#553c9a;margin-top:6px">${replied}</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:#718096;text-align:center">💡 客户不是找不到，很多时候是跟丢了 — 每一步都有数据支撑</div>
+    </div>
+
     <div class="grid-6 mb16">
       <div class="card card-pad" style="cursor:pointer" onclick="go('customers')"><div class="stat-label">🎯 候选客户</div><div class="stat-value">200</div><div class="text-sm text-muted">本月新增</div></div>
       <div class="card card-pad" style="cursor:pointer" onclick="go('customers')"><div class="stat-label">⭐ 优质线索</div><div class="stat-value" style="color:var(--gold)">36</div><div class="text-sm text-muted">≥80分</div></div>

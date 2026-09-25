@@ -8766,19 +8766,6 @@ function exportCSV(filename, headers, rows){
 }
 
 /* 导出客户数据 */
-function exportCustomersCSV(){
-  const customers = S.customers || [];
-  if(!customers.length){ toast('暂无客户数据'); return; }
-  const headers = ['客户名称','国家/地区','邮箱','电话','WhatsApp','网站','来源','等级','状态','产品需求','备注','创建时间','最后跟进'];
-  const rows = customers.map(c=>[
-    c.name||'', c.country||'', c.email||'', c.phone||'', c.whatsapp||'',
-    c.website||'', c.source||'', c.grade||'', c.status||'', c.product||'',
-    c.remark||'', c.createdAt?new Date(c.createdAt).toLocaleDateString():'',
-    c.lastFollow?new Date(c.lastFollow).toLocaleDateString():''
-  ]);
-  exportCSV('锴利外贸_客户数据_'+new Date().toISOString().split('T')[0]+'.csv', headers, rows);
-}
-
 /* 导出订单数据 */
 function exportOrdersCSV(){
   const orders = S.orders || [];

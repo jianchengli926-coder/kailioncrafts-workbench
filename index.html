@@ -1304,6 +1304,57 @@ const IMAGE_SIZES = [
   {id:'1792x1024',label:'16:9 横版 (1792×1024)'}
 ];
 
+/* V32 AI视觉理解 - 支持智谱GLM-4.6V-Flash图片分析 */
+async function callAIVision(imageUrl, prompt, opts={}){
+  opts = opts||{};
+  let cfgs = (S.apis||[]).filter(a=>a.enabled && a.model && (a.model.toLowerCase().includes('4.6v') || a.model.toLowerCase().includes('vl') || a.model.toLowerCase().includes('vision')));
+  if(!cfgs.length){
+    const zhipuCfgs = (S.apis||[]).filter(a=>a.enabled && a.type==='zhipu');
+    if(!zhipuCfgs.length) return {content:null, error:'未启用视觉理解模型，请在设置中启用GLM-4.6V-Flash', mock:true};
+    cfgs = [{...zhipuCfgs[0], model:'glm-4.6v-flash'}];
+  }
+  let cfg = cfgs[0];
+  if(opts.modelConfigId) cfg = cfgs.find(a=>a.id===opts.modelConfigId)||cfg;
+  const t0 = performance.now();
+  try{
+    const headers = {'Content-Type':'application/json'};
+    if(cfg.type!=='ollama' || b64dec(cfg.apiKey)) headers['Authorization']='Bearer '+b64dec(cfg.apiKey);
+    const messages = [{role:'user', content:[
+      {type:'text', text: prompt},
+      {type:'image_url', image_url:{url: imageUrl}}
+    ]}];
+    const body = { model: cfg.model, messages: messages, temperature: opts.temperature!=null?opts.temperature:0.3, stream:false };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=>controller.abort(), 120000);
+    const base = cfg.baseURL.replace(/\s+$/,'').replace(/\/$/,'');
+    const r = await fetch(base+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+    clearTimeout(timeoutId);
+    if(!r.ok){ const txt = await r.text(); return {content:null,error:'HTTP '+r.status+' '+txt.slice(0,300),model:cfg.model}; }
+    const j = await r.json();
+    const usage = j.usage||{};
+    const latency = Math.round(performance.now()-t0);
+    if(!S.visionHistory) S.visionHistory = [];
+    S.visionHistory.unshift({id:uid(),imageUrl:imageUrl,prompt:prompt,result:j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'',t:Date.now(),model:cfg.model,latency:latency});
+    if(S.visionHistory.length>30) S.visionHistory = S.visionHistory.slice(0,30);
+    DB.save('visionHistory', S.visionHistory);
+    logApiCall(cfg.model,'vision_analysis',usage.prompt_tokens||0,usage.completion_tokens||0,0,'success');
+    return { content: j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'', usage:usage, latency:latency, error:null, model:cfg.model };
+  }catch(e){
+    return {content:null,error:'网络/CORS错误: '+e.message, model:cfg.model};
+  }
+}
+
+/* AI视觉理解场景模板 */
+const VISION_TEMPLATES = [
+  {id:'product_analysis',icon:'🔍',label:'产品分析',desc:'分析产品材质、工艺、品质、卖点',prompt:'请详细分析这张产品图片：1)产品类型和用途 2)材质和工艺判断 3)品质等级评估 4)主要卖点和差异化 5)可能的目标市场和价位区间 6)作为五金刀剪工厂，我们可以提供的改进建议。用中文回答，结构化输出。'},
+  {id:'competitor',icon:'⚔️',label:'竞对分析',desc:'分析竞争对手产品优劣势',prompt:'请分析这张竞争对手的产品图片：1)产品定位和目标客户 2)设计特点和创新点 3)可能的成本结构 4)相比我们阳江五金刀剪工厂的优劣势 5)我们可以学习的地方 6)我们可以超越的差异化方向。用中文回答。'},
+  {id:'packaging',icon:'📦',label:'包装评估',desc:'评估产品包装设计和市场适配度',prompt:'请评估这张产品包装图片：1)包装设计风格和定位 2)信息传达是否清晰（品牌/产品/规格/认证） 3)目标市场适配度（欧美/中东/东南亚） 4)环保和可持续性 5)可能的成本估算 6)改进建议。用中文回答。'},
+  {id:'exhibition',icon:'🎪',label:'展会照片分析',desc:'分析展会展位、竞品、客户行为',prompt:'请分析这张展会照片：1)展位设计和吸引力评估 2)展示的产品类型和档次 3)可能的参展商定位 4)客户流量和互动情况 5)值得学习的展示方式 6)我们参展可以借鉴的建议。用中文回答。'},
+  {id:'quality',icon:'✅',label:'品质检验',desc:'检验产品外观缺陷和工艺问题',prompt:'请作为品质检验员分析这张产品图片：1)外观缺陷检查（划痕/锈蚀/毛刺/色差） 2)工艺质量评估（焊接/抛光/装配） 3)包装完整性 4)标识和标签合规性 5)可能导致客户投诉的风险点 6)出厂检验建议。用中文回答。'},
+  {id:'trend',icon:'📈',label:'趋势识别',desc:'识别产品设计趋势和流行元素',prompt:'请分析这张图片中的产品设计趋势：1)当前流行的设计元素（颜色/材质/造型） 2)功能创新方向 3)目标消费群体特征 4)未来6-12个月的趋势预测 5)我们工厂应该关注的研发方向 6)可以快速跟进的产品机会。用中文回答。'},
+  {id:'custom',icon:'✨',label:'自定义分析',desc:'自由输入分析要求',prompt:''}
+];
+
 function seedExtra(){
   if(!S.apis || !S.apis.length) S.apis = defaultApis();
   if(!S.prompts) S.prompts = defaultPrompts();
@@ -5217,6 +5268,69 @@ function viewTools(root){
     </div>` : ''}
   </div>
   
+  <!-- V32 AI视觉识图面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #3182ce;background:linear-gradient(135deg,#f0f7ff,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>👁️ AI 视觉识图（GLM-4.6V-Flash · 免费）</span>
+      <span class="badge" style="background:#3182ce;color:#fff">新功能 V32</span>
+    </div>
+    <p class="text-sm text-muted mb12">上传或输入图片URL，AI自动分析产品/竞对/包装/展会/品质/趋势，7大外贸场景</p>
+    
+    <!-- 场景模板选择 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">选择分析场景：</div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        ${VISION_TEMPLATES.map(t=>`<span id="vistpl-${t.id}" class="badge" style="cursor:pointer;padding:6px 12px;font-size:12px;${t.id==='product_analysis'?'background:#3182ce;color:#fff':'background:#f0f4f8;color:#333'}" onclick="selectVisionTemplate('${t.id}')">${t.icon} ${t.label}</span>`).join('')}
+      </div>
+    </div>
+    
+    <!-- 图片URL输入 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">图片URL（支持https图片链接，或客户发来的产品图链接）：</div>
+      <div class="flex gap8">
+        <input id="visImageUrl" class="form-control" style="flex:1" placeholder="https://example.com/product.jpg" value="">
+        <button class="btn btn-outline" onclick="document.getElementById('visFileInput').click()">📁 上传本地</button>
+        <input type="file" id="visFileInput" accept="image/*" style="display:none" onchange="handleVisFileUpload(event)">
+      </div>
+    </div>
+    
+    <!-- 图片预览 -->
+    <div id="visPreview" class="mb12" style="display:none">
+      <div class="text-xs text-muted mb6">图片预览：</div>
+      <img id="visPreviewImg" style="max-width:300px;max-height:200px;border-radius:6px;border:1px solid #e2e8f0">
+    </div>
+    
+    <!-- 分析要求 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">分析要求（可手动编辑）：</div>
+      <textarea id="visPrompt" class="form-control" rows="3" style="font-family:monospace;font-size:12px">请详细分析这张产品图片：1)产品类型和用途 2)材质和工艺判断 3)品质等级评估 4)主要卖点和差异化 5)可能的目标市场和价位区间 6)作为五金刀剪工厂，我们可以提供的改进建议。用中文回答，结构化输出。</textarea>
+    </div>
+    
+    <!-- 分析按钮 -->
+    <div class="flex gap8 items-center">
+      <button id="visAnalyzeBtn" class="btn" style="background:#3182ce;color:#fff" onclick="runVisionAnalysis()">🔍 开始分析</button>
+      <span id="visStatus" class="text-sm text-muted"></span>
+    </div>
+    
+    <!-- 分析结果 -->
+    <div id="visResult" class="mt16" style="display:none">
+      <div class="text-xs text-muted mb6">📋 AI分析结果：</div>
+      <div id="visResultContent" style="background:#f8fafc;padding:12px;border-radius:6px;font-size:13px;line-height:1.8;white-space:pre-wrap;max-height:400px;overflow-y:auto"></div>
+    </div>
+    
+    <!-- 历史记录 -->
+    ${(S.visionHistory && S.visionHistory.length) ? `
+    <div class="mt16">
+      <div class="text-xs text-muted mb6" style="display:flex;justify-content:space-between">
+        <span>📜 分析历史（最近${Math.min(S.visionHistory.length,8)}条）</span>
+        <span style="cursor:pointer;color:#3182ce" onclick="clearVisionHistory()">清空</span>
+      </div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        ${S.visionHistory.slice(0,8).map(h=>`<div style="width:80px;height:80px;border-radius:6px;overflow:hidden;cursor:pointer;border:1px solid #e2e8f0" title="${h.prompt.slice(0,50)}" onclick="showVisionHistory('${h.id}')"><img src="${h.imageUrl}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
+      </div>
+    </div>` : ''}
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -5286,6 +5400,107 @@ function clearImgHistory(){
   DB.save('imageHistory', S.imageHistory);
   viewTools(document.getElementById('mainContent'));
   toast('已清空生图历史');
+}
+
+/* V32 AI视觉识图 - 选择模板 */
+function selectVisionTemplate(id){
+  const tpl = VISION_TEMPLATES.find(t=>t.id===id);
+  if(!tpl) return;
+  VISION_TEMPLATES.forEach(t=>{
+    const el = document.getElementById('vistpl-'+t.id);
+    if(el) el.style.cssText = `cursor:pointer;padding:6px 12px;font-size:12px;${t.id===id?'background:#3182ce;color:#fff':'background:#f0f4f8;color:#333'}`;
+  });
+  const promptEl = document.getElementById('visPrompt');
+  if(tpl.prompt){
+    promptEl.value = tpl.prompt;
+  } else {
+    promptEl.value = '';
+    promptEl.focus();
+  }
+}
+
+/* 处理本地图片上传 - 转base64 */
+function handleVisFileUpload(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(file.size > 10*1024*1024){ toast('图片大小不能超过10MB'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const dataUrl = e.target.result;
+    document.getElementById('visImageUrl').value = dataUrl;
+    const preview = document.getElementById('visPreview');
+    const previewImg = document.getElementById('visPreviewImg');
+    previewImg.src = dataUrl;
+    preview.style.display = 'block';
+    toast('图片已加载，可开始分析');
+  };
+  reader.readAsDataURL(file);
+}
+
+/* 图片URL输入时自动预览 */
+document.addEventListener('input', function(e){
+  if(e.target.id === 'visImageUrl'){
+    const url = e.target.value.trim();
+    if(url && (url.startsWith('http') || url.startsWith('data:'))){
+      const preview = document.getElementById('visPreview');
+      const previewImg = document.getElementById('visPreviewImg');
+      if(previewImg){
+        previewImg.src = url;
+        preview.style.display = 'block';
+      }
+    }
+  }
+});
+
+/* 执行视觉分析 */
+async function runVisionAnalysis(){
+  const imageUrl = document.getElementById('visImageUrl').value.trim();
+  const prompt = document.getElementById('visPrompt').value.trim();
+  if(!imageUrl){ toast('请输入图片URL或上传本地图片'); return; }
+  if(!prompt){ toast('请输入分析要求'); return; }
+  const btn = document.getElementById('visAnalyzeBtn');
+  const status = document.getElementById('visStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ 分析中...';
+  status.textContent = '正在调用GLM-4.6V-Flash视觉模型，约10-30秒...';
+  const result = await callAIVision(imageUrl, prompt);
+  btn.disabled = false;
+  btn.textContent = '🔍 开始分析';
+  if(result.error){
+    status.innerHTML = '<span style="color:#e53e3e">❌ '+result.error+'</span>';
+    return;
+  }
+  status.innerHTML = `<span style="color:#3182ce">✅ 分析完成！${result.latency}ms · ${result.model}</span>`;
+  const resultDiv = document.getElementById('visResult');
+  const resultContent = document.getElementById('visResultContent');
+  resultDiv.style.display = 'block';
+  resultContent.textContent = result.content;
+  // 刷新历史记录
+  setTimeout(()=>viewTools(document.getElementById('mainContent')), 500);
+}
+
+/* 显示视觉分析历史 */
+function showVisionHistory(id){
+  const item = (S.visionHistory||[]).find(h=>h.id===id);
+  if(!item) return;
+  openModal(`
+    <div class="modal-head"><h3>📋 历史分析结果</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div style="margin-bottom:12px"><img src="${item.imageUrl}" style="max-width:100%;max-height:250px;border-radius:6px"></div>
+      <div class="text-xs text-muted mb6">分析要求：${item.prompt}</div>
+      <div style="background:#f8fafc;padding:12px;border-radius:6px;font-size:13px;line-height:1.8;white-space:pre-wrap;max-height:300px;overflow-y:auto">${item.result}</div>
+      <div class="text-xs text-muted mt8">模型：${item.model} · 耗时：${item.latency}ms</div>
+    </div>
+  `);
+}
+
+/* 清空视觉分析历史 */
+function clearVisionHistory(){
+  if(!confirm('确定清空所有AI视觉分析历史记录？')) return;
+  S.visionHistory = [];
+  DB.save('visionHistory', S.visionHistory);
+  viewTools(document.getElementById('mainContent'));
+  toast('已清空视觉分析历史');
 }
 
 /* V20 端到端获客流水线 */

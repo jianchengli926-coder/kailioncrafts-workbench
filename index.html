@@ -1006,6 +1006,22 @@ function defaultApis(){
      apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
      model:'cogview-3-flash', temperature:0.1, enabled:true, isDefault:false,
      caps:{lead:0,score:0,draft:0,reply:0,quote:0,assistant:0}},
+    {id:uid(), name:'硅基流动 Qwen2.5-7B(免费·通用)', type:'siliconflow', baseURL:'https://api.siliconflow.cn/v1',
+     apiKey:b64enc('sk-nppaoxlxxcouplrgxboegpeqrrpsuzwkpgrvugvopdepuiet'),
+     model:'Qwen/Qwen2.5-7B-Instruct', temperature:0.7, enabled:true, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'硅基流动 GLM-4-9B(免费·通用)', type:'siliconflow', baseURL:'https://api.siliconflow.cn/v1',
+     apiKey:b64enc('sk-nppaoxlxxcouplrgxboegpeqrrpsuzwkpgrvugvopdepuiet'),
+     model:'THUDM/glm-4-9b-chat', temperature:0.7, enabled:true, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'硅基流动 InternLM2.5-7B(免费·推理)', type:'siliconflow', baseURL:'https://api.siliconflow.cn/v1',
+     apiKey:b64enc('sk-nppaoxlxxcouplrgxboegpeqrrpsuzwkpgrvugvopdepuiet'),
+     model:'internlm/internlm2_5-7b-chat', temperature:0.3, enabled:true, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
+    {id:uid(), name:'硅基流动 Qwen2-7B(免费·轻量)', type:'siliconflow', baseURL:'https://api.siliconflow.cn/v1',
+     apiKey:b64enc('sk-nppaoxlxxcouplrgxboegpeqrrpsuzwkpgrvugvopdepuiet'),
+     model:'Qwen/Qwen2-7B-Instruct', temperature:0.7, enabled:true, isDefault:false,
+     caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'本地 Qwen2.5-7B(文本)', type:'ollama', baseURL:'http://localhost:11434/v1',
      apiKey:b64enc(''), model:'qwen2.5:7b', temperature:0.7, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
@@ -1210,41 +1226,76 @@ function getMonthApiCost(){
   const now = new Date(); const ym = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   return Math.round(S.apiLogs.filter(l=>l.time&&l.time.slice(0,7)===ym).reduce((a,l)=>a+(l.cost||0),0)*100)/100;
 }
+/* V42 模型故障转移：按优先级排序，在线模型优先，本地模型兜底 */
+function getFallbackChain(opts={}){
+  const cfgs = (S.apis||[]).filter(a=>a.enabled && a.caps && (a.caps.assistant||a.caps.lead||a.caps.draft));
+  if(!cfgs.length) return [];
+  const purpose = opts.purpose || '';
+  const isReasoning = ['score','lead','profile','analysis','reasoning','关键词','画像','评分','分析'].some(k=>purpose.includes(k));
+  const online = cfgs.filter(a=>a.type!=='ollama');
+  const local = cfgs.filter(a=>a.type==='ollama');
+  const defaultCfg = cfgs.find(a=>a.isDefault);
+  const reasoningModels = online.filter(a=>a.model && /internlm|deepseek|r1|reasoning/i.test(a.model));
+  const generationModels = online.filter(a=>!(a.model && /internlm|deepseek|r1|reasoning/i.test(a.model)));
+  let sorted = [];
+  if(defaultCfg) sorted.push(defaultCfg);
+  if(isReasoning){
+    sorted = sorted.concat(reasoningModels.filter(a=>a.id!==defaultCfg?.id));
+    sorted = sorted.concat(generationModels.filter(a=>a.id!==defaultCfg?.id));
+  } else {
+    sorted = sorted.concat(generationModels.filter(a=>a.id!==defaultCfg?.id));
+    sorted = sorted.concat(reasoningModels.filter(a=>a.id!==defaultCfg?.id));
+  }
+  sorted = sorted.concat(local);
+  const seen = new Set();
+  return sorted.filter(a=>{ if(seen.has(a.id)) return false; seen.add(a.id); return true; });
+}
+
 async function callAI(messages, opts={}){
   opts = opts||{};
-  const cfgs = (S.apis||[]).filter(a=>a.enabled);
-  if(!cfgs.length){ logApiCall('模拟模式',opts.purpose||'general',0,0,0,'mock'); return {content:null, usage:{}, error:null, mock:true, model:'模拟模式'}; }
-  let cfg = cfgs.find(a=>a.isDefault) || cfgs[0];
-  if(opts.modelConfigId) cfg = cfgs.find(a=>a.id===opts.modelConfigId)||cfg;
+  const chain = getFallbackChain(opts);
+  if(!chain.length){ logApiCall('模拟模式',opts.purpose||'general',0,0,0,'mock'); return {content:null, usage:{}, error:null, mock:true, model:'模拟模式'}; }
+  if(opts.modelConfigId){
+    const specific = chain.find(a=>a.id===opts.modelConfigId);
+    if(specific) chain.unshift(specific);
+  }
   const budget = (S.settings&&S.settings.apiBudget)||200;
   const spent = getMonthApiCost();
-  if(spent>=budget && cfg.type!=='ollama'){
-    logApiCall(cfg.model,opts.purpose||'general',0,0,0,'blocked');
-    return {content:null,usage:{},error:'本月API预算已用完（¥'+spent+'/¥'+budget+'），请升级预算或使用本地模型',mock:false,model:cfg.model};
-  }
   const t0 = performance.now();
-  try{
-    const headers = {'Content-Type':'application/json'};
-    if(cfg.type!=='ollama' || b64dec(cfg.apiKey)) headers['Authorization']='Bearer '+b64dec(cfg.apiKey);
-    const msgs = typeof messages==='string' ? [{role:'user',content:messages}] : messages;
-    const body = { model:cfg.model, messages:msgs, temperature: opts.temperature!=null?opts.temperature:cfg.temperature, stream:false };
-    const controller = new AbortController();
-    const timeoutId = setTimeout(()=>controller.abort(), 60000);
-    const r = await fetch(cfg.baseURL.replace(/\s+$/,'').replace(/\$/,'')+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
-    clearTimeout(timeoutId);
-    if(!r.ok){ const txt = await r.text(); logApiCall(cfg.model,opts.purpose||'general',0,0,0,'error'); return {content:null,usage:{},error:'HTTP '+r.status+' '+txt.slice(0,200),model:cfg.model}; }
-    const j = await r.json();
-    const usage = j.usage||{};
-    const it = usage.prompt_tokens||usage.input_tokens||0;
-    const ot = usage.completion_tokens||usage.output_tokens||0;
-    const cost = calcApiCost(cfg.model, it, ot);
-    logApiCall(cfg.model, opts.purpose||'general', it, ot, cost, 'success');
-    return { content: j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'',
-      usage:usage, latency:Math.round(performance.now()-t0), error:null, mock:false, model:cfg.model, cost:cost };
-  }catch(e){
-    logApiCall(cfg.model,opts.purpose||'general',0,0,0,'error');
-    return {content:null,usage:{},error:'网络/CORS错误: '+e.message, mock:false, model:cfg.model};
+  const errors = [];
+  for(let i=0;i<chain.length;i++){
+    const cfg = chain[i];
+    if(spent>=budget && cfg.type!=='ollama'){
+      errors.push(cfg.name+': 预算已用完');
+      continue;
+    }
+    try{
+      const headers = {'Content-Type':'application/json'};
+      if(cfg.type!=='ollama' || b64dec(cfg.apiKey)) headers['Authorization']='Bearer '+b64dec(cfg.apiKey);
+      const msgs = typeof messages==='string' ? [{role:'user',content:messages}] : messages;
+      const body = { model:cfg.model, messages:msgs, temperature: opts.temperature!=null?opts.temperature:cfg.temperature, stream:false };
+      const controller = new AbortController();
+      const timeoutId = setTimeout(()=>controller.abort(), 45000);
+      const r = await fetch(cfg.baseURL.replace(/\s+$/,'').replace(/\$/,'')+'/chat/completions',{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+      clearTimeout(timeoutId);
+      if(!r.ok){ const txt = await r.text(); errors.push(cfg.name+': HTTP '+r.status); logApiCall(cfg.model,opts.purpose||'general',0,0,0,'error'); continue; }
+      const j = await r.json();
+      const usage = j.usage||{};
+      const it = usage.prompt_tokens||usage.input_tokens||0;
+      const ot = usage.completion_tokens||usage.output_tokens||0;
+      const cost = calcApiCost(cfg.model, it, ot);
+      logApiCall(cfg.model, opts.purpose||'general', it, ot, cost, 'success');
+      if(i>0) console.log('[故障转移] 第'+(i+1)+'个模型成功: '+cfg.name);
+      return { content: j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'',
+        usage:usage, latency:Math.round(performance.now()-t0), error:null, mock:false, model:cfg.model, cost:cost, fallbackCount:i };
+    }catch(e){
+      errors.push(cfg.name+': '+e.message);
+      logApiCall(cfg.model,opts.purpose||'general',0,0,0,'error');
+      continue;
+    }
   }
+  const errMsg = '所有模型均调用失败：'+errors.slice(0,3).join('; ');
+  return {content:null,usage:{},error:errMsg, mock:false, model:'全部失败', fallbackCount:chain.length};
 }
 function aiUsage(u){ return u&&u.total_tokens?`消耗 tokens: prompt ${u.prompt_tokens||'?'} + completion ${u.completion_tokens||'?'} = ${u.total_tokens}`:''; }
 
@@ -3668,7 +3719,7 @@ function renderApiSettings(){
       <tbody>${list.map(a=>`
         <tr>
           <td><b>${a.isDefault?'⭐ ':''}${esc(a.name)}</b></td>
-          <td><span class="badge badge-blue">${a.type==='openai'?'OpenAI':a.type==='zhipu'?'智谱':'Ollama'}</span></td>
+          <td><span class="badge badge-blue">${a.type==='openai'?'OpenAI':a.type==='zhipu'?'智谱':a.type==='siliconflow'?'硅基流动':'Ollama'}</span></td>
           <td class="mono text-sm">${esc(a.baseURL)}</td>
           <td class="mono text-sm">${esc(a.model)}</td>
           <td>${apiStatus(a)}</td>
@@ -3692,6 +3743,7 @@ function openApiForm(aid){
       <div class="form-group"><label>类型</label><select class="form-control" id="ap_type">
         <option value="openai" ${a.type==='openai'?'selected':''}>OpenAI兼容中转站</option>
         <option value="zhipu" ${a.type==='zhipu'?'selected':''}>智谱 GLM</option>
+        <option value="siliconflow" ${a.type==='siliconflow'?'selected':''}>硅基流动 SiliconFlow</option>
         <option value="ollama" ${a.type==='ollama'?'selected':''}>本地 Ollama</option>
       </select></div>
       <div class="form-group"><label>Base URL</label><input class="form-control mono" id="ap_base" value="${esc(a.baseURL)}"></div>

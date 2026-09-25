@@ -52,63 +52,76 @@ input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;outlin
 ::-webkit-scrollbar-track{background:transparent}
 
 
-/* ============ 密码登录屏障 ============ */
+/* ============ 密码登录屏障（浅色白色主题） ============ */
 #lockScreen{
   position:fixed;inset:0;z-index:99999;
-  background:linear-gradient(135deg,#0f2240 0%,#1a365d 40%,#14294a 100%);
+  background:linear-gradient(135deg,#ffffff 0%,#f8fafc 40%,#f1f5f9 100%);
   display:flex;align-items:center;justify-content:center;
-  flex-direction:column;gap:28px;
+  flex-direction:column;gap:24px;
   transition:opacity .4s ease,visibility .4s ease;
 }
 #lockScreen.hidden{opacity:0;visibility:hidden;pointer-events:none}
 #lockScreen::before{
   content:'';position:absolute;inset:0;
-  background:radial-gradient(circle at 30% 20%,rgba(201,169,97,.12) 0%,transparent 50%),
-             radial-gradient(circle at 70% 80%,rgba(201,169,97,.08) 0%,transparent 50%);
+  background:radial-gradient(circle at 20% 15%,rgba(201,169,97,.08) 0%,transparent 45%),
+             radial-gradient(circle at 80% 85%,rgba(201,169,97,.06) 0%,transparent 45%),
+             radial-gradient(circle at 50% 50%,rgba(241,245,249,.5) 0%,transparent 60%);
   pointer-events:none;
 }
-.lock-logo-wrap{
-  width:140px;height:140px;border-radius:24px;
-  background:rgba(255,255,255,.06);backdrop-filter:blur(10px);
-  border:1px solid rgba(201,169,97,.25);
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 8px 32px rgba(0,0,0,.3),0 0 60px rgba(201,169,97,.1);
-  position:relative;z-index:1;animation:lockFloat 3s ease-in-out infinite;
+.lock-card{
+  position:relative;z-index:1;
+  background:#fff;border-radius:28px;
+  padding:48px 44px 40px;
+  box-shadow:0 20px 60px rgba(0,0,0,.08),0 4px 20px rgba(0,0,0,.04),0 0 0 1px rgba(0,0,0,.03);
+  display:flex;flex-direction:column;align-items:center;gap:20px;
+  animation:lockCardIn .6s cubic-bezier(.16,1,.3,1);
 }
-@keyframes lockFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-.lock-logo-wrap img{width:110px;height:110px;object-fit:contain;border-radius:16px}
-.lock-company{text-align:center;position:relative;z-index:1}
-.lock-company .name{font-size:28px;font-weight:800;color:#fff;letter-spacing:2px;margin-bottom:6px}
-.lock-company .sub{font-size:14px;color:var(--accent);letter-spacing:4px;text-transform:uppercase}
-.lock-company .slogan{font-size:12px;color:rgba(255,255,255,.45);margin-top:10px;letter-spacing:1px}
-.lock-form{position:relative;z-index:1;width:320px;display:flex;flex-direction:column;gap:14px}
+@keyframes lockCardIn{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+.lock-logo-wrap{
+  width:180px;height:180px;border-radius:32px;
+  background:linear-gradient(135deg,#fefcf7 0%,#faf5e8 100%);
+  border:2px solid rgba(201,169,97,.2);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 32px rgba(201,169,97,.12),0 2px 8px rgba(0,0,0,.04);
+  position:relative;animation:lockFloat 3.5s ease-in-out infinite;
+}
+@keyframes lockFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.lock-logo-wrap img{width:150px;height:150px;object-fit:contain;border-radius:20px}
+.lock-company{text-align:center}
+.lock-company .name{font-size:30px;font-weight:800;color:#1a202c;letter-spacing:1.5px;margin-bottom:8px}
+.lock-company .sub{font-size:13px;color:var(--accent);letter-spacing:5px;text-transform:uppercase;font-weight:600}
+.lock-company .divider{width:40px;height:3px;background:linear-gradient(90deg,var(--accent),#e0c489);border-radius:2px;margin:14px auto 10px}
+.lock-company .slogan{font-size:12px;color:#718096;margin-top:6px;letter-spacing:.5px}
+.lock-form{width:340px;display:flex;flex-direction:column;gap:12px}
 .lock-input-wrap{
   position:relative;display:flex;align-items:center;
-  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
-  border-radius:12px;transition:all .2s;
+  background:#f8fafc;border:2px solid #e2e8f0;
+  border-radius:14px;transition:all .25s;
 }
 .lock-input-wrap:focus-within{
-  border-color:var(--accent);background:rgba(255,255,255,.12);
-  box-shadow:0 0 0 3px rgba(201,169,97,.15);
+  border-color:var(--accent);background:#fff;
+  box-shadow:0 0 0 4px rgba(201,169,97,.12);
 }
-.lock-input-wrap .lock-icon{padding:0 12px;color:rgba(255,255,255,.4);flex-shrink:0}
+.lock-input-wrap .lock-icon{padding:0 14px;color:#a0aec0;flex-shrink:0}
 .lock-input-wrap input{
   flex:1;background:transparent;border:none;outline:none;
-  color:#fff;font-size:16px;padding:14px 12px 14px 0;letter-spacing:4px;
+  color:#1a202c;font-size:17px;padding:16px 12px 16px 0;letter-spacing:5px;font-weight:500;
 }
-.lock-input-wrap input::placeholder{color:rgba(255,255,255,.3);letter-spacing:1px}
-.lock-input-wrap .toggle-pw{padding:0 14px;color:rgba(255,255,255,.4);cursor:pointer;transition:color .2s;flex-shrink:0}
+.lock-input-wrap input::placeholder{color:#cbd5e0;letter-spacing:1px;font-weight:400}
+.lock-input-wrap .toggle-pw{padding:0 16px;color:#a0aec0;cursor:pointer;transition:color .2s;flex-shrink:0}
 .lock-input-wrap .toggle-pw:hover{color:var(--accent)}
 .lock-btn{
-  width:100%;padding:14px;border-radius:12px;
-  background:linear-gradient(135deg,var(--accent) 0%,#e0c489 100%);
-  color:var(--primary-darker);font-size:15px;font-weight:700;letter-spacing:3px;
-  cursor:pointer;border:none;transition:all .2s;box-shadow:0 4px 16px rgba(201,169,97,.3);
+  width:100%;padding:16px;border-radius:14px;
+  background:linear-gradient(135deg,var(--accent) 0%,#d4a84b 100%);
+  color:#fff;font-size:16px;font-weight:700;letter-spacing:4px;
+  cursor:pointer;border:none;transition:all .25s;
+  box-shadow:0 6px 20px rgba(201,169,97,.35);
 }
-.lock-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(201,169,97,.4)}
+.lock-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(201,169,97,.45)}
 .lock-btn:active{transform:translateY(0)}
-.lock-error{color:#ff6b6b;font-size:13px;text-align:center;min-height:18px;transition:opacity .2s}
-.lock-footer{position:absolute;bottom:24px;left:0;right:0;text-align:center;font-size:11px;color:rgba(255,255,255,.3);letter-spacing:1px;z-index:1}
+.lock-error{color:#e53e3e;font-size:13px;text-align:center;min-height:18px;transition:opacity .2s;font-weight:500}
+.lock-footer{position:absolute;bottom:28px;left:0;right:0;text-align:center;font-size:11px;color:#a0aec0;letter-spacing:1px;z-index:1}
+.lock-hint{font-size:11px;color:#a0aec0;text-align:center;margin-top:4px}
 
 /* ============ 布局骨架 ============ */
 .app{display:flex;height:100vh;width:100vw}
@@ -368,30 +381,34 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
 </style>
 </head>
 <body>
-<!-- 密码登录屏障 -->
+<!-- 密码登录屏障（浅色白色主题） -->
 <div id="lockScreen">
-  <div class="lock-logo-wrap">
-    <img src="logo.png" alt="KaiLionCrafts Logo" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\'font-size:48px;font-weight:800;color:var(--accent);\'>KL</div>'">
-  </div>
-  <div class="lock-company">
-    <div class="name">KaiLionCrafts</div>
-    <div class="sub">YANGJIANG HARDWARE</div>
-    <div class="slogan">锴利外贸获客工作台 · 数据安全 · 本地存储</div>
-  </div>
-  <form class="lock-form" onsubmit="return checkLock(event)">
-    <div class="lock-input-wrap">
-      <span class="lock-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-      </span>
-      <input type="password" id="lockInput" placeholder="请输入访问密码" autocomplete="off" maxlength="20">
-      <span class="toggle-pw" onclick="toggleLockPw()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-      </span>
+  <div class="lock-card">
+    <div class="lock-logo-wrap">
+      <img src="logo.png" alt="KaiLionCrafts Logo" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\'font-size:64px;font-weight:800;color:var(--accent);letter-spacing:2px;\'>KL</div>'">
     </div>
-    <div class="lock-error" id="lockError"></div>
-    <button type="submit" class="lock-btn">进 入 工 作 台</button>
-  </form>
-  <div class="lock-footer">© 2026 KaiLionCrafts · 阳江锴利五金 · 仅供授权人员使用</div>
+    <div class="lock-company">
+      <div class="name">KaiLionCrafts</div>
+      <div class="sub">YANGJIANG HARDWARE</div>
+      <div class="divider"></div>
+      <div class="slogan">锴利外贸获客工作台 · 数据安全 · 本地存储</div>
+    </div>
+    <form class="lock-form" onsubmit="return checkLock(event)">
+      <div class="lock-input-wrap">
+        <span class="lock-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </span>
+        <input type="password" id="lockInput" placeholder="请输入访问密码" autocomplete="off" maxlength="20">
+        <span class="toggle-pw" onclick="toggleLockPw()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </span>
+      </div>
+      <div class="lock-error" id="lockError"></div>
+      <button type="submit" class="lock-btn">进 入 工 作 台</button>
+      <div class="lock-hint">🔒 请输入6位访问密码 · 数据仅存储在本地浏览器</div>
+    </form>
+  </div>
+  <div class="lock-footer">© 2026 KaiLionCrafts · 阳江市锴利国际贸易有限公司 · 仅供授权人员使用</div>
 </div>
 
 <!-- APP_ROOT -->

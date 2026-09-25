@@ -3383,7 +3383,8 @@ function globalSearch(q){
  * ============================================================ */
 // 横向条形图：[{label, value, color?}]
 function hBarChart(data, maxVal){
-  const max = maxVal || Math.max(...data.map(d=>d.value));
+  if(!data || !data.length) return '';
+  const max = maxVal || Math.max(...data.map(d=>d.value), 1);
   let rows = data.map((d,i)=>{
     const w = Math.round(d.value/max*100);
     const color = d.color || '#1a365d';
@@ -3398,8 +3399,9 @@ function hBarChart(data, maxVal){
 }
 // 环形图：[{label, value, color}]
 function donutChart(data, size){
+  if(!data || !data.length) return '<div style="padding:20px;text-align:center;color:#a0aec0;font-size:13px">暂无数据</div>';
   size = size || 180;
-  const total = data.reduce((a,b)=>a+b.value,0);
+  const total = data.reduce((a,b)=>a+b.value,0) || 1;
   const r = size/2 - 16, cx = size/2, cy = size/2;
   let circ = 2*Math.PI*r, offset = 0;
   let arcs = data.map(d=>{
@@ -3421,11 +3423,13 @@ function donutChart(data, size){
 }
 // 折线图：近30天 [{label, value}]
 function lineChart(data, w, h){
+  if(!data || !data.length) return '<div style="padding:20px;text-align:center;color:#a0aec0;font-size:13px">暂无数据</div>';
   w = w||520; h = h||180;
   const max = Math.max(...data.map(d=>d.value),5);
   const pad = {l:30,r:10,t:14,b:22};
   const iw = w-pad.l-pad.r, ih = h-pad.t-pad.b;
-  const pts = data.map((d,i)=>({x:pad.l+iw*i/(data.length-1), y:pad.t+ih-(d.value/max)*ih, v:d.value, l:d.label}));
+  const safeLen = Math.max(data.length - 1, 1);
+  const pts = data.map((d,i)=>({x:pad.l+iw*i/safeLen, y:pad.t+ih-(d.value/max)*ih, v:d.value, l:d.label}));
   const path = pts.map((p,i)=>(i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');
   const area = path + ` L ${pts[pts.length-1].x} ${pad.t+ih} L ${pts[0].x} ${pad.t+ih} Z`;
   let grid = '';
@@ -3437,6 +3441,7 @@ function lineChart(data, w, h){
 }
 // 雷达图：5维度
 function radarChart(scores, size){
+  if(!scores) return '<div style="padding:20px;text-align:center;color:#a0aec0;font-size:13px">暂无数据</div>';
   size = size||220;
   const cx = size/2, cy = size/2, R = size/2 - 30;
   const dims = [

@@ -2801,6 +2801,41 @@ function copyCommSummary(cid){
   toast('✅ 沟通总结已复制');
 }
 
+
+
+/* V61 工作台使用统计函数 */
+function isToday(dateStr){
+  if(!dateStr) return false;
+  return new Date(dateStr).toDateString() === new Date().toDateString();
+}
+function isThisWeek(dateStr){
+  if(!dateStr) return false;
+  const d = new Date(dateStr);
+  const now = new Date();
+  const dayOfWeek = now.getDay() || 7;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - dayOfWeek + 1);
+  weekStart.setHours(0,0,0,0);
+  return d >= weekStart;
+}
+function isThisMonth(dateStr){
+  if(!dateStr) return false;
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+function getTodayNewCustomers(){ return S.customers.filter(c=>isToday(c.createdAt)).length; }
+function getWeekNewCustomers(){ return S.customers.filter(c=>isThisWeek(c.createdAt)).length; }
+function getMonthNewCustomers(){ return S.customers.filter(c=>isThisMonth(c.createdAt)).length; }
+function getTodayDrafts(){ return S.drafts.filter(d=>isToday(d.createdAt)).length; }
+function getTodayFollowups(){ return (S.followups||[]).filter(f=>isToday(f.createdAt)).length; }
+function getTodayComms(){ return (S.communications||[]).filter(c=>isToday(c.createdAt)).length; }
+function getReplyRate(){
+  if(!S.customers.length) return 0;
+  const replied = S.customers.filter(c=>c.status==='已回复').length;
+  return Math.round((replied / S.customers.length) * 100);
+}
+
 function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
@@ -3143,6 +3178,48 @@ function viewDashboard(root){
         </div>
         <div class="text-sm text-muted mt8" style="border-top:1px solid #e2e8f0;padding-top:8px">
           ⏰ 建议每天优先处理今日待跟进，超时客户需立即联系
+        </div>
+      </div>
+      <!-- V61 工作台使用统计 -->
+      <div class="card card-pad" style="border-left:4px solid #c9a961">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📊 工作台使用统计</span>
+          <span class="text-sm text-muted">今日 · 本周 · 本月</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px">
+          <div style="background:linear-gradient(135deg,#ebf8ff,#bee3f8);padding:12px;border-radius:8px;text-align:center">
+            <div style="font-size:24px;font-weight:800;color:#2b6cb0">${getTodayNewCustomers()}</div>
+            <div class="text-xs text-muted" style="margin-top:4px">今日新增客户</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#fefcbf,#fef3c7);padding:12px;border-radius:8px;text-align:center">
+            <div style="font-size:24px;font-weight:800;color:#975a16">${getTodayDrafts()}</div>
+            <div class="text-xs text-muted" style="margin-top:4px">今日开发信</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#c6f6d5,#9ae6b4);padding:12px;border-radius:8px;text-align:center">
+            <div style="font-size:24px;font-weight:800;color:#276749">${getTodayFollowups()}</div>
+            <div class="text-xs text-muted" style="margin-top:4px">今日跟进记录</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#e9d8fd,#d6bcfa);padding:12px;border-radius:8px;text-align:center">
+            <div style="font-size:24px;font-weight:800;color:#553c9a">${getTodayComms()}</div>
+            <div class="text-xs text-muted" style="margin-top:4px">今日沟通记录</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px">
+          <div style="background:#f7fafc;padding:10px;border-radius:6px;border-left:3px solid #3182ce">
+            <div class="text-xs text-muted">本周新增客户</div>
+            <div style="font-size:18px;font-weight:700;color:#2b6cb0">${getWeekNewCustomers()} 家</div>
+          </div>
+          <div style="background:#f7fafc;padding:10px;border-radius:6px;border-left:3px solid #c9a961">
+            <div class="text-xs text-muted">本月新增客户</div>
+            <div style="font-size:18px;font-weight:700;color:#975a16">${getMonthNewCustomers()} 家</div>
+          </div>
+          <div style="background:#f7fafc;padding:10px;border-radius:6px;border-left:3px solid #38a169">
+            <div class="text-xs text-muted">客户回复率</div>
+            <div style="font-size:18px;font-weight:700;color:#276749">${getReplyRate()}%</div>
+          </div>
+        </div>
+        <div class="text-sm text-muted mt8" style="border-top:1px solid #e2e8f0;padding-top:8px">
+          💡 持续记录操作数据，帮助您分析工作效率和客户转化情况
         </div>
       </div>
     </div>

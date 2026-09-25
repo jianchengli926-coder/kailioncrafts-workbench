@@ -6197,6 +6197,108 @@ function viewTools(root){
     </div>
   </div>
   
+  <!-- V44 销售漏斗与商机管理中心面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📊 销售漏斗与商机管理中心（6阶段漏斗 · 赢单率预测 · 金额统计 · 阶段推进）</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="badge" style="background:#805ad5;color:#fff">新功能 V44</span>
+        <button class="btn" style="background:#805ad5;color:#fff;font-size:12px;padding:4px 12px" onclick="openAddOpportunity()">➕ 新增商机</button>
+      </div>
+    </div>
+    <p class="text-sm text-muted mb12">从线索到成交的6阶段商机管理，销售漏斗可视化，赢单率自动预测，加权金额统计，一键推进商机阶段</p>
+    
+    <!-- 商机统计看板 -->
+    ${(() => {
+      const opps = S.opportunities || [];
+      const activeOpps = opps.filter(o=>!o.result || o.result==='');
+      const wonOpps = opps.filter(o=>o.result==='won');
+      const totalAmount = activeOpps.reduce((s,o)=>s+(o.amount||0),0);
+      const weightedAmount = activeOpps.reduce((s,o)=>s+(o.amount||0)*(o.winRate||0)/100,0);
+      const wonAmount = wonOpps.reduce((s,o)=>s+(o.amount||0),0);
+      return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+        <div style="text-align:center;padding:10px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:20px;font-weight:bold;color:#805ad5">${activeOpps.length}</div>
+          <div style="font-size:11px;color:#666">进行中商机</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#ebf8ff;border-radius:6px;border:1px solid #90cdf4">
+          <div style="font-size:18px;font-weight:bold;color:#3182ce">$${totalAmount.toLocaleString()}</div>
+          <div style="font-size:11px;color:#666">商机总金额</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#faf5ff;border-radius:6px;border:1px solid #d6bcfa">
+          <div style="font-size:18px;font-weight:bold;color:#805ad5">$${Math.round(weightedAmount).toLocaleString()}</div>
+          <div style="font-size:11px;color:#666">加权金额(按赢单率)</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#f0fff4;border-radius:6px;border:1px solid #9ae6b4">
+          <div style="font-size:18px;font-weight:bold;color:#38a169">$${wonAmount.toLocaleString()}</div>
+          <div style="font-size:11px;color:#666">已成交金额</div>
+        </div>
+      </div>`;
+    })()}
+    
+    <!-- 销售漏斗可视化 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6" style="color:#805ad5;font-weight:bold">📈 销售漏斗（6阶段）</div>
+      ${(() => {
+        const opps = S.opportunities || [];
+        const maxCount = Math.max(...OPPORTUNITY_STAGES.map(s=>opps.filter(o=>o.stage===s.id && (!o.result || o.result==='')).length), 1);
+        return OPPORTUNITY_STAGES.map((stage,idx)=>{
+          const stageOpps = opps.filter(o=>o.stage===stage.id && (!o.result || o.result===''));
+          const amount = stageOpps.reduce((s,o)=>s+(o.amount||0),0);
+          const width = Math.max((stageOpps.length/maxCount)*100, 5);
+          return `<div style="display:flex;align-items:center;margin-bottom:4px;gap:8px">
+            <div style="width:90px;font-size:11px;color:#666;text-align:right">${stage.icon} ${stage.name}</div>
+            <div style="flex:1;background:#f0f4f8;border-radius:4px;height:28px;position:relative;overflow:hidden">
+              <div style="width:${width}%;background:linear-gradient(90deg,${stage.color}80,${stage.color});height:100%;border-radius:4px;transition:width 0.3s"></div>
+              <div style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:bold;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.3)">${stageOpps.length}个 · $${amount.toLocaleString()} · 赢单率${stage.winRate}%</div>
+            </div>
+            ${idx<OPPORTUNITY_STAGES.length-1?'<div style="color:#cbd5e0;font-size:14px;width:20px;text-align:center">→</div>':'<div style="width:20px"></div>'}
+          </div>`;
+        }).join('');
+      })()}
+    </div>
+    
+    <!-- 商机列表 -->
+    <div>
+      <div class="text-xs text-muted mb6" style="color:#805ad5;font-weight:bold">📋 商机列表（按阶段排序）</div>
+      ${(() => {
+        const opps = S.opportunities || [];
+        if(!opps.length) return '<div class="text-xs text-muted" style="padding:20px;text-align:center;background:#f8f9fa;border-radius:6px">暂无商机，点击「➕ 新增商机」开始管理销售漏斗</div>';
+        const sorted = [...opps].sort((a,b)=>{
+          if(a.result && !b.result) return 1;
+          if(!a.result && b.result) return -1;
+          const stageOrder = OPPORTUNITY_STAGES.findIndex(s=>s.id===b.stage) - OPPORTUNITY_STAGES.findIndex(s=>s.id===a.stage);
+          if(stageOrder !== 0) return stageOrder;
+          return (b.amount||0) - (a.amount||0);
+        });
+        return `<div style="max-height:400px;overflow-y:auto">
+          ${sorted.map(opp=>{
+            const stage = OPPORTUNITY_STAGES.find(s=>s.id===opp.stage) || OPPORTUNITY_STAGES[0];
+            const isClosed = opp.result === 'won' || opp.result === 'lost';
+            const nextStage = OPPORTUNITY_STAGES[OPPORTUNITY_STAGES.findIndex(s=>s.id===opp.stage)+1];
+            return `<div style="padding:10px;background:${isClosed?'#f8f9fa':'#fff'};border-radius:6px;margin-bottom:6px;border-left:4px solid ${stage.color};opacity:${isClosed?'0.6':'1'}">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:bold">${opp.name} ${opp.result==='won'?'🎉':opp.result==='lost'?'❌':''}</div>
+                  <div class="text-xs text-muted" style="margin-top:2px">👤 ${opp.customer} · 💰 $${(opp.amount||0).toLocaleString()} · 赢单率 ${opp.winRate||0}%</div>
+                  ${opp.nextAction?`<div class="text-xs" style="margin-top:2px;color:#dd6b20">▶ 下一步：${opp.nextAction}</div>`:''}
+                  ${opp.expectedCloseDate?`<div class="text-xs text-muted" style="margin-top:2px">📅 预计成交：${opp.expectedCloseDate}</div>`:''}
+                </div>
+                <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+                  <span class="badge" style="background:${stage.color};color:#fff;font-size:10px;padding:2px 6px">${stage.icon} ${stage.name}</span>
+                  ${!isClosed && nextStage?`<button class="btn btn-outline" style="font-size:10px;padding:2px 8px;background:#38a169;color:#fff;border-color:#38a169" onclick="updateOpportunityStage('${opp.id}','${nextStage.id}')">→ ${nextStage.name}</button>`:''}
+                  ${!isClosed && opp.stage!=='won'?`<button class="btn btn-outline" style="font-size:10px;padding:2px 6px;background:#38a169;color:#fff;border-color:#38a169" onclick="closeOpportunity('${opp.id}','won','')">🎉成交</button>`:''}
+                  ${!isClosed?`<button class="btn btn-outline" style="font-size:10px;padding:2px 6px;background:#e53e3e;color:#fff;border-color:#e53e3e" onclick="closeOpportunity('${opp.id}','lost','')">❌输单</button>`:''}
+                  <button class="btn btn-outline" style="font-size:10px;padding:2px 6px;color:#e53e3e" onclick="deleteOpportunity('${opp.id}')">🗑️</button>
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      })()}
+    </div>
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -7817,6 +7919,101 @@ function getTaskStatus(dueDate, completed){
   if(diffDays <= 3) return {label:`${diffDays}天后`,color:'#d69e2e',icon:'⏰'};
   if(diffDays <= 7) return {label:`${diffDays}天后`,color:'#3182ce',icon:'📅'};
   return {label:`${diffDays}天后`,color:'#718096',icon:'📋'};
+}
+
+/* V44 销售漏斗与商机管理中心 */
+const OPPORTUNITY_STAGES = [
+  {id:'lead', name:'线索', icon:'🔍', color:'#718096', winRate:10},
+  {id:'contact', name:'初步接触', icon:'📞', color:'#3182ce', winRate:25},
+  {id:'needs', name:'需求确认', icon:'📋', color:'#805ad5', winRate:40},
+  {id:'quote', name:'报价/样品', icon:'💰', color:'#dd6b20', winRate:55},
+  {id:'negotiation', name:'谈判', icon:'🤝', color:'#d69e2e', winRate:75},
+  {id:'won', name:'成交', icon:'🎉', color:'#38a169', winRate:100}
+];
+
+if(!S.opportunities) S.opportunities = [];
+
+function addOpportunity(opp){
+  if(!S.opportunities) S.opportunities = [];
+  opp.id = opp.id || uid();
+  opp.createdAt = opp.createdAt || Date.now();
+  opp.stage = opp.stage || 'lead';
+  opp.winRate = opp.winRate || OPPORTUNITY_STAGES.find(s=>s.id===opp.stage)?.winRate || 10;
+  S.opportunities.unshift(opp);
+  DB.save('opportunities', S.opportunities);
+  return opp;
+}
+
+function updateOpportunityStage(id, newStage){
+  const opp = S.opportunities.find(o=>o.id===id);
+  if(!opp) return;
+  opp.stage = newStage;
+  opp.winRate = OPPORTUNITY_STAGES.find(s=>s.id===newStage)?.winRate || opp.winRate;
+  opp.updatedAt = Date.now();
+  if(newStage==='won'){ opp.closedAt = Date.now(); opp.result='won'; }
+  DB.save('opportunities', S.opportunities);
+  toast('✅ 商机已推进到「'+OPPORTUNITY_STAGES.find(s=>s.id===newStage)?.name+'」');
+  viewTools(document.getElementById('mainContent'));
+}
+
+function closeOpportunity(id, result, reason){
+  const opp = S.opportunities.find(o=>o.id===id);
+  if(!opp) return;
+  opp.result = result;
+  opp.closedAt = Date.now();
+  opp.closeReason = reason || '';
+  if(result==='won'){ opp.stage='won'; opp.winRate=100; }
+  DB.save('opportunities', S.opportunities);
+  toast(result==='won'?'🎉 恭喜成交！':'商机已关闭');
+  viewTools(document.getElementById('mainContent'));
+}
+
+function deleteOpportunity(id){
+  S.opportunities = S.opportunities.filter(o=>o.id!==id);
+  DB.save('opportunities', S.opportunities);
+  toast('商机已删除');
+  viewTools(document.getElementById('mainContent'));
+}
+
+function openAddOpportunity(){
+  const customers = S.customers || [];
+  openModal(`
+    <div class="modal-head"><h3>➕ 新增商机</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="mb8"><label class="text-xs text-muted">客户名称 *</label>
+        ${customers.length ? `<select id="oppCustomer" class="form-control"><option value="">-- 选择客户 --</option>${customers.slice(0,50).map(c=>`<option value="${c.name}">${c.name}${c.country?' ('+c.country+')':''}</option>`).join('')}</select>` : `<input id="oppCustomer" class="form-control" placeholder="客户名称">`}
+      </div>
+      <div class="mb8"><label class="text-xs text-muted">商机名称 *</label><input id="oppName" class="form-control" placeholder="如：厨房剪刀年度采购订单"></div>
+      <div class="mb8"><label class="text-xs text-muted">预计金额(USD)</label><input id="oppAmount" class="form-control" type="number" placeholder="如：50000"></div>
+      <div class="mb8"><label class="text-xs text-muted">当前阶段</label><select id="oppStage" class="form-control">${OPPORTUNITY_STAGES.map(s=>`<option value="${s.id}">${s.icon} ${s.name}（赢单率${s.winRate}%）</option>`).join('')}</select></div>
+      <div class="mb8"><label class="text-xs text-muted">预计成交时间</label><input id="oppCloseDate" class="form-control" type="date"></div>
+      <div class="mb8"><label class="text-xs text-muted">下一步行动</label><input id="oppNextAction" class="form-control" placeholder="如：下周发送报价单"></div>
+      <div class="mb8"><label class="text-xs text-muted">备注</label><textarea id="oppNote" class="form-control" rows="2" placeholder="商机背景、客户需求等..."></textarea></div>
+      <div class="flex gap8">
+        <button class="btn" style="background:#805ad5;color:#fff" onclick="saveOpportunity()">💾 保存商机</button>
+        <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      </div>
+    </div>
+  `);
+}
+
+function saveOpportunity(){
+  const customer = document.getElementById('oppCustomer').value.trim();
+  const name = document.getElementById('oppName').value.trim();
+  if(!customer || !name){ toast('请填写客户名称和商机名称'); return; }
+  const stage = document.getElementById('oppStage').value;
+  addOpportunity({
+    customer: customer,
+    name: name,
+    amount: parseFloat(document.getElementById('oppAmount').value) || 0,
+    stage: stage,
+    expectedCloseDate: document.getElementById('oppCloseDate').value,
+    nextAction: document.getElementById('oppNextAction').value,
+    note: document.getElementById('oppNote').value
+  });
+  closeModal();
+  toast('✅ 商机已创建');
+  viewTools(document.getElementById('mainContent'));
 }
 
 /* V20 端到端获客流水线 */

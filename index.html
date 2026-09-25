@@ -3807,6 +3807,18 @@ function openCustomerDetail(cid){
         <span class="text-sm text-muted">业务员：${esc(c.owner||'Leo')}${c.isOld?' · <b style="color:var(--gold)">老客户</b>':''}</span>
       </div>
 
+      <!-- V53 快捷操作栏 -->
+      <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f4f8,#e2e8f0);border:none">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <button class="btn btn-primary btn-sm" style="font-size:12px;padding:8px 6px" onclick="closeDrawer();go('drafts');setTimeout(()=>{const ta=document.querySelector('textarea');if(ta){ta.value='';ta.focus();}},300)">✉️ 写开发信</button>
+          <button class="btn btn-gold btn-sm" style="font-size:12px;padding:8px 6px" onclick="recordFollowUp('${cid}')">📅 添加跟进</button>
+          <button class="btn btn-outline btn-sm" style="font-size:12px;padding:8px 6px;background:#fff" onclick="openAddCommunication('${cid}')">💬 沟通记录</button>
+          <button class="btn btn-outline btn-sm" style="font-size:12px;padding:8px 6px;background:#fff" onclick="generateCustomerProfile('${cid}')">🤖 AI画像</button>
+          <button class="btn btn-outline btn-sm" style="font-size:12px;padding:8px 6px;background:#fff" onclick="generateReplySuggestion('${cid}')">💡 回复建议</button>
+          <button class="btn btn-outline btn-sm" style="font-size:12px;padding:8px 6px;background:#fff" onclick="copyText('${esc(c.company)} - ${esc(c.contact.email)} - ${esc(c.website)}')">📋 复制信息</button>
+        </div>
+      </div>
+
       <div class="card card-pad mb16">
         <div class="card-title">🏢 公司背调</div>
         <div class="text-sm" style="line-height:2">

@@ -4439,12 +4439,18 @@ function draftSeq(){
   </div>`;
 }
 const TEMPLATES = [
-  {name:'开场破冰型', desc:'首次触达，建立联系', subject:'{product} Supply from Yangjiang, China — {year}'},
-  {name:'产品推荐型', desc:'针对客户产品线推荐', subject:'New {product} Line for {company} — Factory Direct'},
-  {name:'案例分享型', desc:'用同行业案例背书', subject:'How a US Retailer Cut Cutlery Costs 18% with Us'},
-  {name:'节日问候型', desc:'节日 / 展会前触达', subject:'{holiday} Greetings from KaiLionCrafts'},
-  {name:'竞品替代型', desc:'针对现有供应商痛点', subject:'Tired of Delayed Cutlery Shipments? We Can Help'},
-  {name:'样品邀约型', desc:'免费样品促进回复', subject:'Free {product} Sample Box for {company} — No Cost'}
+  {name:'开场破冰型', cat:'初次开发', desc:'首次触达，建立联系', subject:'{product} Supply from Yangjiang, China — {year}', body:'Hi {name},\n\nI came across {company} and noticed your {product} range. We are KaiLionCrafts from Yangjiang, China — the world capital of knives and scissors — manufacturing similar products for 3 EU distributors.\n\nMay I send our latest catalog and price list? No obligation, just wanted to introduce ourselves.\n\nBest regards,\nLeo\nKaiLionCrafts'},
+  {name:'产品推荐型', cat:'初次开发', desc:'针对客户产品线推荐', subject:'New {product} Line for {company} — Factory Direct', body:'Hi {name},\n\nFollowing your recent collection launch, I thought you might be interested in our new {product} line. We currently supply similar items to retailers in Germany and the US.\n\nKey advantages:\n• Factory direct pricing (15-20% below typical trading companies)\n• OEM/ODM available with low MOQ\n• 30-day sample turnaround\n\nWould you like a free sample box?\n\nBest,\nLeo'},
+  {name:'案例分享型', cat:'初次开发', desc:'用同行业案例背书', subject:'How a US Retailer Cut Cutlery Costs 18% with Us', body:'Hi {name},\n\nI wanted to share a quick case study: a US kitchenware retailer switched their cutlery sourcing to us last year and achieved:\n• 18% cost reduction\n• 25% faster lead times\n• Zero quality issues in 6 months\n\nThey started with a simple sample order. Would you be open to a 15-minute call to see if we could do the same for {company}?\n\nBest,\nLeo'},
+  {name:'节日问候型', cat:'关系维护', desc:'节日 / 展会前触达', subject:'{holiday} Greetings from KaiLionCrafts', body:'Hi {name},\n\nWishing you and your team a wonderful {holiday}!\n\nAs we approach the busy season, I wanted to remind you that we have capacity for new orders. Our current lead time is 35-40 days for OEM orders.\n\nIf you have any upcoming projects, feel free to share — happy to provide quotes and samples.\n\nBest regards,\nLeo\nKaiLionCrafts'},
+  {name:'竞品替代型', cat:'初次开发', desc:'针对现有供应商痛点', subject:'Tired of Delayed Cutlery Shipments? We Can Help', body:'Hi {name},\n\nI understand many importers face challenges with suppliers — delayed shipments, inconsistent quality, poor communication.\n\nAt KaiLionCrafts, we guarantee:\n• On-time delivery (98% on-time rate)\n• 100% pre-shipment inspection\n• 24-hour response time\n• Dedicated account manager\n\nWould you be open to a trial order to test our service?\n\nBest,\nLeo'},
+  {name:'样品邀约型', cat:'初次开发', desc:'免费样品促进回复', subject:'Free {product} Sample Box for {company} — No Cost', body:'Hi {name},\n\nI would like to offer {company} a free sample box of our best-selling {product} items. No cost, no obligation — just so you can see and feel our quality.\n\nThe sample box includes:\n• 5 of our most popular {product} designs\n• Product catalog with pricing\n• Factory profile and certifications\n\nSimply reply with your shipping address, and we will send it out within 3 business days.\n\nBest regards,\nLeo'},
+  {name:'3天跟进型', cat:'跟进邮件', desc:'首次发送后3天跟进', subject:'Re: {product} Supply from Yangjiang — Quick Follow-up', body:'Hi {name},\n\nJust following up on my previous email about our {product} range. I know you are busy, so I will keep this short.\n\nWould it be helpful if I sent:\n1. Our product catalog (PDF)?\n2. A price list for your top 5 items?\n3. A free sample box?\n\nJust let me know which would be most useful.\n\nBest,\nLeo'},
+  {name:'7天跟进型', cat:'跟进邮件', desc:'首次发送后7天跟进', subject:'Re: {product} — Did You Get My Email?', body:'Hi {name},\n\nI am not sure if my previous email got lost in your inbox. I wanted to re-introduce KaiLionCrafts — a Yangjiang-based manufacturer of {product} supplying EU and US retailers.\n\nI have attached our catalog for your reference. If there are any items you are interested in, I would be happy to provide a quote and free samples.\n\nLooking forward to hearing from you.\n\nBest,\nLeo'},
+  {name:'14天唤醒型', cat:'跟进邮件', desc:'14天无回复后唤醒', subject:'{product} — Last Try Before I Close Your File', body:'Hi {name},\n\nI have reached out a couple of times about our {product} range but have not heard back. I completely understand if the timing is not right.\n\nBefore I close your file, I wanted to offer one last thing: if you ever need {product} in the future, feel free to reach out directly. I will keep your information on file.\n\nWishing {company} continued success.\n\nBest regards,\nLeo\nKaiLionCrafts'},
+  {name:'报价跟进型', cat:'报价跟进', desc:'发送报价后跟进', subject:'Re: Quotation for {product} — Any Questions?', body:'Hi {name},\n\nI hope you had a chance to review the quotation I sent for the {product}. I wanted to follow up and see if you have any questions.\n\nI am happy to adjust:\n• Quantities and pricing tiers\n• Custom packaging options\n• Delivery schedules\n• Payment terms\n\nPlease let me know if you need any additional information to make a decision.\n\nBest,\nLeo'},
+  {name:'样品跟进型', cat:'样品跟进', desc:'样品签收后跟进', subject:'Re: Sample Shipment — Have You Received It?', body:'Hi {name},\n\nAccording to the tracking information, your sample box should have arrived. I wanted to check if you have received it and had a chance to review the products.\n\nI would love to hear your feedback on:\n• Product quality and finish\n• Design and functionality\n• Packaging and presentation\n\nIf any items are of interest, I can provide a formal quotation with volume pricing.\n\nBest regards,\nLeo'},
+  {name:'客户回复型', cat:'回复处理', desc:'客户回复后及时响应', subject:'Re: {original_subject}', body:'Hi {name},\n\nThank you for your reply! I appreciate you taking the time to get back to me.\n\nRegarding your question about {topic}, here is the information you requested:\n• [Point 1]\n• [Point 2]\n• [Point 3]\n\nI have also attached the relevant documents for your reference. Please let me know if you need anything else.\n\nBest regards,\nLeo\nKaiLionCrafts'}
 ];
 /* V4 邮件效果分析 */
 function pct(a,b){ return b? Math.round(a/b*100):0; }
@@ -4511,6 +4517,9 @@ function draftTpl(){
     {n:'WhatsApp-跟进提醒',body:'Hi [Name], just following up on [product]. Any interest in a free sample?'},
     {n:'WhatsApp-节日问候',body:'Hi [Name], wishing you a great [holiday]! Let me know if you need cutlery supplies this season.'}
   ];
+  const cats = ['全部','初次开发','跟进邮件','报价跟进','样品跟进','关系维护','回复处理'];
+  const activeCat = window._tplCat || '全部';
+  const filtered = activeCat==='全部' ? TEMPLATES : TEMPLATES.filter(t=>t.cat===activeCat);
   return `<div class="card card-pad mb16"><div class="card-title">💬 社媒获客话术（领英 / WhatsApp）</div>
     <div class="grid-12">${LI.map(t=>`
       <div class="card card-pad" style="background:#f7f9fc">
@@ -4518,17 +4527,33 @@ function draftTpl(){
         <div class="text-sm text-muted mono mt8" style="font-size:11px">${t.body}</div>
         <button class="btn btn-outline btn-sm mt8" onclick="copyText('${t.body.replace(/'/g,"\\'")}')">📋 复制</button>
       </div>`).join('')}</div></div>
-  <div class="grid-12">
-    ${TEMPLATES.map(t=>`
-      <div class="card card-pad">
-        <div class="flex-between"><b style="color:var(--primary)">${t.name}</b><span class="text-sm text-muted">${t.desc}</span></div>
-        <div class="divider"></div>
-        <div class="text-sm text-muted mono" style="background:var(--gray-bg);padding:8px 10px;border-radius:6px">Re: ${t.subject}</div>
-        <div class="mt16 btn-row"><button class="btn btn-outline btn-sm" onclick="toast('模板预览（演示）')">预览</button>
-        <button class="btn btn-gold btn-sm" onclick="toast('请在客户详情中点击「生成开发信」应用模板')">应用到客户</button></div>
-      </div>`).join('')}
+  <div class="card card-pad mb16">
+    <div class="flex-between mb16">
+      <div class="card-title" style="margin:0">📧 邮件模板库（${TEMPLATES.length}个模板）</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${cats.map(c=>`<button class="btn btn-sm ${activeCat===c?'btn-gold':'btn-outline'}" onclick="window._tplCat='${c}';renderView()">${c}</button>`).join('')}
+      </div>
+    </div>
+    <div class="grid-12">
+      ${filtered.map((t,i)=>`
+        <div class="card card-pad" style="border-left:3px solid var(--primary)">
+          <div class="flex-between">
+            <b style="color:var(--primary)">${t.name}</b>
+            <span class="badge badge-blue" style="font-size:10px">${t.cat}</span>
+          </div>
+          <div class="text-sm text-muted mt4">${t.desc}</div>
+          <div class="divider"></div>
+          <div class="text-sm mono" style="background:var(--gray-bg);padding:6px 8px;border-radius:4px;font-size:11px"><b>Subject:</b> ${t.subject}</div>
+          <div class="text-sm text-muted mt8" style="font-size:11px;line-height:1.5;max-height:60px;overflow:hidden">${t.body.substring(0,120)}...</div>
+          <div class="mt8 btn-row">
+            <button class="btn btn-outline btn-sm" onclick="copyText('Subject: ${t.subject.replace(/'/g,"\\'")}\\n\\n${t.body.replace(/'/g,"\\'").replace(/\\n/g,'\\\\n')}')">📋 复制全文</button>
+            <button class="btn btn-gold btn-sm" onclick="toast('模板已复制，可在开发信编辑器中粘贴使用')">✉️ 使用模板</button>
+          </div>
+        </div>`).join('')}
+    </div>
   </div>`;
 }
+
 
 /* ---------- 开发信编辑器（抽屉） ---------- */
 function editDraftForCustomer(cid){

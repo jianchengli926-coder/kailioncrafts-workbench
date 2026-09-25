@@ -5470,6 +5470,101 @@ function viewTools(root){
     </div>` : ''}
   </div>
   
+  <!-- V35 AI多语言翻译助手面板 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #dd6b20;background:linear-gradient(135deg,#fffaf0,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🌐 AI 多语言翻译助手（外贸专业术语 · 12国语言）</span>
+      <span class="badge" style="background:#dd6b20;color:#fff">新功能 V35</span>
+    </div>
+    <p class="text-sm text-muted mb12">AI专业外贸翻译，保留格式，术语准确，支持12国语言互译，附30+外贸常用术语对照表</p>
+    
+    <!-- 语言选择 -->
+    <div class="mb12" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div class="text-xs text-muted mb6">源语言：</div>
+        <select id="transFrom" class="form-control" style="width:100%">
+          ${TRANSLATE_LANGS.map((l,i)=>`<option value="${l.id}" ${i===1?'selected':''}>${l.label}</option>`).join('')}
+        </select>
+      </div>
+      <div style="font-size:20px;cursor:pointer;color:#dd6b20" onclick="swapTranslateLangs()" title="交换语言">🔄</div>
+      <div style="flex:1;min-width:200px">
+        <div class="text-xs text-muted mb6">目标语言：</div>
+        <select id="transTo" class="form-control" style="width:100%">
+          ${TRANSLATE_LANGS.map((l,i)=>`<option value="${l.id}" ${i===0?'selected':''}>${l.label}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    
+    <!-- 原文输入 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6" style="display:flex;justify-content:space-between">
+        <span>原文（支持邮件/产品描述/网站内容等，保留格式翻译）：</span>
+        <span id="transCharCount" class="text-muted" style="font-size:10px">0 字</span>
+      </div>
+      <textarea id="transInput" class="form-control" rows="5" placeholder="输入要翻译的内容..." style="font-family:monospace;font-size:12px" oninput="document.getElementById('transCharCount').textContent=this.value.length+' 字'"></textarea>
+    </div>
+    
+    <!-- 快速示例 -->
+    <div class="mb12">
+      <div class="text-xs text-muted mb6">快速填充示例：</div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        <span class="badge" style="cursor:pointer;background:#fffaf0;color:#dd6b20;border:1px solid #fbd38d;font-size:11px" onclick="document.getElementById('transInput').value='Dear Michael,\n\nThank you for your inquiry about our kitchen scissors.\n\nPlease find attached our latest catalog and quotation. The MOQ is 1000pcs, FOB Yangjiang price is USD1.85/pc. Lead time is 30 days after deposit.\n\nWe can provide free samples, you only need to pay the shipping cost.\n\nLooking forward to your reply.\n\nBest regards,\nLeo'">✉️ 开发信</span>
+        <span class="badge" style="cursor:pointer;background:#fffaf0;color:#dd6b20;border:1px solid #fbd38d;font-size:11px" onclick="document.getElementById('transInput').value='8.5寸厨房剪刀，3Cr13不锈钢，刀片硬度54-56HRC，可拆洗设计，带开瓶器和核桃夹功能。FOB阳江价USD1.85/把，MOQ1000把，交期30天。BSCI/ISO9001/FDA认证齐全。'">🔪 产品描述</span>
+        <span class="badge" style="cursor:pointer;background:#fffaf0;color:#dd6b20;border:1px solid #fbd38d;font-size:11px" onclick="document.getElementById('transInput').value='We are a professional manufacturer of kitchen knives and scissors in Yangjiang, China, with 20 years of OEM experience. Our factory covers 5000 square meters, with 150 workers and monthly production capacity of 500,000 pieces. We have BSCI, ISO9001 and FDA certifications.'">🏭 公司介绍</span>
+      </div>
+    </div>
+    
+    <!-- 翻译按钮 -->
+    <div class="flex gap8 items-center">
+      <button id="transBtn" class="btn" style="background:#dd6b20;color:#fff" onclick="runTranslate()">🌐 开始翻译</button>
+      <button class="btn btn-outline" onclick="document.getElementById('transInput').value='';document.getElementById('transResult').style.display='none';document.getElementById('transCharCount').textContent='0 字'">🗑️ 清空</button>
+      <span id="transStatus" class="text-sm text-muted"></span>
+    </div>
+    
+    <!-- 翻译结果 -->
+    <div id="transResult" class="mt12" style="display:none">
+      <div class="text-xs text-muted mb6" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📋 翻译结果：</span>
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 8px" onclick="copyTranslation(document.getElementById('transResultContent').textContent)">📋 复制结果</button>
+      </div>
+      <div id="transResultContent" style="background:#fffaf0;padding:12px;border-radius:6px;font-size:13px;line-height:1.8;white-space:pre-wrap;max-height:400px;overflow-y:auto;border:1px solid #fbd38d">
+      </div>
+    </div>
+    
+    <!-- 外贸术语对照表 -->
+    <div class="mt16">
+      <div class="text-xs text-muted mb6" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="document.getElementById('termsTable').style.display=document.getElementById('termsTable').style.display==='none'?'block':'none'">
+        <span>📖 外贸常用术语对照表（30+条，点击展开/收起）</span>
+        <span style="color:#dd6b20">▼</span>
+      </div>
+      <div id="termsTable" style="display:none;max-height:300px;overflow-y:auto;border:1px solid #fbd38d;border-radius:6px">
+        <table style="width:100%;font-size:12px;border-collapse:collapse">
+          <thead style="background:#fffaf0;position:sticky;top:0">
+            <tr><th style="padding:8px;text-align:left;border-bottom:1px solid #fbd38d;color:#dd6b20">英文术语</th><th style="padding:8px;text-align:left;border-bottom:1px solid #fbd38d;color:#dd6b20">中文释义</th></tr>
+          </thead>
+          <tbody>
+            ${TRADE_TERMS.map((t,i)=>`<tr style="${i%2?'background:#fffdf7':''}"><td style="padding:6px 8px;border-bottom:1px solid #fef3c7;font-family:monospace">${t.en}</td><td style="padding:6px 8px;border-bottom:1px solid #fef3c7">${t.zh}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- 历史记录 -->
+    ${(S.translateHistory && S.translateHistory.length) ? `
+    <div class="mt16">
+      <div class="text-xs text-muted mb6" style="display:flex;justify-content:space-between">
+        <span>📜 翻译历史（最近${Math.min(S.translateHistory.length,10)}条）</span>
+        <span style="cursor:pointer;color:#dd6b20" onclick="clearTranslateHistory()">清空</span>
+      </div>
+      <div style="max-height:200px;overflow-y:auto">
+        ${S.translateHistory.slice(0,10).map(h=>`<div style="padding:8px;background:#fffaf0;border-radius:4px;margin-bottom:6px;cursor:pointer;border-left:3px solid #dd6b20" onclick="showTranslateHistory('${h.id}')">
+          <div class="text-xs" style="color:#666">${TRANSLATE_LANGS.find(l=>l.id===h.from)?TRANSLATE_LANGS.find(l=>l.id===h.from).label:h.from} → ${TRANSLATE_LANGS.find(l=>l.id===h.to)?TRANSLATE_LANGS.find(l=>l.id===h.to).label:h.to} · ${h.latency}ms</div>
+          <div style="font-size:12px;color:#333;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.text.slice(0,80)}...</div>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+  </div>
+  
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
@@ -5947,6 +6042,167 @@ function clearProfileHistory(){
   DB.save('profileHistory', S.profileHistory);
   viewTools(document.getElementById('mainContent'));
   toast('已清空客户画像历史');
+}
+
+/* V35 AI多语言翻译助手 */
+const TRANSLATE_LANGS = [
+  {id:'zh',label:'🇨🇳 中文',flag:'🇨🇳'},
+  {id:'en',label:'🇺🇸 English',flag:'🇺🇸'},
+  {id:'de',label:'🇩🇪 Deutsch',flag:'🇩🇪'},
+  {id:'es',label:'🇪🇸 Español',flag:'🇪🇸'},
+  {id:'fr',label:'🇫🇷 Français',flag:'🇫🇷'},
+  {id:'it',label:'🇮🇹 Italiano',flag:'🇮🇹'},
+  {id:'pt',label:'🇵🇹 Português',flag:'🇵🇹'},
+  {id:'ja',label:'🇯🇵 日本語',flag:'🇯🇵'},
+  {id:'ko',label:'🇰🇷 한국어',flag:'🇰🇷'},
+  {id:'ar',label:'🇸🇦 العربية',flag:'🇸🇦'},
+  {id:'ru',label:'🇷🇺 Русский',flag:'🇷🇺'},
+  {id:'nl',label:'🇳🇱 Nederlands',flag:'🇳🇱'}
+];
+
+/* 外贸常用术语对照 */
+const TRADE_TERMS = [
+  {en:'MOQ (Minimum Order Quantity)',zh:'最小起订量'},
+  {en:'FOB (Free On Board)',zh:'离岸价'},
+  {en:'CIF (Cost, Insurance, Freight)',zh:'到岸价（成本+保险+运费）'},
+  {en:'DDP (Delivered Duty Paid)',zh:'完税后交货'},
+  {en:'EXW (Ex Works)',zh:'工厂交货价'},
+  {en:'Lead Time',zh:'交货周期/生产周期'},
+  {en:'Sample Charge',zh:'样品费'},
+  {en:'OEM (Original Equipment Manufacturer)',zh:'贴牌生产'},
+  {en:'ODM (Original Design Manufacturer)',zh:'原始设计制造商'},
+  {en:'BSCI Certification',zh:'BSCI认证（商业社会标准认证）'},
+  {en:'FDA Certification',zh:'FDA认证（美国食品药品监督管理局）'},
+  {en:'CE Certification',zh:'CE认证（欧盟安全合格标志）'},
+  {en:'GS Certification',zh:'GS认证（德国安全认证）'},
+  {en:'T/T (Telegraphic Transfer)',zh:'电汇'},
+  {en:'L/C (Letter of Credit)',zh:'信用证'},
+  {en:'D/A (Documents against Acceptance)',zh:'承兑交单'},
+  {en:'D/P (Documents against Payment)',zh:'付款交单'},
+  {en:'B/L (Bill of Lading)',zh:'提单'},
+  {en:'CO (Certificate of Origin)',zh:'原产地证'},
+  {en:'Form A',zh:'普惠制原产地证格式A'},
+  {en:'RCEP',zh:'区域全面经济伙伴关系协定'},
+  {en:'Incoterms',zh:'国际贸易术语解释通则'},
+  {en:'Proforma Invoice (PI)',zh:'形式发票'},
+  {en:'Commercial Invoice (CI)',zh:'商业发票'},
+  {en:'Packing List',zh:'装箱单'},
+  {en:'Inspection Report',zh:'检验报告'},
+  {en:'Defect Rate',zh:'不良率/次品率'},
+  {en:'Hardness (HRC)',zh:'硬度（洛氏硬度C级）'},
+  {en:'Stainless Steel 3Cr13',zh:'3Cr13不锈钢'},
+  {en:'Stainless Steel 5Cr15Mov',zh:'5Cr15Mov不锈钢'}
+];
+
+/* 执行翻译 */
+async function translateText(text, fromLang, toLang){
+  if(!text || !text.trim()) return {result:null, error:'请输入要翻译的内容'};
+  if(fromLang === toLang) return {result:text, error:'源语言和目标语言相同'};
+  const fromName = TRANSLATE_LANGS.find(l=>l.id===fromLang);
+  const toName = TRANSLATE_LANGS.find(l=>l.id===toLang);
+  const prompt = `你是专业的外贸翻译专家。请将以下${fromName?fromName.label:fromLang}文本翻译成${toName?toName.label:toLang}。
+
+要求：
+1. 保持原文的格式（换行、列表、标点）
+2. 外贸专业术语要准确（如MOQ/FOB/CIF/DDP/BSCI/FDA等）
+3. 语气要专业、商务化
+4. 如果是邮件，保持邮件的礼貌和格式
+5. 只输出翻译结果，不要添加解释
+
+原文：
+${text}`;
+  const result = await callAI([{role:'user',content:prompt}], {purpose:'translation', temperature:0.2});
+  if(result.error) return {result:null, error:result.error};
+  // 保存历史
+  if(!S.translateHistory) S.translateHistory = [];
+  S.translateHistory.unshift({id:uid(),text:text,result:result.content,from:fromLang,to:toLang,t:Date.now(),model:result.model,latency:result.latency});
+  if(S.translateHistory.length>50) S.translateHistory = S.translateHistory.slice(0,50);
+  DB.save('translateHistory', S.translateHistory);
+  return {result:result.content, model:result.model, latency:result.latency};
+}
+
+/* 复制翻译结果 */
+function copyTranslation(text){
+  navigator.clipboard.writeText(text).then(()=>toast('✅ 翻译结果已复制')).catch(()=>{
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('✅ 翻译结果已复制');
+  });
+}
+
+/* 翻译 - 执行翻译 */
+async function runTranslate(){
+  const text = document.getElementById('transInput').value.trim();
+  const fromLang = document.getElementById('transFrom').value;
+  const toLang = document.getElementById('transTo').value;
+  if(!text){ toast('请输入要翻译的内容'); return; }
+  if(fromLang === toLang){ toast('源语言和目标语言不能相同'); return; }
+  const btn = document.getElementById('transBtn');
+  const status = document.getElementById('transStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ 翻译中...';
+  status.textContent = 'AI正在翻译，请稍候...';
+  const result = await translateText(text, fromLang, toLang);
+  btn.disabled = false;
+  btn.textContent = '🌐 开始翻译';
+  if(result.error){
+    status.innerHTML = '<span style="color:#e53e3e">❌ '+result.error+'</span>';
+    return;
+  }
+  status.innerHTML = `<span style="color:#dd6b20">✅ 翻译完成！${result.latency}ms · ${result.model}</span>`;
+  const resultDiv = document.getElementById('transResult');
+  const resultContent = document.getElementById('transResultContent');
+  resultDiv.style.display = 'block';
+  resultContent.textContent = result.result;
+  // 刷新历史
+  setTimeout(()=>viewTools(document.getElementById('mainContent')), 500);
+}
+
+/* 翻译 - 交换语言 */
+function swapTranslateLangs(){
+  const fromSel = document.getElementById('transFrom');
+  const toSel = document.getElementById('transTo');
+  const temp = fromSel.value;
+  fromSel.value = toSel.value;
+  toSel.value = temp;
+  // 交换输入和结果
+  const input = document.getElementById('transInput');
+  const resultContent = document.getElementById('transResultContent');
+  const resultDiv = document.getElementById('transResult');
+  if(resultDiv.style.display !== 'none' && resultContent.textContent){
+    input.value = resultContent.textContent;
+    document.getElementById('transCharCount').textContent = input.value.length + ' 字';
+    resultDiv.style.display = 'none';
+  }
+  toast('已交换源语言和目标语言');
+}
+
+/* 翻译 - 显示历史 */
+function showTranslateHistory(id){
+  const item = (S.translateHistory||[]).find(h=>h.id===id);
+  if(!item) return;
+  openModal(`
+    <div class="modal-head"><h3>🌐 翻译历史</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="text-xs text-muted mb6">${TRANSLATE_LANGS.find(l=>l.id===item.from)?TRANSLATE_LANGS.find(l=>l.id===item.from).label:item.from} → ${TRANSLATE_LANGS.find(l=>l.id===item.to)?TRANSLATE_LANGS.find(l=>l.id===item.to).label:item.to} · ${item.latency}ms</div>
+      <div class="text-xs mb6" style="color:#666;background:#f8fafc;padding:8px;border-radius:4px"><b>原文：</b><br>${item.text.replace(/\n/g,'<br>')}</div>
+      <div class="text-xs mb6" style="color:#dd6b20"><b>译文：</b></div>
+      <div style="background:#fffaf0;padding:12px;border-radius:6px;font-size:13px;line-height:1.8;white-space:pre-wrap;max-height:300px;overflow-y:auto;border:1px solid #fbd38d">${item.result}</div>
+      <div class="flex gap8 mt12">
+        <button class="btn" style="background:#dd6b20;color:#fff" onclick="copyTranslation(document.querySelectorAll('#modalRoot .modal-body div')[3].innerText);closeModal()">📋 复制译文</button>
+      </div>
+    </div>
+  `);
+}
+
+/* 翻译 - 清空历史 */
+function clearTranslateHistory(){
+  if(!confirm('确定清空所有翻译历史？')) return;
+  S.translateHistory = [];
+  DB.save('translateHistory', S.translateHistory);
+  viewTools(document.getElementById('mainContent'));
+  toast('已清空翻译历史');
 }
 
 /* V20 端到端获客流水线 */

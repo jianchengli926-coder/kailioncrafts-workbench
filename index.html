@@ -2459,6 +2459,26 @@ function markSOPStep(cid, stepIndex){
   openCustomerDetail(cid);
 }
 
+
+
+/* V56 客户质量分析辅助函数 */
+function getGradeBar(grade, count, total){
+  const colors = {'A':'#38a169', 'B':'#3182ce', 'C':'#718096'};
+  const labels = {'A':'A级（高价值）', 'B':'B级（有潜力）', 'C':'C级（待培育）'};
+  const percent = total>0 ? Math.round(count/total*100) : 0;
+  return `
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+        <span style="font-weight:600;color:${colors[grade]}">${labels[grade]}</span>
+        <span class="text-muted">${count}个 (${percent}%)</span>
+      </div>
+      <div style="height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden">
+        <div style="width:${percent}%;height:100%;background:${colors[grade]};border-radius:4px;transition:width 0.5s"></div>
+      </div>
+    </div>
+  `;
+}
+
 function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
@@ -2757,6 +2777,54 @@ function viewDashboard(root){
         <span class="text-sm text-gold">📌 客户不是找不到，很多时候是跟丢了</span>
       </div>
     </div>
+
+    <!-- V56 客户质量分析与跟进统计 -->
+    <div class="grid-2 mb16">
+      <div class="card card-pad">
+        <div class="card-title">📊 客户质量分布</div>
+        <div style="display:flex;align-items:center;gap:20px;margin-top:12px">
+          <div style="flex:1">
+            ${getGradeBar('A', S.customers.filter(c=>c.scores&&c.scores.grade==='A').length, total)}
+            ${getGradeBar('B', S.customers.filter(c=>c.scores&&c.scores.grade==='B').length, total)}
+            ${getGradeBar('C', S.customers.filter(c=>c.scores&&c.scores.grade==='C').length, total)}
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:32px;font-weight:800;color:var(--primary)">${total>0?Math.round(S.customers.filter(c=>c.scores&&(c.scores.grade==='A'||c.scores.grade==='B')).length/total*100):0}%</div>
+            <div class="text-sm text-muted">优质客户占比</div>
+            <div style="font-size:12px;color:var(--green);margin-top:4px">A+B级客户</div>
+          </div>
+        </div>
+        <div class="text-sm text-muted mt8" style="border-top:1px solid #e2e8f0;padding-top:8px">
+          💡 A级客户优先跟进，B级客户定期培育，C级客户降低跟进频率
+        </div>
+      </div>
+
+      <div class="card card-pad">
+        <div class="card-title">📈 跟进状态统计</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px">
+          <div style="background:#f0f4f8;padding:10px;border-radius:8px;text-align:center">
+            <div style="font-size:20px;font-weight:700;color:var(--primary)">${getTodayFollowCount()}</div>
+            <div class="text-xs text-muted">今日待跟进</div>
+          </div>
+          <div style="background:#fefcbf;padding:10px;border-radius:8px;text-align:center">
+            <div style="font-size:20px;font-weight:700;color:#975a16">${getFollowOverdueCount()}</div>
+            <div class="text-xs text-muted">跟进超时(>14天)</div>
+          </div>
+          <div style="background:#c6f6d5;padding:10px;border-radius:8px;text-align:center">
+            <div style="font-size:20px;font-weight:700;color:#276749">${replied}</div>
+            <div class="text-xs text-muted">已回复客户</div>
+          </div>
+          <div style="background:#e9d8fd;padding:10px;border-radius:8px;text-align:center">
+            <div style="font-size:20px;font-weight:700;color:#553c9a">${S.communications.length}</div>
+            <div class="text-xs text-muted">沟通记录总数</div>
+          </div>
+        </div>
+        <div class="text-sm text-muted mt8" style="border-top:1px solid #e2e8f0;padding-top:8px">
+          ⏰ 建议每天优先处理今日待跟进，超时客户需立即联系
+        </div>
+      </div>
+    </div>
+
     <div class="card card-pad mb16" style="padding:10px 16px;background:#0f172a;color:#fff;overflow:hidden">
       <div style="display:flex;gap:32px;white-space:nowrap;animation:ticker 20s linear infinite">
         <span>🆕 今日新线索 <b>${S.customers.length?12:0}</b></span>

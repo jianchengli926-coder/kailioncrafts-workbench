@@ -678,6 +678,9 @@ function persist(){
   DB.save('profileHistory',S.profileHistory); DB.save('translateHistory',S.translateHistory);
   DB.save('replyHistory',S.replyHistory); DB.save('waHistory',S.waHistory);
   DB.save('emailHistory',S.emailHistory); DB.save('whatsappHistory',S.whatsappHistory);
+  DB.save('autoSearch',S.autoSearch); DB.save('activityLog',S.activityLog); DB.save('socialMonitor',S.socialMonitor);
+  DB.save('mailQueue',S.mailQueue); DB.save('mailLogs',S.mailLogs); DB.save('smtpConfig',S.smtpConfig);
+  DB.save('devPlans',S.devPlans); DB.save('apiLogs',S.apiLogs); DB.save('pipeline2',S.pipeline2);
 }
 
 /* V74.6 导出客户数据为CSV */

@@ -12664,6 +12664,27 @@ elif page == "📖 工作台说明书":
                     else:
                         st.caption("（暂无详细内容）")
                     st.markdown("</div></div>", unsafe_allow_html=True)
+                    # ===== 章节截图（自动匹配）=====
+                    _screenshot_map = {
+                        "登录": "manual_assets/00_login.png",
+                        "仪表盘首页": "manual_assets/01_dashboard.png",
+                        "客户中心总览": "manual_assets/02_customer_center.png",
+                        "潜在客户分析": "manual_assets/02_customer_center.png",
+                        "产品库": "manual_assets/03_product_library.png",
+                        "设置中心": "manual_assets/04_settings.png",
+                        "模型管理": "manual_assets/04_settings.png",
+                        "SKU命名工具": "manual_assets/05_ai_tools.png",
+                        "产品线稿工具": "manual_assets/05_ai_tools.png",
+                        "公司知识库": "manual_assets/06_knowledge_base.png",
+                        "图片SEO命名": "manual_assets/07_seo_center.png",
+                        "Listing SEO": "manual_assets/07_seo_center.png",
+                    }
+                    for _kw, _img_path in _screenshot_map.items():
+                        if _kw in _sec_name:
+                            _full_path = Path(__file__).parent / _img_path
+                            if _full_path.exists():
+                                st.image(str(_full_path), caption=f"📸 {_sec_name} - 操作界面截图", use_container_width=True)
+                            break
 
 # ============ 页脚 ============
 st.markdown("---")

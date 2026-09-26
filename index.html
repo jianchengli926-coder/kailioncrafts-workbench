@@ -627,6 +627,18 @@ function loadState(){
       else S[k] = {};
     }
   });
+  
+  // V74.7 客户数据健壮性：确保每个客户都有scores对象，防止c.scores.grade崩溃
+  if(Array.isArray(S.customers)){
+    S.customers.forEach(c=>{
+      if(!c.scores) c.scores = {total:0, grade:'C', dimensions:{}};
+      if(!c.scores.grade) c.scores.grade = 'C';
+      if(c.scores.total == null) c.scores.total = 0;
+      if(!c.tags) c.tags = [];
+      if(!c.communications) c.communications = [];
+      if(!c.createdAt) c.createdAt = new Date().toISOString();
+    });
+  }
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -2269,10 +2281,12 @@ const NAV = [
   {key:'expos',icon:'🎪',label:'展会管理',title:'展会管理',crumb:'展前邀约 · 展中分级 · 展后跟进'},
   {group:'数据与智能'},
   {key:'reports',icon:'🏆',label:'业绩战报',title:'业绩战报',crumb:'漏斗看未来 · 战报看现在 · 行为看过程'},
+  {key:'pipeline',icon:'🎯',label:'销售漏斗',title:'销售漏斗',crumb:'6阶段商机管理 · 销售预测'},
   {key:'agents',icon:'🤖',label:'AI Agent团队',title:'AI Agent团队',crumb:'AI CEO调度 · 11个专业Agent协同'},
   {key:'activity',icon:'📋',label:'操作日志',title:'操作日志与审计',crumb:'记录所有重要操作 · 可追溯可审计'},
   {key:'linkedin',icon:'💼',label:'领英拓客',title:'领英智能拓客',crumb:'4步拓客法 · AI站内信 · 智能互动'},
   {key:'socialmonitor',icon:'📡',label:'社媒监控',title:'社媒关键词监控',crumb:'监控行业痛点 · 发现潜在客户'},
+  {key:'outreach',icon:'📤',label:'触达中心',title:'多渠道触达中心',crumb:'邮件·WhatsApp·领英·电话统一管理'},
   {group:'系统'},
   {key:'tools',icon:'🧰',label:'工具箱',title:'工具箱',crumb:'14类·100+工具'},
   {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings'},
@@ -3532,6 +3546,14 @@ function viewDashboard(root){
   S.products = S.products || [];
   S.knowledge = S.knowledge || [];
   S.activityLog = S.activityLog || [];
+  
+  // V74.7 客户数据健壮性：确保每个客户的关键字段存在，防止渲染崩溃
+  S.customers.forEach(c=>{
+    if(!c.scores) c.scores = {total:0, grade:'C', dimensions:{}};
+    if(!c.scores.grade) c.scores.grade = 'C';
+    if(!c.createdAt) c.createdAt = new Date().toISOString();
+    if(!c.tags) c.tags = [];
+  });
 
   const total = S.customers.length;
   const plansRunning = S.plans.filter(p=>p.status==='running').length;

@@ -647,6 +647,48 @@ function persist(){
   DB.save('pipeline',S.pipeline); DB.save('emailTemplates',S.emailTemplates); DB.save('modelSpeedTest',S.modelSpeedTest); DB.save('contentHistory',S.contentHistory); DB.save('communications',S.communications); DB.save('documents',S.documents);
   DB.save('finance',S.finance); DB.save('catalog',S.catalog); DB.save('team',S.team);
 }
+
+/* V74.6 导出客户数据为CSV */
+function exportCustomersCSV(){
+  const list = (S.customers||[]).slice();
+  if(!list.length){ alert('暂无客户数据可导出'); return; }
+  const headers = ['公司名称','联系人','职位','邮箱','电话','国家','城市','来源','等级','状态','标签','产品','网站','下次跟进','创建时间','备注'];
+  const rows = list.map(c=>{
+    const contact = c.contact || {};
+    const scores = c.scores || {};
+    return [
+      c.company||'', contact.name||'', contact.title||'', contact.email||'', contact.phone||'',
+      c.country||'', c.city||'', c.source||'', scores.grade||'', c.status||'',
+      (c.tags||[]).join('; '), (c.products||[]).join('; '), c.website||'',
+      c.nextFollowUp||'', c.createdAt||'', (c.notes||'').replace(/[\r\n]/g,' ')
+    ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',');
+  });
+  const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `客户数据_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  if(typeof logAction === 'function') logAction('export', '导出客户数据', `导出${list.length}个客户`);
+}
+
+/* V74.6 导出开发信为CSV */
+function exportDraftsCSV(){
+  const list = (S.drafts||[]).slice();
+  if(!list.length){ alert('暂无开发信可导出'); return; }
+  const headers = ['客户公司','客户邮箱','主题','正文','状态','创建时间'];
+  const rows = list.map(d=>[
+    d.customer||'', d.email||'', d.subject||'',
+    (d.body||'').replace(/[\r\n]/g,' '), d.status||'', d.createdAt||''
+  ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+  const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `开发信_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  if(typeof logAction === 'function') logAction('export', '导出开发信', `导出${list.length}封开发信`);
+}
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
 function gradeBadge(g){ if(!g) return '<span class="badge badge-c" title="未评级">未评级</span>'; const n=GRADE_NAME[g]||g; const cls = String(g).toLowerCase().replace(/[^a-z0-9]/g,'') || 'c'; return `<span class="badge badge-${cls}" title="${n}">${n}</span>`; }
@@ -4188,6 +4230,7 @@ function viewCustomers(root){
       ${[['all','全部客户'],['new','新开发客户'],['old','老客户（已成交）']].map(([k,l])=>
         `<button class="btn ${custFilter.view===k?'btn-gold':'btn-outline'}" onclick="custFilter.view='${k}';custFilter.page=1;renderView()">${l}</button>`).join('')}
       <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="exportCustomersCSV()">📤 导出</button>
         <button class="btn btn-outline" onclick="openImportModal()">📥 导入</button>
         <button class="btn btn-outline" onclick="findDuplicates()">🔍 查重</button>
         ${custFilter.selected.length?`<button class="btn btn-gold" onclick="openBatchOps()">⚡ 批量操作（${custFilter.selected.length}）</button>`:''}
@@ -11594,7 +11637,7 @@ Best regards,
 
 /* 获取邮件模板列表（内置+自定义） */
 function getAllEmailTemplates(){
-  const custom = S.emailTemplates || [];
+  const custom = Array.isArray(S.emailTemplates) ? S.emailTemplates : [];
   return [...BUILTIN_EMAIL_TEMPLATES, ...custom];
 }
 

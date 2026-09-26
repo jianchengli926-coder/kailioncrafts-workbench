@@ -617,6 +617,16 @@ function loadState(){
   S.modelSpeedTest = DB.load('modelSpeedTest') || null;
   S.contentHistory = DB.load('contentHistory') || null;
   S.communications = DB.load('communications') || null;
+  
+  // V74.5 全局null清理：把所有为null的数组初始化为空数组，防止页面渲染崩溃
+  Object.keys(S).forEach(k => {
+    if (S[k] === null) {
+      // 根据属性名判断应该初始化为数组还是对象
+      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks'];
+      if (arrayKeys.includes(k)) S[k] = [];
+      else S[k] = {};
+    }
+  });
 }
 function persist(){
   DB.save('customers',S.customers); DB.save('plans',S.plans); DB.save('drafts',S.drafts);
@@ -3472,6 +3482,15 @@ function radarChart(scores, size){
  * ============================================================ */
 function viewDashboard(root){
   try {
+  // V74.5 空值保护：确保所有数组不为null（用户localStorage可能有null数据）
+  S.customers = S.customers || [];
+  S.plans = S.plans || [];
+  S.drafts = S.drafts || [];
+  S.inbox = S.inbox || [];
+  S.products = S.products || [];
+  S.knowledge = S.knowledge || [];
+  S.activityLog = S.activityLog || [];
+
   const total = S.customers.length;
   const plansRunning = S.plans.filter(p=>p.status==='running').length;
   const today = new Date().toISOString().slice(0,10);

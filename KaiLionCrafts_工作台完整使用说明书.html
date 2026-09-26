@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaiLionCrafts AI工作台 · 完整使用说明书</title>
+<style>
+:root {
+  --primary: #c8102e;
+  --primary-dark: #9a0c23;
+  --dark: #1a1a2e;
+  --dark2: #16213e;
+  --accent: #e94560;
+  --bg: #f8f9fa;
+  --card: #ffffff;
+  --text: #333;
+  --text2: #666;
+  --border: #e0e0e0;
+  --green: #28a745;
+  --orange: #fd7e14;
+  --blue: #007bff;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background:var(--bg); color:var(--text); line-height:1.7; }
+
+/* 顶部 */
+.hero { background: linear-gradient(135deg, var(--dark) 0%, var(--dark2) 100%); color:#fff; padding:40px 20px; text-align:center; }
+.hero h1 { font-size:2.2em; margin-bottom:10px; }
+.hero .sub { opacity:.8; font-size:1.1em; }
+.hero .badges { margin-top:15px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.hero .badge { background:rgba(255,255,255,.15); padding:4px 14px; border-radius:20px; font-size:.85em; }
+
+/* 布局 */
+.wrapper { display:flex; max-width:1400px; margin:0 auto; }
+.sidebar { width:280px; background:#fff; border-right:1px solid var(--border); padding:20px; position:sticky; top:0; height:100vh; overflow-y:auto; flex-shrink:0; }
+.sidebar h3 { font-size:.9em; color:var(--text2); margin:15px 0 8px; text-transform:uppercase; letter-spacing:1px; }
+.sidebar a { display:block; padding:6px 10px; color:var(--text); text-decoration:none; border-radius:6px; font-size:.92em; }
+.sidebar a:hover { background:var(--bg); color:var(--primary); }
+.sidebar a.active { background:#fff0f1; color:var(--primary); font-weight:600; }
+.main { flex:1; padding:30px; min-width:0; }
+
+/* 搜索框 */
+.search-box { margin-bottom:15px; }
+.search-box input { width:100%; padding:10px 14px; border:1px solid var(--border); border-radius:8px; font-size:.95em; }
+
+/* 内容卡片 */
+.card { background:var(--card); border-radius:12px; padding:25px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+.card h2 { color:var(--dark); border-left:4px solid var(--primary); padding-left:12px; margin-bottom:15px; font-size:1.4em; }
+.card h3 { color:var(--dark); margin:18px 0 10px; font-size:1.15em; }
+.card h4 { color:var(--text); margin:12px 0 8px; font-size:1.05em; }
+.card p { margin-bottom:10px; }
+.card ul, .card ol { margin:8px 0 12px 20px; }
+.card li { margin-bottom:5px; }
+
+/* 标签 */
+.tag { display:inline-block; padding:2px 10px; border-radius:12px; font-size:.8em; margin-right:5px; }
+.tag-ai { background:#e3f2fd; color:#1565c0; }
+.tag-free { background:#e8f5e9; color:#2e7d32; }
+.tag-config { background:#fff3e0; color:#e65100; }
+.tag-optional { background:#f3e5f5; color:#7b1fa2; }
+
+/* 步骤 */
+.step { display:flex; gap:12px; margin:12px 0; }
+.step-num { background:var(--primary); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0; }
+.step-content { flex:1; }
+
+/* 提示框 */
+.tip { background:#e3f2fd; border-left:4px solid var(--blue); padding:12px 16px; border-radius:0 8px 8px 0; margin:12px 0; }
+.warning { background:#fff3e0; border-left:4px solid var(--orange); padding:12px 16px; border-radius:0 8px 8px 0; margin:12px 0; }
+.success { background:#e8f5e9; border-left:4px solid var(--green); padding:12px 16px; border-radius:0 8px 8px 0; margin:12px 0; }
+
+/* 表格 */
+table { width:100%; border-collapse:collapse; margin:12px 0; font-size:.92em; }
+th, td { border:1px solid var(--border); padding:8px 12px; text-align:left; }
+th { background:var(--dark); color:#fff; }
+tr:nth-child(even) { background:var(--bg); }
+
+/* 代码 */
+code { background:#f0f0f0; padding:2px 6px; border-radius:4px; font-family:"SF Mono", Monaco, monospace; font-size:.9em; color:var(--primary); }
+
+/* 功能网格 */
+.feature-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px,1fr)); gap:15px; margin:15px 0; }
+.feature-item { background:var(--bg); border-radius:8px; padding:15px; border:1px solid var(--border); }
+.feature-item .icon { font-size:1.8em; margin-bottom:8px; }
+.feature-item .name { font-weight:600; margin-bottom:5px; }
+.feature-item .desc { font-size:.88em; color:var(--text2); }
+
+/* 目录折叠 */
+details { margin:8px 0; }
+summary { cursor:pointer; font-weight:600; padding:8px; background:var(--bg); border-radius:6px; }
+details[open] summary { background:#e8e8e8; }
+
+/* 回到顶部 */
+#backtop { position:fixed; bottom:30px; right:30px; width:45px; height:45px; border-radius:50%; background:var(--primary); color:#fff; border:none; cursor:pointer; font-size:20px; box-shadow:0 2px 8px rgba(0,0,0,.2); display:none; }
+
+@media (max-width:900px) {
+  .wrapper { flex-direction:column; }
+  .sidebar { width:100%; height:auto; position:relative; border-right:none; border-bottom:1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🔪 KaiLionCrafts AI工作台</h1>
+  <div class="sub">完整使用说明书 · 小白也能上手</div>
+  <div class="badges">
+    <span class="badge">📦 12大模块</span>
+    <span class="badge">🤖 9个AI工具</span>
+    <span class="badge">🔧 37个功能页面</span>
+    <span class="badge">🧠 9节点AI故障转移</span>
+    <span class="badge">📚 106个详细章节</span>
+  </div>
+</div>
+
+<div class="wrapper">
+<!-- 侧边栏目录 -->
+<div class="sidebar">
+  <div class="search-box"><input type="text" id="searchInput" placeholder="🔍 搜索功能..."></div>
+  <div id="toc"></div>
+</div>
+
+<!-- 主内容 -->
+<div class="main" id="mainContent">
+<!-- content will be inserted here -->
+</div>
+</div>
+
+<button id="backtop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+<script>
+// 功能数据
+const sections = [
+  {
+    id: "start", icon: "🚀", title: "快速开始",
+    items: [
+      { id:"launch", title:"1. 启动工作台", tags:["开箱即用"], content:`
+        <h3>双击桌面图标即可启动</h3>
+        <p>桌面上有一个 <code>启动企业AI工作台（KaiLionCrafts）.command</code> 文件，双击它即可。</p>
+        <div class="step"><div class="step-num">1</div><div class="step-content">双击桌面启动文件</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-content">等待约10秒，浏览器会自动打开</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-content">输入密码 <code>441723</code>，点「进入」</div></div>
+        <div class="tip">💡 启动窗口可以关掉，工作台在后台继续运行。要关闭时双击桌面的「关闭企业AI工作台」即可。</div>
+        <h4>访问方式</h4>
+        <table><tr><th>方式</th><th>地址</th><th>说明</th></tr>
+        <tr><td>本机</td><td>http://localhost:8501</td><td>启动后自动打开</td></tr>
+        <tr><td>局域网</td><td>http://192.168.1.22:8501</td><td>同WiFi下其他电脑/手机可访问</td></tr></table>
+      `},
+      { id:"login", title:"2. 登录与密码", tags:["安全"], content:`
+        <p>打开工作台后首先看到登录页，输入访问密码 <code>441723</code> 即可进入。</p>
+        <div class="success">✅ 登录后当前浏览器会保持登录状态，刷新不需要重新输入。</div>
+        <div class="warning">⚠️ 密码是工作台唯一的安全屏障，不要告诉外部人员。修改密码需要编辑 app.py 第151行。</div>
+      `},
+      { id:"interface", title:"3. 界面认识", tags:["开箱即用"], content:`
+        <p>工作台界面分为三部分：</p>
+        <div class="feature-grid">
+          <div class="feature-item"><div class="icon">📌</div><div class="name">左侧导航栏</div><div class="desc">12个功能模块，点一下就切换</div></div>
+          <div class="feature-item"><div class="icon">🤖</div><div class="name">AI状态栏</div><div class="desc">显示当前用哪个AI模型</div></div>
+          <div class="feature-item"><div class="icon">💬</div><div class="name">AI快速问答</div><div class="desc">任何页面都能快速问AI</div></div>
+          <div class="feature-item"><div class="icon">📊</div><div class="name">主内容区</div><div class="desc">当前功能的操作界面</div></div>
+        </div>
+      `},
+    ]
+  },
+  {
+    id: "dashboard", icon: "🏠", title: "仪表盘",
+    items: [
+      { id:"dash-overview", title:"仪表盘首页", tags:["AI增强"], content:`
+        <p>登录后默认进入仪表盘，这里是工作台的"驾驶舱"。</p>
+        <h4>你能看到什么</h4>
+        <ul>
+          <li><b>总客户数</b>：目前录入了多少客户</li>
+          <li><b>平均评分</b>：所有客户的AI匹配度平均分</li>
+          <li><b>待跟进</b>：今天需要联系的客户数</li>
+          <li><b>已成交/转化率</b>：成单情况</li>
+          <li><b>AI引擎状态</b>：当前用的哪个模型、故障转移链状态</li>
+        </ul>
+        <div class="tip">💡 每天早上进来先看这里，就知道今天该干什么。</div>
+      `},
+      { id:"dash-ai", title:"AI今日工作建议", tags:["AI增强"], content:`
+        <p>点击「✨ 生成今日工作建议」，AI会自动分析你的客户、待办、订单，给你列出今天最重要的3件事。</p>
+        <div class="step"><div class="step-num">1</div><div class="step-content">点仪表盘上的「生成今日工作建议」按钮</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-content">等5-15秒，AI生成建议</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-content">如果有满意的建议，可以一键转为今日待办</div></div>
+      `},
+    ]
+  },
+  {
+    id: "customer", icon: "👥", title: "客户中心",
+    items: [
+      { id:"cust-analyze", title:"潜在客户分析", tags:["AI增强"], content:`
+        <p>这是最常用的功能之一。输入一个潜在客户的信息，AI帮你分析这个客户值不值得跟、怎么跟。</p>
+        <h4>怎么用</h4>
+        <div class="step"><div class="step-num">1</div><div class="step-content">左边导航点「👥 客户中心」</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-content">在「公司名称」填客户公司名（如 TestKitchen Inc）</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-content">填国家（如 德国）、主营产品（如 厨房刀具）</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-content">点「🔍 AI分析」按钮，等几秒</div></div>
+        <p>AI会输出：客户类型、核心业务、目标市场、采购模式推测、预估年采购量、匹配度评分、跟进建议。</p>
+      `},
+      { id:"cust-dev", title:"开发信生成", tags:["AI增强"], content:`
+        <p>AI帮你写个性化外贸开发信，支持多语言。</p>
+        <h4>两个入口</h4>
+        <ul>
+          <li><b>个性化开发信（网址+案例）</b>：输入客户网站，AI先背调再写信</li>
+          <li><b>新开发信</b>：手动填客户信息，AI直接写信</li>
+        </ul>
+        <div class="tip">💡 第一次用之前，先展开顶部的「第一步：企业信息与工程案例库」，填好公司简介，AI写出来的信更专业。</div>
+      `},
+      { id:"cust-followup", title:"跟进序列", tags:["AI增强"], content:`
+        <p>客户不回邮件怎么办？AI帮你自动生成4轮跟进邮件：</p>
+        <ol>
+          <li><b>第1封</b>：初次开发信</li>
+          <li><b>第2封</b>：3天后跟进，补充信息</li>
+          <li><b>第3封</b>：7天后跟进，分享案例</li>
+          <li><b>第4封</b>：14天后最后尝试</li>
+        </ol>
+      `},
+      { id:"cust-crm", title:"客户管理CRM", tags:["开箱即用"], content:`
+        <p>所有录入的客户都在这里管理。可以按等级（A/B/C/D）筛选、查看客户详情、记录跟进活动。</p>
+        <div class="tip">💡 A级客户绿色标签最高优先级，每周跟进；C级灰色标签每月跟进即可。</div>
+      `},
+    ]
+  },
+  {
+    id: "tools", icon: "🛠️", title: "AI工具库",
+    items: [
+      { id:"tools-overview", title:"9个AI工具总览", tags:["开箱即用"], content:`
+        <p>左侧导航点「🤖 锴利自研AI工具库」，这里有9个专为刀剪行业做的工具：</p>
+        <div class="feature-grid">
+          <div class="feature-item"><div class="icon">🏷️</div><div class="name">SKU命名工具</div><div class="desc">一键生成SKU编码和SEO文件名</div></div>
+          <div class="feature-item"><div class="icon">✏️</div><div class="name">产品线稿工具</div><div class="desc">产品照片转线稿图</div></div>
+          <div class="feature-item"><div class="icon">🎨</div><div class="name">视觉矫正</div><div class="desc">AI自动调图片角度和缩放</div></div>
+          <div class="feature-item"><div class="icon">📝</div><div class="name">提示词库</div><div class="desc">37条刀剪产品生图提示词</div></div>
+          <div class="feature-item"><div class="icon">🖼️</div><div class="name">场景图反推</div><div class="desc">上传参考图AI分析风格</div></div>
+          <div class="feature-item"><div class="icon">🌡️</div><div class="name">白平衡校正</div><div class="desc">AI推荐最佳色温参数</div></div>
+          <div class="feature-item"><div class="icon">🎬</div><div class="name">爆款视频反推</div><div class="desc">AI生成视频脚本和镜头</div></div>
+          <div class="feature-item"><div class="icon">🖼️</div><div class="name">AI作图工作台</div><div class="desc">一站式生图+文案+脚本</div></div>
+          <div class="feature-item"><div class="icon">📐</div><div class="name">选片对齐</div><div class="desc">JPG选片匹配RAW原片</div></div>
+        </div>
+      `},
+    ]
+  },
+  {
+    id: "product", icon: "📦", title: "产品库",
+    items: [
+      { id:"prod-browse", title:"产品浏览", tags:["开箱即用"], content:`
+        <p>左侧导航点「📦 产品库」，这里有公司全部127个产品。</p>
+        <ul>
+          <li>按品类筛选：厨房刀(36)、户外刀(30)、剪刀(31)、厨房用品(30)</li>
+          <li>按价格区间筛选</li>
+          <li>按材质筛选</li>
+          <li>搜索SKU快速定位</li>
+        </ul>
+        <p>每个产品显示：SKU编码、产品名称、材质、图片数量。点「查看SEO资料」可看到该产品的SEO优化内容。</p>
+      `},
+    ]
+  },
+  {
+    id: "seo", icon: "🔍", title: "SEO中心",
+    items: [
+      { id:"seo-overview", title:"SEO中心6大工具", tags:["AI增强"], content:`
+        <div class="feature-grid">
+          <div class="feature-item"><div class="icon">📊</div><div class="name">SEO表格工具</div><div class="desc">关键词密度分析表格</div></div>
+          <div class="feature-item"><div class="icon">📦</div><div class="name">上品SEO</div><div class="desc">AI生成22模块完整Listing</div></div>
+          <div class="feature-item"><div class="icon">🖼️</div><div class="name">图片SEO命名</div><div class="desc">AI视觉分析后生成文件名和ALT</div></div>
+          <div class="feature-item"><div class="icon">✍️</div><div class="name">博客SEO</div><div class="desc">AI生成博客文章和关键词</div></div>
+          <div class="feature-item"><div class="icon">🗺️</div><div class="name">SEO策略</div><div class="desc">内容集群规划</div></div>
+          <div class="feature-item"><div class="icon">📈</div><div class="name">SEO评分卡</div><div class="desc">AI评分+优化建议</div></div>
+        </div>
+      `},
+    ]
+  },
+  {
+    id: "market", icon: "📈", title: "市场与产品分析",
+    items: [
+      { id:"market-overview", title:"市场分析工具", tags:["AI增强"], content:`
+        <p>左侧导航点「📈 市场与产品分析」，包含：</p>
+        <ul>
+          <li><b>入市分析</b>：选目标市场和品类，AI生成入市作战地图</li>
+          <li><b>蓝海选品</b>：分析哪些产品竞争小、机会大</li>
+          <li><b>VOC客户之声</b>：分析客户评价中的痛点</li>
+          <li><b>关键词挖掘</b>：找客户搜索词</li>
+        </ul>
+      `},
+    ]
+  },
+  {
+    id: "inquiry", icon: "🖥️", title: "独立站管理",
+    items: [
+      { id:"inquiry-overview", title:"询盘管理", tags:["开箱即用"], content:`
+        <p>管理独立站收到的客户询盘。可以录入新询盘、查看评论、统计数据。</p>
+        <div class="warning">⚠️ WooCommerce订单拉取需要配置API密钥，目前暂无询盘数据时显示空状态是正常的。</div>
+      `},
+    ]
+  },
+  {
+    id: "order", icon: "🧾", title: "订单台账",
+    items: [
+      { id:"order-overview", title:"订单与财务", tags:["AI增强"], content:`
+        <p>这里管理销售订单、采购工厂、收付款记录。</p>
+        <ul>
+          <li><b>销售订单</b>：记录卖给客户的订单</li>
+          <li><b>采购/工厂</b>：记录向工厂采购</li>
+          <li><b>收付款</b>：记录钱进钱出</li>
+          <li><b>经营看板</b>：AI分析经营状况</li>
+        </ul>
+        <div class="tip">💡 目前还没有订单数据，点「新建销售订单」添加第一笔即可。</div>
+      `},
+    ]
+  },
+  {
+    id: "social", icon: "🌍", title: "海外社媒",
+    items: [
+      { id:"social-overview", title:"社媒矩阵", tags:["AI增强"], content:`
+        <p>管理LinkedIn/Facebook/Instagram/TikTok的内容。</p>
+        <ul>
+          <li>选品类+平台+内容类型</li>
+          <li>输入产品描述</li>
+          <li>AI生成英文Caption + 10-15个Hashtag + 发布时间建议</li>
+        </ul>
+      `},
+    ]
+  },
+  {
+    id: "kb", icon: "📚", title: "公司知识库",
+    items: [
+      { id:"kb-overview", title:"知识库", tags:["开箱即用"], content:`
+        <p>左侧导航点「📚 公司知识库」，这里汇集了公司所有资料：</p>
+        <ul>
+          <li>公司简介、产品术语、工厂供应链信息</li>
+          <li>谈客户技巧、谈判报价、邮件模板</li>
+          <li>FAQ问答、SKU数据、营销攻略</li>
+        </ul>
+        <h4>AI知识问答</h4>
+        <p>在知识库页面底部有AI问答框，直接用自然语言提问，比如"我们的MOQ是多少？"，AI会从知识库找答案。</p>
+      `},
+    ]
+  },
+  {
+    id: "setting", icon: "⚙️", title: "设置与模型",
+    items: [
+      { id:"model-mgmt", title:"模型管理", tags:["开箱即用"], content:`
+        <p>侧边栏点「⚙️ 模型管理」进入AI模型控制后台。</p>
+        <h4>故障转移链（重要）</h4>
+        <p>工作台配置了9个AI模型，一个坏了自动切下一个，你无感知：</p>
+        <table><tr><th>#</th><th>模型</th><th>类型</th><th>状态</th></tr>
+        <tr><td>1</td><td>智谱GLM-4-Flash</td><td>在线免费</td><td>✅ 主力</td></tr>
+        <tr><td>2</td><td>智谱GLM-4.7-Flash</td><td>在线免费</td><td>✅ 深度思考</td></tr>
+        <tr><td>3</td><td>硅基流动Xing4.0-29B</td><td>在线免费</td><td>❌ 余额不足</td></tr>
+        <tr><td>4</td><td>硅基流动Qwen2.5-7B</td><td>在线免费</td><td>❌ 余额不足</td></tr>
+        <tr><td>5</td><td>智谱GLM-4.6V-Flash</td><td>在线免费</td><td>✅ 视觉理解</td></tr>
+        <tr><td>6</td><td>豆包Seed-2.1-Turbo</td><td>在线付费</td><td>✅ 备用</td></tr>
+        <tr><td>7-9</td><td>Ollama本地模型×3</td><td>本地</td><td>✅ 断网兜底</td></tr></table>
+        <div class="tip">💡 硅基流动两个模型余额不足，不影响使用——故障转移会自动跳过它们。后续充值或换API即可。</div>
+      `},
+      { id:"health-check", title:"一键健康检测", tags:["开箱即用"], content:`
+        <p>在模型管理页面点「🔍 一键检测所有模型」，系统会逐个测试每个在线模型的连接速度。</p>
+        <p>结果显示：✅正常(带响应时间) / ❌异常(带错误原因) / ⏭️跳过(本地模型)。</p>
+      `},
+    ]
+  },
+  {
+    id: "faq", icon: "❓", title: "常见问题",
+    items: [
+      { id:"faq-list", title:"FAQ", tags:["参考"], content:`
+        <details><summary>Q: AI调用失败怎么办？</summary><p>A: 工作台有9节点故障转移，一个失败自动切下一个。如果全部在线模型都失败会切到本地Ollama。</p></details>
+        <details><summary>Q: AI生成很慢怎么办？</summary><p>A: 正常，复杂分析需要10-30秒。简单问题1-2秒。</p></details>
+        <details><summary>Q: 数据存在哪里？安全吗？</summary><p>A: 所有数据都存在本地 data/ 文件夹，不上传第三方。备份只需复制整个文件夹。</p></details>
+        <details><summary>Q: 如何重启工作台？</summary><p>A: 双击桌面「关闭企业AI工作台」，再双击「启动企业AI工作台」。</p></details>
+        <details><summary>Q: 忘记密码？</summary><p>A: 密码是 441723。</p></details>
+        <details><summary>Q: 局域网其他电脑怎么访问？</summary><p>A: 同一WiFi下浏览器打开 http://192.168.1.22:8501</p></details>
+      `},
+    ]
+  },
+];
+
+// 渲染目录
+const toc = document.getElementById('toc');
+const main = document.getElementById('mainContent');
+let tocHTML = '';
+let contentHTML = '';
+
+sections.forEach((sec, si) => {
+  tocHTML += `<h3>${sec.icon} ${sec.title}</h3>`;
+  sec.items.forEach((item, ii) => {
+    const id = item.id;
+    tocHTML += `<a href="#${id}" data-target="${id}">${item.title}</a>`;
+    contentHTML += `<div class="card" id="${id}">
+      <h2>${sec.icon} ${item.title}</h2>
+      <p>${item.tags.map(t => `<span class="tag tag-${t.includes('AI')?'ai':t.includes('免费')?'free':t.includes('配置')?'config':'optional'}">${t}</span>`).join('')}</p>
+      ${item.content}
+    </div>`;
+  });
+});
+toc.innerHTML = tocHTML;
+main.innerHTML = contentHTML;
+
+// 搜索
+document.getElementById('searchInput').addEventListener('input', function(e) {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('.card').forEach(card => {
+    const text = card.textContent.toLowerCase();
+    card.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+  document.querySelectorAll('.sidebar a').forEach(a => {
+    const text = a.textContent.toLowerCase();
+    a.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+});
+
+// 回到顶部
+window.onscroll = function() {
+  document.getElementById('backtop').style.display = window.scrollY > 300 ? 'block' : 'none';
+};
+
+// 高亮当前目录
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+      const link = document.querySelector(`.sidebar a[data-target="${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, {rootMargin: '-20% 0px -70% 0px'});
+document.querySelectorAll('.card').forEach(c => observer.observe(c));
+</script>
+</body>
+</html>

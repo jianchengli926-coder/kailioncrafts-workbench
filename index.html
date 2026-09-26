@@ -617,6 +617,19 @@ function loadState(){
   S.modelSpeedTest = DB.load('modelSpeedTest') || null;
   S.contentHistory = DB.load('contentHistory') || null;
   S.communications = DB.load('communications') || null;
+  S.orders = DB.load('orders') || [];
+  S.followupTasks = DB.load('followupTasks') || [];
+  S.opportunities = DB.load('opportunities') || [];
+  S.publicPool = DB.load('publicPool') || [];
+  S.receivables = DB.load('receivables') || [];
+  S.imageHistory = DB.load('imageHistory') || [];
+  S.visionHistory = DB.load('visionHistory') || [];
+  S.profileHistory = DB.load('profileHistory') || [];
+  S.translateHistory = DB.load('translateHistory') || [];
+  S.replyHistory = DB.load('replyHistory') || [];
+  S.waHistory = DB.load('waHistory') || [];
+  S.emailHistory = DB.load('emailHistory') || [];
+  S.whatsappHistory = DB.load('whatsappHistory') || [];
   
   // V74.5 全局null清理：把所有为null的数组初始化为空数组，防止页面渲染崩溃
   Object.keys(S).forEach(k => {
@@ -658,6 +671,13 @@ function persist(){
   DB.save('productmedia',S.productmedia); DB.save('aisales',S.aisales);
   DB.save('pipeline',S.pipeline); DB.save('emailTemplates',S.emailTemplates); DB.save('modelSpeedTest',S.modelSpeedTest); DB.save('contentHistory',S.contentHistory); DB.save('communications',S.communications); DB.save('documents',S.documents);
   DB.save('finance',S.finance); DB.save('catalog',S.catalog); DB.save('team',S.team);
+  DB.save('linkedin',S.linkedin); DB.save('tools',S.tools); DB.save('workflows',S.workflows);
+  DB.save('orders',S.orders); DB.save('followupTasks',S.followupTasks); DB.save('opportunities',S.opportunities);
+  DB.save('publicPool',S.publicPool); DB.save('receivables',S.receivables);
+  DB.save('imageHistory',S.imageHistory); DB.save('visionHistory',S.visionHistory);
+  DB.save('profileHistory',S.profileHistory); DB.save('translateHistory',S.translateHistory);
+  DB.save('replyHistory',S.replyHistory); DB.save('waHistory',S.waHistory);
+  DB.save('emailHistory',S.emailHistory); DB.save('whatsappHistory',S.whatsappHistory);
 }
 
 /* V74.6 导出客户数据为CSV */

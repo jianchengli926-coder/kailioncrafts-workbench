@@ -5040,6 +5040,13 @@ function claimCust(cid){
 
 function openCustomerDetail(cid){
   const c = S.customers.find(x=>x.id===cid); if(!c) return;
+  c.scores = c.scores || {grade:'C',total:0,product:0,companyType:0,purchaseSignal:0,contactQuality:0};
+  c.contact = c.contact || {name:'-',title:'-',email:'-'};
+  c.profile = c.profile || {};
+  c.matchReasons = c.matchReasons || [];
+  c.addresses = c.addresses || [];
+  c.customs = c.customs || null;
+  c.tags = c.tags || [];
   const drafts = S.drafts.filter(d=>d.customerId===cid);
   openDrawer(`
     <div class="drawer-head">
@@ -5112,11 +5119,11 @@ function openCustomerDetail(cid){
       <div class="card card-pad mb16">
         <div class="card-title">AI 客户画像</div>
         <div class="text-sm" style="line-height:1.9">
-          <div><b style="color:var(--primary)">核心业务：</b>${esc(c.profile.business)}</div>
-          <div><b style="color:var(--primary)">产品线：</b>${esc(c.profile.productLine)}</div>
-          <div><b style="color:var(--primary)">采购需求：</b>${esc(c.profile.needs)}</div>
-          <div><b style="color:var(--primary)">供应链痛点：</b>${esc(c.profile.painPoints)}</div>
-          <div><b style="color:var(--accent-dark)">🎯 最佳切入：</b>${esc(c.profile.angle)}</div>
+          <div><b style="color:var(--primary)">核心业务：</b>${esc((c.profile&&c.profile.business)||'-')}</div>
+          <div><b style="color:var(--primary)">产品线：</b>${esc((c.profile&&c.profile.productLine)||'-')}</div>
+          <div><b style="color:var(--primary)">采购需求：</b>${esc((c.profile&&c.profile.needs)||'-')}</div>
+          <div><b style="color:var(--primary)">供应链痛点：</b>${esc((c.profile&&c.profile.painPoints)||'-')}</div>
+          <div><b style="color:var(--accent-dark)">🎯 最佳切入：</b>${esc((c.profile&&c.profile.angle)||'-')}</div>
         </div>
       </div>
 
@@ -5132,15 +5139,15 @@ function openCustomerDetail(cid){
       <div class="card card-pad mb16">
         <div class="card-title">AI 匹配理由</div>
         <ul style="padding-left:18px;font-size:13px;line-height:1.9">
-          ${c.matchReasons.map(r=>`<li>${esc(r)}</li>`).join('')}
+          ${(c.matchReasons||[]).map(r=>`<li>${esc(r)}</li>`).join('')}
         </ul>
       </div>
 
       <div class="card card-pad mb16">
         <div class="card-title">联系方式</div>
         <div class="text-sm" style="line-height:2">
-          <div>👤 <b>${esc(c.contact.name)}</b> · ${esc(c.contact.title)}</div>
-          <div>✉️ <span class="mono">${esc(c.contact.email)}</span>
+          <div>👤 <b>${esc((c.contact&&c.contact.name)||'-')}</b> · ${esc((c.contact&&c.contact.title)||'-')}</div>
+          <div>✉️ <span class="mono">${esc((c.contact&&c.contact.email)||'-')}</span>
           <button class="btn btn-outline btn-sm" onclick="copyText('${c.contact.email}')">📧 复制</button></div>
         <div>📱 WhatsApp: ${esc(c.contact.whatsapp||'-')}
           <button class="btn btn-outline btn-sm" onclick="copyText('${c.contact.whatsapp||''}')">📱 复制</button></div>
@@ -5605,7 +5612,7 @@ function openDraftEditor(did, isNew){
     <div class="drawer-body">
       <div style="background:#f7efdd;padding:12px 14px;border-radius:8px;margin-bottom:16px">
         <b class="text-gold">🤖 AI 已引用以下客户真实信息：</b>
-        <ul style="margin:6px 0 0 18px;font-size:12.5px;line-height:1.8">${d.aiNotes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>
+        <ul style="margin:6px 0 0 18px;font-size:12.5px;line-height:1.8">${(d.aiNotes||[]).map(n=>`<li>${esc(n)}</li>`).join('')}</ul>
       </div>
       <div class="form-group"><label>收件人</label><input class="form-control" id="dr_email" value="${c?esc(c.contact.email):''}"></div>
       <div class="form-group"><label>主题</label><input class="form-control" id="dr_subject" value="${esc(d.subject)}"></div>

@@ -5021,8 +5021,21 @@ function transferCustomer(cid){
 function doTransfer(cid){
   const to=document.getElementById('transferTo').value;
   const c=S.customers.find(x=>x.id===cid);
+  if(!c.followUpHistory) c.followUpHistory=[];
   c.followUpHistory.push({t:daysAgo(0),desc:'移交给业务员 '+to});
   c.owner=to; persist(); closeModal(); toast('已移交给 '+to);
+}
+/* V74.9 修复：缺失的客户领取函数（公海客户领取） */
+function claimCust(cid){
+  const c=S.customers.find(x=>x.id===cid);
+  if(!c){ toast('客户不存在','err'); return; }
+  if(!c.followUpHistory) c.followUpHistory=[];
+  c.followUpHistory.push({t:daysAgo(0),desc:'从公海领取，分配给业务员 Leo'});
+  c.owner='Leo';
+  logAction('customer','领取客户',c.company);
+  persist();
+  toast('已领取客户：'+c.company,'ok');
+  renderView();
 }
 
 function openCustomerDetail(cid){

@@ -36,6 +36,7 @@ from provider_manager import (
 from knowledge_base import kb
 from customer_manager import cm, PIPELINE_STAGES
 from ai_client import ai
+from manual_content import MANUAL_CATEGORIES, search_manual as _search_manual
 from prompts import (
     CUSTOMER_ANALYSIS_PROMPT, COLD_EMAIL_PROMPT, FOLLOW_UP_PROMPT,
     FAQ_PROMPT, PRODUCT_RECOMMEND_PROMPT, INQUIRY_REPLY_PROMPT,
@@ -160,7 +161,7 @@ if not st.session_state["authed"]:
                         logs = json.load(open(log_file, encoding="utf-8"))
                     logs.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "登录成功"})
                     json.dump(logs[-100:], open(log_file, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-                except:
+                except Exception as e:
                     pass
                 st.rerun()
             else:
@@ -296,12 +297,21 @@ with st.sidebar:
         "📖 工作台说明书",
     ]
 
+    def _on_nav_change():
+        # 用户手动切换导航时，退出模型管理二级页
+        st.session_state.pop("_show_model_mgmt", None)
+
     page = st.radio(
         "功能导航",
         nav_options,
         label_visibility="collapsed",
         key="main_nav",
+        on_change=_on_nav_change,
     )
+
+    # 模型管理二级页：独立标志覆盖（避免radio已实例化后改session_state报错）
+    if st.session_state.get("_show_model_mgmt"):
+        page = "🤖 模型管理"
 
     # 切换导航时清除SEO子页面状态
     if page != "🔍 独立站SEO中心":
@@ -396,11 +406,13 @@ with st.sidebar:
                     st.success(f"已切换：{p['name']}")
                     st.rerun()
         if st.button("⚙️ 模型管理", use_container_width=True, key='goto_model_mgmt'):
-            page = "🤖 模型管理"
+            st.session_state["_show_model_mgmt"] = True
+            st.rerun()
     else:
         st.warning("未配置模型")
         if st.button("⚙️ 去配置", use_container_width=True):
-            page = "🤖 模型管理"
+            st.session_state["_show_model_mgmt"] = True
+            st.rerun()
 
     st.markdown("---")
     
@@ -684,7 +696,7 @@ if page == "🏠 仪表盘":
                         todo_text = f"待办{len(pending_todos)}条（高优先级{len(high_todos)}条）"
                     else:
                         todo_text = "暂无待办"
-                except:
+                except Exception as e:
                     todo_text = "暂无待办数据"
                 
                 prompt = f"""你是KaiLionCrafts外贸业务助理。请根据以下数据，生成今日工作建议：
@@ -808,7 +820,7 @@ if page == "🏠 仪表盘":
         if todo_file.exists():
             try:
                 todos = _json.loads(todo_file.read_text(encoding="utf-8"))
-            except:
+            except Exception as e:
                 todos = []
         else:
             todos = []
@@ -1435,14 +1447,32 @@ elif page == "🌅 晨间简报":
                     # 从简报中提取待办项
                     todo_items = _re.findall(r'[-•]\s*(.+?)(?=\n[-•]|\n##|$)', deep_brief, _re.DOTALL)
                     added = 0
+                    # 直接写入 data/todo/todos.json（与今日待办页共用同一文件）
+                    _todo_file = Path("data/todo/todos.json")
+                    _todo_file.parent.mkdir(parents=True, exist_ok=True)
+                    if _todo_file.exists():
+                        try:
+                            _todos = _json.loads(_todo_file.read_text(encoding="utf-8"))
+                        except Exception:
+                            _todos = []
+                    else:
+                        _todos = []
+                    _today = datetime.now().strftime("%Y-%m-%d")
                     for item in todo_items[:8]:
                         item = item.strip()
                         if len(item) > 5 and len(item) < 100:
                             priority = "高" if any(k in item for k in ["优先", "紧急", "立即", "A级", "重点"]) else "中"
-                            if "todo_manager" in dir():
-                                todo_manager.add_task(item, priority=priority, category="客户跟进")
-                                added += 1
+                            _todos.append({
+                                "task": item,
+                                "done": False,
+                                "priority": priority,
+                                "category": "客户跟进",
+                                "date": _today,
+                                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            })
+                            added += 1
                     if added > 0:
+                        _todo_file.write_text(_json.dumps(_todos, ensure_ascii=False, indent=2), encoding="utf-8")
                         st.success(f"✅ 已添加 {added} 条待办到今日待办")
                     else:
                         st.info("未提取到可转换的待办项，请手动添加")
@@ -2393,7 +2423,7 @@ EN: ...
                                     continue
                                 if days_f == "超过90天" and days_since <= 90:
                                     continue
-                            except:
+                            except Exception as e:
                                 pass
                         else:
                             # 没有跟进记录的，如果筛选7/30/90天内就排除
@@ -2819,7 +2849,7 @@ EN: ...
                         try:
                             start_date = datetime.strptime(seq_start_date[:10], "%Y-%m-%d")
                             days_since_start = (datetime.now() - start_date).days
-                        except:
+                        except Exception as e:
                             continue
 
                         steps = sequences[seq_name]["steps"]
@@ -3273,7 +3303,7 @@ EN: ...
                                         cm.update_customer(c["id"], {"owner": "公池"})
                                         cm.add_activity(c["id"], "系统", f"[自动清洗] {days_since}天没跟进，自动移到公池")
                                         cleaned += 1
-                                except:
+                                except Exception as e:
                                     pass
                         else:
                             try:
@@ -3283,7 +3313,7 @@ EN: ...
                                     cm.update_customer(c["id"], {"owner": "公池"})
                                     cm.add_activity(c["id"], "系统", f"[自动清洗] {days_since}天没跟进，自动移到公池")
                                     cleaned += 1
-                            except:
+                            except Exception as e:
                                 pass
                     st.success(f"✅ 清洗完成！共把 {cleaned} 个客户移到公池")
                     st.rerun()
@@ -3450,7 +3480,7 @@ EN: ...
                             days_since = (datetime.now() - datetime.strptime(last_fu[:10], "%Y-%m-%d")).days
                             if days_since >= 3:
                                 quoted_no_reply.append({**c, "days_since": days_since})
-                        except:
+                        except Exception as e:
                             pass
 
             # 分类3：样品寄出待确认（阶段=样品，且超过7天没跟进）
@@ -3464,7 +3494,7 @@ EN: ...
                             days_since = (datetime.now() - datetime.strptime(last_fu[:10], "%Y-%m-%d")).days
                             if days_since >= 7:
                                 sample_wait.append({**c, "days_since": days_since})
-                        except:
+                        except Exception as e:
                             pass
 
             # 分类4：A级客户7天未跟进
@@ -3477,7 +3507,7 @@ EN: ...
                             days_since = (datetime.now() - datetime.strptime(last_fu[:10], "%Y-%m-%d")).days
                             if days_since >= 7:
                                 a_grade_idle.append({**c, "days_since": days_since})
-                        except:
+                        except Exception as e:
                             pass
 
             # ===== 显示分类提醒卡片 =====
@@ -6202,7 +6232,7 @@ SKU格式：KL-品类-材质-款式号
                     if "sr_result" in st.session_state:
                         try:
                             result = _json.loads(st.session_state["sr_result"])
-                        except:
+                        except Exception as e:
                             result = {"interaction":"human hand","scene":"modern kitchen","action":"cutting","keywords":["natural light"],"composition":"rule of thirds","lighting":"soft light","mood":"premium"}
                         m1, m2, m3 = st.columns(3)
                         with m1:
@@ -6320,7 +6350,7 @@ SKU格式：KL-品类-材质-款式号
                                         st.session_state["wb_ai_reason"] = wb_rec.get("reason", "")
                                         st.success(f"✅ AI推荐已应用！理由：{wb_rec.get('reason', '')}")
                                         st.rerun()
-                                    except:
+                                    except Exception as e:
                                         st.session_state["wb_ai_raw"] = wb_result
                                         st.info("AI分析结果（原始）：")
                                         st.code(wb_result)
@@ -7233,7 +7263,7 @@ JPG文件（未匹配）：
                             _wm_draw = ImageDraw.Draw(_wm_layer)
                             try:
                                 _wm_font = ImageFont.truetype("/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc", _wm_size)
-                            except:
+                            except Exception as e:
                                 _wm_font = ImageFont.load_default()
                             _wm_bbox = _wm_draw.textbbox((0,0), _wm_text, font=_wm_font)
                             _wm_tw, _wm_th = _wm_bbox[2]-_wm_bbox[0], _wm_bbox[3]-_wm_bbox[1]
@@ -7276,7 +7306,7 @@ JPG文件（未匹配）：
                             _tx_draw = ImageDraw.Draw(_tx_layer)
                             try:
                                 _tx_font = ImageFont.truetype("/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc", _tx_size)
-                            except:
+                            except Exception as e:
                                 _tx_font = ImageFont.load_default()
                             _tx_bbox = _tx_draw.textbbox((0,0), _tx_text, font=_tx_font)
                             _tx_tw, _tx_th = _tx_bbox[2]-_tx_bbox[0], _tx_bbox[3]-_tx_bbox[1]
@@ -9733,6 +9763,8 @@ elif page == "🤖 模型管理":
         if st.button("🔍 一键检测所有模型", type="primary", use_container_width=True, key="health_check_all"):
             st.session_state['_health_results'] = None
             try:
+                import time as _hc_time
+                import requests as _hc_req
                 from ai_client import ai as _ai_hc
                 chain = _ai_hc.get_failover_chain()
                 hc_results = []
@@ -9740,21 +9772,21 @@ elif page == "🤖 模型管理":
                     if ep['type'] != 'online':
                         hc_results.append({'label': ep['label'], 'type': 'local', 'status': 'skipped', 'elapsed': 0, 'error': '本地模型跳过'})
                         continue
-                    t0 = time.time()
+                    t0 = _hc_time.time()
                     try:
-                        resp = requests.post(
+                        resp = _hc_req.post(
                             f"{ep['base_url']}/chat/completions",
                             headers={"Authorization": f"Bearer {ep['api_key']}", "Content-Type": "application/json"},
                             json={"model": ep['model'], "messages": [{"role": "user", "content": "hi"}], "max_tokens": 5},
                             timeout=15,
                         )
-                        elapsed = time.time() - t0
+                        elapsed = _hc_time.time() - t0
                         if resp.status_code == 200:
                             hc_results.append({'label': ep['label'], 'type': 'online', 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
                         else:
                             hc_results.append({'label': ep['label'], 'type': 'online', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code}"})
                     except Exception as e:
-                        elapsed = time.time() - t0
+                        elapsed = _hc_time.time() - t0
                         hc_results.append({'label': ep['label'], 'type': 'online', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': str(e)[:60]})
                 st.session_state['_health_results'] = hc_results
             except Exception as e:
@@ -10070,7 +10102,7 @@ elif page == "📋 今日待办":
                         f"- {c.get('company_name','?')} | {c.get('grade','?')}级 | {c.get('status','?')} | {c.get('country','?')}"
                         for c in customers[:15]
                     ])
-                except:
+                except Exception as e:
                     customer_summary = "暂无客户数据"
                 
                 prompt = f"""你是一个外贸业务助理。根据以下信息，生成5-8条今日待办事项：
@@ -12516,20 +12548,122 @@ elif page == "⚙️ 设置":
     st.caption(f"工作台目录：{Path(__file__).parent}")
     
 elif page == "📖 工作台说明书":
-    st.title("📖 KaiLionCrafts AI工作台使用说明书")
-    st.caption("完整覆盖37个功能页面 · 从入门到精通 · 小白也能看懂")
-    
-    # 读取HTML说明书文件
-    manual_path = Path(__file__).parent / "KaiLionCrafts_AI工作台使用说明书_专业版.html"
-    if manual_path.exists():
-        with open(manual_path, 'r', encoding='utf-8') as f:
-            html_content = f.read()
-        # 使用components.html嵌入完整HTML说明书
-        import streamlit.components.v1 as components
-        components.html(html_content, height=3000, scrolling=True)
+    # ===== 注入精美说明书CSS =====
+    st.markdown("""
+    <style>
+    .manual-hero {
+        background: linear-gradient(150deg, #0f766e 0%, #115e59 55%, #134e4a 100%);
+        color: #fff; border-radius: 18px; padding: 36px 34px;
+        box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 20px rgba(16,24,40,.06);
+        margin-bottom: 22px;
+    }
+    .manual-hero .kicker { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; opacity: .8; margin-bottom: 10px; }
+    .manual-hero h1 { margin: 0 0 8px; font-size: 28px; line-height: 1.25; }
+    .manual-hero p { margin: 0; opacity: .92; font-size: 14px; }
+    .manual-hero .meta { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .manual-hero .meta span { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.22); border-radius: 999px; padding: 4px 12px; font-size: 12px; }
+    .manual-card {
+        background: #fff; border: 1px solid #e4e7eb; border-radius: 12px;
+        margin: 0 0 16px; box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 14px rgba(16,24,40,.05);
+        overflow: hidden;
+    }
+    .manual-card .hd {
+        padding: 16px 22px 12px; border-bottom: 1px solid #e4e7eb;
+        display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: #fafbfc;
+    }
+    .manual-card .idx {
+        font-size: 12px; font-weight: 700; color: #fff; background: #0f766e;
+        width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    }
+    .manual-card .hd h3 { margin: 0; font-size: 17px; flex: 1 1 auto; color: #1c2024; }
+    .manual-card .grp-tag { font-size: 11.5px; color: #8b949e; background: #eef1f4; padding: 2px 8px; border-radius: 5px; }
+    .manual-card .bd { padding: 16px 22px 20px; font-size: 14px; line-height: 1.75; color: #495057; }
+    .manual-card .bd p { margin: 8px 0; }
+    .manual-card .bd ul { margin: 6px 0; padding-left: 20px; }
+    .manual-card .bd li { margin: 4px 0; }
+    .manual-card .bd table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+    .manual-card .bd th, .manual-card .bd td { border: 1px solid #e4e7eb; padding: 7px 10px; text-align: left; }
+    .manual-card .bd th { background: #f2f4f6; font-weight: 600; }
+    .manual-card .bd code { background: #eef1f4; border: 1px solid #e4e7eb; border-radius: 4px; padding: 1px 5px; font-size: .88em; }
+    .manual-search-result { background: #fff; border: 1px solid #e4e7eb; border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; }
+    .manual-search-result .cat { font-size: 11px; color: #0f766e; font-weight: 600; }
+    .manual-search-result .title { font-size: 15px; font-weight: 600; margin: 4px 0; }
+    .manual-tabs-stats { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 16px; }
+    .manual-tabs-stats span { background: #e7f3f1; color: #0b5c56; border-radius: 6px; padding: 3px 10px; font-size: 12px; font-weight: 500; }
+    </style>
+    """, unsafe_allow_html=True)
+    _total_secs = sum(len(secs) for _, secs in MANUAL_CATEGORIES)
+    # ===== Hero区域 =====
+    st.markdown(f"""
+    <div class="manual-hero">
+        <div class="kicker">KaiLionCrafts · 企业级AI工作台</div>
+        <h1>📖 工作台使用说明书</h1>
+        <p>这份说明书按「左侧导航的每一个功能」逐页讲清楚：这一页是干什么用的、每一步怎么点、需要提前配置什么。凡是需要连接外部 API 才能见效的功能，都会单独标注清楚。</p>
+        <div class="meta">
+            <span>共 {len(MANUAL_CATEGORIES)} 个功能分类</span>
+            <span>{_total_secs} 个详细章节</span>
+            <span>从入门到精通</span>
+            <span>小白也能看懂</span>
+            <span>2026-09 版</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    # ===== 搜索框 =====
+    _manual_search = st.text_input("🔍 搜索说明书", placeholder="输入关键词搜索，如：故障转移、AI模型、客户分析、SKU命名...", key="manual_search_v3")
+    if _manual_search and _manual_search.strip():
+        _results = _search_manual(_manual_search)
+        if _results:
+            st.success(f"✅ 找到 {len(_results)} 条相关内容")
+            for _i, _r in enumerate(_results, 1):
+                st.markdown(f"""
+                <div class="manual-search-result">
+                    <div class="cat">[{_r['category']}]</div>
+                    <div class="title">{_i}. {_r['title']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.markdown(_r['content'])
+                st.markdown("---")
+        else:
+            st.warning(f"❌ 未找到与「{_manual_search}」相关的内容")
     else:
-        st.error("❌ 说明书文件未找到，请确认 KaiLionCrafts_AI工作台使用说明书_专业版.html 存在于工作台目录")
-        st.info("说明书文件路径：" + str(manual_path))
+        # ===== 顶部Tabs分类导航（全宽，无内部左侧栏）=====
+        _cat_names = [cat[0] for cat in MANUAL_CATEGORIES]
+        # 分类统计标签
+        _stats_html = '<div class="manual-tabs-stats">'
+        for _cn, _ss in MANUAL_CATEGORIES:
+            _stats_html += f'<span>{_cn} · {len(_ss)}章</span>'
+        _stats_html += '</div>'
+        st.markdown(_stats_html, unsafe_allow_html=True)
+        # 用tabs切换分类
+        _tabs = st.tabs(_cat_names)
+        for _tab_idx, _tab in enumerate(_tabs):
+            with _tab:
+                _cat_name = _cat_names[_tab_idx]
+                _sections = MANUAL_CATEGORIES[_tab_idx][1]
+                st.caption(f"共 {len(_sections)} 个详细章节，全部展开阅读")
+                st.markdown("---")
+                for _idx, (_sec_name, _sec_content) in enumerate(_sections, 1):
+                    _first_line = _sec_content.strip().split('\n')[0] if _sec_content.strip() else ""
+                    _grp_tag = _first_line if len(_first_line) < 20 and not _first_line.startswith('**') else ""
+                    st.markdown(f"""
+                    <div class="manual-card">
+                        <div class="hd">
+                            <span class="idx">{_idx}</span>
+                            <h3>{_sec_name}</h3>
+                            {f'<span class="grp-tag">{_grp_tag}</span>' if _grp_tag else ''}
+                        </div>
+                        <div class="bd">
+                    """, unsafe_allow_html=True)
+                    _content_lines = _sec_content.strip().split('\n')
+                    if _grp_tag and _content_lines:
+                        _render_content = '\n'.join(_content_lines[1:]).strip()
+                    else:
+                        _render_content = _sec_content
+                    if _render_content:
+                        st.markdown(_render_content)
+                    else:
+                        st.caption("（暂无详细内容）")
+                    st.markdown("</div></div>", unsafe_allow_html=True)
 
 # ============ 页脚 ============
 st.markdown("---")

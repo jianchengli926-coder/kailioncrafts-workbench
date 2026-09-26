@@ -88,7 +88,7 @@ def test_connection():
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             json={"folder_token": WORKBENCH_FOLDER_TOKEN, "title": "连接测试"}, timeout=10)
         results["doc"] = "✅ 可创建" if r.status_code == 200 and r.json().get("code") == 0 else "❌ 需权限"
-    except:
+    except Exception as e:
         results["doc"] = "❌ 需权限"
     return results
 
@@ -128,6 +128,3 @@ def upload_html_report(title, html_content):
     """把HTML报告存为飞书文档"""
     result = create_doc(title, html_content)
     return result
-
-if __name__ == "__main__":
-    print(json.dumps(test_connection(), ensure_ascii=False, indent=2))

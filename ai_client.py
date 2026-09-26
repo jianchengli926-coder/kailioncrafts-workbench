@@ -84,7 +84,9 @@ class AIClient:
                     continue
                 first_model = models[0]
                 if p.get("type") == "local":
-                    local_list.append((p, first_model))
+                    # 本地模型：所有模型都加入故障转移链（兜底用，多模型更可靠）
+                    for m in models:
+                        local_list.append((p, m))
                 else:
                     online_list.append((p, first_model))
             for p, m in online_list:

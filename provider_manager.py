@@ -98,7 +98,7 @@ def add_provider(name, base_url, api_key, models=None, provider_type="online"):
                     if detected_models:
                         provider['models'] = detected_models
                         provider['auto_detect'] = True
-        except:
+        except Exception as e:
             pass
 
     data['providers'].append(provider)
@@ -161,7 +161,7 @@ def detect_ollama_models():
             # 过滤掉嵌入模型，只保留对话模型
             chat_models = [m for m in models if 'embed' not in m.lower()]
             return chat_models
-    except:
+    except Exception as e:
         pass
     return []
 

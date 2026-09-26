@@ -639,7 +639,7 @@ function persist(){
 }
 function gradeOf(total){ return total>=80?'A':(total>=60?'B':'C'); }
 const GRADE_NAME={A:'优先联系',B:'待验证',C:'暂不联系'};
-function gradeBadge(g){ const n=GRADE_NAME[g]||g; return `<span class="badge badge-${g.toLowerCase()}" title="${n}">${n}</span>`; }
+function gradeBadge(g){ if(!g) return '<span class="badge badge-c" title="未评级">未评级</span>'; const n=GRADE_NAME[g]||g; const cls = String(g).toLowerCase().replace(/[^a-z0-9]/g,'') || 'c'; return `<span class="badge badge-${cls}" title="${n}">${n}</span>`; }
 
 /* ============================================================
  * 演示种子数据
@@ -2939,6 +2939,7 @@ function getTagCloudHTML(){
   }).join('');
 }
 
+
 function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
@@ -3470,6 +3471,7 @@ function radarChart(scores, size){
  * 视图 1：数据总览 Dashboard
  * ============================================================ */
 function viewDashboard(root){
+  try {
   const total = S.customers.length;
   const plansRunning = S.plans.filter(p=>p.status==='running').length;
   const today = new Date().toISOString().slice(0,10);
@@ -3942,6 +3944,11 @@ function viewDashboard(root){
           </div>`).join('')}
       </div>
     </div>`;
+  } catch(e) {
+    console.error('[viewDashboard] 渲染失败:', e);
+    root.innerHTML = '<div style="padding:40px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><h3 style="color:#e53e3e;margin-bottom:12px">数据看板加载遇到问题</h3><p style="color:#718096;margin-bottom:8px">错误信息: ' + e.message + '</p><p style="color:#a0aec0;font-size:12px">请尝试刷新页面，或联系技术支持</p><button onclick="go(&quot;dashboard&quot;)" style="margin-top:16px;padding:8px 20px;background:#1a365d;color:#fff;border:none;border-radius:6px;cursor:pointer">重新加载</button></div>';
+    if(typeof logAction === 'function') logAction('error', '数据看板渲染失败', e.message);
+  }
 }
 
 /* ============================================================

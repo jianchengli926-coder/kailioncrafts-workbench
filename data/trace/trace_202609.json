@@ -1009,5 +1009,39 @@
       "故障转移: 硅基流动（SiliconFlow）/XingChenAGI/Xing4.0-29B -> 智谱·GLM-4-Flash（免费/文本生成）/glm-4-flash"
     ],
     "failover_count": 4
+  },
+  {
+    "time": "2026-09-25 21:15:03",
+    "task": "连通性测试",
+    "model": "glm-4-flash",
+    "provider": "智谱GLM（免费模型）/glm-4-flash",
+    "elapsed_seconds": 0.76,
+    "prompt_chars": 14,
+    "completion_chars": 7,
+    "prompt_tokens": 537,
+    "completion_tokens": 8,
+    "total_tokens": 545,
+    "knowledge_refs": [],
+    "status": "success",
+    "error": null,
+    "failover": null,
+    "failover_count": 0
+  },
+  {
+    "time": "2026-09-25 21:16:54",
+    "task": "未命名任务",
+    "model": "glm-4-flash",
+    "provider": "智谱GLM（免费模型）/glm-4-flash",
+    "elapsed_seconds": 16.29,
+    "prompt_chars": 1149,
+    "completion_chars": 486,
+    "prompt_tokens": 1259,
+    "completion_tokens": 308,
+    "total_tokens": 1567,
+    "knowledge_refs": [],
+    "status": "success",
+    "error": null,
+    "failover": null,
+    "failover_count": 0
   }
 ]

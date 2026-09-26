@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>锴利外贸获客工作台 - 完整使用说明书 V75.1</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif; background:#f8fafc; color:#1e293b; line-height:1.8; }
+  .container { max-width:1100px; margin:0 auto; padding:30px 20px; }
+  .cover { text-align:center; padding:60px 20px; background:linear-gradient(135deg,#1e3a5f,#0f172a); color:#fff; border-radius:16px; margin-bottom:40px; }
+  .cover h1 { font-size:36px; margin-bottom:12px; color:#fbbf24; }
+  .cover p { font-size:16px; color:#94a3b8; margin-bottom:8px; }
+  .cover .version { display:inline-block; background:#fbbf24; color:#1e293b; padding:6px 20px; border-radius:20px; font-weight:bold; margin-top:16px; }
+  .toc { background:#fff; border-radius:12px; padding:24px 30px; margin-bottom:40px; border:1px solid #e2e8f0; }
+  .toc h2 { font-size:20px; color:#1e3a5f; margin-bottom:16px; border-bottom:2px solid #fbbf24; padding-bottom:8px; }
+  .toc ol { padding-left:24px; }
+  .toc li { margin-bottom:6px; }
+  .toc a { color:#2563eb; text-decoration:none; }
+  .toc a:hover { text-decoration:underline; }
+  .section { background:#fff; border-radius:12px; padding:30px; margin-bottom:30px; border:1px solid #e2e8f0; }
+  .section h2 { font-size:24px; color:#1e3a5f; margin-bottom:16px; border-left:4px solid #fbbf24; padding-left:12px; }
+  .section h3 { font-size:18px; color:#2563eb; margin:20px 0 10px; }
+  .section h4 { font-size:15px; color:#475569; margin:14px 0 8px; }
+  .section p { margin-bottom:12px; }
+  .section ul, .section ol { padding-left:24px; margin-bottom:12px; }
+  .section li { margin-bottom:6px; }
+  .screenshot { width:100%; border-radius:8px; border:1px solid #e2e8f0; margin:16px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+  .tip { background:#fef3c7; border-left:4px solid #f59e0b; padding:12px 16px; border-radius:0 8px 8px 0; margin:16px 0; }
+  .tip b { color:#92400e; }
+  .warn { background:#fee2e2; border-left:4px solid #ef4444; padding:12px 16px; border-radius:0 8px 8px 0; margin:16px 0; }
+  .warn b { color:#991b1b; }
+  .info { background:#dbeafe; border-left:4px solid #3b82f6; padding:12px 16px; border-radius:0 8px 8px 0; margin:16px 0; }
+  .info b { color:#1e40af; }
+  .success { background:#dcfce7; border-left:4px solid #22c55e; padding:12px 16px; border-radius:0 8px 8px 0; margin:16px 0; }
+  .success b { color:#166534; }
+  code { background:#f1f5f9; padding:2px 6px; border-radius:4px; font-family:Menlo,monospace; font-size:13px; color:#dc2626; }
+  pre { background:#1e293b; color:#e2e8f0; padding:16px; border-radius:8px; overflow-x:auto; margin:12px 0; font-size:13px; line-height:1.6; }
+  pre code { background:none; color:#e2e8f0; padding:0; }
+  .step { display:flex; gap:12px; margin-bottom:12px; align-items:flex-start; }
+  .step-num { background:#2563eb; color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0; font-size:14px; }
+  .step-content { flex:1; }
+  .feature-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin:16px 0; }
+  .feature-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; }
+  .feature-card b { color:#1e3a5f; display:block; margin-bottom:4px; }
+  .feature-card span { font-size:13px; color:#64748b; }
+  table { width:100%; border-collapse:collapse; margin:16px 0; }
+  th, td { border:1px solid #e2e8f0; padding:10px 12px; text-align:left; font-size:14px; }
+  th { background:#1e3a5f; color:#fff; }
+  tr:nth-child(even) { background:#f8fafc; }
+  .footer { text-align:center; padding:30px; color:#64748b; font-size:13px; border-top:1px solid #e2e8f0; margin-top:40px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- 封面 -->
+<div class="cover">
+  <h1>🏗️ 锴利外贸获客工作台</h1>
+  <p>KaiLionCrafts Prospect Workbench</p>
+  <p>外贸获客全流程 · AI智能驱动 · 本地私有化部署</p>
+  <div class="version">V75.1 完整版使用说明书</div>
+</div>
+
+<!-- 目录 -->
+<div class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#intro">工作台介绍</a></li>
+    <li><a href="#quickstart">快速开始（3种访问方式 + 登录）</a></li>
+    <li><a href="#interface">界面导航说明</a></li>
+    <li><a href="#features">24个功能页面详细使用说明</a></li>
+    <li><a href="#ai">AI模型配置与使用</a></li>
+    <li><a href="#data">数据管理（备份/导入/导出）</a></li>
+    <li><a href="#server">服务器管理（启动/关闭/自启）</a></li>
+    <li><a href="#faq">常见问题 FAQ</a></li>
+    <li><a href="#shortcuts">快捷键大全</a></li>
+  </ol>
+</div>
+
+<!-- 1. 介绍 -->
+<div class="section" id="intro">
+  <h2>一、工作台介绍</h2>
+  <p>锴利外贸获客工作台是一款专为外贸企业打造的<strong>全流程获客管理系统</strong>，集成了客户管理、开发信撰写、AI智能获客、销售漏斗、社媒监控等24个功能模块。</p>
+  
+  <h3>核心特点</h3>
+  <div class="feature-grid">
+    <div class="feature-card"><b>🔒 本地私有化部署</b><span>数据全部存在本地浏览器，不上传云端，安全可控</span></div>
+    <div class="feature-card"><b>🤖 AI智能驱动</b><span>支持在线免费模型+本地Ollama模型，AI写开发信、客户画像、SEO内容</span></div>
+    <div class="feature-card"><b>📊 全流程管理</b><span>从获客→开发信→跟进→询盘→报价→订单→售后，全流程覆盖</span></div>
+    <div class="feature-card"><b>🌐 三种访问方式</b><span>本地访问、局域网访问、公网访问（Cloudflare Tunnel）</span></div>
+    <div class="feature-card"><b>⚡ 开机自启动</b><span>launchd守护进程，Mac开机自动运行，无需手动启动</span></div>
+    <div class="feature-card"><b>💾 数据自动保存</b><span>所有操作自动保存到localStorage，支持CSV导入导出</span></div>
+  </div>
+
+  <h3>技术规格</h3>
+  <table>
+    <tr><th>项目</th><th>规格</th></tr>
+    <tr><td>前端</td><td>单文件HTML应用（index.html，约14000行，468个函数）</td></tr>
+    <tr><td>后端</td><td>Node.js本地服务器（server.js，341行，端口8080）</td></tr>
+    <tr><td>数据存储</td><td>浏览器localStorage（前缀 kailion_ark_）</td></tr>
+    <tr><td>AI模型</td><td>15个模型（智谱5个+硅基流动4个+Gemini 3个+本地Ollama 3个）</td></tr>
+    <tr><td>功能页面</td><td>24个</td></tr>
+  </table>
+</div>
+
+<!-- 2. 快速开始 -->
+<div class="section" id="quickstart">
+  <h2>二、快速开始</h2>
+  
+  <h3>2.1 三种访问方式</h3>
+  <table>
+    <tr><th>访问方式</th><th>地址</th><th>适用场景</th></tr>
+    <tr><td>本地访问</td><td><code>http://localhost:8080</code></td><td>在自己电脑上使用</td></tr>
+    <tr><td>局域网访问</td><td><code>http://192.168.1.22:8080</code></td><td>同一WiFi下的同事访问</td></tr>
+    <tr><td>公网访问</td><td><code>https://prospect.kailioncrafts.com</code></td><td>外出时通过互联网访问</td></tr>
+  </table>
+
+  <div class="info"><b>💡 提示：</b>服务器已设置为开机自启动，打开电脑后直接在浏览器输入地址即可使用，无需手动启动服务器。</div>
+
+  <h3>2.2 登录系统</h3>
+  <div class="step"><div class="step-num">1</div><div class="step-content">在浏览器中输入访问地址（如 <code>http://localhost:8080</code>）</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-content">看到锁屏页面，在密码输入框中输入访问密码：<code>441723</code></div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-content">按回车键或点击"解锁"按钮，即可进入工作台</div></div>
+
+  <div class="warn"><b>⚠️ 注意：</b>访问密码是工作台的唯一安全屏障，请妥善保管，不要告诉无关人员。修改密码请在"设置"页面操作。</div>
+</div>
+
+<!-- 3. 界面导航 -->
+<div class="section" id="interface">
+  <h2>三、界面导航说明</h2>
+  
+  <h3>3.1 整体布局</h3>
+  <p>工作台采用经典的<strong>左侧导航 + 顶部栏 + 主内容区</strong>三栏布局：</p>
+  <ul>
+    <li><strong>左侧导航栏</strong>：24个功能页面入口，按业务流程分为5组</li>
+    <li><strong>顶部栏</strong>：页面标题、全局搜索、通知、用户头像</li>
+    <li><strong>主内容区</strong>：当前页面的功能内容</li>
+  </ul>
+
+  <h3>3.2 左侧导航分组</h3>
+  <table>
+    <tr><th>分组</th><th>包含页面</th></tr>
+    <tr><td>🎯 核心流程</td><td>数据看板、AI开发任务、自动搜客、开发计划、客户台账、开发信</td></tr>
+    <tr><td>💬 沟通与跟进</td><td>AI收件箱、跟进日程、触达中心</td></tr>
+    <tr><td>📦 交易与产品</td><td>询盘管理、报价与订单、产品与样品、知识库</td></tr>
+    <tr><td>📈 营销与增长</td><td>SEO内容营销、展会管理、领英拓客、社媒监控</td></tr>
+    <tr><td>🤖 数据与智能</td><td>业绩战报、销售漏斗、AI Agent团队、操作日志、工具箱、设置</td></tr>
+  </table>
+
+  <h3>3.3 顶部栏功能</h3>
+  <ul>
+    <li><strong>☰ 菜单按钮</strong>：折叠/展开左侧导航栏</li>
+    <li><strong>🔍 全局搜索</strong>：搜索客户、公司、邮箱</li>
+    <li><strong>🌙 主题切换</strong>：切换深色/浅色模式</li>
+    <li><strong>🔔 通知</strong>：查看系统通知和提醒</li>
+    <li><strong>👤 用户头像</strong>：用户信息和快捷操作</li>
+  </ul>
+</div>
+
+<!-- 4. 功能页面详细说明 -->
+<div class="section" id="features">
+  <h2>四、24个功能页面详细使用说明</h2>
+
+  <!-- 4.1 数据看板 -->
+  <h3>4.1 📊 数据看板</h3>
+  <p><strong>功能定位：</strong>工作台首页，一目了然查看所有关键业务指标。</p>
+  <img src="说明书截图/01_数据看板.png" class="screenshot" alt="数据看板">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>核心指标卡片</strong>：客户总数、待跟进、本月新客户、开发信数量、回复率、转化率</li>
+    <li><strong>今日任务</strong>：今天需要跟进的客户和任务</li>
+    <li><strong>数据趋势图</strong>：近7天/30天客户增长、开发信发送、回复趋势</li>
+    <li><strong>客户分级分布</strong>：A/B/C级客户占比饼图</li>
+    <li><strong>最近活动</strong>：最新的操作记录和跟进动态</li>
+  </ul>
+  <div class="tip"><b>💡 使用技巧：</b>每天早上打开工作台先看数据看板，了解今日待办和业务概况，点击指标卡片可跳转到对应页面。</div>
+
+  <!-- 4.2 AI开发任务 -->
+  <h3>4.2 🤖 AI开发任务</h3>
+  <p><strong>功能定位：</strong>AI自动生成个性化获客计划，指定目标市场和产品，AI输出开发策略。</p>
+  <img src="说明书截图/02_AI开发任务.png" class="screenshot" alt="AI开发任务">
+  <h4>操作步骤</h4>
+  <div class="step"><div class="step-num">1</div><div class="step-content">填写目标市场（如"美国厨房用品批发商"）</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-content">选择主推产品（从产品库选择或手动输入）</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-content">点击"🚀 生成获客计划"按钮，AI自动输出开发策略</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-content">查看AI生成的计划，可保存为开发任务或一键生成开发信</div></div>
+
+  <!-- 4.3 自动搜客 -->
+  <h3>4.3 🔍 自动搜客</h3>
+  <p><strong>功能定位：</strong>多引擎智能搜客，一键搜索全球采购商、决策人信息。</p>
+  <img src="说明书截图/03_自动搜客.png" class="screenshot" alt="自动搜客">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>搜客引擎</strong>：支持Google、Bing、DuckDuckGo多引擎搜索</li>
+    <li><strong>全球采购商地图</strong>：按国家/地区查看采购商分布</li>
+    <li><strong>决策人挖掘</strong>：AI分析找到采购经理、CEO等关键决策人</li>
+    <li><strong>一键启动搜客</strong>：输入关键词，自动执行多轮搜索</li>
+    <li><strong>导入客户台账</strong>：搜索结果可一键导入客户管理</li>
+    <li><strong>导出CSV</strong>：搜索结果可导出为Excel表格</li>
+  </ul>
+
+  <!-- 4.4 客户台账 -->
+  <h3>4.4 👥 客户台账</h3>
+  <p><strong>功能定位：</strong>核心功能，管理所有客户信息，支持分级、标签、跟进、批量操作。</p>
+  <img src="说明书截图/05_客户台账.png" class="screenshot" alt="客户台账">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>客户列表</strong>：按优先级分层展示，A/B/C级客户一目了然</li>
+    <li><strong>添加客户</strong>：手动添加或CSV批量导入</li>
+    <li><strong>客户详情</strong>：点击客户行查看完整信息，包含16个功能按钮</li>
+    <li><strong>批量操作</strong>：全选、批量分级、批量打标签、批量导出</li>
+    <li><strong>筛选搜索</strong>：按国家、分级、状态、来源筛选，支持关键词搜索</li>
+    <li><strong>公海池</strong>：未分配客户的公共池，可领取分配</li>
+  </ul>
+  <h4>客户详情16个功能按钮</h4>
+  <div class="feature-grid">
+    <div class="feature-card"><b>✉️ 写开发信</b><span>基于客户信息AI生成开发信</span></div>
+    <div class="feature-card"><b>📅 添加跟进</b><span>记录跟进内容和下次跟进时间</span></div>
+    <div class="feature-card"><b>💬 沟通记录</b><span>查看所有历史沟通记录</span></div>
+    <div class="feature-card"><b>🤖 AI画像</b><span>AI分析客户采购潜力和特点</span></div>
+    <div class="feature-card"><b>💡 回复建议</b><span>AI生成客户回复的应对建议</span></div>
+    <div class="feature-card"><b>📋 复制信息</b><span>一键复制客户关键信息</span></div>
+    <div class="feature-card"><b>📍 谷歌地图</b><span>查看客户公司地址实景</span></div>
+    <div class="feature-card"><b>🚢 海关数据</b><span>查询客户采购记录</span></div>
+    <div class="feature-card"><b>🔎 谷歌搜索</b><span>搜索客户公司相关信息</span></div>
+    <div class="feature-card"><b>💼 领英</b><span>查看客户领英主页</span></div>
+    <div class="feature-card"><b>📘 Facebook</b><span>查看客户Facebook主页</span></div>
+    <div class="feature-card"><b>🌐 公司官网</b><span>打开客户公司网站</span></div>
+    <div class="feature-card"><b>🌐 WHOIS</b><span>查询域名注册信息</span></div>
+    <div class="feature-card"><b>📚 行业目录</b><span>搜索行业目录中的客户</span></div>
+    <div class="feature-card"><b>™️ 商标专利</b><span>查询客户商标专利信息</span></div>
+    <div class="feature-card"><b>🏷️ 标签管理</b><span>管理客户标签和分级</span></div>
+  </div>
+
+  <!-- 4.5 开发信 -->
+  <h3>4.5 ✉️ 开发信</h3>
+  <p><strong>功能定位：</strong>开发信撰写和管理，AI生成、模板、AB测试、统计分析。</p>
+  <img src="说明书截图/06_开发信.png" class="screenshot" alt="开发信">
+  <h4>6个功能标签页</h4>
+  <table>
+    <tr><th>标签页</th><th>功能说明</th></tr>
+    <tr><td>📝 草稿列表</td><td>所有开发信草稿，支持编辑、发送、删除</td></tr>
+    <tr><td>⚡ 快捷写信</td><td>选择客户+产品，AI一键生成开发信</td></tr>
+    <tr><td>📋 模板库</td><td>保存常用开发信模板，快速复用</td></tr>
+    <tr><td>🔬 AB测试</td><td>对比两版开发信的回复率，优化文案</td></tr>
+    <tr><td>📊 统计分析</td><td>发送量、回复率、转化率统计</td></tr>
+    <tr><td>⏰ 定时发送</td><td>设置定时发送任务（需配置SMTP）</td></tr>
+  </table>
+  <h4>开发信编辑器6个按钮</h4>
+  <ul>
+    <li><strong>⏰ 定时发送</strong>：设置发送时间</li>
+    <li><strong>💾 保存草稿</strong>：保存当前编辑内容</li>
+    <li><strong>🛡 检测进箱率</strong>：AI检测邮件是否容易进垃圾箱</li>
+    <li><strong>✅ 标记已人工发送</strong>：标记为已发送，启动跟进序列</li>
+    <li><strong>🔄 AI重新生成</strong>：AI重新生成开发信内容</li>
+    <li><strong>📋 复制</strong>：复制开发信到剪贴板</li>
+  </ul>
+  <div class="warn"><b>⚠️ 重要：</b>工作台的开发信只生成草稿，<strong>发送动作由你手动完成</strong>（复制到Gmail/Outlook发送）。"标记已发送"只是记录状态，不会真的发邮件。</div>
+
+  <!-- 4.6 AI收件箱 -->
+  <h3>4.6 📬 AI收件箱</h3>
+  <p><strong>功能定位：</strong>客户回复汇总管理，AI智能分类和回复建议。</p>
+  <img src="说明书截图/07_AI收件箱.png" class="screenshot" alt="AI收件箱">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>回复分类</strong>：全部/未读/已读/已回复，快速筛选</li>
+    <li><strong>AI智能分类</strong>：自动识别客户意图（询价/拒绝/待定/感谢等）</li>
+    <li><strong>回复建议</strong>：AI生成针对客户回复的应对建议</li>
+    <li><strong>一键生成回复</strong>：基于AI建议生成回复邮件</li>
+  </ul>
+
+  <!-- 4.7 跟进日程 -->
+  <h3>4.7 📅 跟进日程</h3>
+  <p><strong>功能定位：</strong>日历视图管理所有跟进任务，今日待办一目了然。</p>
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>日历视图</strong>：月/周/日视图，查看跟进安排</li>
+    <li><strong>今日待办</strong>：今天需要跟进的客户列表</li>
+    <li><strong>添加跟进</strong>：记录跟进内容，设置下次跟进时间</li>
+    <li><strong>跟进历史</strong>：查看每个客户的完整跟进记录</li>
+    <li><strong>SOP流程</strong>：标准7步跟进法引导，提高回复率30%</li>
+  </ul>
+
+  <!-- 4.8 询盘管理 -->
+  <h3>4.8 📋 询盘管理</h3>
+  <p><strong>功能定位：</strong>管理客户询盘，跟踪询盘来源和转化状态。</p>
+  <img src="说明书截图/09_询盘管理.png" class="screenshot" alt="询盘管理">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>询盘列表</strong>：所有询盘记录，按状态筛选</li>
+    <li><strong>新增询盘</strong>：记录客户询盘内容和需求</li>
+    <li><strong>询盘转化</strong>：跟踪询盘→报价→订单的转化过程</li>
+    <li><strong>来源分析</strong>：统计各渠道询盘数量和质量</li>
+  </ul>
+
+  <!-- 4.9 报价与订单 -->
+  <h3>4.9 💰 报价与订单</h3>
+  <p><strong>功能定位：</strong>报价单、合同、订单全流程管理。</p>
+  <img src="说明书截图/10_报价与订单.png" class="screenshot" alt="报价与订单">
+  <h4>3个功能标签页</h4>
+  <ul>
+    <li><strong>📝 报价单</strong>：创建和管理报价单，支持产品快速报价</li>
+    <li><strong>📄 合同管理</strong>：合同记录和状态跟踪</li>
+    <li><strong>📦 订单管理</strong>：订单状态、发货、收款跟踪</li>
+  </ul>
+
+  <!-- 4.10 产品与样品 -->
+  <h3>4.10 📦 产品与样品</h3>
+  <p><strong>功能定位：</strong>产品库管理，支持快速报价和样品管理。</p>
+  <img src="说明书截图/11_产品与样品.png" class="screenshot" alt="产品与样品">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>产品库</strong>：管理所有产品信息（名称、规格、价格、图片）</li>
+    <li><strong>快速报价</strong>：选择产品自动计算报价，生成报价单</li>
+    <li><strong>样品管理</strong>：样品寄送记录和跟踪</li>
+    <li><strong>产品分类</strong>：按品类管理产品，支持搜索筛选</li>
+  </ul>
+
+  <!-- 4.11 知识库 -->
+  <h3>4.11 📚 知识库</h3>
+  <p><strong>功能定位：</strong>企业知识管理，产品资料、行业知识、话术模板统一管理。</p>
+  <img src="说明书截图/12_知识库.png" class="screenshot" alt="知识库">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>知识分类</strong>：产品知识、行业知识、话术模板、FAQ等分类</li>
+    <li><strong>全文搜索</strong>：关键词搜索所有知识条目</li>
+    <li><strong>AI引用</strong>：写开发信时AI自动引用知识库内容</li>
+    <li><strong>新增知识</strong>：手动添加或批量导入知识条目</li>
+  </ul>
+
+  <!-- 4.12 SEO内容营销 -->
+  <h3>4.12 📈 SEO内容营销</h3>
+  <p><strong>功能定位：</strong>AI生成SEO优化内容，关键词研究和内容规划。</p>
+  <img src="说明书截图/13_SEO内容营销.png" class="screenshot" alt="SEO内容营销">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>关键词研究</strong>：AI分析目标关键词和长尾词</li>
+    <li><strong>AI内容生成</strong>：输入关键词，AI生成SEO优化的文章</li>
+    <li><strong>内容日历</strong>：规划内容发布计划</li>
+    <li><strong>外链管理</strong>：管理外链建设和友情链接</li>
+  </ul>
+
+  <!-- 4.13 展会管理 -->
+  <h3>4.13 🎪 展会管理</h3>
+  <p><strong>功能定位：</strong>展会计划、客户邀约、展后跟进全流程管理。</p>
+  <img src="说明书截图/14_展会管理.png" class="screenshot" alt="展会管理">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>展会计划</strong>：记录参展展会信息（时间、地点、展位）</li>
+    <li><strong>客户邀约</strong>：筛选目标客户，批量发送展会邀约</li>
+    <li><strong>展后跟进</strong>：展会收集的名片快速录入，启动跟进序列</li>
+  </ul>
+
+  <!-- 4.14 领英拓客 -->
+  <h3>4.14 💼 领英拓客</h3>
+  <p><strong>功能定位：</strong>领英平台智能拓客，4步拓客法+AI站内信。</p>
+  <img src="说明书截图/15_领英拓客.png" class="screenshot" alt="领英拓客">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>拓客看板</strong>：领英好友、申请、回复、会议统计</li>
+    <li><strong>搜索找人</strong>：按职位、行业、地区搜索目标客户</li>
+    <li><strong>AI站内信</strong>：AI生成个性化领英站内信</li>
+    <li><strong>智能互动</strong：点赞、评论策略，提高账号活跃度</li>
+    <li><strong>内容Post</strong>：AI生成领英发布内容</li>
+    <li><strong>4步拓客法</strong>：标准拓客流程引导</li>
+  </ul>
+
+  <!-- 4.15 社媒监控 -->
+  <h3>4.15 📱 社媒监控</h3>
+  <p><strong>功能定位：</strong>5大平台关键词监控，发现潜在客户和行业痛点。</p>
+  <img src="说明书截图/16_社媒监控.png" class="screenshot" alt="社媒监控">
+  <h4>5个功能标签页</h4>
+  <ul>
+    <li><strong>监控看板</strong>：各平台帖子分布、监控效果统计</li>
+    <li><strong>关键词管理</strong>：设置监控关键词（产品词、行业词、竞品词）</li>
+    <li><strong>社媒帖子</strong>：监控到的相关帖子列表</li>
+    <li><strong>痛点分析</strong>：AI分析帖子中的客户痛点和需求</li>
+    <li><strong>线索发现</strong>：从帖子中识别潜在客户线索</li>
+  </ul>
+
+  <!-- 4.16 业绩战报 -->
+  <h3>4.16 🏆 业绩战报</h3>
+  <p><strong>功能定位：</strong>销售数据全景分析，漏斗+战报+行为三维度。</p>
+  <img src="说明书截图/17_业绩战报.png" class="screenshot" alt="业绩战报">
+  <h4>三大分析维度</h4>
+  <ul>
+    <li><strong>🔮 漏斗（未来）</strong>：新线索→建立联系→方案报价→谈判中→已成交</li>
+    <li><strong>💰 战报（现在）</strong>：本月目标、完成率、环比/同比增长</li>
+    <li><strong>⚡ 行为（过程）</strong>：今日新客户、发邮件、跟进、回复率、转化率</li>
+  </ul>
+
+  <!-- 4.17 销售漏斗 -->
+  <h3>4.17 🎯 销售漏斗</h3>
+  <p><strong>功能定位：</strong>6阶段商机管理，销售预测和停滞提醒。</p>
+  <img src="说明书截图/18_销售漏斗.png" class="screenshot" alt="销售漏斗">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>6阶段漏斗</strong>：新线索→初步接触→需求确认→报价中→谈判中→已成交</li>
+    <li><strong>销售预测</strong>：加权预测本月可能成交金额</li>
+    <li><strong>停滞超期提醒</strong>：自动识别长时间无进展的商机</li>
+    <li><strong>商机列表</strong>：所有商机的阶段、金额、停留时间、下一步</li>
+    <li><strong>新增商机</strong>：手动添加或从客户转化</li>
+  </ul>
+
+  <!-- 4.18 AI Agent团队 -->
+  <h3>4.18 🤖 AI Agent团队</h3>
+  <p><strong>功能定位：</strong>11个专业AI Agent协同工作，AI CEO调度分配任务。</p>
+  <img src="说明书截图/19_AI_Agent团队.png" class="screenshot" alt="AI Agent团队">
+  <h4>11个专业Agent</h4>
+  <div class="feature-grid">
+    <div class="feature-card"><b>👑 AI CEO（调度者）</b><span>接收任务，拆解分配，监控进度，汇总结果</span></div>
+    <div class="feature-card"><b>🔍 产品分析Agent</b><span>分析产品卖点和差异化</span></div>
+    <div class="feature-card"><b>🌐 市场研究Agent</b><span>目标市场规模和趋势分析</span></div>
+    <div class="feature-card"><b>👤 客户画像Agent</b><span>构建理想客户画像</span></div>
+    <div class="feature-card"><b>🏢 找公司Agent</b><span>搜索潜在客户公司</span></div>
+    <div class="feature-card"><b>📋 企业背调Agent</b><span>深度背调公司信息</span></div>
+    <div class="feature-card"><b>⭐ 客户评分Agent</b><span>多维度评分和分级</span></div>
+    <div class="feature-card"><b>📞 联系人研究Agent</b><span>找决策人联系方式</span></div>
+    <div class="feature-card"><b>📡 近期信号Agent</b><span>捕捉采购信号和动态</span></div>
+    <div class="feature-card"><b>✉️ 开发信Agent</b><span>个性化开发信撰写</span></div>
+    <div class="feature-card"><b>💬 社媒运营Agent</b><span>社媒内容和互动</span></div>
+  </div>
+
+  <!-- 4.19 操作日志 -->
+  <h3>4.19 📋 操作日志</h3>
+  <p><strong>功能定位：</strong>全操作审计追踪，记录所有重要操作，可追溯可审计。</p>
+  <img src="说明书截图/20_操作日志.png" class="screenshot" alt="操作日志">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>操作记录</strong>：时间、类型、操作、详情、操作人</li>
+    <li><strong>类型筛选</strong>：客户操作、跟进操作、AI调用、导出、错误等</li>
+    <li><strong>导出日志</strong>：导出操作日志为CSV</li>
+    <li><strong>清空日志</strong>：清空所有操作记录（谨慎操作）</li>
+  </ul>
+
+  <!-- 4.20 工具箱 -->
+  <h3>4.20 🧰 工具箱</h3>
+  <p><strong>功能定位：</strong>14类100+外贸工具集合，AI生图、AI识图、物流、汇率等。</p>
+  <img src="说明书截图/21_工具箱.png" class="screenshot" alt="工具箱">
+  <h4>AI智能工具</h4>
+  <ul>
+    <li><strong>🎨 AI智能生图</strong>：8大外贸场景模板，一键生成产品效果图/营销图/海报</li>
+    <li><strong>👁️ AI视觉识图</strong>：上传图片URL，AI分析产品/竞对/包装/展会/品质/趋势</li>
+  </ul>
+  <h4>14类常用工具</h4>
+  <table>
+    <tr><th>分类</th><th>包含工具</th></tr>
+    <tr><td>🔍 找客户</td><td>Apollo.io、Hunter.io、Snov.io、ZoomInfo</td></tr>
+    <tr><td>📊 海关数据</td><td>ImportYeti、Panjiva、Volza</td></tr>
+    <tr><td>🌐 网站分析</td><td>SimilarWeb、Whois、BuiltWith</td></tr>
+    <tr><td>📱 社媒获客</td><td>LinkedIn Sales Nav、Facebook Groups、Instagram</td></tr>
+    <tr><td>🗺️ 地图找客户</td><td>Google Maps</td></tr>
+    <tr><td>✉️ 邮件营销</td><td>Hunter.io、Snov.io、Mailchimp</td></tr>
+    <tr><td>🌍 翻译</td><td>DeepL、Google Translate</td></tr>
+    <tr><td>✍️ 文案优化</td><td>Grammarly、Hemingway</td></tr>
+    <tr><td>🚢 物流报价</td><td>Freightos</td></tr>
+    <tr><td>💰 汇率</td><td>XE.com、OANDA</td></tr>
+    <tr><td>📋 CRM</td><td>Zoho、HubSpot</td></tr>
+    <tr><td>🤖 AI工具</td><td>WorkBuddy、Claude、ChatGPT</td></tr>
+    <tr><td>🎬 视频制作</td><td>Canva、CapCut</td></tr>
+    <tr><td>📸 图片处理</td><td>Canva、Remove.bg、TinyPNG</td></tr>
+  </table>
+
+  <!-- 4.21 设置 -->
+  <h3>4.21 ⚙️ 设置</h3>
+  <p><strong>功能定位：</strong>系统设置中心，模型配置、团队管理、数据备份、个性化设置。</p>
+  <img src="说明书截图/22_设置.png" class="screenshot" alt="设置">
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>👥 团队管理</strong>：团队成员、角色、负责市场、月度目标</li>
+    <li><strong>🔒 公海池规则</strong>：保护期、回收线、优先权、私海上限</li>
+    <li><strong>📝 获客资料</strong>：业务背景、个人背景、主推产品库（AI写开发信时自动引用）</li>
+    <li><strong>🤖 AI模型配置</strong>：15个模型的API Key配置、默认模型选择、模型测速</li>
+    <li><strong>💾 数据管理</strong>：全量数据导出、数据导入、数据清空、数据备份</li>
+    <li><strong>🔐 安全设置</strong>：修改访问密码、自动锁定设置</li>
+    <li><strong>🎨 个性化</strong>：主题颜色、品牌名称、Logo设置</li>
+  </ul>
+
+  <!-- 4.22 触达中心 -->
+  <h3>4.22 📤 触达中心</h3>
+  <p><strong>功能定位：</strong>多渠道触达管理，邮件、WhatsApp、领英、电话统一管理。</p>
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>邮件触达</strong>：批量发送开发信（需配置SMTP）</li>
+    <li><strong>WhatsApp触达</strong>：WhatsApp消息模板和发送记录</li>
+    <li><strong>领英触达</strong>：领英站内信和好友申请</li>
+    <li><strong>电话触达</strong>：电话记录和话术模板</li>
+    <li><strong>触达统计</strong>：各渠道触达量和回复率统计</li>
+  </ul>
+
+  <!-- 4.23 开发计划 -->
+  <h3>4.23 📈 开发计划</h3>
+  <p><strong>功能定位：</strong>开发任务排期和执行管理，创建并启动开发计划。</p>
+  <h4>主要功能</h4>
+  <ul>
+    <li><strong>创建计划</strong>：设定目标市场、产品、开发数量、时间周期</li>
+    <li><strong>计划列表</strong>：所有开发计划的状态和进度</li>
+    <li><strong>启动计划</strong>：AI自动执行开发任务（搜客→写开发信→跟进）</li>
+    <li><strong>演示数据</strong>：一键加载3条演示计划，快速了解功能</li>
+  </ul>
+
+  <!-- 4.24 使用说明书 -->
+  <h3>4.24 📖 使用说明书</h3>
+  <p><strong>功能定位：</strong>工作台内置的简化版使用说明，快速查阅操作方法。</p>
+  <div class="info"><b>💡 提示：</b>完整详细版说明书就是本文档，工作台内的是简化版快速参考。</div>
+</div>
+
+<!-- 5. AI模型配置 -->
+<div class="section" id="ai">
+  <h2>五、AI模型配置与使用</h2>
+  
+  <h3>5.1 支持的AI模型（15个）</h3>
+  <table>
+    <tr><th>供应商</th><th>模型</th><th>类型</th><th>状态</th></tr>
+    <tr><td rowspan="5">智谱GLM</td><td>glm-4-flash</td><td>在线免费</td><td>✅ 推荐使用</td></tr>
+    <tr><td>glm-4-plus</td><td>在线付费</td><td>需API余额</td></tr>
+    <tr><td>glm-4v-flash</td><td>在线免费（识图）</td><td>✅ 推荐使用</td></tr>
+    <tr><td>glm-4-air</td><td>在线付费</td><td>需API余额</td></tr>
+    <tr><td>glm-4-long</td><td>在线付费</td><td>需API余额</td></tr>
+    <tr><td rowspan="4">硅基流动</td><td>Qwen2.5-7B</td><td>在线免费</td><td>需API Key</td></tr>
+    <tr><td>DeepSeek-V2</td><td>在线付费</td><td>需API余额</td></tr>
+    <tr><td>Llama-3.1-8B</td><td>在线免费</td><td>需API Key</td></tr>
+    <tr><td>GLM-4-9B</td><td>在线免费</td><td>需API Key</td></tr>
+    <tr><td rowspan="3">Google Gemini</td><td>gemini-1.5-flash</td><td>在线免费</td><td>需网络环境</td></tr>
+    <tr><td>gemini-1.5-pro</td><td>在线付费</td><td>需API余额</td></tr>
+    <tr><td>gemini-2.0-flash</td><td>在线免费</td><td>需网络环境</td></tr>
+    <tr><td rowspan="3">本地Ollama</td><td>qwen2.5:7b</td><td>本地免费</td><td>✅ 已安装</td></tr>
+    <tr><td>deepseek-r1:7b</td><td>本地免费</td><td>✅ 已安装</td></tr>
+    <tr><td>qwen2.5vl:7b</td><td>本地免费（识图）</td><td>✅ 已安装</td></tr>
+  </table>
+
+  <h3>5.2 配置API Key</h3>
+  <div class="step"><div class="step-num">1</div><div class="step-content">进入"设置"页面，找到"AI模型配置"区域</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-content">在对应模型供应商的输入框中粘贴API Key</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-content">点击"保存"按钮，配置自动保存</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-content">点击"测试连接"按钮，验证API Key是否有效</div></div>
+
+  <h3>5.3 模型测速</h3>
+  <p>在"设置"页面点击"模型测速"按钮，系统会自动测试所有已配置模型的响应速度，按速度排序，方便选择最快的模型。</p>
+
+  <h3>5.4 故障转移机制</h3>
+  <div class="success"><b>✅ 智能故障转移：</b>工作台内置智能故障转移机制，当首选模型调用失败时（如余额不足、网络超时），会自动切换到下一个可用模型，确保AI功能始终可用。切换顺序：在线免费模型 → 其他在线模型 → 本地Ollama模型。</div>
+
+  <h3>5.5 本地Ollama模型安装</h3>
+  <p>如果需要使用本地模型（完全免费、无需联网、数据不出本地），按以下步骤安装：</p>
+  <pre><code># 1. 安装Ollama
+# 访问 https://ollama.com 下载Mac版并安装
+
+# 2. 启动Ollama服务
+ollama serve
+
+# 3. 下载模型（首次使用需要下载）
+ollama pull qwen2.5:7b
+ollama pull deepseek-r1:7b
+ollama pull qwen2.5vl:7b
+
+# 4. 查看已安装模型
+ollama list</code></pre>
+  <div class="info"><b>💡 提示：</b>工作台服务器启动时会自动检测Ollama状态，如果Ollama运行中，本地模型会自动出现在模型列表中。</div>
+</div>
+
+<!-- 6. 数据管理 -->
+<div class="section" id="data">
+  <h2>六、数据管理</h2>
+  
+  <h3>6.1 数据存储位置</h3>
+  <p>工作台所有数据都存储在<strong>浏览器的localStorage</strong>中，key前缀为 <code>kailion_ark_</code>。</p>
+  <div class="warn"><b>⚠️ 重要：</b>数据绑定浏览器！如果清除浏览器数据、更换浏览器或更换电脑，数据会丢失。请定期备份数据！</div>
+
+  <h3>6.2 数据备份</h3>
+  <div class="step"><div class="step-num">1</div><div class="step-content">进入"设置"页面，找到"数据管理"区域</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-content">点击"导出全部数据"按钮</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-content">浏览器会下载一个JSON文件，包含所有数据</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-content">将JSON文件保存到安全位置（如网盘、移动硬盘）</div></div>
+
+  <h3>6.3 数据恢复</h3>
+  <div class="step"><div class="step-num">1</div><div class="step-content">进入"设置"页面，找到"数据管理"区域</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-content">点击"导入数据"按钮，选择之前备份的JSON文件</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-content">确认导入，数据会恢复到备份时的状态</div></div>
+  <div class="warn"><b>⚠️ 注意：</b>导入数据会<strong>覆盖当前所有数据</strong>，请确保当前数据已备份再导入！</div>
+
+  <h3>6.4 CSV导入导出</h3>
+  <table>
+    <tr><th>数据类型</th><th>导出</th><th>导入</th></tr>
+    <tr><td>客户数据</td><td>客户台账页面 → "导出CSV"按钮</td><td>客户台账页面 → "导入CSV"按钮</td></tr>
+    <tr><td>开发信</td><td>开发信页面 → "导出CSV"按钮</td><td>暂不支持导入</td></tr>
+    <tr><td>操作日志</td><td>操作日志页面 → "导出日志"按钮</td><td>暂不支持导入</td></tr>
+    <tr><td>全量数据</td><td>设置页面 → "导出全部数据"（JSON格式）</td><td>设置页面 → "导入数据"（JSON格式）</td></tr>
+  </table>
+
+  <h3>6.5 客户查重合并</h3>
+  <p>在客户台账页面，系统会自动检测重复客户（相同公司名或邮箱），提示合并。也可以手动选择多个客户进行合并。</p>
+</div>
+
+<!-- 7. 服务器管理 -->
+<div class="section" id="server">
+  <h2>七、服务器管理</h2>
+  
+  <h3>7.1 服务器状态</h3>
+  <p>工作台使用Node.js本地服务器，已配置为<strong>开机自启动</strong>（launchd守护进程）。正常情况下无需手动管理。</p>
+  <table>
+    <tr><th>项目</th><th>值</th></tr>
+    <tr><td>服务器文件</td><td><code>server.js</code></td></tr>
+    <tr><td>端口</td><td><code>8080</code></td></tr>
+    <tr><td>launchd配置</td><td><code>~/Library/LaunchAgents/com.kailioncrafts.prospect.plist</code></td></tr>
+    <tr><td>项目文件夹</td><td><code>/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/</code></td></tr>
+  </table>
+
+  <h3>7.2 常用命令</h3>
+  <pre><code># 查看服务器状态
+lsof -i :8080
+
+# 重启服务器（修改代码后需要重启）
+launchctl kickstart -k gui/$(id -u)/com.kailioncrafts.prospect
+
+# 停止服务器
+launchctl unload ~/Library/LaunchAgents/com.kailioncrafts.prospect.plist
+
+# 启动服务器
+launchctl load ~/Library/LaunchAgents/com.kailioncrafts.prospect.plist
+
+# 手动启动（前台运行，用于调试）
+cd "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台"
+node server.js
+
+# 查看服务器日志
+log show --predicate 'process == "node"' --last 1h
+
+# Git提交备份
+cd "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台"
+git add -A
+git commit -m "备份描述"
+git push origin ark-html-workbench</code></pre>
+
+  <h3>7.3 公网访问（Cloudflare Tunnel）</h3>
+  <p>工作台已配置Cloudflare Tunnel，可通过公网地址 <code>https://prospect.kailioncrafts.com</code> 访问。</p>
+  <div class="info"><b>💡 提示：</b>Cloudflare Tunnel也配置为开机自启动，与工作台服务器一起运行。外出时可通过手机或其他设备访问公网地址使用工作台。</div>
+</div>
+
+<!-- 8. FAQ -->
+<div class="section" id="faq">
+  <h2>八、常见问题 FAQ</h2>
+
+  <h3>Q1：工作台打不开怎么办？</h3>
+  <p><strong>A：</strong>按以下步骤排查：</p>
+  <ol>
+    <li>确认电脑已开机，服务器已自动启动</li>
+    <li>在浏览器输入 <code>http://localhost:8080</code></li>
+    <li>如果打不开，在终端运行 <code>lsof -i :8080</code> 查看服务器是否运行</li>
+    <li>如果服务器没运行，运行 <code>launchctl kickstart -k gui/$(id -u)/com.kailioncrafts.prospect</code> 重启</li>
+    <li>如果还是不行，检查项目文件夹是否存在（外置硬盘是否连接）</li>
+  </ol>
+
+  <h3>Q2：数据会丢失吗？</h3>
+  <p><strong>A：</strong>数据存储在浏览器localStorage中，正常使用不会丢失。但以下情况会导致数据丢失：</p>
+  <ul>
+    <li>清除浏览器数据/缓存</li>
+    <li>更换浏览器（Chrome的数据在Safari中看不到）</li>
+    <li>更换电脑</li>
+    <li>浏览器用户配置文件损坏</li>
+  </ul>
+  <div class="tip"><b>💡 建议：</b>每周备份一次数据（设置页面→导出全部数据），备份文件保存到网盘或移动硬盘。</div>
+
+  <h3>Q3：AI功能用不了怎么办？</h3>
+  <p><strong>A：</strong>按以下步骤排查：</p>
+  <ol>
+    <li>检查网络连接是否正常</li>
+    <li>进入"设置"页面，检查API Key是否正确配置</li>
+    <li>点击"模型测速"，查看哪些模型可用</li>
+    <li>如果在线模型都不可用，确保本地Ollama已启动（运行 <code>ollama serve</code>）</li>
+    <li>工作台会自动故障转移到可用模型，无需手动切换</li>
+  </ol>
+
+  <h3>Q4：局域网同事无法访问怎么办？</h3>
+  <p><strong>A：</strong>按以下步骤排查：</p>
+  <ol>
+    <li>确认你的电脑和同事的电脑在同一个WiFi/局域网下</li>
+    <li>查看你的电脑IP地址（系统设置→网络→IP地址）</li>
+    <li>同事浏览器输入 <code>http://你的IP:8080</code></li>
+    <li>检查Mac防火墙是否阻止了8080端口（系统设置→网络→防火墙）</li>
+    <li>确认服务器绑定地址是0.0.0.0（允许局域网访问）</li>
+  </ol>
+
+  <h3>Q5：公网访问不了怎么办？</h3>
+  <p><strong>A：</strong>按以下步骤排查：</p>
+  <ol>
+    <li>确认本地工作台能正常访问（localhost:8080）</li>
+    <li>确认Cloudflare Tunnel进程在运行</li>
+    <li>检查Cloudflare Tunnel配置是否正确</li>
+    <li>查看Cloudflare Tunnel日志排查错误</li>
+  </ol>
+
+  <h3>Q6：怎么修改访问密码？</h3>
+  <p><strong>A：</strong>进入"设置"页面，找到"安全设置"区域，输入旧密码和新密码，点击保存即可。</p>
+
+  <h3>Q7：开发信怎么发送？</h3>
+  <p><strong>A：</strong>工作台只生成开发信草稿，<strong>发送需要你手动完成</strong>：</p>
+  <ol>
+    <li>在开发信编辑器中点击"📋 复制"按钮</li>
+    <li>打开Gmail/Outlook/企业邮箱</li>
+    <li>粘贴开发信内容，填写收件人</li>
+    <li>点击发送</li>
+    <li>回到工作台，点击"✅ 标记已人工发送"记录状态</li>
+  </ol>
+  <div class="info"><b>💡 提示：</b>也可以配置SMTP服务器实现自动发送，但需要企业邮箱的SMTP授权码。</div>
+
+  <h3>Q8：换电脑了数据怎么迁移？</h3>
+  <p><strong>A：</strong>按以下步骤迁移：</p>
+  <ol>
+    <li>在旧电脑上：设置→导出全部数据，下载JSON文件</li>
+    <li>在新电脑上：安装工作台（复制项目文件夹）</li>
+    <li>在新电脑上：设置→导入数据，选择JSON文件</li>
+    <li>确认导入，数据迁移完成</li>
+  </ol>
+</div>
+
+<!-- 9. 快捷键 -->
+<div class="section" id="shortcuts">
+  <h2>九、快捷键大全</h2>
+  
+  <h3>9.1 页面导航快捷键</h3>
+  <p>按 <code>g</code> 键，然后按对应字母快速跳转到页面：</p>
+  <table>
+    <tr><th>快捷键</th><th>页面</th></tr>
+    <tr><td><code>g</code> + <code>d</code></td><td>数据看板</td></tr>
+    <tr><td><code>g</code> + <code>c</code></td><td>客户台账</td></tr>
+    <tr><td><code>g</code> + <code>e</code></td><td>开发信</td></tr>
+    <tr><td><code>g</code> + <code>s</code></td><td>跟进日程</td></tr>
+    <tr><td><code>g</code> + <code>p</code></td><td>产品管理</td></tr>
+    <tr><td><code>g</code> + <code>k</code></td><td>知识库</td></tr>
+    <tr><td><code>g</code> + <code>t</code></td><td>工具箱</td></tr>
+    <tr><td><code>g</code> + <code>o</code></td><td>设置</td></tr>
+  </table>
+
+  <h3>9.2 常用操作快捷键</h3>
+  <table>
+    <tr><th>快捷键</th><th>功能</th></tr>
+    <tr><td><code>/</code></td><td>聚焦全局搜索框</td></tr>
+    <tr><td><code>n</code></td><td>新增客户/新增开发信（根据当前页面）</td></tr>
+    <tr><td><code>Esc</code></td><td>关闭弹窗/抽屉</td></tr>
+    <tr><td><code>Ctrl</code>+<code>S</code></td><td>保存当前编辑内容</td></tr>
+    <tr><td><code>?</code></td><td>显示快捷键帮助</td></tr>
+  </table>
+</div>
+
+<div class="footer">
+  <p>锴利外贸获客工作台 V75.1 · 完整使用说明书</p>
+  <p>最后更新：2026-09-26 · 适用于V75.0及以上版本</p>
+  <p>如有问题请参考"常见问题FAQ"或联系工作台管理员</p>
+</div>
+
+</div>
+
+</body>
+</html>

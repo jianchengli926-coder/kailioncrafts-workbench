@@ -1043,5 +1043,22 @@
     "error": null,
     "failover": null,
     "failover_count": 0
+  },
+  {
+    "time": "2026-09-25 23:42:07",
+    "task": "未命名任务",
+    "model": "glm-4-flash",
+    "provider": "智谱GLM（免费模型）/glm-4-flash",
+    "elapsed_seconds": 17.48,
+    "prompt_chars": 1185,
+    "completion_chars": 514,
+    "prompt_tokens": 1252,
+    "completion_tokens": 335,
+    "total_tokens": 1587,
+    "knowledge_refs": [],
+    "status": "success",
+    "error": null,
+    "failover": null,
+    "failover_count": 0
   }
 ]

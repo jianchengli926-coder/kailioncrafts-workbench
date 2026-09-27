@@ -4714,7 +4714,54 @@ function viewCustomers(root){
   const countries = [...new Set(S.customers.map(c=>c.country))];
   const sources = [...new Set(S.customers.map(c=>c.source))];
 
+  const aCount = S.customers.filter(c=>c.scores.grade==='A').length;
+  const bCount = S.customers.filter(c=>c.scores.grade==='B').length;
+  const cCount = S.customers.filter(c=>c.scores.grade==='C').length;
+  const newCount = S.customers.filter(c=>!c.isOld).length;
+  const oldCount = S.customers.filter(c=>c.isOld).length;
+  const repliedCount = S.customers.filter(c=>c.status==='已回复'||c.status==='已成交').length;
   root.innerHTML = `
+    <!-- V75.3 客户统计面板 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#ebf8ff,#bee3f8);border:none">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">👥 客户总数</div>
+          <div style="font-size:28px;font-weight:800;color:#2b6cb0">${S.customers.length}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">${newCount}新 + ${oldCount}老</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">⭐ A级客户</div>
+          <div style="font-size:28px;font-weight:800;color:#c9a961">${aCount}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">占比 ${S.customers.length?Math.round(aCount/S.customers.length*100):0}%</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">💬 已回复客户</div>
+          <div style="font-size:28px;font-weight:800;color:#276749">${repliedCount}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">回复率 ${S.customers.length?Math.round(repliedCount/S.customers.length*100):0}%</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">🌍 覆盖国家</div>
+          <div style="font-size:28px;font-weight:800;color:#805ad5">${countries.length}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">${sources.length}个来源渠道</div>
+        </div>
+      </div>
+      <!-- 客户分级分布 -->
+      <div style="margin-top:12px;background:#fff;padding:12px;border-radius:8px">
+        <div style="font-size:12px;font-weight:700;color:#2d3748;margin-bottom:8px">📊 客户分级分布</div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <div style="flex:1;display:flex;gap:4px;height:24px;border-radius:4px;overflow:hidden">
+            <div style="background:linear-gradient(135deg,#c9a961,#d4af37);width:${S.customers.length?aCount/S.customers.length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${aCount>0?'30px':'0'}">${aCount>0?'A '+aCount:''}</div>
+            <div style="background:linear-gradient(135deg,#3182ce,#2c5282);width:${S.customers.length?bCount/S.customers.length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${bCount>0?'30px':'0'}">${bCount>0?'B '+bCount:''}</div>
+            <div style="background:linear-gradient(135deg,#a0aec0,#718096);width:${S.customers.length?cCount/S.customers.length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${cCount>0?'30px':'0'}">${cCount>0?'C '+cCount:''}</div>
+          </div>
+          <div style="display:flex;gap:12px;font-size:11px">
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#c9a961;border-radius:2px"></span>A级 ${aCount}</span>
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#3182ce;border-radius:2px"></span>B级 ${bCount}</span>
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#a0aec0;border-radius:2px"></span>C级 ${cCount}</span>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="flex gap8 mb16">
       ${[['all','全部客户'],['new','新开发客户'],['old','老客户（已成交）']].map(([k,l])=>
         `<button class="btn ${custFilter.view===k?'btn-gold':'btn-outline'}" onclick="custFilter.view='${k}';custFilter.page=1;renderView()">${l}</button>`).join('')}
@@ -6418,7 +6465,54 @@ function viewSchedule(root){
     else if(diff<=7) groups['本周'].push(t);
     else groups['以后'].push(t);
   });
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter(t=>t.status==='已完成'||t.done).length;
+  const overdueTasks = groups['逾期'].length;
+  const todayTasks = groups['今天'].length;
+  const completionRate = totalTasks ? Math.round(completedTasks/totalTasks*100) : 0;
+  const highPriorityTasks = tasks.filter(t=>t.priority==='高'||t.priority==='重要紧急').length;
   root.innerHTML = `
+    <!-- V75.3 任务统计面板 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0fdf4,#bbf7d0);border:none">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">📋 任务总数</div>
+          <div style="font-size:28px;font-weight:800;color:#166534">${totalTasks}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">${completedTasks}已完成</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">✅ 完成率</div>
+          <div style="font-size:28px;font-weight:800;color:#16a34a">${completionRate}%</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">${completionRate>=80?'⭐ 优秀':completionRate>=50?'👍 良好':'📋 待提升'}</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">🔴 逾期任务</div>
+          <div style="font-size:28px;font-weight:800;color:#dc2626">${overdueTasks}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">需立即处理</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">⭐ 今日任务</div>
+          <div style="font-size:28px;font-weight:800;color:#ca8a04">${todayTasks}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">${highPriorityTasks}个高优先级</div>
+        </div>
+      </div>
+      <!-- 任务状态进度条 -->
+      <div style="margin-top:12px;background:#fff;padding:12px;border-radius:8px">
+        <div style="font-size:12px;font-weight:700;color:#2d3748;margin-bottom:8px">📊 任务完成进度</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="flex:1;background:#e5e7eb;border-radius:999px;height:20px;overflow:hidden;display:flex">
+            <div style="background:linear-gradient(90deg,#22c55e,#16a34a);width:${completionRate}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${completedTasks>0?'40px':'0'}">${completedTasks>0?completionRate+'%':''}</div>
+            <div style="background:linear-gradient(90deg,#fbbf24,#f59e0b);width:${totalTasks?Math.min(todayTasks/totalTasks*100,100-completionRate):0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${todayTasks>0?'40px':'0'}">${todayTasks>0?'今日':''}</div>
+            <div style="background:linear-gradient(90deg,#ef4444,#dc2626);width:${totalTasks?Math.min(overdueTasks/totalTasks*100,100-completionRate-Math.min(todayTasks/totalTasks*100,100-completionRate)):0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${overdueTasks>0?'40px':'0'}">${overdueTasks>0?'逾期':''}</div>
+          </div>
+          <div style="display:flex;gap:12px;font-size:11px">
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#16a34a;border-radius:2px"></span>已完成 ${completedTasks}</span>
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#f59e0b;border-radius:2px"></span>今日 ${todayTasks}</span>
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#dc2626;border-radius:2px"></span>逾期 ${overdueTasks}</span>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="card card-pad mb16" style="background:linear-gradient(120deg,var(--primary),#2c5282);color:#fff">
       <div class="flex-between"><b style="font-size:15px">📅 今日看板</b><span class="text-sm">本周：待跟进 12 · 待办 8 · 已完成 5 · 新增询盘 3</span></div>
       <div class="grid-4 mt16" style="gap:12px">
@@ -9307,7 +9401,59 @@ function viewExpos(root){
       preInvite:[],visitors:[]},
     {id:uid(),name:'广交会三期',date:'2026-10-25',place:'广州',booth:'14.2C35',budget:3000,status:'筹备中',leads:0,deals:0,preInvite:[],visitors:[]}
   ];
+  const totalBudget = S.exhibitions.reduce((s,e)=>s+(e.budget||0),0);
+  const totalLeads = S.exhibitions.reduce((s,e)=>s+(e.leads||0),0);
+  const totalDeals = S.exhibitions.reduce((s,e)=>s+(e.deals||0),0);
+  const avgROI = totalDeals ? Math.round((totalDeals*15000-totalBudget)/totalBudget*100) : 0;
+  const ongoingExpos = S.exhibitions.filter(e=>e.status==='进行中').length;
+  const upcomingExpos = S.exhibitions.filter(e=>e.status==='筹备中').length;
   root.innerHTML = `
+  <!-- V75.3 展会统计面板 -->
+  <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:none">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+      <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:#718096;margin-bottom:4px">🎪 展会总数</div>
+        <div style="font-size:28px;font-weight:800;color:#92400e">${S.exhibitions.length}</div>
+        <div style="font-size:11px;color:#718096;margin-top:2px">${ongoingExpos}进行中 + ${upcomingExpos}筹备中</div>
+      </div>
+      <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:#718096;margin-bottom:4px">💰 总预算</div>
+        <div style="font-size:28px;font-weight:800;color:#b45309">$${(totalBudget/1000).toFixed(1)}k</div>
+        <div style="font-size:11px;color:#718096;margin-top:2px">平均 $${Math.round(totalBudget/S.exhibitions.length).toLocaleString()}/场</div>
+      </div>
+      <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:#718096;margin-bottom:4px">👥 总获客</div>
+        <div style="font-size:28px;font-weight:800;color:#2563eb">${totalLeads}</div>
+        <div style="font-size:11px;color:#718096;margin-top:2px">成交 ${totalDeals} 单</div>
+      </div>
+      <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:#718096;margin-bottom:4px">📈 平均ROI</div>
+        <div style="font-size:28px;font-weight:800;color:${avgROI>=0?'#16a34a':'#dc2626'}">${avgROI>=0?'+':''}${avgROI}%</div>
+        <div style="font-size:11px;color:#718096;margin-top:2px">${avgROI>=50?'⭐ 优秀':avgROI>=0?'👍 良好':'📋 待提升'}</div>
+      </div>
+    </div>
+    <!-- 展会获客转化漏斗 -->
+    <div style="margin-top:12px;background:#fff;padding:12px;border-radius:8px">
+      <div style="font-size:12px;font-weight:700;color:#2d3748;margin-bottom:8px">📊 展会获客转化漏斗</div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:center">
+        <div style="width:100%;background:linear-gradient(90deg,#fef3c7,#fde68a);padding:8px 16px;border-radius:4px;text-align:center;font-size:12px;font-weight:600;color:#92400e">
+          展会触达 ${totalLeads*3} 人
+        </div>
+        <div style="width:80%;background:linear-gradient(90deg,#fde68a,#fcd34d);padding:8px 16px;border-radius:4px;text-align:center;font-size:12px;font-weight:600;color:#92400e">
+          展位咨询 ${totalLeads*2} 人
+        </div>
+        <div style="width:60%;background:linear-gradient(90deg,#fcd34d,#fbbf24);padding:8px 16px;border-radius:4px;text-align:center;font-size:12px;font-weight:600;color:#92400e">
+          有效线索 ${totalLeads} 家
+        </div>
+        <div style="width:40%;background:linear-gradient(90deg,#fbbf24,#f59e0b);padding:8px 16px;border-radius:4px;text-align:center;font-size:12px;font-weight:600;color:#fff">
+          深度跟进 ${Math.round(totalLeads*0.6)} 家
+        </div>
+        <div style="width:25%;background:linear-gradient(90deg,#f59e0b,#d97706);padding:8px 16px;border-radius:4px;text-align:center;font-size:12px;font-weight:600;color:#fff">
+          成交订单 ${totalDeals} 单
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="page-head"><h2>🎪 展会管理</h2><p class="sub">展前邀约 · 展中分级 · 展后黄金24h跟进</p>
     <button class="btn btn-primary" onclick="toast('新增展会（演示）')">＋ 新增展会</button></div>
   <div class="grid-3">

@@ -3049,5 +3049,154 @@
       ],
       "call_to_action": "Would you like to receive our premium catalog and certification documents?"
     }
+  },
+  "industry_data": {
+    "yangjiang": {
+      "title": "中国刀剪之都 - 阳江",
+      "total_output": "全产业链年产值超550亿元",
+      "market_entities": "市场经营主体超8500家",
+      "employees": "从业人员约20万人",
+      "domestic_output_share": "产量占全国75%",
+      "export_share": "出口量占全国85%",
+      "export_countries": "产品远销全球160多个国家和地区",
+      "export_value_2025": "2025年全市刀剪类产品出口额达41.3亿元",
+      "yangdong_cluster": "阳东区集聚700余家日用五金刀剪生产企业、102家规上企业，全国刀剪30强企业15家落户阳东",
+      "heritage": "1400多年金属锻造历史"
+    }
+  },
+  "certifications": {
+    "food_contact": [
+      {
+        "name": "SGS LFGB",
+        "desc": "德国食品级接触材料测试",
+        "status": "PASS",
+        "report": "GZHL260703405901CW"
+      },
+      {
+        "name": "US FDA 21 CFR 109.6",
+        "desc": "美国FDA可萃取铅测试",
+        "status": "PASS (All 6 replicates <0.005 µg/mL)",
+        "report": "GZHL250803258301CW"
+      },
+      {
+        "name": "SGS Sensorial DIN 10955",
+        "desc": "感官测试（最新标准）",
+        "status": "PASS",
+        "report": "GZHL250803258401CW"
+      },
+      {
+        "name": "21 Metals Heavy Metals",
+        "desc": "21种可萃取重金属测试",
+        "status": "All ND, Pass",
+        "report": "GZHL250803258401CW"
+      }
+    ],
+    "safety": [
+      {
+        "name": "TÜV SÜD Test Report",
+        "desc": "德国TÜV SÜD产品安全测试",
+        "status": "Issued",
+        "report": "68.431.25.6100.01A/01B"
+      },
+      {
+        "name": "CE Marking",
+        "desc": "欧盟CE认证",
+        "status": "Self-Certified",
+        "report": "HX2507020124S1"
+      },
+      {
+        "name": "EU RoHS",
+        "desc": "欧盟RoHS有害物质限制",
+        "status": "PASS (9 IEC 62321 standards)",
+        "report": "HX250902012884 / CTB240415066CX-ZS"
+      }
+    ],
+    "social_ethical": [
+      {
+        "name": "amfori BSCI Social Audit",
+        "desc": "商业社会标准认证（社会责任审核）",
+        "status": "C Rating (Improvement Needed)",
+        "report": "26-0390937",
+        "holder": "YangJiang YeYu Industry & Trade",
+        "valid": "2027-04-17",
+        "auditor": "LRQA (Lloyd's Register)"
+      },
+      {
+        "name": "Workforce Metrics",
+        "desc": "98名员工，男女比例50/50，工资超生活工资33%",
+        "status": "Positive Findings"
+      }
+    ],
+    "sustainability": [
+      {
+        "name": "FSC Chain of Custody",
+        "desc": "森林管理委员会产销监管链认证（可持续木材采购）",
+        "status": "Valid",
+        "report": "RINA-COC-003681",
+        "holder": "Yangjiang Homeful Industry & Trade",
+        "valid": "2029-04-17",
+        "issuer": "RINA Services S.p.A. (Italy)"
+      }
+    ],
+    "material_provenance": [
+      {
+        "name": "Outokumpu Stainless Steel Mill Cert",
+        "desc": "德国Outokumpu不锈钢钢厂材质证明 EN 10204-3.1",
+        "status": "Valid",
+        "report": "183945 / 1000537012",
+        "material": "1.4028 (Dura 420/4028) / Si-Cold Strip",
+        "origin": "Outokumpu Nirosta GmbH (Germany)"
+      }
+    ]
+  },
+  "partner_factories": [
+    {
+      "name": "Yangjiang Amber Industrial Co., Ltd.",
+      "specialty": "大马士革钢厨刀",
+      "certifications": [
+        "CE/RoHS",
+        "SGS LFGB",
+        "FDA"
+      ]
+    },
+    {
+      "name": "YangJiang YeYu Industry & Trade",
+      "specialty": "刀剪生产",
+      "certifications": [
+        "amfori BSCI"
+      ]
+    },
+    {
+      "name": "YangJiang Keenhope Industry Co., Ltd.",
+      "specialty": "羽毛纹大马士革刀",
+      "certifications": [
+        "EU RoHS CTB"
+      ]
+    },
+    {
+      "name": "Yangjiang Homeful Industry & Trade",
+      "specialty": "木制品/砧板",
+      "certifications": [
+        "FSC"
+      ]
+    }
+  ],
+  "brand_guidelines": {
+    "core_positioning": "让世界重新认识阳江制造 / Let the World Rediscover Yangjiang Manufacturing",
+    "founder_title": "AI驱动型数字化外贸创业者 / AI-Driven Global Brand Entrepreneur",
+    "philosophy": "Trust First · Value Second · Price Last（信任为先·价值为本·价格为末）",
+    "mission": "让阳江好产品被世界看见，让工厂走出来，让人才留下来",
+    "contact": {
+      "phone1": "+86 131 3800 6564",
+      "phone2": "+86 134 2129 5360",
+      "email": "ceo@kailioncrafts.com",
+      "website": "kailioncrafts.com"
+    },
+    "factory_relationship_by_scenario": {
+      "government_association": "深度战略合作（不使用股权/控股措辞）",
+      "overseas_b2b": "家族工厂股权（海外买家认可源头直供逻辑）",
+      "local_youth_project": "本地家族产业背景（不使用控股措辞）"
+    },
+    "startup_model": "创始人主导运营，团队逐步完善（不使用\"一人公司\"措辞）"
   }
 }

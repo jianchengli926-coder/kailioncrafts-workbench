@@ -5856,6 +5856,16 @@ function openInqDetail(iid){
         <ul style="padding-left:18px;line-height:2;font-size:13.5px">${i.aiSuggestions.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>
       <div class="card card-pad mb16"><div class="card-title">处理记录</div>
         <div class="timeline">${i.history.map(h=>`<div class="tl-item done"><div class="tl-time">${fmtDate(h.t)}</div><div class="tl-title" style="font-weight:500;font-size:13px">${esc(h.desc)}</div></div>`).join('')}</div></div>
+      <!-- V75.3 知识库快速回复模板 -->
+      <div class="card card-pad mb16" style="border-left:4px solid #c9a961;background:linear-gradient(135deg,#fdfbf7,#f9f6f0)">
+        <div class="card-title" style="font-size:13px">📦 知识库快速回复（一键复制）</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">
+          <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left" onclick="copyText('Thank you for your inquiry about ${esc(i.product)}. We are ${PROSPECT_KB.company.brand}, a ${PROSPECT_KB.company.location}-based manufacturer with ${PROSPECT_KB.company.factories} family factories. We can provide ${esc(i.product)} with ${PROSPECT_KB.company.cost_advantage} cost advantage. May I send you our catalog and best price?');toast('已复制询盘回复模板')">✉️ 询盘回复模板</button>
+          <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left" onclick="copyText('Certifications: ${PROSPECT_KB.certifications.map(c=>c.name).join(', ')}. Full audit reports and test certificates available upon request.');toast('已复制认证清单')">📜 认证资质清单</button>
+          <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left" onclick="copyText('We specialize in ${PROSPECT_KB.categories.map(c=>c.name).join(', ')}, with ${PROSPECT_KB.categories.reduce((s,c)=>s+c.count,0)}+ SKUs. MOQ from 500pcs, sample available.');toast('已复制产品介绍')">📦 产品品类介绍</button>
+          <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left" onclick="copyText('${PROSPECT_KB.company.core_advantages.slice(0,3).map((a,i)=>(i+1)+'. '+a).join('\n')}');toast('已复制核心卖点')">💎 核心卖点3条</button>
+        </div>
+      </div>
       <div class="btn-row">
         <button class="btn btn-gold" onclick="toast('已生成报价单草稿')">📄 转报价单</button>
         <button class="btn btn-primary" onclick="toast('状态更新为跟进中')">标记跟进中</button>
@@ -5869,6 +5879,24 @@ function openInqDetail(iid){
 const QUOTE_STATUS = {'草稿':['badge-gray'],'已发送':['badge-blue'],'已接受':['badge-a'],'已拒绝':['badge-red'],'已过期':['badge-c']};
 function viewQuotes(root){
   root.innerHTML = `
+    <!-- V75.3 知识库产品推荐 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f4f8,#e2e8f0);border:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-weight:700;font-size:14px;color:#1a365d">📊 知识库产品推荐（报价参考）</div>
+        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff" onclick="prospectKB=true;prospectKBTab='products';go('knowledge')">查看详情</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        ${PROSPECT_KB.categories.slice(0,3).map(c=>`
+          <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #e2e8f0">
+            <div style="font-size:13px;font-weight:700;color:#1a365d">${c.name}</div>
+            <div style="font-size:11px;color:#718096;margin:4px 0">${c.count} SKU · ${c.sub_cats.slice(0,3).join('/')}</div>
+            <div style="font-size:11px;color:#c9a961;font-weight:600">建议MOQ: 500pcs起</div>
+          </div>`).join('')}
+      </div>
+      <div class="text-xs text-muted mt8" style="line-height:1.6">
+        <b>报价策略：</b>工厂直供价低${PROSPECT_KB.company.cost_advantage} · 阶梯报价量大优惠 · 支持DDP方案 · 500pcs小批量试单
+      </div>
+    </div>
     <div class="flex-between mb16">
       <div class="text-muted text-sm">共 ${S.quotes.length} 张 · 总金额 $${S.quotes.reduce((a,q)=>a+q.total,0).toLocaleString()}</div>
       <button class="btn btn-gold" onclick="openQuoteForm()">＋ 新建报价单</button>
@@ -6246,7 +6274,25 @@ function orderDocs(){
       <td><button class="btn btn-outline btn-sm" onclick="window.print()">🖨 打印</button></td></tr>`).join('')}</tbody></table></div>`;
 }
 function orderQuotes(){
-  return `<div class="flex-between mb16">
+  return `<!-- V75.3 知识库产品推荐 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f4f8,#e2e8f0);border:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-weight:700;font-size:14px;color:#1a365d">📊 知识库产品推荐（报价参考）</div>
+        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff" onclick="prospectKB=true;prospectKBTab='products';go('knowledge')">查看详情</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        ${PROSPECT_KB.categories.slice(0,3).map(c=>`
+          <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #e2e8f0">
+            <div style="font-size:13px;font-weight:700;color:#1a365d">${c.name}</div>
+            <div style="font-size:11px;color:#718096;margin:4px 0">${c.count} SKU · ${c.sub_cats.slice(0,3).join('/')}</div>
+            <div style="font-size:11px;color:#c9a961;font-weight:600">建议MOQ: 500pcs起</div>
+          </div>`).join('')}
+      </div>
+      <div class="text-xs text-muted mt8" style="line-height:1.6">
+        <b>报价策略：</b>工厂直供价低${PROSPECT_KB.company.cost_advantage} · 阶梯报价量大优惠 · 支持DDP方案 · 500pcs小批量试单
+      </div>
+    </div>
+    <div class="flex-between mb16">
       <div class="text-muted text-sm">共 ${S.quotes.length} 张 · $${S.quotes.reduce((a,q)=>a+q.total,0).toLocaleString()}</div>
       <button class="btn btn-gold" onclick="openQuoteForm()">＋ 新建报价单</button>
     </div>
@@ -12816,6 +12862,21 @@ function viewAutoSearch(root){
         `<button class="btn ${autoSearchTab===k?'btn-gold':'btn-outline'}" onclick="autoSearchTab='${k}';renderView()">${l}</button>`).join('')}
     </div>
     ${autoSearchTab==='engine'?`
+    <!-- V75.3 知识库推荐搜索关键词 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f4f8,#e2e8f0);border:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-weight:700;font-size:14px;color:#1a365d">💡 知识库推荐搜索关键词</div>
+        <span class="text-xs text-muted">基于产品品类和目标市场</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        ${['kitchen shears wholesale','chef knife OEM manufacturer','outdoor folding knife supplier','kitchen accessories distributor','damascus knife factory','poultry shears bulk','cutting board supplier','vegetable peeler manufacturer','kitchen tool set importer','BBQ knife wholesale'].map(kw=>
+          `<span class="badge badge-gold" style="cursor:pointer;padding:6px 10px" onclick="document.getElementById('as_keyword').value='${kw}';toast('已填入关键词：${kw}')">${kw}</span>`).join('')}
+      </div>
+      <div class="text-xs text-muted" style="line-height:1.6">
+        <b>推荐目标市场：</b>${PROSPECT_KB.markets.map(m=>m.name.split(' ')[0]).join('、')} · 
+        <b>推荐客户类型：</b>${PROSPECT_KB.personas.map(p=>p.name).join('、')}
+      </div>
+    </div>
     <div class="card card-pad mb16">
       <div class="card-title">🎯 搜客任务配置</div>`:''}
       <div class="grid-3" style="gap:12px;margin-bottom:12px">

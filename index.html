@@ -6775,10 +6775,140 @@ function renderKBMatchCard(cid){
     + '<div class="text-xs" style="color:#38a169;font-weight:700;margin-bottom:6px">✉️ 推荐开发信模板</div>'
     + '<div style="font-size:12px;line-height:1.7"><b>主题：</b><span style="color:#c9a961">' + t.subject + '</span><br><b>卖点：</b>' + t.key_points.slice(0,3).join(' | ') + '</div>'
     + '<div class="flex gap8 mt8"><button class="btn btn-gold btn-sm" style="font-size:11px" onclick="copyEmailTemplateFromKB(\'' + t.key + '\')">📋 复制模板</button>'
-    + '<button class="btn btn-outline btn-sm" style="font-size:11px" onclick="prospectKB=true;prospectKBTab=\'templates\';closeDrawer();go(\'knowledge\')">查看全部模板</button></div></div>'
+    + '<button class="btn btn-outline btn-sm" style="font-size:11px" onclick="prospectKB=true;prospectKBTab=\'templates\';closeDrawer();go(\'knowledge\')">查看全部</button><button class=\"btn btn-primary btn-sm\" style=\"font-size:11px\" onclick=\"generateEmailWithKB(cid)\">🤖 AI生成开发信</button></div></div>'
     + '<div style="background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;margin-top:10px">'
     + '<div class="text-xs" style="color:#805ad5;font-weight:700;margin-bottom:6px">💎 公司核心卖点（开发信必提）</div>'
     + '<div style="font-size:12px;line-height:1.9;color:#555">' + PROSPECT_KB.company.core_advantages.slice(0,4).map(function(a,i){return '<span style="display:inline-block;margin-right:8px">'+(i+1)+'. '+a+'</span>'}).join('') + '</div></div></div>';
+}
+
+
+
+/* V75.3 基于知识库生成客户专属开发信 */
+async function generateEmailWithKB(cid){
+  const c = S.customers.find(x=>x.id===cid); if(!c){toast('客户不存在');return;}
+  const match = getKBMatchForCustomer(c);
+  const kb = PROSPECT_KB;
+  
+  openModal(`
+    <div class="modal-head"><h3>🤖 基于知识库生成开发信</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="card card-pad mb12" style="background:#fdfbf7;border:1px solid #e8dcc8">
+        <div class="text-xs" style="line-height:1.8">
+          <b>客户：</b>${esc(c.company)} (${esc(c.country)})<br>
+          <b>匹配画像：</b><span style="color:#c9a961">${match.persona.name}</span><br>
+          <b>匹配市场：</b><span style="color:#3182ce">${match.market.name}</span><br>
+          <b>推荐模板：</b><span style="color:#38a169">${match.template.subject}</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="text-xs text-muted">语言</label>
+          <select id="kbEmailLang" class="form-control">
+            <option value="en">英文</option>
+            <option value="zh">中文</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-muted">语气风格</label>
+          <select id="kbEmailTone" class="form-control">
+            <option value="professional">专业正式</option>
+            <option value="friendly">友好亲切</option>
+            <option value="direct">直接高效</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt12">
+        <label class="text-xs text-muted">额外要求（可选）</label>
+        <textarea id="kbEmailExtra" class="form-control" rows="2" placeholder="例如：强调小批量试单、快速交期、BSCI认证..."></textarea>
+      </div>
+      <div id="kbEmailResult" class="mt12" style="display:none">
+        <div class="text-xs text-muted mb4"><b>AI生成结果：</b></div>
+        <div id="kbEmailOutput" style="background:#f8fafc;padding:12px;border-radius:6px;font-size:12px;white-space:pre-wrap;max-height:350px;overflow-y:auto;border:1px solid #e2e8f0"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button id="kbEmailGenBtn" class="btn btn-gold" onclick="doGenerateEmailWithKB('${cid}')">🚀 生成开发信</button>
+    </div>`);
+}
+
+async function doGenerateEmailWithKB(cid){
+  const c = S.customers.find(x=>x.id===cid); if(!c){toast('客户不存在');return;}
+  const match = getKBMatchForCustomer(c);
+  const kb = PROSPECT_KB;
+  const lang = document.getElementById('kbEmailLang').value;
+  const tone = document.getElementById('kbEmailTone').value;
+  const extra = document.getElementById('kbEmailExtra').value.trim();
+  
+  const btn = document.getElementById('kbEmailGenBtn');
+  btn.disabled = true; btn.textContent = '⏳ 生成中...';
+  
+  const toneMap = {professional:'专业正式',friendly:'友好亲切',direct:'直接高效'};
+  
+  const prompt = `你是${kb.company.brand}的资深外贸业务专家。请为以下客户生成一封${lang==='en'?'英文':'中文'}的个性化开发信。
+
+【客户信息】
+公司：${c.company}
+国家：${c.country}
+类型：${c.customerType||'—'}
+主营：${c.mainProducts||'—'}
+联系人：${c.contact?.name||'—'} (${c.contact?.title||'—'})
+
+【知识库匹配结果】
+客户画像：${match.persona.name}
+画像痛点：${match.persona.pain_points.join('、')}
+切入角度：${match.persona.email_angle}
+目标市场：${match.market.name}
+市场主推：${match.market.key_products.join('、')}
+营销角度：${match.market.marketing_angle}
+推荐模板主题：${match.template.subject}
+模板卖点：${match.template.key_points.join('、')}
+
+【公司知识库】
+公司：${kb.company.name}（${kb.company.brand}）
+定位：${kb.company.positioning}
+核心优势：${kb.company.core_advantages.join('；')}
+产品品类：${kb.categories.map(x=>x.name+'('+x.sku_count+'SKU)').join('、')}
+认证：${kb.certifications.map(x=>x.name).join('、')}
+经营哲学：${kb.company.philosophy}
+产业背景：${kb.industry.city}是中国刀剪之都，产量占全国${kb.industry.national_output_share}，出口占全国${kb.industry.export_share}
+
+${extra?'【额外要求】'+extra:''}
+
+【写作要求】
+1. 语气：${toneMap[tone]||'专业正式'}
+2. 邮件主题和正文都要写
+3. 自然融入公司优势、认证和产业背景，不要生硬堆砌
+4. 针对客户画像痛点给出具体解决方案
+5. 推荐1-2个匹配的产品品类
+6. 结尾要有明确的行动号召（如索要样品、安排通话）
+7. 格式：先写Subject: 然后空一行写正文
+8. 不要加任何解释，直接输出邮件内容`;
+  
+  const r = await callAI(prompt, {purpose:'draft'});
+  btn.disabled = false; btn.textContent = '🚀 生成开发信';
+  
+  if(r.error){ toast('生成失败: '+r.error); return; }
+  
+  const resultDiv = document.getElementById('kbEmailResult');
+  const output = document.getElementById('kbEmailOutput');
+  resultDiv.style.display = 'block';
+  output.textContent = r.content;
+  
+  // 自动保存为草稿
+  const lines = r.content.split('\n');
+  let subject = '', body = r.content;
+  if(lines[0].toLowerCase().startsWith('subject:')){
+    subject = lines[0].substring(8).trim();
+    body = lines.slice(1).join('\n').trim();
+  }
+  if(!S.drafts) S.drafts = [];
+  S.drafts.push({
+    id:'draft_'+uid(), customerId:cid, subject, content:body,
+    status:'草稿', createdAt:new Date().toISOString(), kbGenerated:true
+  });
+  persist();
+  toast('✅ 开发信已生成并保存到草稿箱');
 }
 
 
@@ -10054,11 +10184,24 @@ async function doAiGenerateTemplate(){
   const catLabel = EMAIL_TEMPLATE_CATS.find(c=>c.id===cat)?.label || '';
   const btn = document.getElementById('aiTplGenBtn');
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
-  const prompt = `请为外贸业务员生成一封${lang==='en'?'英文':'中文'}的${catLabel}邮件模板。
+  // V75.3 注入知识库上下文
+  const kb = PROSPECT_KB;
+  const kbContext = `
+【公司背景】${kb.company.name}（${kb.company.brand}），${kb.company.founded_year}年成立，${kb.company.location}
+【核心优势】${kb.company.core_advantages.join('；')}
+【产品品类】${kb.categories.map(c=>c.name+'('+c.sku_count+'SKU)').join('、')}
+【认证体系】${kb.certifications.map(c=>c.name).join('、')}
+【目标市场】${kb.markets.map(m=>m.name).join('、')}
+【经营哲学】${kb.company.philosophy}
+  `;
+  const prompt = `你是${kb.company.brand}的外贸业务专家。请为外贸业务员生成一封${lang==='en'?'英文':'中文'}的${catLabel}邮件模板。
+
+${kbContext}
+
 要求：
 1. 邮件主题和正文都要写
 2. 使用变量占位符，如 {clientName} {company} {product} {price} {moq} {myName} {myCompany} {myEmail}
-3. 专业、简洁、有说服力
+3. 专业、简洁、有说服力，自然融入公司优势和认证
 4. 针对场景：${desc}
 5. 格式：先写Subject: 然后空一行写正文
 6. 不要加任何解释，直接输出邮件内容`;

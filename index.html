@@ -6994,6 +6994,54 @@ function resetData(){
 let orderTab = 'quotes';
 function viewOrders(root){
   root.innerHTML = `
+    <!-- V75.3 订单业务统计面板 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f4f8,#e2e8f0);border:none">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div style="background:#fff;padding:14px;border-radius:8px;border-left:4px solid #3182ce">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">📄 报价单</div>
+          <div style="font-size:24px;font-weight:800;color:#2b6cb0">${S.quotes.length}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">总金额 $${S.quotes.reduce((a,q)=>a+q.total,0).toLocaleString()}</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;border-left:4px solid #805ad5">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">📋 合同</div>
+          <div style="font-size:24px;font-weight:800;color:#6b46c1">${S.contracts.length}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">总金额 $${S.contracts.reduce((a,c)=>a+c.amount,0).toLocaleString()}</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;border-left:4px solid #dd6b20">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">🚚 执行中订单</div>
+          <div style="font-size:24px;font-weight:800;color:#c05621">${S.contracts.filter(c=>c.status==='执行中').length}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">金额 $${S.contracts.filter(c=>c.status==='执行中').reduce((a,c)=>a+c.amount,0).toLocaleString()}</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;border-left:4px solid #38a169">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">✅ 已完成订单</div>
+          <div style="font-size:24px;font-weight:800;color:#276749">${S.contracts.filter(c=>c.status==='已完成').length}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">金额 $${S.contracts.filter(c=>c.status==='已完成').reduce((a,c)=>a+c.amount,0).toLocaleString()}</div>
+        </div>
+      </div>
+      <!-- 订单状态分布条形图 -->
+      <div style="margin-top:12px;background:#fff;padding:12px;border-radius:8px">
+        <div style="font-size:12px;font-weight:700;color:#2d3748;margin-bottom:8px">📊 订单状态分布</div>
+        <div style="display:flex;gap:8px;align-items:flex-end;height:80px">
+          ${(() => {
+            const statuses = [
+              {label:'待确认', count: S.contracts.filter(c=>c.status==='待确认').length, color:'#a0aec0'},
+              {label:'已确认', count: S.contracts.filter(c=>c.status==='已确认').length, color:'#4299e1'},
+              {label:'执行中', count: S.contracts.filter(c=>c.status==='执行中').length, color:'#dd6b20'},
+              {label:'已完成', count: S.contracts.filter(c=>c.status==='已完成').length, color:'#38a169'},
+              {label:'已取消', count: S.contracts.filter(c=>c.status==='已取消').length, color:'#e53e3e'}
+            ];
+            const max = Math.max(...statuses.map(s=>s.count), 1);
+            return statuses.map(s=>`
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="font-size:14px;font-weight:700;color:${s.color}">${s.count}</div>
+                <div style="width:100%;background:${s.color};border-radius:4px 4px 0 0;height:${Math.max(s.count/max*60,4)}px;transition:height .5s"></div>
+                <div style="font-size:10px;color:#718096">${s.label}</div>
+              </div>
+            `).join('');
+          })()}
+        </div>
+      </div>
+    </div>
     <div class="flex gap8 mb16">
       ${[['quotes','📄 报价单'],['contracts','📋 合同'],['orders','🚚 订单执行'],['calc','🧮 计算器'],['docs','📑 单据中心']].map(([k,l])=>
         `<button class="btn ${orderTab===k?'btn-gold':'btn-outline'}" onclick="orderTab='${k}';renderView()">${l}</button>`).join('')}
@@ -7020,7 +7068,58 @@ function orderDocs(){
       <td><button class="btn btn-outline btn-sm" onclick="window.print()">🖨 打印</button></td></tr>`).join('')}</tbody></table></div>`;
 }
 function orderQuotes(){
-  return `<!-- V75.3 知识库产品推荐 -->
+  const acceptedQuotes = S.quotes.filter(q=>q.status==='已接受'||q.status==='已成交');
+  const pendingQuotes = S.quotes.filter(q=>q.status==='待确认'||q.status==='已发送');
+  const conversionRate = S.quotes.length ? Math.round(acceptedQuotes.length/S.quotes.length*100) : 0;
+  return `<!-- V75.3 报价统计面板 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fefcbf,#fef3c7);border:none">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">📄 报价总数</div>
+          <div style="font-size:28px;font-weight:800;color:#2b6cb0">${S.quotes.length}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">总金额 $${S.quotes.reduce((a,q)=>a+q.total,0).toLocaleString()}</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">⏳ 待跟进</div>
+          <div style="font-size:28px;font-weight:800;color:#c05621">${pendingQuotes.length}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">金额 $${pendingQuotes.reduce((a,q)=>a+q.total,0).toLocaleString()}</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">✅ 已成交</div>
+          <div style="font-size:28px;font-weight:800;color:#276749">${acceptedQuotes.length}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">金额 $${acceptedQuotes.reduce((a,q)=>a+q.total,0).toLocaleString()}</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">📈 报价转化率</div>
+          <div style="font-size:28px;font-weight:800;color:#c9a961">${conversionRate}%</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">${conversionRate>=30?'⭐ 优秀':conversionRate>=20?'👍 良好':'📋 待提升'}</div>
+        </div>
+      </div>
+      <!-- 报价金额区间分布 -->
+      <div style="margin-top:12px;background:#fff;padding:12px;border-radius:8px">
+        <div style="font-size:12px;font-weight:700;color:#2d3748;margin-bottom:8px">💰 报价金额区间分布</div>
+        <div style="display:flex;gap:8px;align-items:flex-end;height:70px">
+          ${(() => {
+            const ranges = [
+              {label:'<$1k', count: S.quotes.filter(q=>q.total<1000).length, color:'#90cdf4'},
+              {label:'$1k-5k', count: S.quotes.filter(q=>q.total>=1000&&q.total<5000).length, color:'#4299e1'},
+              {label:'$5k-10k', count: S.quotes.filter(q=>q.total>=5000&&q.total<10000).length, color:'#2b6cb0'},
+              {label:'$10k-50k', count: S.quotes.filter(q=>q.total>=10000&&q.total<50000).length, color:'#2c5282'},
+              {label:'>$50k', count: S.quotes.filter(q=>q.total>=50000).length, color:'#1a365d'}
+            ];
+            const max = Math.max(...ranges.map(r=>r.count), 1);
+            return ranges.map(r=>`
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="font-size:13px;font-weight:700;color:${r.color}">${r.count}</div>
+                <div style="width:100%;background:${r.color};border-radius:4px 4px 0 0;height:${Math.max(r.count/max*50,4)}px"></div>
+                <div style="font-size:10px;color:#718096">${r.label}</div>
+              </div>
+            `).join('');
+          })()}
+        </div>
+      </div>
+    </div>
+    <!-- V75.3 知识库产品推荐 -->
     <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f4f8,#e2e8f0);border:none">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div style="font-weight:700;font-size:14px;color:#1a365d">📊 知识库产品推荐（报价参考）</div>
@@ -7266,7 +7365,54 @@ KaiLionCrafts`;
 function viewProducts(root){
   const cats = ['全部',...new Set(S.products.map(p=>p.category))];
   const list = prodCat==='全部'?S.products:S.products.filter(p=>p.category===prodCat);
+  const totalStock = S.products.reduce((s,p)=>s+(Number(p.stock)||0),0);
+  const avgMargin = S.products.length ? Math.round(S.products.reduce((s,p)=>{const price=Number(p.price)||0,cost=Number(p.cost)||0;return s+(price>0?((price-cost)/price*100):0);},0)/S.products.length) : 0;
   root.innerHTML = `
+    <!-- V75.3 产品统计面板 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0fff4,#c6f6d5);border:none">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">📦 产品总数</div>
+          <div style="font-size:28px;font-weight:800;color:#276749">${S.products.length}</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">${cats.length-1} 个品类</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">📊 平均利润率</div>
+          <div style="font-size:28px;font-weight:800;color:#c9a961">${avgMargin}%</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">${avgMargin>=50?'⭐ 高利润':avgMargin>=30?'👍 中等':'📋 偏低'}</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">🏭 库存总量</div>
+          <div style="font-size:28px;font-weight:800;color:#2b6cb0">${(totalStock/10000).toFixed(1)}万</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">pcs</div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
+          <div style="font-size:11px;color:#718096;margin-bottom:4px">💰 库存价值</div>
+          <div style="font-size:28px;font-weight:800;color:#c05621">$${(S.products.reduce((s,p)=>s+(Number(p.cost)||0)*(Number(p.stock)||0),0)/10000).toFixed(1)}万</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">成本价</div>
+        </div>
+      </div>
+      <!-- 产品品类分布 -->
+      <div style="margin-top:12px;background:#fff;padding:12px;border-radius:8px">
+        <div style="font-size:12px;font-weight:700;color:#2d3748;margin-bottom:8px">📊 产品品类分布（本地产品库）</div>
+        <div style="display:flex;gap:8px;align-items:flex-end;height:70px">
+          ${(() => {
+            const catCounts = {};
+            S.products.forEach(p=>{ catCounts[p.category||'未分类'] = (catCounts[p.category||'未分类']||0)+1; });
+            const entries = Object.entries(catCounts).sort((a,b)=>b[1]-a[1]);
+            const colors = ['#3182ce','#38a169','#dd6b20','#805ad5','#e53e3e','#319795','#d69e2e','#2b6cb0'];
+            const max = Math.max(...entries.map(e=>e[1]), 1);
+            return entries.slice(0,8).map((e,i)=>`
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="font-size:13px;font-weight:700;color:${colors[i%colors.length]}">${e[1]}</div>
+                <div style="width:100%;background:${colors[i%colors.length]};border-radius:4px 4px 0 0;height:${Math.max(e[1]/max*50,4)}px"></div>
+                <div style="font-size:10px;color:#718096;text-align:center;line-height:1.2">${e[0].length>6?e[0].slice(0,6)+'..':e[0]}</div>
+              </div>
+            `).join('');
+          })()}
+        </div>
+      </div>
+    </div>
     <div class="flex gap8 mb16">
       ${cats.map(c=>`<button class="btn ${prodCat===c?'btn-gold':'btn-outline'}" onclick="prodCat='${c}';renderView()">${c}</button>`).join('')}
       <button class="btn btn-primary" style="margin-left:auto" onclick="toast('新建产品（演示）')">＋ 新品</button>
@@ -7297,9 +7443,9 @@ function viewProducts(root){
           <div class="fw700" style="text-align:center">${esc(p.name)}</div>
           <div class="text-sm text-muted" style="text-align:center">${esc(p.spec)}</div>
           <div class="divider"></div>
-          <div class="flex-between text-sm"><span>成本</span><b>$${p.cost.toFixed(2)}</b></div>
-          <div class="flex-between text-sm"><span>建议售价</span><b class="text-gold">$${p.price.toFixed(2)}</b></div>
-          <div class="flex-between text-sm"><span>库存</span><span class="badge ${p.stock<3000?'badge-red':'badge-a'}">${p.stock} pcs</span></div>
+          <div class="flex-between text-sm"><span>成本</span><b>$${(Number(p.cost)||0).toFixed(2)}</b></div>
+          <div class="flex-between text-sm"><span>建议售价</span><b class="text-gold">$${(Number(p.price)||0).toFixed(2)}</b></div>
+          <div class="flex-between text-sm"><span>库存</span><span class="badge ${(Number(p.stock)||0)<3000?'badge-red':'badge-a'}">${Number(p.stock)||0} pcs</span></div>
           <div class="text-sm text-muted mt8" style="font-size:11px">关键词：${esc(p.keywords)}</div>
           <button class="btn btn-gold btn-sm mt8" style="width:100%" onclick="openQuickQuote('${p.id}')">💰 快速报价</button>
         </div>`).join('')}

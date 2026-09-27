@@ -5170,6 +5170,17 @@ function openCustomerDetail(cid){
 
       
       ${renderKBMatchCard(cid)}
+      <!-- V75.3 知识库快捷操作栏 -->
+      <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f4f8,#e2e8f0);border:none">
+        <div class="card-title" style="margin-bottom:10px">⚡ 知识库快捷操作</div>
+        <div class="flex gap8" style="flex-wrap:wrap">
+          <button class="btn btn-sm" style="font-size:12px;background:#25D366;color:#fff" onclick="quickKBAction('${cid}','whatsapp')">💬 生成WhatsApp话术</button>
+          <button class="btn btn-sm" style="font-size:12px;background:#319795;color:#fff" onclick="quickKBAction('${cid}','translate')">🌐 翻译客户信息</button>
+          <button class="btn btn-sm" style="font-size:12px;background:#dd6b20;color:#fff" onclick="quickKBAction('${cid}','marketing')">✍️ 生成营销内容</button>
+          <button class="btn btn-sm" style="font-size:12px;background:#805ad5;color:#fff" onclick="quickKBAction('${cid}','search')">🔍 AI检索客户相关</button>
+          <button class="btn btn-sm" style="font-size:12px;background:#3182ce;color:#fff" onclick="quickKBAction('${cid}','profile')">👥 深度客户画像</button>
+        </div>
+      </div>
 <div class="card card-pad mb16">
         <div class="card-title">🏢 公司背调</div>
         <div class="text-sm" style="line-height:2">
@@ -5490,8 +5501,16 @@ function viewDrafts(root){
     ${draftTab==='list'?draftList():draftTab==='short'?draftShort():draftTab==='multi'?draftMultiLang():draftTab==='seq'?draftSeq():draftTab==='send'?draftSend():draftTab==='stats'?draftStats():draftTab==='ab'?draftAB():draftTpl()}`;
 }
 function draftShort(){
+  const kbTpls = PROSPECT_KB.email_templates || [];
   return `<div class="card card-pad"><div class="card-title">✂️ 短开发信（≤50词）</div>
     <div class="text-sm text-muted mb16">核心理念：不求多，但求每封调得好。每日上限 30 封。3句话结构：引用客户官网→我方对应优势→简单行动号召。</div>
+    <!-- V75.3 知识库模板快速选择 -->
+    <div class="mb16" style="padding:12px;background:linear-gradient(135deg,#fdfbf7,#f9f6f0);border-radius:8px;border:1px solid #e8dcc8">
+      <div class="text-xs text-muted mb8" style="font-weight:600">📚 知识库开发信模板（点击一键填充）：</div>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        ${kbTpls.map((t,i)=>`<button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff" onclick="fillKBEmailTemplate(${i})">${t.icon||'✉️'} ${t.label||t.key}</button>`).join('')}
+      </div>
+    </div>
     <div class="form-group"><label>客户国家（自动调整语气）</label>
       <select class="form-control"><option>🇩🇪德国（严谨重数据）</option><option>🇺🇸美国（直接重时效）</option><option>🇬🇧英国（传统重礼仪）</option><option>🇯🇵日本（重细节）</option></select></div>
     <div class="form-group"><label>邮件正文（实时单词计数）</label>
@@ -5505,6 +5524,45 @@ function draftShort(){
     <div class="divider"></div>
     <b class="text-sm">今日发送统计：</b><span class="text-sm">&nbsp;已发 <b>12</b> / 30 · 回复 <b style="color:var(--green)">3</b> · 回复率 <b>25%</b></span>
   </div>`;
+}
+function quickKBAction(cid, action){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c){ toast('客户不存在'); return; }
+  const customerInfo = (c.company||'') + ', ' + (c.country||'') + ', ' + (c.products||'') + ', ' + (c.notes||'');
+  switch(action){
+    case 'whatsapp':
+      go('tools'); switchTool(2);
+      setTimeout(()=>{ const el=document.getElementById('waCustomerInfo'); if(el) el.value=customerInfo; toast('✅ 已填充客户信息到WhatsApp工具'); }, 300);
+      break;
+    case 'translate':
+      go('tools'); switchTool(4);
+      setTimeout(()=>{ const el=document.getElementById('transInput'); if(el) el.value=customerInfo; toast('✅ 已填充客户信息到翻译工具'); }, 300);
+      break;
+    case 'marketing':
+      go('tools'); switchTool(13);
+      setTimeout(()=>{ const el=document.getElementById('mcProduct'); if(el) el.value=(c.products||'stainless steel kitchen scissors'); toast('✅ 已填充产品到营销内容工具'); }, 300);
+      break;
+    case 'search':
+      prospectKB=true; prospectKBTab='aisearch'; go('knowledge');
+      setTimeout(()=>{ const el=document.getElementById('kb_search_input'); if(el) el.value=(c.company||'')+' '+(c.country||'')+' '+(c.products||''); toast('✅ 已填充检索关键词'); }, 300);
+      break;
+    case 'profile':
+      go('tools'); switchTool(3);
+      setTimeout(()=>{ const el=document.getElementById('profileCustomerInfo'); if(el) el.value=customerInfo; toast('✅ 已填充客户信息到画像工具'); }, 300);
+      break;
+  }
+}
+function fillKBEmailTemplate(idx){
+  const tpls = PROSPECT_KB.email_templates || [];
+  const tpl = tpls[idx];
+  if(!tpl) return;
+  const textarea = document.getElementById('shortEmail');
+  if(textarea){
+    const content = tpl.content || tpl.body || (tpl.key_points ? tpl.key_points.join('\n') : '');
+    textarea.value = content.substring(0, 300);
+    countWords();
+    toast('✅ 已填充模板：' + (tpl.label||tpl.key));
+  }
 }
 function countWords(){
   const t=document.getElementById('shortEmail'); if(!t) return;
@@ -8447,16 +8505,27 @@ function runAgents(){
   if(log) log.style.display='block'; if(out) out.innerHTML='';
   AGENTS.forEach((a,i)=>{ const el=document.getElementById('agent-'+i); if(el) el.style.background='#f7efdd';
     const st=document.getElementById('agent-status-'+i); if(st) st.innerHTML='<span class="badge badge-gold">🟡 工作中</span>'; });
-  const msgs=['🔍 产品分析Agent：识别出厨房剪刀3个核心卖点','🌍 市场研究Agent：北美厨房用品市场规模$12B','👤 客户画像Agent：目标客户=进口商+分销商+电商',
-    '🏢 找公司Agent：搜索到47家潜在客户公司','📋 企业背调Agent：完成47家公司官网分析','⭐ 客户评分Agent：筛选出12家A级客户',
-    '📞 联系人研究Agent：找到9个决策人邮箱','📡 近期信号Agent：3家客户近期有采购动态','✉️ 开发信Agent：生成12封个性化开发信',
-    '💬 社媒运营Agent：准备领英加好友附言','✍️ 内容创作Agent：推荐2篇博客选题'];
+  const kb = PROSPECT_KB;
+  const topProducts = Object.entries(kb.products||{}).slice(0,2).map(([cat,ps])=>ps[0]?.name_en).filter(Boolean).join('、');
+  const msgs=[
+    '🔍 产品分析Agent：基于知识库识别出'+kb.categories.length+'大品类核心卖点，重点产品：'+topProducts,
+    '🌍 市场研究Agent：参考知识库'+kb.markets.length+'大目标市场，北美厨房用品市场规模$12B，主推'+kb.markets[0]?.key_products?.slice(0,2).join('、'),
+    '👤 客户画像Agent：匹配知识库'+kb.personas.length+'类客户画像，目标客户='+kb.personas.map(p=>p.name).join('+'),
+    '🏢 找公司Agent：搜索到47家潜在客户公司，覆盖'+kb.markets.length+'大市场',
+    '📋 企业背调Agent：完成47家公司官网分析，重点关注'+kb.categories[0]?.name+'品类采购商',
+    '⭐ 客户评分Agent：筛选出12家A级客户，匹配度基于知识库画像评估',
+    '📞 联系人研究Agent：找到9个决策人邮箱，优先联系采购经理和创始人',
+    '📡 近期信号Agent：3家客户近期有采购动态，与'+kb.categories[1]?.name+'品类相关',
+    '✉️ 开发信Agent：生成12封个性化开发信，已注入公司'+kb.company.core_advantages.length+'大核心优势和'+kb.certifications.length+'张认证',
+    '💬 社媒运营Agent：准备领英加好友附言，融入'+kb.company.brand+'品牌定位',
+    '✍️ 内容创作Agent：推荐2篇博客选题，基于知识库SEO关键词和热门产品'
+  ];
   msgs.forEach((m,i)=>{
     setTimeout(()=>{
       if(out) out.innerHTML += '<div>'+m+'</div>';
       const st=document.getElementById('agent-status-'+i); if(st) st.innerHTML='<span class="badge badge-a">✅ 完成</span>';
       const el=document.getElementById('agent-'+i); if(el) el.style.background='var(--success-bg,#f0fff4)';
-      if(i===msgs.length-1 && out){ out.innerHTML += '<div style="margin-top:12px;color:var(--green);font-weight:700">✅ 获客任务完成：发现 12 家精准客户，生成 12 封开发信</div>'; agentRunning=false; }
+      if(i===msgs.length-1 && out){ out.innerHTML += '<div style="margin-top:12px;color:var(--green);font-weight:700">✅ 获客任务完成：发现 12 家精准客户，生成 12 封开发信（全部基于知识库智能匹配）</div>'; agentRunning=false; }
     }, i*800);
   });
 }

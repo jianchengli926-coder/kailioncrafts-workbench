@@ -6415,6 +6415,340 @@ function openCustomerDetail(cid){
 }
 
 /* ---------- 添加 / 编辑客户 ---------- */
+/* V75.3 操作日志增强 */
+function addOperationLog(type, action, detail){
+  if(!S.operationLogs || !Array.isArray(S.operationLogs)){
+    S.operationLogs = [];
+  }
+  
+  S.operationLogs.unshift({
+    id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    type: type,
+    action: action,
+    detail: detail || '',
+    timestamp: Date.now(),
+    userAgent: navigator.userAgent.substring(0, 100)
+  });
+  
+  // 限制日志数量，最多保留500条
+  if(S.operationLogs.length > 500){
+    S.operationLogs = S.operationLogs.slice(0, 500);
+  }
+  
+  persist();
+}
+
+function renderOperationLogs(){
+  const logs = S.operationLogs || [];
+  const typeFilter = document.getElementById('logTypeFilter')?.value || '';
+  const timeFilter = document.getElementById('logTimeFilter')?.value || '';
+  const searchQuery = document.getElementById('logSearch')?.value?.toLowerCase() || '';
+  
+  let filtered = logs;
+  
+  // 类型筛选
+  if(typeFilter){
+    filtered = filtered.filter(l => l.type === typeFilter);
+  }
+  
+  // 时间筛选
+  if(timeFilter){
+    const now = Date.now();
+    const todayStart = new Date().setHours(0, 0, 0, 0);
+    const weekStart = todayStart - (new Date().getDay() || 7) * 24 * 60 * 60 * 1000;
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+    
+    if(timeFilter === 'today'){
+      filtered = filtered.filter(l => l.timestamp >= todayStart);
+    }else if(timeFilter === 'week'){
+      filtered = filtered.filter(l => l.timestamp >= weekStart);
+    }else if(timeFilter === 'month'){
+      filtered = filtered.filter(l => l.timestamp >= monthStart);
+    }
+  }
+  
+  // 搜索筛选
+  if(searchQuery){
+    filtered = filtered.filter(l => 
+      (l.action || '').toLowerCase().includes(searchQuery) ||
+      (l.detail || '').toLowerCase().includes(searchQuery)
+    );
+  }
+  
+  // 更新统计
+  const todayStart = new Date().setHours(0, 0, 0, 0);
+  document.getElementById('logTotal').textContent = logs.length;
+  document.getElementById('logToday').textContent = logs.filter(l => l.timestamp >= todayStart).length;
+  document.getElementById('logAI').textContent = logs.filter(l => l.type === 'ai').length;
+  document.getElementById('logError').textContent = logs.filter(l => l.type === 'error').length;
+  
+  // 渲染日志列表
+  const listEl = document.getElementById('operationLogList');
+  if(!listEl) return;
+  
+  if(filtered.length === 0){
+    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px">暂无符合条件的日志</div>';
+    return;
+  }
+  
+  const typeColors = {
+    customer: '#3b82f6',
+    email: '#10b981',
+    ai: '#f59e0b',
+    product: '#8b5cf6',
+    order: '#ec4899',
+    quote: '#06b6d4',
+    system: '#6b7280',
+    error: '#ef4444'
+  };
+  
+  const typeLabels = {
+    customer: '客户',
+    email: '开发信',
+    ai: 'AI',
+    product: '产品',
+    order: '订单',
+    quote: '报价',
+    system: '系统',
+    error: '错误'
+  };
+  
+  listEl.innerHTML = filtered.slice(0, 100).map(log => {
+    const time = new Date(log.timestamp);
+    const timeStr = time.toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    const color = typeColors[log.type] || '#6b7280';
+    const label = typeLabels[log.type] || log.type;
+    
+    return '<div style="display:flex;gap:8px;padding:8px;background:#fff;border-radius:6px;margin-bottom:4px;border-left:3px solid ' + color + '">' +
+      '<span style="font-size:10px;padding:2px 6px;background:' + color + '20;color:' + color + ';border-radius:4px;white-space:nowrap;height:fit-content;margin-top:2px">' + label + '</span>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:12px;font-weight:600;color:#1f2937">' + (log.action || '') + '</div>' +
+        (log.detail ? '<div style="font-size:11px;color:#6b7280;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + log.detail + '</div>' : '') +
+      '</div>' +
+      '<span style="font-size:10px;color:#9ca3af;white-space:nowrap">' + timeStr + '</span>' +
+    '</div>';
+  }).join('') + (filtered.length > 100 ? '<div style="text-align:center;padding:8px;color:#9ca3af;font-size:11px">... 还有 ' + (filtered.length - 100) + ' 条日志，请使用筛选功能查看</div>' : '');
+}
+
+function exportOperationLogs(){
+  const logs = S.operationLogs || [];
+  if(logs.length === 0){
+    toast('⚠️ 暂无日志可导出');
+    return;
+  }
+  
+  const data = {
+    exportTime: new Date().toISOString(),
+    totalLogs: logs.length,
+    logs: logs.map(l => ({
+      type: l.type,
+      action: l.action,
+      detail: l.detail,
+      timestamp: new Date(l.timestamp).toISOString()
+    }))
+  };
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '操作日志_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ 已导出 ' + logs.length + ' 条操作日志');
+}
+
+function clearOperationLogs(){
+  if(!confirm('确定要清空所有操作日志吗？此操作不可撤销！')) return;
+  S.operationLogs = [];
+  persist();
+  renderOperationLogs();
+  toast('✅ 操作日志已清空');
+}
+
+/* V75.3 客户标签管理 */
+function getCustomerTags(){
+  if(!S.customerTags || !Array.isArray(S.customerTags)){
+    S.customerTags = [
+      {label:'重点客户', color:'#ef4444'},
+      {label:'已报价', color:'#f59e0b'},
+      {label:'已寄样', color:'#10b981'},
+      {label:'展会客户', color:'#8b5cf6'},
+      {label:'老客户', color:'#3b82f6'},
+      {label:'潜在客户', color:'#06b6d4'},
+    ];
+    persist();
+  }
+  return S.customerTags;
+}
+
+function renderTagList(){
+  const tags = getCustomerTags();
+  const customers = S.customers || [];
+  const tagList = document.getElementById('tagList');
+  
+  if(!tagList) return;
+  
+  if(tags.length === 0){
+    tagList.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:#9ca3af;font-size:13px">暂无标签，点击上方添加</div>';
+    return;
+  }
+  
+  tagList.innerHTML = tags.map((tag, idx) => {
+    const count = customers.filter(c => (c.tags || []).includes(tag.label)).length;
+    return '<div style="background:#fff;padding:10px 12px;border-radius:8px;border-left:4px solid ' + tag.color + ';display:flex;justify-content:space-between;align-items:center">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:700;font-size:13px;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + tag.label + '</div>' +
+        '<div style="font-size:11px;color:#6b7280;margin-top:2px">' + count + ' 个客户</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:4px;margin-left:8px">' +
+        '<button onclick="renameTag(' + idx + ')" style="background:#f3f4f6;border:none;width:24px;height:24px;border-radius:4px;cursor:pointer;font-size:12px" title="重命名">✏️</button>' +
+        '<button onclick="deleteTag(' + idx + ')" style="background:#fef2f2;border:none;width:24px;height:24px;border-radius:4px;cursor:pointer;font-size:12px;color:#ef4444" title="删除">🗑️</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function addCustomerTag(){
+  const nameInput = document.getElementById('newTagName');
+  const colorSelect = document.getElementById('newTagColor');
+  const name = nameInput.value.trim();
+  
+  if(!name){
+    toast('⚠️ 请输入标签名称');
+    return;
+  }
+  
+  const tags = getCustomerTags();
+  if(tags.some(t => t.label === name)){
+    toast('⚠️ 标签已存在');
+    return;
+  }
+  
+  tags.push({label:name, color:colorSelect.value});
+  persist();
+  renderTagList();
+  nameInput.value = '';
+  toast('✅ 标签已添加：' + name);
+}
+
+function renameTag(idx){
+  const tags = getCustomerTags();
+  const oldName = tags[idx].label;
+  const newName = prompt('请输入新的标签名称：', oldName);
+  
+  if(!newName || newName.trim() === oldName) return;
+  
+  if(tags.some((t, i) => i !== idx && t.label === newName.trim())){
+    toast('⚠️ 标签已存在');
+    return;
+  }
+  
+  // 更新所有客户中的标签
+  const customers = S.customers || [];
+  customers.forEach(c => {
+    if(c.tags && c.tags.includes(oldName)){
+      c.tags = c.tags.map(t => t === oldName ? newName.trim() : t);
+    }
+  });
+  
+  tags[idx].label = newName.trim();
+  persist();
+  renderTagList();
+  toast('✅ 标签已重命名：' + oldName + ' → ' + newName.trim());
+}
+
+function deleteTag(idx){
+  const tags = getCustomerTags();
+  const tagName = tags[idx].label;
+  const count = (S.customers || []).filter(c => (c.tags || []).includes(tagName)).length;
+  
+  if(!confirm('确定要删除标签「' + tagName + '」吗？' + (count > 0 ? '\n将从 ' + count + ' 个客户中移除此标签。' : ''))) return;
+  
+  // 从所有客户中移除标签
+  const customers = S.customers || [];
+  customers.forEach(c => {
+    if(c.tags){
+      c.tags = c.tags.filter(t => t !== tagName);
+    }
+  });
+  
+  tags.splice(idx, 1);
+  persist();
+  renderTagList();
+  toast('✅ 标签已删除：' + tagName);
+}
+
+/* V75.3 工作台欢迎引导 */
+let currentGuideStep = 1;
+const totalGuideSteps = 6;
+
+function showWelcomeGuide(){
+  document.getElementById('welcomeGuide').style.display = 'flex';
+  currentGuideStep = 1;
+  updateGuideStep();
+}
+
+function closeWelcomeGuide(){
+  document.getElementById('welcomeGuide').style.display = 'none';
+  localStorage.setItem('kailion_welcome_shown', 'true');
+}
+
+function nextGuideStep(){
+  if(currentGuideStep < totalGuideSteps){
+    currentGuideStep++;
+    updateGuideStep();
+  }
+}
+
+function prevGuideStep(){
+  if(currentGuideStep > 1){
+    currentGuideStep--;
+    updateGuideStep();
+  }
+}
+
+function goToGuideStep(step){
+  currentGuideStep = step;
+  updateGuideStep();
+}
+
+function updateGuideStep(){
+  // 隐藏所有步骤
+  document.querySelectorAll('.guide-step').forEach(s => {
+    s.style.display = 'none';
+  });
+  // 显示当前步骤
+  const currentStep = document.querySelector('.guide-step[data-step="' + currentGuideStep + '"]');
+  if(currentStep) currentStep.style.display = 'block';
+  
+  // 更新圆点
+  document.querySelectorAll('.guide-dot').forEach((dot, i) => {
+    dot.style.background = (i + 1 === currentGuideStep) ? '#667eea' : '#e2e8f0';
+  });
+  
+  // 更新按钮
+  document.getElementById('guidePrev').style.display = currentGuideStep > 1 ? 'inline-block' : 'none';
+  document.getElementById('guideNext').style.display = currentGuideStep < totalGuideSteps ? 'inline-block' : 'none';
+  document.getElementById('guideFinish').style.display = currentGuideStep === totalGuideSteps ? 'inline-block' : 'none';
+}
+
+// 页面加载时检查是否需要显示欢迎引导
+document.addEventListener('DOMContentLoaded', function(){
+  const welcomeShown = localStorage.getItem('kailion_welcome_shown');
+  if(!welcomeShown){
+    setTimeout(() => showWelcomeGuide(), 1000);
+  }
+});
+
+// 给圆点添加点击事件
+document.addEventListener('click', function(e){
+  if(e.target.classList.contains('guide-dot')){
+    const step = parseInt(e.target.getAttribute('data-dot'));
+    goToGuideStep(step);
+  }
+});
+
 /* V75.3 工作台健康度评分 */
 function calculateHealthScore(){
   const customers = S.customers || [];
@@ -9551,6 +9885,92 @@ function renderApiSettings(){
         <div style="font-size:32px;margin-bottom:8px">🌙</div>
         <div style="font-size:14px;font-weight:700;color:#e2e8f0">深色主题</div>
         <div style="font-size:11px;color:#a0aec0;margin-top:4px">护眼舒适 · 夜间使用</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- V75.3 操作日志增强 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📋 操作日志管理</span>
+      <span class="badge" style="background:#0ea5e9;color:#fff;font-size:10px">审计追踪</span>
+    </div>
+    <p class="text-sm text-muted mb12">记录所有重要操作，支持筛选、导出和审计追踪</p>
+    <!-- 日志统计 -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+      <div style="background:#fff;padding:10px;border-radius:8px;text-align:center;border-top:3px solid #3b82f6">
+        <div id="logTotal" style="font-size:20px;font-weight:800;color:#3b82f6">--</div>
+        <div style="font-size:10px;color:#6b7280">总操作数</div>
+      </div>
+      <div style="background:#fff;padding:10px;border-radius:8px;text-align:center;border-top:3px solid #10b981">
+        <div id="logToday" style="font-size:20px;font-weight:800;color:#10b981">--</div>
+        <div style="font-size:10px;color:#6b7280">今日操作</div>
+      </div>
+      <div style="background:#fff;padding:10px;border-radius:8px;text-align:center;border-top:3px solid #f59e0b">
+        <div id="logAI" style="font-size:20px;font-weight:800;color:#f59e0b">--</div>
+        <div style="font-size:10px;color:#6b7280">AI调用</div>
+      </div>
+      <div style="background:#fff;padding:10px;border-radius:8px;text-align:center;border-top:3px solid #ef4444">
+        <div id="logError" style="font-size:20px;font-weight:800;color:#ef4444">--</div>
+        <div style="font-size:10px;color:#6b7280">错误/警告</div>
+      </div>
+    </div>
+    <!-- 筛选栏 -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <select id="logTypeFilter" class="form-control" style="width:120px;padding:6px 10px;font-size:12px" onchange="renderOperationLogs()">
+        <option value="">全部类型</option>
+        <option value="customer">客户操作</option>
+        <option value="email">开发信</option>
+        <option value="ai">AI调用</option>
+        <option value="product">产品操作</option>
+        <option value="order">订单操作</option>
+        <option value="quote">报价操作</option>
+        <option value="system">系统操作</option>
+        <option value="error">错误/警告</option>
+      </select>
+      <select id="logTimeFilter" class="form-control" style="width:120px;padding:6px 10px;font-size:12px" onchange="renderOperationLogs()">
+        <option value="">全部时间</option>
+        <option value="today">今天</option>
+        <option value="week">本周</option>
+        <option value="month">本月</option>
+      </select>
+      <input id="logSearch" type="text" placeholder="搜索日志内容..." class="form-control" style="flex:1;min-width:150px;padding:6px 10px;font-size:12px" oninput="renderOperationLogs()">
+      <button class="btn btn-outline btn-sm" onclick="exportOperationLogs()">📤 导出</button>
+      <button class="btn btn-outline btn-sm" onclick="clearOperationLogs()">🗑️ 清空</button>
+    </div>
+    <!-- 日志列表 -->
+    <div id="operationLogList" style="max-height:300px;overflow-y:auto;background:#f8fafc;border-radius:8px;padding:8px">
+      加载中...
+    </div>
+  </div>
+
+  <!-- V75.3 客户标签管理 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #7c3aed;background:linear-gradient(135deg,#f5f3ff,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🏷️ 客户标签管理</span>
+      <span class="badge" style="background:#7c3aed;color:#fff;font-size:10px">客户分类</span>
+    </div>
+    <p class="text-sm text-muted mb12">管理客户标签，方便快速筛选和分组客户</p>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input id="newTagName" type="text" placeholder="输入新标签名称..." class="form-control" style="flex:1;padding:8px 12px;font-size:13px">
+      <select id="newTagColor" class="form-control" style="width:100px;padding:8px;font-size:13px">
+        <option value="#3b82f6">🔵 蓝色</option>
+        <option value="#10b981">🟢 绿色</option>
+        <option value="#f59e0b">🟡 黄色</option>
+        <option value="#ef4444">🔴 红色</option>
+        <option value="#8b5cf6">🟣 紫色</option>
+        <option value="#ec4899">🩷 粉色</option>
+        <option value="#06b6d4">🔵 青色</option>
+        <option value="#84cc16">🟢 黄绿</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="addCustomerTag()">➕ 添加</button>
+    </div>
+    <div id="tagList" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+      加载中...
+    </div>
+    <div style="margin-top:12px;padding:10px;background:#f5f3ff;border-radius:6px;border:1px solid #ddd6fe">
+      <div style="font-size:11px;color:#5b21b6;line-height:1.6">
+        💡 <b>提示：</b>标签可在客户详情页和客户列表中使用，点击标签可快速筛选对应客户。删除标签不会删除客户，仅移除标签关联。
       </div>
     </div>
   </div>
@@ -17917,6 +18337,197 @@ function copyMultiLangResult(){
       <div style="display:flex;gap:8px">
         <input id="aiChatInput" type="text" placeholder="输入您的问题..." onkeydown="if(event.key==='Enter')sendAIChat()" style="flex:1;padding:10px 14px;border:1px solid #e2e8f0;border-radius:20px;font-size:13px;outline:none">
         <button onclick="sendAIChat()" style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;cursor:pointer;font-size:16px">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- V75.3 工作台欢迎引导 -->
+<div id="welcomeGuide" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:20px;width:600px;max-width:90%;max-height:85vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <!-- 头部 -->
+    <div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;text-align:center;position:relative">
+      <button onclick="closeWelcomeGuide()" style="position:absolute;top:15px;right:15px;background:rgba(255,255,255,0.2);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px">×</button>
+      <div style="font-size:48px;margin-bottom:10px">🎉</div>
+      <h2 style="color:#fff;margin:0 0 8px;font-size:24px">欢迎使用 KaiLionCrafts 工作台</h2>
+      <p style="color:rgba(255,255,255,0.9);margin:0;font-size:14px">您的外贸获客智能助手 · 让客户开发更简单</p>
+    </div>
+    <!-- 引导步骤 -->
+    <div style="padding:24px;max-height:400px;overflow-y:auto">
+      <div id="guideSteps">
+        <!-- 步骤1 -->
+        <div class="guide-step" data-step="1" style="display:block">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            <div style="width:40px;height:40px;border-radius:50%;background:#667eea;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px">1</div>
+            <div>
+              <h3 style="margin:0;color:#2d3748;font-size:18px">📊 数据看板总览</h3>
+              <p style="margin:2px 0 0;color:#718096;font-size:12px">一目了然掌握所有业务数据</p>
+            </div>
+          </div>
+          <div style="background:#f7fafc;padding:16px;border-radius:10px;border-left:4px solid #667eea">
+            <p style="margin:0 0 8px;font-size:13px;color:#4a5568;line-height:1.7">
+              进入工作台后，首先看到的是<b>数据看板</b>，包含：
+            </p>
+            <ul style="margin:0;padding-left:20px;font-size:12px;color:#4a5568;line-height:2">
+              <li>📈 开发漏斗可视化（6阶段转化）</li>
+              <li>🌍 客户来源/国家/状态分布图表</li>
+              <li>⭐ 客户质量分布（A/B/C级）</li>
+              <li>💰 业绩预测仪表盘（AI线性回归）</li>
+              <li>🏥 客户健康度监控面板</li>
+            </ul>
+          </div>
+        </div>
+        <!-- 步骤2 -->
+        <div class="guide-step" data-step="2" style="display:none">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            <div style="width:40px;height:40px;border-radius:50%;background:#10b981;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px">2</div>
+            <div>
+              <h3 style="margin:0;color:#2d3748;font-size:18px">👥 客户管理与开发</h3>
+              <p style="margin:2px 0 0;color:#718096;font-size:12px">核心功能：客户全生命周期管理</p>
+            </div>
+          </div>
+          <div style="background:#f0fdf4;padding:16px;border-radius:10px;border-left:4px solid #10b981">
+            <p style="margin:0 0 8px;font-size:13px;color:#166534;line-height:1.7">
+              <b>客户管理</b>是工作台的核心，支持：
+            </p>
+            <ul style="margin:0;padding-left:20px;font-size:12px;color:#166534;line-height:2">
+              <li>🔍 AI自动搜客（关键词+国家+类型）</li>
+              <li>🤖 AI客户背调（访问官网分析业务）</li>
+              <li>⭐ 客户评分（A/B/C三级智能评分）</li>
+              <li>📧 AI开发信生成（注入知识库内容）</li>
+              <li>📅 跟进SOP（7节点跟进节奏）</li>
+              <li>🎯 高级筛选（7种筛选条件组合）</li>
+            </ul>
+          </div>
+        </div>
+        <!-- 步骤3 -->
+        <div class="guide-step" data-step="3" style="display:none">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            <div style="width:40px;height:40px;border-radius:50%;background:#f59e0b;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px">3</div>
+            <div>
+              <h3 style="margin:0;color:#2d3748;font-size:18px">🧰 工具箱15大功能</h3>
+              <p style="margin:2px 0 0;color:#718096;font-size:12px">外贸工具集合，提升工作效率</p>
+            </div>
+          </div>
+          <div style="background:#fffbeb;padding:16px;border-radius:10px;border-left:4px solid #f59e0b">
+            <p style="margin:0 0 8px;font-size:13px;color:#92400e;line-height:1.7">
+              <b>工具箱</b>包含15大类实用工具：
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:12px;color:#92400e">
+              <div>✉️ 开发信生成器</div>
+              <div>💬 WhatsApp话术</div>
+              <div>🎯 客户画像分析</div>
+              <div>🔄 询盘回复助手</div>
+              <div>📝 营销内容生成</div>
+              <div>🔍 SEO文章生成</div>
+              <div>💰 报价PI工具</div>
+              <div>📊 展会资料包</div>
+              <div>💼 领英拓客</div>
+              <div>📈 业绩战报</div>
+              <div>🤖 AI Agent团队</div>
+              <div>✍️ AI智能写作</div>
+              <div>🌐 多语言翻译</div>
+              <div>📋 任务管理</div>
+              <div>🎁 更多工具</div>
+            </div>
+          </div>
+        </div>
+        <!-- 步骤4 -->
+        <div class="guide-step" data-step="4" style="display:none">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            <div style="width:40px;height:40px;border-radius:50%;background:#8b5cf6;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px">4</div>
+            <div>
+              <h3 style="margin:0;color:#2d3748;font-size:18px">📚 外贸客户开发知识库</h3>
+              <p style="margin:2px 0 0;color:#718096;font-size:12px">公司核心资产，AI智能检索</p>
+            </div>
+          </div>
+          <div style="background:#faf5ff;padding:16px;border-radius:10px;border-left:4px solid #8b5cf6">
+            <p style="margin:0 0 8px;font-size:13px;color:#5b21b6;line-height:1.7">
+              <b>知识库</b>包含10大模块，200个产品完整明细：
+            </p>
+            <ul style="margin:0;padding-left:20px;font-size:12px;color:#5b21b6;line-height:2">
+              <li>🏢 公司概况（品牌/创始人/优势）</li>
+              <li>📦 6大品类（200个SKU完整明细）</li>
+              <li>🌍 5大目标市场（北美/欧洲/东南亚等）</li>
+              <li>👥 4类客户画像（亚马逊/品牌商/批发商/零售）</li>
+              <li>✅ 11张认证证书（CE/FDA/LFGB/RoHS）</li>
+              <li>✉️ 6个开发信模板（按客户类型）</li>
+              <li>🏭 阳江产业数据（1400年锻造历史）</li>
+              <li>🔍 AI智能检索（关键词搜索知识库）</li>
+            </ul>
+          </div>
+        </div>
+        <!-- 步骤5 -->
+        <div class="guide-step" data-step="5" style="display:none">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            <div style="width:40px;height:40px;border-radius:50%;background:#ec4899;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px">5</div>
+            <div>
+              <h3 style="margin:0;color:#2d3748;font-size:18px">🤖 AI模型配置</h3>
+              <p style="margin:2px 0 0;color:#718096;font-size:12px">在线+本地双模型，自动故障转移</p>
+            </div>
+          </div>
+          <div style="background:#fdf2f8;padding:16px;border-radius:10px;border-left:4px solid #ec4899">
+            <p style="margin:0 0 8px;font-size:13px;color:#9d174d;line-height:1.7">
+              <b>AI模型</b>支持15个模型，自动故障转移：
+            </p>
+            <ul style="margin:0;padding-left:20px;font-size:12px;color:#9d174d;line-height:2">
+              <li>🌐 在线免费模型：智谱GLM系列（4个）</li>
+              <li>💻 本地Ollama模型：qwen2.5/deepseek/qwen2.5vl（3个）</li>
+              <li>🔄 自动故障转移：在线→本地，15个模型链式转移</
+              <li>🎯 手动切换：可在设置页面手动选择模型</li>
+              <li>⚡ 模型测速：实时测试各模型响应延迟</li>
+            </ul>
+            <div style="margin-top:12px;padding:10px;background:#fff;border-radius:8px;border:1px dashed #f9a8d4">
+              <p style="margin:0;font-size:11px;color:#9d174d">
+                💡 <b>提示：</b>右下角悬浮🤖按钮可随时打开全局AI助手！
+              </p>
+            </div>
+          </div>
+        </div>
+        <!-- 步骤6 -->
+        <div class="guide-step" data-step="6" style="display:none">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            <div style="width:40px;height:40px;border-radius:50%;background:#06b6d4;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px">6</div>
+            <div>
+              <h3 style="margin:0;color:#2d3748;font-size:18px">⚙️ 系统管理与数据安全</h3>
+              <p style="margin:2px 0 0;color:#718096;font-size:12px">性能监控/数据清理/健康度评分</p>
+            </div>
+          </div>
+          <div style="background:#ecfeff;padding:16px;border-radius:10px;border-left:4px solid #06b6d4">
+            <p style="margin:0 0 8px;font-size:13px;color:#155e75;line-height:1.7">
+              <b>设置页面</b>提供完整的系统管理功能：
+            </p>
+            <ul style="margin:0;padding-left:20px;font-size:12px;color:#155e75;line-height:2">
+              <li>📊 性能监控（存储/数据/服务器/运行时间）</li>
+              <li>🧹 数据清理（重复检测/空邮箱/格式修复/存储优化）</li>
+              <li>💚 健康度评分（5维度综合评估+改进建议）</li>
+              <li>💾 数据备份（一键导出/导入全部数据）</li>
+              <li>🎨 主题切换（浅色/深色双主题）</li>
+              <li>⌨️ 快捷键帮助（12个全局快捷键）</li>
+            </ul>
+          </div>
+          <div style="margin-top:20px;text-align:center">
+            <div style="font-size:48px;margin-bottom:10px">🚀</div>
+            <h3 style="color:#2d3748;margin:0 0 8px">开始您的外贸获客之旅！</h3>
+            <p style="color:#718096;margin:0 0 16px;font-size:13px">如有问题，随时点击右下角🤖AI助手</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 底部导航 -->
+    <div style="padding:16px 24px;background:#f7fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;gap:6px">
+        <span class="guide-dot" data-dot="1" style="width:10px;height:10px;border-radius:50%;background:#667eea;cursor:pointer"></span>
+        <span class="guide-dot" data-dot="2" style="width:10px;height:10px;border-radius:50%;background:#e2e8f0;cursor:pointer"></span>
+        <span class="guide-dot" data-dot="3" style="width:10px;height:10px;border-radius:50%;background:#e2e8f0;cursor:pointer"></span>
+        <span class="guide-dot" data-dot="4" style="width:10px;height:10px;border-radius:50%;background:#e2e8f0;cursor:pointer"></span>
+        <span class="guide-dot" data-dot="5" style="width:10px;height:10px;border-radius:50%;background:#e2e8f0;cursor:pointer"></span>
+        <span class="guide-dot" data-dot="6" style="width:10px;height:10px;border-radius:50%;background:#e2e8f0;cursor:pointer"></span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="guidePrev" onclick="prevGuideStep()" class="btn btn-outline btn-sm" style="display:none">⬅️ 上一步</button>
+        <button id="guideNext" onclick="nextGuideStep()" class="btn btn-primary btn-sm">下一步 ➡️</button>
+        <button id="guideFinish" onclick="closeWelcomeGuide()" class="btn btn-gold btn-sm" style="display:none">🎉 开始使用</button>
       </div>
     </div>
   </div>

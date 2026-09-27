@@ -4093,6 +4093,25 @@ function viewDashboard(root){
 const PLAN_STATUS = {running:['运行中','badge-blue'],paused:['已暂停','badge-gold'],done:['已完成','badge-a'],stopped:['已停止','badge-c']};
 function viewPlans(root){
   root.innerHTML = `
+    <!-- V75.3 知识库任务推荐 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f4f8,#e2e8f0);border:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-weight:700;font-size:14px;color:#1a365d">🎯 知识库推荐开发任务</div>
+        <span class="text-xs text-muted">基于产品品类和目标市场</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        ${PROSPECT_KB.markets.slice(0,3).map((m,i)=>`
+          <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #e2e8f0;cursor:pointer" onclick="openNewPlan();toast('已填入${m.name}推荐配置')">
+            <div style="font-size:13px;font-weight:700;color:#1a365d">${m.name}</div>
+            <div style="font-size:11px;color:#718096;margin:4px 0">主推：${m.key_products.slice(0,2).join('、')}</div>
+            <div style="font-size:11px;color:#c9a961">${m.marketing_angle.substring(0,25)}...</div>
+          </div>`).join('')}
+      </div>
+      <div class="text-xs text-muted mt8" style="line-height:1.6">
+        <b>推荐客户类型：</b>${PROSPECT_KB.personas.map(p=>p.name).join('、')} · 
+        <b>推荐产品品类：</b>${PROSPECT_KB.categories.map(c=>c.name).join('、')}
+      </div>
+    </div>
     <div class="flex-between mb16">
       <div>
         <div style="font-size:13px;color:var(--text-2)">AI 自动执行 <b>找客户 → 核证据 → 写草稿</b> 三步脏活；发送由你人工完成。</div>
@@ -5780,6 +5799,35 @@ function viewSchedule(root){
       <div class="flex gap16 mt8" style="flex-wrap:wrap">
         ${[['📧 邮件',28,'12%'],['📞 电话',15,'35%'],['💬 WhatsApp',20,'28%'],['💼 LinkedIn',10,'18%']]
           .map(([ch,n,rate])=>`<span class="text-sm">${ch} 跟进 <b>${n}</b> 次 · 回复率 <b>${rate}</b></span>`).join('')}
+      </div>
+    </div>
+
+    <!-- V75.3 知识库跟进建议 -->
+    <div class="card card-pad mb16" style="border-left:4px solid #c9a961;background:linear-gradient(135deg,#fdfbf7,#f9f6f0)">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📊 知识库跟进建议</span>
+        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff" onclick="prospectKB=true;prospectKBTab='templates';go('knowledge')">查看全部模板</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px">
+        <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #eee">
+          <div style="font-size:12px;font-weight:700;color:#8b6914;margin-bottom:6px">📅 跟进节奏建议</div>
+          <div class="text-xs text-muted" style="line-height:1.8">
+            <b>第1天：</b>开发信（匹配模板）<br>
+            <b>第3天：</b>WhatsApp跟进（简短问候）<br>
+            <b>第7天：</b>第二封邮件（产品目录）<br>
+            <b>第14天：</b>电话/视频会议邀请
+          </div>
+        </div>
+        <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #eee">
+          <div style="font-size:12px;font-weight:700;color:#2b6cb0;margin-bottom:6px">✉️ 推荐开发信模板</div>
+          <div class="text-xs text-muted" style="line-height:1.8">
+            ${PROSPECT_KB.email_templates.slice(0,3).map((t,i)=>`<div style="margin-bottom:4px"><b>${i+1}.</b> ${t.subject.substring(0,35)}...</div>`).join('')}
+          </div>
+          <button class="btn btn-gold btn-sm mt8" style="font-size:11px;width:100%" onclick="go('drafts')">✉️ 去写开发信</button>
+        </div>
+      </div>
+      <div class="text-xs text-muted mt8" style="line-height:1.6">
+        <b>跟进话术要点：</b>先提客户痛点 → 再给解决方案 → 最后行动号召 · 自然融入${PROSPECT_KB.company.core_advantages[0]}和${PROSPECT_KB.company.core_advantages[2]}
       </div>
     </div>
     <div class="flex-between mb16">
@@ -7779,6 +7827,39 @@ function viewAgents(root){
       <div style="flex:1"><b style="font-size:16px">AI CEO（调度者）</b>
         <div style="font-size:13px;opacity:.85;margin-top:4px">接收任务后拆解分配给专业Agent，监控进度，汇总结果</div></div>
       <button class="btn btn-gold" onclick="runAgents()">▶ 运行获客任务</button>
+    </div>
+  </div>
+
+  <!-- V75.3 AI Agent知识库参考 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#f3e8ff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📚 AI Agent 知识库参考</span>
+      <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff" onclick="prospectKB=true;prospectKBTab='company';go('knowledge')">查看完整知识库</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px">
+      <div style="background:#fff;padding:10px;border-radius:6px;text-align:center;border:1px solid #e9d8fd">
+        <div style="font-size:20px">🏢</div>
+        <div style="font-size:11px;font-weight:700;color:#805ad5;margin-top:4px">公司信息</div>
+        <div style="font-size:10px;color:#718096;margin-top:2px">${PROSPECT_KB.company.brand}</div>
+      </div>
+      <div style="background:#fff;padding:10px;border-radius:6px;text-align:center;border:1px solid #e9d8fd">
+        <div style="font-size:20px">📦</div>
+        <div style="font-size:11px;font-weight:700;color:#805ad5;margin-top:4px">产品品类</div>
+        <div style="font-size:10px;color:#718096;margin-top:2px">${PROSPECT_KB.categories.length}类 ${PROSPECT_KB.categories.reduce((s,c)=>s+c.count,0)}+SKU</div>
+      </div>
+      <div style="background:#fff;padding:10px;border-radius:6px;text-align:center;border:1px solid #e9d8fd">
+        <div style="font-size:20px">🌍</div>
+        <div style="font-size:11px;font-weight:700;color:#805ad5;margin-top:4px">目标市场</div>
+        <div style="font-size:10px;color:#718096;margin-top:2px">${PROSPECT_KB.markets.length}大市场</div>
+      </div>
+      <div style="background:#fff;padding:10px;border-radius:6px;text-align:center;border:1px solid #e9d8fd">
+        <div style="font-size:20px">📜</div>
+        <div style="font-size:11px;font-weight:700;color:#805ad5;margin-top:4px">认证资质</div>
+        <div style="font-size:10px;color:#718096;margin-top:2px">${PROSPECT_KB.certifications.length}张证书</div>
+      </div>
+    </div>
+    <div class="text-xs text-muted mt8" style="line-height:1.6">
+      <b>AI Agent执行任务时自动参考知识库：</b>写开发信时注入公司优势和产品推荐 · 客户画像时评估匹配度 · 搜客时推荐关键词和目标市场
     </div>
   </div>
   <div class="grid-3" id="agentGrid">

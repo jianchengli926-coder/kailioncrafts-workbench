@@ -384,6 +384,74 @@ body.dark table.tbl th{background:#0f172a;color:var(--text-2)}
 body.dark .search-box{background:#0f172a;border-color:var(--border)}
 body.dark .form-control{background:#0f172a;color:var(--text)}
 @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+/* V75.3 深色主题 */
+.dark-theme {
+  background: #1a202c !important;
+  color: #e2e8f0 !important;
+}
+.dark-theme .card {
+  background: #2d3748 !important;
+  border-color: #4a5568 !important;
+  color: #e2e8f0 !important;
+}
+.dark-theme .card-title {
+  color: #f7fafc !important;
+}
+.dark-theme .text-muted {
+  color: #a0aec0 !important;
+}
+.dark-theme .text-sm {
+  color: #cbd5e0 !important;
+}
+.dark-theme .form-control {
+  background: #1a202c !important;
+  border-color: #4a5568 !important;
+  color: #e2e8f0 !important;
+}
+.dark-theme .tbl {
+  background: #2d3748 !important;
+  color: #e2e8f0 !important;
+}
+.dark-theme .tbl th {
+  background: #4a5568 !important;
+  color: #f7fafc !important;
+}
+.dark-theme .tbl tr:hover {
+  background: #4a5568 !important;
+}
+.dark-theme .btn-outline {
+  background: transparent !important;
+  border-color: #718096 !important;
+  color: #e2e8f0 !important;
+}
+.dark-theme .page-head h2 {
+  color: #f7fafc !important;
+}
+.dark-theme .sub {
+  color: #a0aec0 !important;
+}
+.dark-theme .badge {
+  background: #4a5568 !important;
+  color: #e2e8f0 !important;
+}
+.dark-theme input, .dark-theme select, .dark-theme textarea {
+  background: #1a202c !important;
+  border-color: #4a5568 !important;
+  color: #e2e8f0 !important;
+}
+.dark-theme .modal-content, .dark-theme .modal-body {
+  background: #2d3748 !important;
+  color: #e2e8f0 !important;
+}
+.dark-theme .modal-head {
+  background: #4a5568 !important;
+  color: #f7fafc !important;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
 </style>
 </head>
 <body>
@@ -6347,6 +6415,110 @@ function openCustomerDetail(cid){
 }
 
 /* ---------- 添加 / 编辑客户 ---------- */
+/* V75.3 主题切换 */
+function setTheme(theme){
+  if(theme === 'dark'){
+    document.body.classList.add('dark-theme');
+    document.getElementById('themeLightCard').style.borderColor = '#e2e8f0';
+    document.getElementById('themeDarkCard').style.borderColor = '#6b46c1';
+    document.getElementById('themeDarkCard').style.boxShadow = '0 0 0 3px rgba(107,70,193,0.2)';
+    document.getElementById('themeLightCard').style.boxShadow = 'none';
+  }else{
+    document.body.classList.remove('dark-theme');
+    document.getElementById('themeLightCard').style.borderColor = '#6b46c1';
+    document.getElementById('themeLightCard').style.boxShadow = '0 0 0 3px rgba(107,70,193,0.2)';
+    document.getElementById('themeDarkCard').style.borderColor = '#e2e8f0';
+    document.getElementById('themeDarkCard').style.boxShadow = 'none';
+  }
+  localStorage.setItem('kailion_theme', theme);
+  toast('✅ 已切换到' + (theme==='dark'?'深色':'浅色') + '主题');
+}
+
+function initTheme(){
+  const savedTheme = localStorage.getItem('kailion_theme') || 'light';
+  if(savedTheme === 'dark'){
+    document.body.classList.add('dark-theme');
+  }
+}
+
+/* V75.3 全局AI助手悬浮窗 */
+let aiChatHistory = [];
+
+function toggleAIAssistant(){
+  const panel = document.getElementById('aiAssistantPanel');
+  const btn = document.getElementById('aiFloatBtn');
+  if(panel.style.display === 'none' || !panel.style.display){
+    panel.style.display = 'flex';
+    btn.style.transform = 'rotate(90deg)';
+  }else{
+    panel.style.display = 'none';
+    btn.style.transform = 'rotate(0deg)';
+  }
+}
+
+function aiQuickAsk(question){
+  document.getElementById('aiChatInput').value = question;
+  sendAIChat();
+}
+
+async function sendAIChat(){
+  const input = document.getElementById('aiChatInput');
+  const question = input.value.trim();
+  if(!question) return;
+  
+  const messagesDiv = document.getElementById('aiChatMessages');
+  
+  // 添加用户消息
+  const userMsg = document.createElement('div');
+  userMsg.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;flex-direction:row-reverse';
+  userMsg.innerHTML = '<div style="width:32px;height:32px;border-radius:50%;background:#3182ce;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">👤</div><div style="background:#3182ce;color:#fff;padding:10px 14px;border-radius:12px 12px 2px 12px;max-width:80%;font-size:13px;line-height:1.6">' + question.replace(/</g,'&lt;') + '</div>';
+  messagesDiv.appendChild(userMsg);
+  
+  input.value = '';
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  
+  // 添加AI正在输入提示
+  const typingMsg = document.createElement('div');
+  typingMsg.style.cssText = 'display:flex;gap:8px;margin-bottom:12px';
+  typingMsg.id = 'aiTypingMsg';
+  typingMsg.innerHTML = '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🤖</div><div style="background:#fff;padding:10px 14px;border-radius:12px 12px 12px 2px;font-size:13px;color:#718096;box-shadow:0 1px 3px rgba(0,0,0,0.05)"><span style="animation:blink 1s infinite">正在思考...</span></div>';
+  messagesDiv.appendChild(typingMsg);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  
+  // 构建消息历史
+  aiChatHistory.push({role:'user',content:question});
+  const messages = [
+    {role:'system',content:'你是KaiLionCrafts锴利匠心的外贸AI助手，帮助用户解答外贸开发、客户管理、市场营销等问题。回答要专业、简洁、实用。公司背景：阳江市锴利国际贸易有限公司，品牌KaiLionCrafts·锴利匠心，主营厨房用品/剪刀/厨刀/户外刀，出口130+国家，家族工厂股权模式，成本低于市场20%+，认证CE/FDA/LFGB/RoHS。'}
+  ].concat(aiChatHistory.slice(-10));
+  
+  try{
+    const r = await callAI(messages, {purpose:'ai_assistant', temperature:0.7});
+    // 移除正在输入提示
+    messagesDiv.removeChild(typingMsg);
+    
+    if(r.error){
+      const errorMsg = document.createElement('div');
+      errorMsg.style.cssText = 'display:flex;gap:8px;margin-bottom:12px';
+      errorMsg.innerHTML = '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🤖</div><div style="background:#fff5f5;color:#9b2c2c;padding:10px 14px;border-radius:12px 12px 12px 2px;font-size:13px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">抱歉，AI服务暂时不可用：' + r.error + '</div>';
+      messagesDiv.appendChild(errorMsg);
+    }else{
+      aiChatHistory.push({role:'assistant',content:r.content});
+      const aiMsg = document.createElement('div');
+      aiMsg.style.cssText = 'display:flex;gap:8px;margin-bottom:12px';
+      aiMsg.innerHTML = '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🤖</div><div style="background:#fff;padding:10px 14px;border-radius:12px 12px 12px 2px;max-width:80%;font-size:13px;line-height:1.7;color:#2d3748;box-shadow:0 1px 3px rgba(0,0,0,0.05);white-space:pre-wrap">' + r.content.replace(/</g,'&lt;') + '</div>';
+      messagesDiv.appendChild(aiMsg);
+    }
+  }catch(e){
+    messagesDiv.removeChild(typingMsg);
+    const errorMsg = document.createElement('div');
+    errorMsg.style.cssText = 'display:flex;gap:8px;margin-bottom:12px';
+    errorMsg.innerHTML = '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🤖</div><div style="background:#fff5f5;color:#9b2c2c;padding:10px 14px;border-radius:12px;font-size:13px">出错了：' + e.message + '</div>';
+    messagesDiv.appendChild(errorMsg);
+  }
+  
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
 function resetCustomerFilter(){
   custFilter = {q:'', grade:'', country:'', source:'', tag:'', status:'', customerType:'', followDays:'', view:'all', page:1, selected:[]};
   renderView();
@@ -9042,6 +9214,65 @@ function renderApiSettings(){
           </tr>`).join('')}</tbody>
       </table></div>`;
     })()}
+  </div>
+
+  <!-- V75.3 主题切换 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #6b46c1;background:linear-gradient(135deg,#faf5ff,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🎨 主题外观设置</span>
+      <span class="badge" style="background:#6b46c1;color:#fff;font-size:10px">个性化</span>
+    </div>
+    <p class="text-sm text-muted mb12">选择浅色或深色主题，保护眼睛，提升夜间使用体验</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div id="themeLightCard" onclick="setTheme('light')" style="cursor:pointer;padding:16px;border-radius:10px;border:2px solid #e2e8f0;background:#fff;text-align:center;transition:all 0.3s">
+        <div style="font-size:32px;margin-bottom:8px">☀️</div>
+        <div style="font-size:14px;font-weight:700;color:#2d3748">浅色主题</div>
+        <div style="font-size:11px;color:#718096;margin-top:4px">明亮清爽 · 白天使用</div>
+      </div>
+      <div id="themeDarkCard" onclick="setTheme('dark')" style="cursor:pointer;padding:16px;border-radius:10px;border:2px solid #e2e8f0;background:#1a202c;text-align:center;transition:all 0.3s">
+        <div style="font-size:32px;margin-bottom:8px">🌙</div>
+        <div style="font-size:14px;font-weight:700;color:#e2e8f0">深色主题</div>
+        <div style="font-size:11px;color:#a0aec0;margin-top:4px">护眼舒适 · 夜间使用</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- V75.3 全局快捷键帮助 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #319795;background:linear-gradient(135deg,#f0fdfa,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>⌨️ 全局快捷键帮助</span>
+      <span class="badge" style="background:#319795;color:#fff;font-size:10px">效率提升</span>
+    </div>
+    <p class="text-sm text-muted mb12">使用键盘快捷键快速操作工作台，提升工作效率</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="background:#f8fafc;padding:12px;border-radius:8px">
+        <div style="font-size:12px;font-weight:700;color:#234e52;margin-bottom:8px">📂 页面导航</div>
+        <div style="font-size:12px;line-height:2">
+          <div style="display:flex;justify-content:space-between"><span>数据看板</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">g + d</kbd></div>
+          <div style="display:flex;justify-content:space-between"><span>客户管理</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">g + c</kbd></div>
+          <div style="display:flex;justify-content:space-between"><span>开发信</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">g + e</kbd></div>
+          <div style="display:flex;justify-content:space-between"><span>产品管理</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">g + p</kbd></div>
+          <div style="display:flex;justify-content:space-between"><span>工具箱</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">g + t</kbd></div>
+          <div style="display:flex;justify-content:space-between"><span>设置</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">g + s</kbd></div>
+        </div>
+      </div>
+      <div style="background:#f8fafc;padding:12px;border-radius:8px">
+        <div style="font-size:12px;font-weight:700;color:#234e52;margin-bottom:8px">⚡ 快捷操作</div>
+        <div style="font-size:12px;line-height:2">
+          <div style="display:flex;justify-content:space-between"><span>搜索客户</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">/</kbd></div>
+          <div style="display:flex;justify-content:space-between"><span>AI助手</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">g + a</kbd></div>
+          <div style="display:flex;justify-content:space-between"><span>新建客户</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">n</kbd></div>
+          <div style="display:flex;justify-content:space-between"><span>返回首页</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">Esc</kbd></div>
+          <div style="display:flex;justify-content:space-between"><span>帮助文档</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">?</kbd></div>
+          <div style="display:flex;justify-content:space-between"><span>切换主题</span><kbd style="background:#e6fffa;color:#234e52;padding:2px 8px;border-radius:4px;font-size:11px">g + h</kbd></div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;padding:10px;background:#f0fdfa;border-radius:6px;border:1px solid #99f6e4">
+      <div style="font-size:11px;color:#234e52;line-height:1.6">
+        💡 <b>提示：</b>按 <kbd style="background:#fff;padding:1px 6px;border-radius:3px">g</kbd> 后松开，再按对应字母可快速跳转到对应页面；按 <kbd style="background:#fff;padding:1px 6px;border-radius:3px">?</kbd> 可随时打开快捷键帮助。
+      </div>
+    </div>
   </div>
 
   <!-- V75.3 数据一键备份与恢复 -->
@@ -17148,6 +17379,47 @@ function copyMultiLangResult(){
   navigator.clipboard.writeText(text).then(()=>toast('已复制到剪贴板')).catch(()=>toast('复制失败，请手动选择','error'));
 }
 </script>
+
+<!-- V75.3 全局AI助手悬浮窗 -->
+<div id="aiAssistantFloat" style="position:fixed;bottom:24px;right:24px;z-index:9999">
+  <button id="aiFloatBtn" onclick="toggleAIAssistant()" style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 20px rgba(102,126,234,0.4);transition:all 0.3s" title="AI助手">
+    🤖
+  </button>
+  <div id="aiAssistantPanel" style="display:none;position:absolute;bottom:70px;right:0;width:380px;height:520px;background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,0.15);overflow:hidden;flex-direction:column">
+    <div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="color:#fff;font-weight:700;font-size:15px">🤖 KaiLion AI助手</div>
+        <div style="color:rgba(255,255,255,0.8);font-size:11px;margin-top:2px">随时为您解答外贸问题</div>
+      </div>
+      <button onclick="toggleAIAssistant()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px">×</button>
+    </div>
+    <div id="aiChatMessages" style="flex:1;overflow-y:auto;padding:16px;background:#f8fafc">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🤖</div>
+        <div style="background:#fff;padding:10px 14px;border-radius:12px 12px 12px 2px;max-width:80%;font-size:13px;line-height:1.6;color:#2d3748;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+          您好！我是KaiLion AI助手，可以帮您：<br>
+          • 解答外贸开发问题<br>
+          • 生成开发信/营销文案<br>
+          • 分析客户/市场信息<br>
+          • 查询知识库内容<br><br>
+          有什么可以帮您的吗？
+        </div>
+      </div>
+    </div>
+    <div style="padding:12px;background:#fff;border-top:1px solid #e2e8f0">
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <button onclick="aiQuickAsk('写一封开发信')" style="font-size:11px;padding:4px 10px;background:#f0f4f8;border:1px solid #e2e8f0;border-radius:12px;cursor:pointer;color:#4a5568">✉️ 写开发信</button>
+        <button onclick="aiQuickAsk('分析客户画像')" style="font-size:11px;padding:4px 10px;background:#f0f4f8;border:1px solid #e2e8f0;border-radius:12px;cursor:pointer;color:#4a5568">👥 客户画像</button>
+        <button onclick="aiQuickAsk('市场分析')" style="font-size:11px;padding:4px 10px;background:#f0f4f8;border:1px solid #e2e8f0;border-radius:12px;cursor:pointer;color:#4a5568">📊 市场分析</button>
+        <button onclick="aiQuickAsk('翻译')" style="font-size:11px;padding:4px 10px;background:#f0f4f8;border:1px solid #e2e8f0;border-radius:12px;cursor:pointer;color:#4a5568">🌐 翻译</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="aiChatInput" type="text" placeholder="输入您的问题..." onkeydown="if(event.key==='Enter')sendAIChat()" style="flex:1;padding:10px 14px;border:1px solid #e2e8f0;border-radius:20px;font-size:13px;outline:none">
+        <button onclick="sendAIChat()" style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;cursor:pointer;font-size:16px">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

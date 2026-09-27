@@ -1425,6 +1425,15 @@ async function callAI(messages, opts={}){
     const specific = chain.find(a=>a.id===opts.modelConfigId);
     if(specific) chain.unshift(specific);
   }
+  // V75.3 支持指定模型名称（opts.model），优先使用匹配的模型
+  if(opts.model){
+    const specific = chain.find(a=>a.model===opts.model);
+    if(specific){
+      const idx = chain.indexOf(specific);
+      if(idx>0) chain.splice(idx,1);
+      chain.unshift(specific);
+    }
+  }
   const budget = (S.settings&&S.settings.apiBudget)||200;
   const spent = getMonthApiCost();
   const t0 = performance.now();
@@ -8766,12 +8775,6 @@ function downloadFile(name, content, type){
   const blob=new Blob(['﻿'+content],{type:type||'text/plain;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-}
-function exportCustomersCSV(){
-  const head='公司名,国家,客户类型,来源,邮箱,电话,评分,等级,负责人';
-  const rows=S.customers.map(c=>[c.company,c.country,c.customerType,c.source,c.contact.email,c.contact.phone||'',c.scores.total,c.scores.grade,c.owner||'公海'].join(','));
-  downloadFile('kailion_customers_'+todayStr()+'.csv',head+'\\n'+rows.join('\\n'),'text/csv;charset=utf-8');
-  toast('已导出客户CSV');
 }
 function exportDrafts(){
   const rows=S.drafts.map(d=>[d.customerName,d.country,d.subject,d.status,d.sentAt||''].join(' | '));

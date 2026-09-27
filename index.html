@@ -518,7 +518,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
         <button class="icon-btn" onclick="toggleTheme()" title="切换深浅主题">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
         </button>
-        <button class="icon-btn" onclick="go('customers')" title="待跟进">
+        <button class="icon-btn" onclick="go(\'customers\')" title="待跟进">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M10 21a2 2 0 004 0"/></svg>
           <span class="notif-dot" id="notifDot">0</span>
         </button>
@@ -3814,6 +3814,14 @@ function viewDashboard(root){
       ${unreadInbox?`<span class="badge badge-gold" style="cursor:pointer" onclick="go('inbox')">${unreadInbox} 封客户回复待处理</span>`:''}
     </div>
 
+    <!-- V75.3 数据报告导出栏 -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="exportDataReport('html')">📄 导出HTML报告</button>
+      <button class="btn btn-outline btn-sm" onclick="exportDataReport('json')">📊 导出JSON数据</button>
+      <button class="btn btn-outline btn-sm" onclick="exportDataReport('summary')">📋 导出数据摘要</button>
+      <span style="font-size:11px;color:#718096;align-self:center;margin-left:auto">💡 报告包含客户/开发信/产品/订单等全模块统计</span>
+    </div>
+
     <!-- V30.0 今天先做最重要的事 NEXT BEST ACTIONS -->
     <div class="card card-pad mb16" style="background:linear-gradient(135deg,#0f172a,#1e3a5f);color:#fff;border:none">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -3835,7 +3843,7 @@ function viewDashboard(root){
           </div>
           <div style="font-size:11px;opacity:.6">送到预定并确认收件邮箱</div>
         </div>
-        <div style="flex:1;background:rgba(255,255,255,.06);border-radius:8px;padding:12px 14px;cursor:pointer" onclick="go('customers')">
+        <div style="flex:1;background:rgba(255,255,255,.06);border-radius:8px;padding:12px 14px;cursor:pointer" onclick="go(\'customers\')">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
             <span style="background:#4299e1;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px">02</span>
             <span style="font-size:13px;font-weight:600">${S.customers.filter(c=>c.scores.grade==='A').length} 家高匹配客户待开发</span>
@@ -3847,17 +3855,17 @@ function viewDashboard(root){
 
     <!-- V30.0 5个核心统计卡片 -->
     <div class="grid-5 mb16">
-      <div class="card card-pad" style="cursor:pointer" onclick="go('customers')">
+      <div class="card card-pad" style="cursor:pointer" onclick="go(\'customers\')">
         <div class="stat-label">📋 全部线索</div>
         <div class="stat-value">${total}</div>
         <div class="text-sm text-muted">已写入平台</div>
       </div>
-      <div class="card card-pad" style="cursor:pointer" onclick="go('customers')">
+      <div class="card card-pad" style="cursor:pointer" onclick="go(\'customers\')">
         <div class="stat-label">⭐ 高匹配</div>
         <div class="stat-value" style="color:var(--gold)">${S.customers.filter(c=>c.scores.grade==='A').length}</div>
         <div class="text-sm text-muted">匹配度 80 分以上</div>
       </div>
-      <div class="card card-pad" style="cursor:pointer" onclick="go('customers')">
+      <div class="card card-pad" style="cursor:pointer" onclick="go(\'customers\')">
         <div class="stat-label">📧 可联系</div>
         <div class="stat-value" style="color:var(--green)">${S.customers.filter(c=>c.email).length}</div>
         <div class="text-sm text-muted">邮箱与证据均已确认</div>
@@ -3887,7 +3895,7 @@ function viewDashboard(root){
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-gold btn-sm" style="font-size:12px" onclick="prospectKB=true;prospectKBTab='company';go('knowledge')">📚 查看知识库</button>
           <button class="btn btn-sm" style="font-size:12px;background:#805ad5;color:#fff" onclick="prospectKB=true;prospectKBTab='aisearch';go('knowledge')">🔍 AI检索</button>
-          <button class="btn btn-outline btn-sm" style="font-size:12px;background:#fff" onclick="go('customers')">🎯 智能匹配客户</button>
+          <button class="btn btn-outline btn-sm" style="font-size:12px;background:#fff" onclick="go(\'customers\')">🎯 智能匹配客户</button>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
@@ -4009,8 +4017,8 @@ function viewDashboard(root){
     </div>
 
     <div class="grid-6 mb16">
-      <div class="card card-pad" style="cursor:pointer" onclick="go('customers')"><div class="stat-label">🎯 候选客户</div><div class="stat-value">200</div><div class="text-sm text-muted">本月新增</div></div>
-      <div class="card card-pad" style="cursor:pointer" onclick="go('customers')"><div class="stat-label">⭐ 优质线索</div><div class="stat-value" style="color:var(--gold)">36</div><div class="text-sm text-muted">≥80分</div></div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go(\'customers\')"><div class="stat-label">🎯 候选客户</div><div class="stat-value">200</div><div class="text-sm text-muted">本月新增</div></div>
+      <div class="card card-pad" style="cursor:pointer" onclick="go(\'customers\')"><div class="stat-label">⭐ 优质线索</div><div class="stat-value" style="color:var(--gold)">36</div><div class="text-sm text-muted">≥80分</div></div>
       <div class="card card-pad" style="cursor:pointer" onclick="go('outreach')"><div class="stat-label">📤 本月触达</div><div class="stat-value">245</div><div class="text-sm text-muted">邮件156+WA89</div></div>
       <div class="card card-pad" style="cursor:pointer" onclick="go('inbox')"><div class="stat-label">💬 回复客户</div><div class="stat-value" style="color:var(--green)">23</div><div class="text-sm text-muted">9%回复率</div></div>
       <div class="card card-pad" style="cursor:pointer" onclick="go('pipeline')"><div class="stat-label">💰 在跟商机</div><div class="stat-value">28</div><div class="text-sm text-muted">¥1.8M</div></div>
@@ -5105,6 +5113,10 @@ function viewCustomers(root){
       ${[['all','全部客户'],['new','新开发客户'],['old','老客户（已成交）']].map(([k,l])=>
         `<button class="btn ${custFilter.view===k?'btn-gold':'btn-outline'}" onclick="custFilter.view='${k}';custFilter.page=1;renderView()">${l}</button>`).join('')}
       <div style="margin-left:auto;display:flex;gap:8px">
+        <div style="display:flex;gap:0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+          <button onclick="setCustomerView('list')" id="custViewList" class="btn btn-sm" style="border-radius:0;background:#3182ce;color:#fff;border:none">📋 列表</button>
+          <button onclick="setCustomerView('group')" id="custViewGroup" class="btn btn-sm btn-outline" style="border-radius:0;border-left:none">🗂️ 分组</button>
+        </div>
         <button class="btn btn-outline" onclick="exportCustomersCSV()">📤 导出</button>
         <button class="btn btn-outline" onclick="openImportModal()">📥 导入</button>
         <button class="btn btn-outline" onclick="findDuplicates()">🔍 查重</button>
@@ -5162,7 +5174,18 @@ function viewCustomers(root){
       </div>
     </div>
     ${custFilter.q?`<div class="mb16 text-sm">搜索 “<b>${esc(custFilter.q)}</b>” 共 ${list.length} 条 <a class="text-gold" style="cursor:pointer" onclick="custFilter.q='';routeParams.q='';renderView()">清除</a></div>`:''}
-    <div class="card">
+    <div id="customerGroupView" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:700;color:#4a5568;align-self:center">按维度分组：</span>
+        <button onclick="setGroupBy('tag')" id="groupByTag" class="btn btn-sm" style="background:#8b5cf6;color:#fff;border:none">🏷️ 标签</button>
+        <button onclick="setGroupBy('country')" id="groupByCountry" class="btn btn-sm btn-outline">🌍 国家</button>
+        <button onclick="setGroupBy('grade')" id="groupByGrade" class="btn btn-sm btn-outline">⭐ 等级</button>
+        <button onclick="setGroupBy('status')" id="groupByStatus" class="btn btn-sm btn-outline">📊 状态</button>
+        <button onclick="setGroupBy('source')" id="groupBySource" class="btn btn-sm btn-outline">📡 来源</button>
+      </div>
+      <div id="groupedCustomerList"></div>
+    </div>
+    <div id="customerListView" class="card">
       <div class="table-wrap"><table class="tbl">
         <colgroup><col style="width:4%"><col style="width:18%"><col style="width:6%"><col style="width:5%"><col style="width:13%"><col style="width:14%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:12%"></colgroup>
         <thead><th><input type="checkbox" onchange="toggleAllCust(this.checked)"></th><th>公司</th><th>国家</th><th>等级</th><th>主营产品</th><th>决策人邮箱</th><th>距上次跟进</th><th>下次跟进</th><th>标签</th><th>状态</th></tr></thead>
@@ -7171,6 +7194,147 @@ async function sendAIChat(){
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
+let customerViewMode = 'list';
+let customerGroupBy = 'tag';
+
+function toggleGroupDisplay(el){
+  const next = el.nextElementSibling;
+  if(next){
+    next.style.display = next.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+function setCustomerView(mode){
+  customerViewMode = mode;
+  const listView = document.getElementById('customerListView');
+  const groupView = document.getElementById('customerGroupView');
+  const listBtn = document.getElementById('custViewList');
+  const groupBtn = document.getElementById('custViewGroup');
+  
+  if(mode === 'group'){
+    listView.style.display = 'none';
+    groupView.style.display = 'block';
+    listBtn.className = 'btn btn-sm btn-outline';
+    listBtn.style.background = '';
+    listBtn.style.color = '';
+    groupBtn.className = 'btn btn-sm';
+    groupBtn.style.background = '#3182ce';
+    groupBtn.style.color = '#fff';
+    renderGroupedCustomers();
+  }else{
+    listView.style.display = 'block';
+    groupView.style.display = 'none';
+    groupBtn.className = 'btn btn-sm btn-outline';
+    groupBtn.style.background = '';
+    groupBtn.style.color = '';
+    listBtn.className = 'btn btn-sm';
+    listBtn.style.background = '#3182ce';
+    listBtn.style.color = '#fff';
+  }
+}
+
+function setGroupBy(dim){
+  customerGroupBy = dim;
+  ['tag','country','grade','status','source'].forEach(d => {
+    const btn = document.getElementById('groupBy' + d.charAt(0).toUpperCase() + d.slice(1));
+    if(btn){
+      if(d === dim){
+        btn.className = 'btn btn-sm';
+        btn.style.background = '#8b5cf6';
+        btn.style.color = '#fff';
+        btn.style.border = 'none';
+      }else{
+        btn.className = 'btn btn-sm btn-outline';
+        btn.style.background = '';
+        btn.style.color = '';
+      }
+    }
+  });
+  renderGroupedCustomers();
+}
+
+function renderGroupedCustomers(){
+  const customers = S.customers || [];
+  const listEl = document.getElementById('groupedCustomerList');
+  if(!listEl) return;
+  
+  let list = customers.slice();
+  if(custFilter.grade) list = list.filter(c=>c.scores.grade===custFilter.grade);
+  if(custFilter.country) list = list.filter(c=>c.country===custFilter.country);
+  if(custFilter.source) list = list.filter(c=>c.source===custFilter.source);
+  if(custFilter.status) list = list.filter(c=>c.status===custFilter.status);
+  if(custFilter.tag) list = list.filter(c=>(c.tags||[]).includes(custFilter.tag));
+  if(custFilter.q){ const q=custFilter.q.toLowerCase(); list = list.filter(c=>(c.company+c.contact.email+c.products).toLowerCase().includes(q)); }
+  
+  const groups = {};
+  list.forEach(c => {
+    let key;
+    if(customerGroupBy === 'tag'){
+      key = (c.tags && c.tags.length > 0) ? c.tags[0] : '未分类';
+    }else if(customerGroupBy === 'country'){
+      key = c.country || '未知';
+    }else if(customerGroupBy === 'grade'){
+      key = c.scores?.grade || 'C';
+    }else if(customerGroupBy === 'status'){
+      key = c.status || '新客户';
+    }else if(customerGroupBy === 'source'){
+      key = c.source || '未知';
+    }
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(c);
+  });
+  
+  const sortedGroups = Object.entries(groups).sort((a,b) => b[1].length - a[1].length);
+  const gradeColors = {'A':'#f59e0b','B':'#3b82f6','C':'#9ca3af'};
+  const statusColors = {'新客户':'#3b82f6','已回复':'#10b981','已成交':'#8b5cf6','已流失':'#ef4444'};
+  
+  listEl.innerHTML = sortedGroups.map(([key, groupCustomers]) => {
+    const color = customerGroupBy === 'grade' ? (gradeColors[key] || '#9ca3af') :
+                  customerGroupBy === 'status' ? (statusColors[key] || '#6b7280') : '#8b5cf6';
+    const aCount = groupCustomers.filter(c => c.scores?.grade === 'A').length;
+    
+    let html = '<div style="background:#fff;border-radius:10px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">';
+    html += '<div style="background:linear-gradient(90deg,' + color + ',' + color + 'dd);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleGroupDisplay(this)">';
+    html += '<div style="display:flex;align-items:center;gap:10px">';
+    html += '<span style="color:#fff;font-weight:700;font-size:15px">' + key + '</span>';
+    html += '<span style="background:rgba(255,255,255,0.3);color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600">' + groupCustomers.length + ' 个客户</span>';
+    if(aCount > 0) html += '<span style="background:rgba(255,255,255,0.2);color:#fff;padding:2px 8px;border-radius:12px;font-size:11px">⭐ ' + aCount + ' A级</span>';
+    html += '</div><span style="color:#fff;font-size:18px">▼</span></div>';
+    html += '<div style="padding:8px">';
+    
+    groupCustomers.slice(0, 10).forEach(c => {
+      html += '<div class="grouped-customer-row" data-cid="' + c.id + '" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:6px;cursor:pointer">';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-weight:600;font-size:13px;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (c.company || '未知公司') + '</div>';
+      html += '<div style="font-size:11px;color:#6b7280;margin-top:2px">' + (c.contact?.email || '无邮箱') + ' · ' + (c.country || '未知') + '</div>';
+      html += '</div>';
+      html += '<div style="display:flex;gap:6px;align-items:center;margin-left:12px">';
+      html += '<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:' + (gradeColors[c.scores?.grade] || '#9ca3af') + '20;color:' + (gradeColors[c.scores?.grade] || '#9ca3af') + ';font-weight:600">' + (c.scores?.grade || 'C') + '</span>';
+      html += '<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:' + (statusColors[c.status] || '#6b7280') + '20;color:' + (statusColors[c.status] || '#6b7280') + '">' + (c.status || '新客户') + '</span>';
+      html += '</div></div>';
+    });
+    
+    if(groupCustomers.length > 10){
+      html += '<div class="view-all-customers" style="text-align:center;padding:8px;color:#6b7280;font-size:12px;cursor:pointer">... 还有 ' + (groupCustomers.length - 10) + ' 个客户，点击查看全部</div>';
+    }
+    
+    html += '</div></div>';
+    return html;
+  }).join('');
+  
+  setTimeout(() => {
+    document.querySelectorAll('.grouped-customer-row').forEach(row => {
+      row.addEventListener('click', function(){
+        openCustomerDetail(this.getAttribute('data-cid'));
+      });
+      row.addEventListener('mouseenter', function(){ this.style.background = '#f8fafc'; });
+      row.addEventListener('mouseleave', function(){ this.style.background = ''; });
+    });
+    document.querySelectorAll('.view-all-customers').forEach(el => {
+      el.addEventListener('click', function(){ go('customers'); });
+    });
+  }, 10);
+}
 function resetCustomerFilter(){
   custFilter = {q:'', grade:'', country:'', source:'', tag:'', status:'', customerType:'', followDays:'', view:'all', page:1, selected:[]};
   renderView();
@@ -7485,8 +7649,9 @@ function draftTpl(){
       </div>`).join('')}</div></div>
   <div class="card card-pad mb16">
     <div class="flex-between mb16">
-      <div class="card-title" style="margin:0">📧 邮件模板库（${TEMPLATES.length}个模板）</div>
+      <div class="card-title" style="margin:0">📧 邮件模板库（${TEMPLATES.length + (S.customTemplates||[]).length}个模板）</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-gold btn-sm" onclick="openTemplateEditor()">➕ 自定义模板</button>
         ${cats.map(c=>`<button class="btn btn-sm ${activeCat===c?'btn-gold':'btn-outline'}" onclick="window._tplCat='${c}';renderView()">${c}</button>`).join('')}
       </div>
     </div>
@@ -7507,7 +7672,272 @@ function draftTpl(){
           </div>
         </div>`).join('')}
     </div>
+  </div>
+  ${(S.customTemplates||[]).length ? '<div class="card card-pad mb16" style="border-left:4px solid #8b5cf6;background:linear-gradient(135deg,#faf5ff,#fff)"><div class="card-title" style="margin-bottom:12px">✨ 我的自定义模板（' + (S.customTemplates||[]).length + '个）</div><div id="customTemplateList" class="grid-12"></div></div>' : ''}
   </div>`;
+}
+
+/* V75.3 数据统计报告导出 */
+function exportDataReport(format){
+  const customers = S.customers || [];
+  const emails = S.emails || [];
+  const products = S.products || [];
+  const orders = S.orders || [];
+  const quotes = S.quotes || [];
+  const tasks = S.tasks || [];
+  const exhibitions = S.exhibitions || [];
+  
+  // 计算统计数据
+  const aCount = customers.filter(c => c.scores?.grade === 'A').length;
+  const bCount = customers.filter(c => c.scores?.grade === 'B').length;
+  const cCount = customers.filter(c => c.scores?.grade === 'C').length;
+  const repliedCount = customers.filter(c => c.status === '已回复' || c.status === '已成交').length;
+  const countries = [...new Set(customers.map(c => c.country).filter(Boolean))];
+  
+  const totalRevenue = orders.reduce((s,o) => s + (Number(o.totalAmount) || Number(o.amount) || 0), 0);
+  const totalQuoteAmount = quotes.reduce((s,q) => s + (Number(q.totalAmount) || Number(q.amount) || 0), 0);
+  
+  const completedTasks = tasks.filter(t => t.status === 'completed' || t.completed).length;
+  const pendingTasks = tasks.length - completedTasks;
+  
+  if(format === 'json'){
+    const data = {
+      reportTime: new Date().toISOString(),
+      summary: {
+        totalCustomers: customers.length,
+        totalEmails: emails.length,
+        totalProducts: products.length,
+        totalOrders: orders.length,
+        totalQuotes: quotes.length,
+        totalTasks: tasks.length,
+        totalExhibitions: exhibitions.length,
+        totalRevenue: totalRevenue,
+        totalQuoteAmount: totalQuoteAmount,
+        aGradeCustomers: aCount,
+        bGradeCustomers: bCount,
+        cGradeCustomers: cCount,
+        repliedCustomers: repliedCount,
+        countries: countries.length
+      },
+      customers: customers.map(c => ({
+        id: c.id, company: c.company, country: c.country,
+        grade: c.scores?.grade, status: c.status, email: c.contact?.email,
+        products: c.products, source: c.source, tags: c.tags
+      })),
+      products: products.map(p => ({
+        id: p.id, name: p.name, category: p.category,
+        price: p.price, cost: p.cost, stock: p.stock
+      }))
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '数据统计报告_' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('✅ JSON数据报告已导出');
+    
+  }else if(format === 'summary'){
+    const summary = [
+      '===== KaiLionCrafts 工作台数据摘要 =====',
+      '生成时间: ' + new Date().toLocaleString('zh-CN'),
+      '',
+      '【客户统计】',
+      '客户总数: ' + customers.length,
+      'A级客户: ' + aCount + ' (' + (customers.length?Math.round(aCount/customers.length*100):0) + '%)',
+      'B级客户: ' + bCount + ' (' + (customers.length?Math.round(bCount/customers.length*100):0) + '%)',
+      'C级客户: ' + cCount + ' (' + (customers.length?Math.round(cCount/customers.length*100):0) + '%)',
+      '已回复/已成交: ' + repliedCount,
+      '覆盖国家: ' + countries.length + ' 个',
+      '',
+      '【业务统计】',
+      '开发信: ' + emails.length + ' 封',
+      '产品: ' + products.length + ' 个',
+      '订单: ' + orders.length + ' 个',
+      '订单总金额: $' + totalRevenue.toFixed(2),
+      '报价: ' + quotes.length + ' 个',
+      '报价总金额: $' + totalQuoteAmount.toFixed(2),
+      '任务: ' + tasks.length + ' 个 (已完成' + completedTasks + '/待办' + pendingTasks + ')',
+      '展会: ' + exhibitions.length + ' 个',
+      '',
+      '===== 报告结束 ====='
+    ].join('\n');
+    
+    const blob = new Blob([summary], {type:'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '数据摘要_' + new Date().toISOString().slice(0,10) + '.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('✅ 数据摘要已导出');
+    
+  }else{
+    // HTML报告
+    const html = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>KaiLionCrafts 数据统计报告</title>' +
+      '<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:900px;margin:0 auto;padding:30px;background:#f7fafc;color:#1a202c}' +
+      'h1{color:#2b6cb0;border-bottom:3px solid #2b6cb0;padding-bottom:10px}' +
+      'h2{color:#2d3748;margin-top:30px;border-left:4px solid #2b6cb0;padding-left:12px}' +
+      '.card{background:#fff;padding:20px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:16px}' +
+      '.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}' +
+      '.stat{text-align:center;padding:16px;background:#ebf8ff;border-radius:8px}' +
+      '.stat .num{font-size:28px;font-weight:800;color:#2b6cb0}' +
+      '.stat .label{font-size:12px;color:#718096;margin-top:4px}' +
+      'table{width:100%;border-collapse:collapse;margin-top:12px}' +
+      'th,td{padding:10px;text-align:left;border-bottom:1px solid #e2e8f0;font-size:13px}' +
+      'th{background:#f7fafc;font-weight:600;color:#4a5568}' +
+      '.footer{text-align:center;color:#a0aec0;font-size:12px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0}' +
+      '</style></head><body>' +
+      '<h1>📊 KaiLionCrafts 外贸获客工作台 - 数据统计报告</h1>' +
+      '<p style="color:#718096">生成时间: ' + new Date().toLocaleString('zh-CN') + '</p>' +
+      '<div class="card"><h2 style="margin-top:0">📈 核心数据概览</h2>' +
+      '<div class="grid">' +
+      '<div class="stat"><div class="num">' + customers.length + '</div><div class="label">客户总数</div></div>' +
+      '<div class="stat"><div class="num">' + emails.length + '</div><div class="label">开发信</div></div>' +
+      '<div class="stat"><div class="num">' + products.length + '</div><div class="label">产品</div></div>' +
+      '<div class="stat"><div class="num">' + orders.length + '</div><div class="label">订单</div></div>' +
+      '</div></div>' +
+      '<div class="card"><h2 style="margin-top:0">👥 客户质量分析</h2>' +
+      '<table><tr><th>等级</th><th>数量</th><th>占比</th></tr>' +
+      '<tr><td><span style="color:#d69e2e">⭐ A级</span></td><td>' + aCount + '</td><td>' + (customers.length?Math.round(aCount/customers.length*100):0) + '%</td></tr>' +
+      '<tr><td><span style="color:#3182ce">⭐ B级</span></td><td>' + bCount + '</td><td>' + (customers.length?Math.round(bCount/customers.length*100):0) + '%</td></tr>' +
+      '<tr><td><span style="color:#a0aec0">⭐ C级</span></td><td>' + cCount + '</td><td>' + (customers.length?Math.round(cCount/customers.length*100):0) + '%</td></tr>' +
+      '</table>' +
+      '<p style="margin-top:12px;font-size:13px;color:#4a5568">已回复/已成交客户: <b>' + repliedCount + '</b> 个 | 覆盖国家: <b>' + countries.length + '</b> 个</p>' +
+      '</div>' +
+      '<div class="card"><h2 style="margin-top:0">💰 业务数据</h2>' +
+      '<table><tr><th>指标</th><th>数值</th></tr>' +
+      '<tr><td>订单总数</td><td>' + orders.length + ' 个</td></tr>' +
+      '<tr><td>订单总金额</td><td>$' + totalRevenue.toFixed(2) + '</td></tr>' +
+      '<tr><td>报价总数</td><td>' + quotes.length + ' 个</td></tr>' +
+      '<tr><td>报价总金额</td><td>$' + totalQuoteAmount.toFixed(2) + '</td></tr>' +
+      '<tr><td>任务完成率</td><td>' + (tasks.length?Math.round(completedTasks/tasks.length*100):0) + '% (' + completedTasks + '/' + tasks.length + ')</td></tr>' +
+      '</table></div>' +
+      '<div class="footer">KaiLionCrafts · 锴利匠心 | 让阳江好产品被世界看见</div>' +
+      '</body></html>';
+    
+    const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '数据统计报告_' + new Date().toISOString().slice(0,10) + '.html';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('✅ HTML报告已导出，可在浏览器中打开查看');
+  }
+}
+
+/* V75.3 自定义邮件模板管理 */
+function openTemplateEditor(editIndex){
+  const isEdit = typeof editIndex === 'number';
+  const tpl = isEdit ? (S.customTemplates||[])[editIndex] : {};
+  
+  const modal = document.createElement('div');
+  modal.id = 'templateEditorModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = '<div style="background:#fff;border-radius:12px;width:600px;max-width:90%;max-height:85vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">' +
+    '<div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);padding:16px 20px;display:flex;justify-content:space-between;align-items:center">' +
+      '<span style="color:#fff;font-weight:700;font-size:16px">' + (isEdit ? '✏️ 编辑模板' : '➕ 新建自定义模板') + '</span>' +
+      '<button onclick="closeTemplateEditor()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px">×</button>' +
+    '</div>' +
+    '<div style="padding:20px;max-height:60vh;overflow-y:auto">' +
+      '<div style="margin-bottom:12px"><label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">模板名称</label>' +
+      '<input id="tplName" type="text" class="form-control" value="' + (tpl.name||'') + '" placeholder="例如：德国客户初次开发信" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></div>' +
+      '<div style="margin-bottom:12px"><label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">模板描述</label>' +
+      '<input id="tplDesc" type="text" class="form-control" value="' + (tpl.desc||'') + '" placeholder="简短描述这个模板的用途" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></div>' +
+      '<div style="margin-bottom:12px"><label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">邮件主题</label>' +
+      '<input id="tplSubject" type="text" class="form-control" value="' + (tpl.subject||'') + '" placeholder="邮件主题行" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></div>' +
+      '<div style="margin-bottom:12px"><label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">邮件正文</label>' +
+      '<textarea id="tplBody" class="form-control" rows="8" placeholder="邮件正文内容，支持 [Name] [Company] [Product] 等变量" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-family:monospace">' + (tpl.body||'') + '</textarea></div>' +
+      '<div style="background:#f5f3ff;padding:10px;border-radius:6px;font-size:11px;color:#6b21a8;line-height:1.6">💡 支持变量：[Name] 客户姓名、[Company] 公司名、[Product] 产品、[Country] 国家</div>' +
+    '</div>' +
+    '<div style="padding:16px 20px;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px">' +
+      '<button class="btn btn-outline" onclick="closeTemplateEditor()">取消</button>' +
+      '<button class="btn btn-gold" onclick="saveCustomTemplate(' + (isEdit ? editIndex : -1) + ')">💾 保存模板</button>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(modal);
+}
+
+function closeTemplateEditor(){
+  const modal = document.getElementById('templateEditorModal');
+  if(modal) modal.remove();
+}
+
+function saveCustomTemplate(editIndex){
+  const name = document.getElementById('tplName').value.trim();
+  const desc = document.getElementById('tplDesc').value.trim();
+  const subject = document.getElementById('tplSubject').value.trim();
+  const body = document.getElementById('tplBody').value.trim();
+  
+  if(!name){ toast('⚠️ 请输入模板名称'); return; }
+  if(!body){ toast('⚠️ 请输入邮件正文'); return; }
+  
+  if(!S.customTemplates) S.customTemplates = [];
+  
+  if(editIndex >= 0){
+    S.customTemplates[editIndex] = {name, desc, subject, body, createdAt: S.customTemplates[editIndex].createdAt, updatedAt: Date.now()};
+    toast('✅ 模板已更新');
+  }else{
+    S.customTemplates.push({name, desc, subject, body, createdAt: Date.now()});
+    toast('✅ 模板已创建');
+  }
+  
+  persist();
+  closeTemplateEditor();
+  renderView();
+}
+
+function editCustomTemplate(idx){
+  openTemplateEditor(idx);
+}
+
+function renderCustomTemplates(){
+  const listEl = document.getElementById('customTemplateList');
+  if(!listEl) return;
+  const templates = S.customTemplates || [];
+  
+  listEl.innerHTML = templates.map((t,i) => {
+    return '<div class="card card-pad custom-template-card" data-index="' + i + '" style="border-left:3px solid #8b5cf6">' +
+      '<div class="flex-between"><b style="color:#8b5cf6">' + t.name + '</b><span class="badge" style="background:#8b5cf6;color:#fff;font-size:10px">自定义</span></div>' +
+      '<div class="text-sm text-muted mt4">' + (t.desc||'') + '</div>' +
+      '<div class="divider"></div>' +
+      '<div class="text-sm mono" style="background:#f5f3ff;padding:6px 8px;border-radius:4px;font-size:11px"><b>Subject:</b> ' + (t.subject||'') + '</div>' +
+      '<div class="text-sm text-muted mt8" style="font-size:11px;line-height:1.5;max-height:60px;overflow:hidden">' + (t.body||'').substring(0,120) + '...</div>' +
+      '<div class="mt8 btn-row">' +
+        '<button class="btn btn-outline btn-sm copy-template-btn">📋 复制</button>' +
+        '<button class="btn btn-outline btn-sm edit-template-btn">✏️ 编辑</button>' +
+        '<button class="btn btn-outline btn-sm delete-template-btn" style="color:#ef4444">🗑️ 删除</button>' +
+      '</div></div>';
+  }).join('');
+  
+  // 绑定事件
+  setTimeout(() => {
+    document.querySelectorAll('.custom-template-card').forEach(card => {
+      const idx = parseInt(card.getAttribute('data-index'));
+      card.querySelector('.copy-template-btn').addEventListener('click', function(){
+        const t = S.customTemplates[idx];
+        copyText('Subject: ' + t.subject + '\n\n' + t.body);
+      });
+      card.querySelector('.edit-template-btn').addEventListener('click', function(){
+        editCustomTemplate(idx);
+      });
+      card.querySelector('.delete-template-btn').addEventListener('click', function(){
+        deleteCustomTemplate(idx);
+      });
+    });
+  }, 10);
+}
+
+function deleteCustomTemplate(idx){
+  const tpl = (S.customTemplates||[])[idx];
+  if(!confirm('确定要删除模板「' + tpl.name + '」吗？')) return;
+  S.customTemplates.splice(idx, 1);
+  persist();
+  renderView();
+  toast('✅ 模板已删除');
 }
 
 
@@ -11892,7 +12322,7 @@ function viewOutreach(root){
       <div class="card-title">⚡ 快捷操作</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
         <button class="btn btn-primary" onclick="go('drafts')">✉️ 写开发信</button>
-        <button class="btn btn-gold" onclick="go('customers')">👥 选择客户群发</button>
+        <button class="btn btn-gold" onclick="go(\'customers\')">👥 选择客户群发</button>
         <button class="btn btn-outline" onclick="go('schedule')">📅 查看跟进日程</button>
         <button class="btn btn-outline" onclick="go('activity')">📋 查看触达日志</button>
       </div>

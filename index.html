@@ -4237,6 +4237,84 @@ function viewDashboard(root){
       </div>
     </div>
 
+    <!-- V75.3 客户健康度监控面板 -->
+    <div class="card card-pad mb16" style="border-left:4px solid #e53e3e">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>❤️ 客户健康度监控（活跃度 · 风险预警 · 跟进时效）</span>
+        <div style="display:flex;gap:8px">
+          <span class="badge" style="background:#f0fff4;color:#276749;font-size:10px">🟢 健康</span>
+          <span class="badge" style="background:#fffbeb;color:#92400e;font-size:10px">🟡 关注</span>
+          <span class="badge" style="background:#fff5f5;color:#9b2c2c;font-size:10px">🔴 风险</span>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        ${(() => {
+          const now = Date.now();
+          const dayMs = 24*60*60*1000;
+          // 计算每个客户的健康度
+          const healthData = S.customers.map(c=>{
+            const lastFollowup = c.followUpHistory && c.followUpHistory.length ? 
+              Math.max(...c.followUpHistory.map(h=>h.t||h.createdAt||0)) : (c.createdAt||0);
+            const daysSince = Math.floor((now-lastFollowup)/dayMs);
+            const commCount = (getCustomerCommunications(c.id)||[]).length;
+            // 健康度评分
+            let score = 100;
+            if(daysSince>30) score -= 40;
+            else if(daysSince>14) score -= 20;
+            else if(daysSince>7) score -= 10;
+            if(commCount===0) score -= 20;
+            else if(commCount<2) score -= 10;
+            if(c.status==='已成交') score += 10;
+            if(c.isOld) score += 10;
+            score = Math.max(0, Math.min(100, score));
+            // 健康状态
+            let status = 'healthy';
+            let statusLabel = '🟢 健康';
+            let statusColor = '#38a169';
+            if(score<50){ status='risk'; statusLabel='🔴 风险'; statusColor='#e53e3e'; }
+            else if(score<75){ status='warning'; statusLabel='🟡 关注'; statusColor='#d69e2e'; }
+            return {id:c.id, company:c.company, score:score, status:status, statusLabel:statusLabel, statusColor:statusColor, daysSince:daysSince, commCount:commCount, country:c.country, grade:c.scores?.grade||'-'};
+          });
+          const healthyCount = healthData.filter(h=>h.status==='healthy').length;
+          const warningCount = healthData.filter(h=>h.status==='warning').length;
+          const riskCount = healthData.filter(h=>h.status==='risk').length;
+          const avgScore = healthData.length ? Math.round(healthData.reduce((s,h)=>s+h.score,0)/healthData.length) : 0;
+          const riskCustomers = healthData.filter(h=>h.status==='risk').sort((a,b)=>a.score-b.score).slice(0,5);
+          // 活跃度分布
+          const active7 = healthData.filter(h=>h.daysSince<=7).length;
+          const active14 = healthData.filter(h=>h.daysSince>7 && h.daysSince<=14).length;
+          const active30 = healthData.filter(h=>h.daysSince>14 && h.daysSince<=30).length;
+          const active30plus = healthData.filter(h=>h.daysSince>30).length;
+          
+          return '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">' +
+            '<div style="background:linear-gradient(135deg,#f0fff4,#c6f6d5);padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:800;color:#276749">'+healthyCount+'</div><div style="font-size:11px;color:#276749;margin-top:2px">🟢 健康客户</div></div>' +
+            '<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:800;color:#92400e">'+warningCount+'</div><div style="font-size:11px;color:#92400e;margin-top:2px">🟡 需关注</div></div>' +
+            '<div style="background:linear-gradient(135deg,#fff5f5,#fed7d7);padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:800;color:#9b2c2c">'+riskCount+'</div><div style="font-size:11px;color:#9b2c2c;margin-top:2px">🔴 风险客户</div></div>' +
+            '<div style="background:linear-gradient(135deg,#ebf8ff,#bee3f8);padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:800;color:#2c5282">'+avgScore+'</div><div style="font-size:11px;color:#2c5282;margin-top:2px">平均健康分</div></div>' +
+            '</div>' +
+            // 活跃度分布条形图
+            '<div style="background:#f8fafc;padding:12px;border-radius:8px;margin-bottom:14px">' +
+            '<div style="font-size:12px;font-weight:600;color:#4a5568;margin-bottom:8px">📅 最近跟进时间分布</div>' +
+            '<div style="display:flex;gap:6px;align-items:flex-end;height:60px">' +
+            '<div style="flex:1;text-align:center"><div style="background:#38a169;height:'+Math.max(active7/Math.max(healthData.length,1)*50,4)+'px;border-radius:4px 4px 0 0;margin:0 auto;width:80%"></div><div style="font-size:10px;color:#718096;margin-top:4px">≤7天</div><div style="font-size:11px;font-weight:700;color:#38a169">'+active7+'</div></div>' +
+            '<div style="flex:1;text-align:center"><div style="background:#d69e2e;height:'+Math.max(active14/Math.max(healthData.length,1)*50,4)+'px;border-radius:4px 4px 0 0;margin:0 auto;width:80%"></div><div style="font-size:10px;color:#718096;margin-top:4px">8-14天</div><div style="font-size:11px;font-weight:700;color:#d69e2e">'+active14+'</div></div>' +
+            '<div style="flex:1;text-align:center"><div style="background:#dd6b20;height:'+Math.max(active30/Math.max(healthData.length,1)*50,4)+'px;border-radius:4px 4px 0 0;margin:0 auto;width:80%"></div><div style="font-size:10px;color:#718096;margin-top:4px">15-30天</div><div style="font-size:11px;font-weight:700;color:#dd6b20">'+active30+'</div></div>' +
+            '<div style="flex:1;text-align:center"><div style="background:#e53e3e;height:'+Math.max(active30plus/Math.max(healthData.length,1)*50,4)+'px;border-radius:4px 4px 0 0;margin:0 auto;width:80%"></div><div style="font-size:10px;color:#718096;margin-top:4px">>30天</div><div style="font-size:11px;font-weight:700;color:#e53e3e">'+active30plus+'</div></div>' +
+            '</div></div>' +
+            // 风险预警客户列表
+            (riskCustomers.length ? '<div style="background:#fff5f5;padding:12px;border-radius:8px;border:1px solid #feb2b2"><div style="font-size:12px;font-weight:600;color:#9b2c2c;margin-bottom:8px">⚠️ 风险预警客户（需立即跟进）</div>' +
+              riskCustomers.map(c=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #fed7d7;cursor:pointer" onclick="openCustomerDetail(\''+c.id+'\')">' +
+                '<div style="flex:1;min-width:0"><span style="font-size:12px;font-weight:600;color:#2d3748">'+c.company.substring(0,20)+'</span><span style="font-size:10px;color:#718096;margin-left:8px">'+c.country+' · '+c.grade+'级</span></div>' +
+                '<div style="text-align:right;flex-shrink:0"><span style="font-size:11px;font-weight:700;color:#e53e3e">'+c.score+'分</span><span style="font-size:10px;color:#e53e3e;margin-left:6px">'+c.daysSince+'天未跟进</span></div>' +
+                '</div>').join('') +
+              '</div>' : '<div style="text-align:center;padding:16px;color:#38a169;font-size:13px">✅ 暂无风险客户，所有客户健康状况良好</div>');
+        })()}
+      </div>
+      <div class="text-sm text-muted mt8" style="border-top:1px solid #e2e8f0;padding-top:8px">
+        💡 客户健康度基于跟进时效、沟通频率、成交状态综合评估，点击风险客户可直接进入详情页跟进
+      </div>
+    </div>
+
     <!-- V61 工作台使用统计 -->
       <div class="card card-pad" style="border-left:4px solid #c9a961">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -5851,6 +5929,69 @@ function openCustomerDetail(cid){
           <button class="btn btn-sm" style="font-size:12px;background:#e53e3e;color:#fff" onclick="quickKBAction('${cid}','expo')">🎪 展会资料包</button>
         </div>
       </div>
+
+      <!-- V75.3 客户旅程时间轴 -->
+      <div class="card card-pad mb16" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#fff)">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>🚀 客户旅程时间轴（从接触到成交全流程）</span>
+          <span class="badge" style="background:#805ad5;color:#fff;font-size:10px">7个关键节点</span>
+        </div>
+        <div style="margin-top:16px">
+          ${(() => {
+            const journey = [
+              {icon:'👋', label:'首次接触', desc:'客户录入系统', time:c.createdAt, color:'#3182ce', key:'contact'},
+              {icon:'✉️', label:'首次开发信', desc:'发送第一封开发信', time:null, color:'#38a169', key:'email'},
+              {icon:'💬', label:'客户回复', desc:'客户首次回复', time:null, color:'#d69e2e', key:'reply'},
+              {icon:'💰', label:'首次报价', desc:'发送第一份报价单', time:null, color:'#dd6b20', key:'quote'},
+              {icon:'📦', label:'样品寄送', desc:'寄送样品给客户', time:null, color:'#e53e3e', key:'sample'},
+              {icon:'🎉', label:'首次订单', desc:'客户下第一笔订单', time:null, color:'#805ad5', key:'order'},
+              {icon:'⭐', label:'老客户', desc:'成为稳定老客户', time:null, color:'#c9a961', key:'loyal'}
+            ];
+            // 查找各节点时间
+            const drafts = S.drafts.filter(d=>d.customerId===cid);
+            if(drafts.length) journey[1].time = drafts[0].createdAt || drafts[0].sentAt;
+            // 查找回复（沟通记录中客户回复）
+            const comms = getCustomerCommunications(cid);
+            const replyComm = comms.find(r=>r.type==='customer_reply' || r.type==='inquiry');
+            if(replyComm) journey[2].time = replyComm.createdAt;
+            // 查找报价
+            const quotes = S.quotes.filter(q=>q.customerId===cid);
+            if(quotes.length) journey[3].time = quotes[0].createdAt;
+            // 查找样品
+            const samples = S.samples.filter(s=>s.customerId===cid);
+            if(samples.length) journey[4].time = samples[0].createdAt || samples[0].sentAt;
+            // 查找订单
+            const orders = S.orders.filter(o=>o.customerId===cid);
+            if(orders.length) journey[5].time = orders[0].createdAt;
+            // 老客户
+            if(c.isOld || orders.length>=2) journey[6].time = orders.length>=2 ? orders[1].createdAt : c.createdAt;
+            
+            const completed = journey.filter(j=>j.time).length;
+            const progress = Math.round(completed/journey.length*100);
+            
+            // 生成时间轴
+            let timelineHtml = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:0 10px">';
+            journey.forEach((j,i)=>{
+              const isDone = !!j.time;
+              const timeStr = j.time ? new Date(j.time).toLocaleDateString('zh-CN',{month:'short',day:'numeric'}) : '待完成';
+              timelineHtml += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;position:relative">' +
+                (i<journey.length-1 ? '<div style="position:absolute;top:16px;left:50%;width:100%;height:3px;background:'+(isDone?'#805ad5':'#e2e8f0')+'"></div>' : '') +
+                '<div style="width:32px;height:32px;border-radius:50%;background:'+(isDone?j.color:'#e2e8f0')+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;z-index:1;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.1)">'+j.icon+'</div>' +
+                '<div style="font-size:10px;font-weight:'+(isDone?'700':'500')+';color:'+(isDone?'#2d3748':'#a0aec0')+';margin-top:6px;text-align:center;white-space:nowrap">'+j.label+'</div>' +
+                '<div style="font-size:9px;color:'+(isDone?j.color:'#cbd5e0')+';margin-top:2px">'+timeStr+'</div>' +
+                '</div>';
+            });
+            timelineHtml += '</div>';
+            
+            // 进度条
+            timelineHtml += '<div style="background:#e2e8f0;border-radius:10px;height:8px;overflow:hidden;margin-bottom:8px"><div style="width:'+progress+'%;height:100%;background:linear-gradient(90deg,#805ad5,#d6bcfa);border-radius:10px;transition:width .5s"></div></div>';
+            timelineHtml += '<div style="display:flex;justify-content:space-between;font-size:11px;color:#718096"><span>旅程进度：'+completed+'/'+journey.length+' 节点完成</span><span style="font-weight:700;color:#805ad5">'+progress+'%</span></div>';
+            
+            return timelineHtml;
+          })()}
+        </div>
+      </div>
+
 <div class="card card-pad mb16">
         <div class="card-title">🏢 公司背调</div>
         <div class="text-sm" style="line-height:2">
@@ -10741,7 +10882,7 @@ function viewTools(root){
   ];
   const history = S.imageHistory || [];
   root.innerHTML=`
-  <div class="page-head"><h2>🧰 外贸工具箱</h2><p class="sub">14类·100+工具·找客户/写开发信/查海关/做图片</p></div>
+  <div class="page-head"><h2>🧰 外贸工具箱</h2><p class="sub">15类·100+工具·找客户/写开发信/查海关/做图片/AI写作</p></div>
 
   <!-- V75.2 工具箱分类导航小卡片 -->
   <div id="toolNav" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
@@ -10750,7 +10891,7 @@ function viewTools(root){
       ['🎯','客户画像','#805ad5'],['🌐','翻译助手','#319795'],['💡','回复助手','#d69e2e'],
       ['💰','报价PI','#e53e3e'],['📦','订单跟踪','#2b6cb0'],['📚','产品库','#2f855a'],
       ['💾','数据备份','#718096'],['📋','跟进SOP','#b7791f'],['📊','销售漏斗','#6b46c1'],
-      ['📧','邮件模板','#c53030'],['✍️','营销内容','#dd6b20']
+      ['📧','邮件模板','#c53030'],['✍️','营销内容','#dd6b20'],['🤖','AI写作','#2b6cb0']
     ].map((t,i)=>`<div id="toolNav-${i}" onclick="switchTool(${i})" style="cursor:pointer;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;transition:all 0.2s;${i===0?'background:'+t[2]+';color:#fff;box-shadow:0 2px 8px '+t[2]+'40':'background:#fff;color:#4a5568;border:1px solid #e2e8f0'}">${t[0]} ${t[1]}</div>`).join('')}
   </div>
   
@@ -12011,6 +12152,83 @@ function viewTools(root){
       </div>
     </div>
   </div>
+
+  <!-- V75.3 AI智能写作助手面板 -->
+  <div id="tool-panel-14" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #2b6cb0;background:linear-gradient(135deg,#ebf8ff,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🤖 AI智能写作助手（多场景·多语言·一键生成）</span>
+      <span class="badge" style="background:#2b6cb0;color:#fff;font-size:10px">新功能 V75.3</span>
+    </div>
+    <p class="text-sm text-muted mb12">支持8大外贸写作场景，多语言输出，AI自动生成专业文案，可直接复制使用</p>
+    
+    <!-- 场景选择 -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+      ${[
+        ['✉️','开发信','#3182ce'],['💬','回复邮件','#38a169'],['📱','WhatsApp','#25D366'],['📝','产品描述','#805ad5'],
+        ['🏢','公司介绍','#d69e2e'],['📢','营销文案','#dd6b20'],['🌐','社交媒体','#e53e3e'],['🎪','展会邀请','#6b46c1']
+      ].map((s,i)=>`<div id="aiWriteScene-${i}" onclick="selectAIWriteScene(${i})" style="cursor:pointer;padding:10px;border-radius:8px;text-align:center;transition:all 0.2s;${i===0?'background:'+s[2]+';color:#fff;box-shadow:0 2px 8px '+s[2]+'40':'background:#fff;color:#4a5568;border:1px solid #e2e8f0'}">
+        <div style="font-size:20px">${s[0]}</div>
+        <div style="font-size:11px;font-weight:600;margin-top:4px">${s[1]}</div>
+      </div>`).join('')}
+    </div>
+    
+    <!-- 写作参数 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#4a5568;margin-bottom:4px;display:block">🌐 语言</label>
+        <select id="aiWriteLang" class="form-control" style="font-size:13px">
+          <option value="en">English（英文）</option>
+          <option value="zh">中文</option>
+          <option value="es">Español（西班牙语）</option>
+          <option value="de">Deutsch（德语）</option>
+          <option value="fr">Français（法语）</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#4a5568;margin-bottom:4px;display:block">🎯 语气风格</label>
+        <select id="aiWriteTone" class="form-control" style="font-size:13px">
+          <option value="professional">专业正式</option>
+          <option value="friendly">友好亲切</option>
+          <option value="persuasive">说服力强</option>
+          <option value="concise">简洁明了</option>
+        </select>
+      </div>
+    </div>
+    
+    <!-- 输入区域 -->
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;font-weight:600;color:#4a5568;margin-bottom:4px;display:block">📝 写作要点/关键词（用逗号分隔）</label>
+      <textarea id="aiWriteInput" class="form-control" rows="3" placeholder="例如：阳江厨房剪刀，不锈钢材质，CE认证，工厂直供价格，MOQ 500把" style="font-size:13px"></textarea>
+    </div>
+    
+    <!-- 生成按钮 -->
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button id="aiWriteBtn" class="btn btn-primary" onclick="doAIWrite()" style="flex:1">🚀 AI生成文案</button>
+      <button class="btn btn-outline" onclick="document.getElementById('aiWriteInput').value=''">🗑 清空</button>
+    </div>
+    
+    <!-- 结果区域 -->
+    <div id="aiWriteResult" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:13px;font-weight:600;color:#2b6cb0">✨ AI生成结果</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" style="font-size:11px" onclick="copyAIWriteResult()">📋 复制</button>
+          <button class="btn btn-outline btn-sm" style="font-size:11px" onclick="doAIWrite()">🔄 重新生成</button>
+        </div>
+      </div>
+      <div id="aiWriteOutput" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;font-size:13px;line-height:1.8;color:#2d3748;white-space:pre-wrap;max-height:300px;overflow-y:auto"></div>
+    </div>
+    
+    <!-- 快速提示 -->
+    <div style="margin-top:14px;padding:10px;background:#f0f7ff;border-radius:8px;border:1px solid #bee3f8">
+      <div style="font-size:11px;color:#2c5282;font-weight:600;margin-bottom:4px">💡 使用提示</div>
+      <div style="font-size:11px;color:#4a5568;line-height:1.6">
+        1. 选择写作场景后，输入关键词或要点，AI会自动生成专业文案<br>
+        2. 支持多语言输出，可根据目标市场选择合适语言<br>
+        3. 生成结果可直接复制使用，也可重新生成获取不同版本
+      </div>
+    </div>
+  </div>
   
   <div class="grid-3">
     ${cats.map(c=>`<div class="card card-pad">
@@ -12278,14 +12496,14 @@ ${kbContext}
 
 /* V75.2 工具箱分类切换 */
 function switchTool(idx){
-  const colors=['#c9a961','#3182ce','#25D366','#805ad5','#319795','#d69e2e','#e53e3e','#2b6cb0','#2f855a','#718096','#b7791f','#6b46c1','#c53030','#dd6b20'];
-  for(let i=0;i<14;i++){
+  const colors=['#c9a961','#3182ce','#25D366','#805ad5','#319795','#d69e2e','#e53e3e','#2b6cb0','#2f855a','#718096','#b7791f','#6b46c1','#c53030','#dd6b20','#2b6cb0'];
+  for(let i=0;i<15;i++){
     const p=document.getElementById('tool-panel-'+i);
     if(p) p.style.display='none';
   }
   const sp=document.getElementById('tool-panel-'+idx);
   if(sp) sp.style.display='block';
-  for(let i=0;i<14;i++){
+  for(let i=0;i<15;i++){
     const n=document.getElementById('toolNav-'+i);
     if(n){
       if(i===idx){
@@ -12302,6 +12520,90 @@ function switchTool(idx){
     }
   }
   window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* V75.3 AI智能写作助手 */
+let currentAIWriteScene = 0;
+const AI_WRITE_SCENES = ['开发信','回复邮件','WhatsApp话术','产品描述','公司介绍','营销文案','社交媒体帖子','展会邀请函'];
+
+function selectAIWriteScene(idx){
+  currentAIWriteScene = idx;
+  const colors = ['#3182ce','#38a169','#25D366','#805ad5','#d69e2e','#dd6b20','#e53e3e','#6b46c1'];
+  for(let i=0;i<8;i++){
+    const el = document.getElementById('aiWriteScene-'+i);
+    if(el){
+      if(i===idx){
+        el.style.background = colors[i];
+        el.style.color = '#fff';
+        el.style.boxShadow = '0 2px 8px '+colors[i]+'40';
+        el.style.border = 'none';
+      }else{
+        el.style.background = '#fff';
+        el.style.color = '#4a5568';
+        el.style.boxShadow = 'none';
+        el.style.border = '1px solid #e2e8f0';
+      }
+    }
+  }
+}
+
+async function doAIWrite(){
+  const input = document.getElementById('aiWriteInput').value.trim();
+  if(!input){ toast('请输入写作要点或关键词'); return; }
+  const lang = document.getElementById('aiWriteLang').value;
+  const tone = document.getElementById('aiWriteTone').value;
+  const scene = AI_WRITE_SCENES[currentAIWriteScene];
+  const langNames = {en:'English',zh:'中文',es:'Español',de:'Deutsch',fr:'Français'};
+  const toneNames = {professional:'专业正式',friendly:'友好亲切',persuasive:'说服力强',concise:'简洁明了'};
+  
+  const btn = document.getElementById('aiWriteBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ AI生成中...';
+  
+  const kbContext = getToolKBContext('AI写作助手');
+  const prompt = `你是一位专业的外贸文案写作专家。请根据以下要求撰写一篇${scene}：
+
+【写作要点】${input}
+【语言】${langNames[lang]}
+【语气风格】${toneNames[tone]}
+
+【公司背景】
+${kbContext}
+
+【要求】
+1. 直接输出完整的${scene}内容，不要加任何解释
+2. 内容要专业、有说服力，符合外贸行业规范
+3. 适当融入公司优势（阳江工厂直供、成本优势、认证齐全）
+4. 字数控制在200-400字之间`;
+
+  const r = await callAI(prompt, {purpose:'ai_write', temperature:0.7});
+  btn.disabled = false;
+  btn.textContent = '🚀 AI生成文案';
+  
+  if(r.error){ toast('生成失败: '+r.error); return; }
+  
+  const resultDiv = document.getElementById('aiWriteResult');
+  const output = document.getElementById('aiWriteOutput');
+  resultDiv.style.display = 'block';
+  output.textContent = r.content;
+  toast('✅ AI文案已生成');
+  logAction('ai_write', '生成'+scene, input.substring(0,50));
+}
+
+function copyAIWriteResult(){
+  const output = document.getElementById('aiWriteOutput').textContent;
+  if(!output){ toast('暂无内容可复制'); return; }
+  navigator.clipboard.writeText(output).then(()=>{
+    toast('✅ 已复制到剪贴板');
+  }).catch(()=>{
+    const ta = document.createElement('textarea');
+    ta.value = output;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('✅ 已复制到剪贴板');
+  });
 }
 
 /* AI生图 - 选择模板 */

@@ -8325,9 +8325,20 @@ function viewTools(root){
   const history = S.imageHistory || [];
   root.innerHTML=`
   <div class="page-head"><h2>🧰 外贸工具箱</h2><p class="sub">14类·100+工具·找客户/写开发信/查海关/做图片</p></div>
+
+  <!-- V75.2 工具箱分类导航小卡片 -->
+  <div id="toolNav" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+    ${[
+      ['🎨','AI生图','#c9a961'],['👁️','AI识图','#3182ce'],['💬','WhatsApp','#25D366'],
+      ['🎯','客户画像','#805ad5'],['🌐','翻译助手','#319795'],['💡','回复助手','#d69e2e'],
+      ['💰','报价PI','#e53e3e'],['📦','订单跟踪','#2b6cb0'],['📚','产品库','#2f855a'],
+      ['💾','数据备份','#718096'],['📋','跟进SOP','#b7791f'],['📊','销售漏斗','#6b46c1'],
+      ['📧','邮件模板','#c53030'],['✍️','营销内容','#dd6b20']
+    ].map((t,i)=>`<div id="toolNav-${i}" onclick="switchTool(${i})" style="cursor:pointer;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;transition:all 0.2s;${i===0?'background:'+t[2]+';color:#fff;box-shadow:0 2px 8px '+t[2]+'40':'background:#fff;color:#4a5568;border:1px solid #e2e8f0'}">${t[0]} ${t[1]}</div>`).join('')}
+  </div>
   
   <!-- V31 AI生图面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #c9a961;background:linear-gradient(135deg,#fefcf7,#fff)">
+  <div id="tool-panel-0" class="tool-panel card card-pad mb16" style="border-left:4px solid #c9a961;background:linear-gradient(135deg,#fefcf7,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>🎨 AI 智能生图（CogView-3-Flash · 免费）</span>
       <span class="badge badge-gold">新功能 V31</span>
@@ -8388,7 +8399,7 @@ function viewTools(root){
   </div>
   
   <!-- V32 AI视觉识图面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #3182ce;background:linear-gradient(135deg,#f0f7ff,#fff)">
+  <div id="tool-panel-1" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #3182ce;background:linear-gradient(135deg,#f0f7ff,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>👁️ AI 视觉识图（GLM-4.6V-Flash · 免费）</span>
       <span class="badge" style="background:#3182ce;color:#fff">新功能 V32</span>
@@ -8451,7 +8462,7 @@ function viewTools(root){
   </div>
   
   <!-- V33 WhatsApp营销助手面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #25D366;background:linear-gradient(135deg,#f0fff4,#fff)">
+  <div id="tool-panel-2" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #25D366;background:linear-gradient(135deg,#f0fff4,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>💬 WhatsApp 营销助手（AI话术生成 · 10国语言）</span>
       <span class="badge" style="background:#25D366;color:#fff">新功能 V33</span>
@@ -8522,7 +8533,7 @@ function viewTools(root){
   </div>
   
   <!-- V34 AI客户画像分析面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#fff)">
+  <div id="tool-panel-3" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>🎯 AI 客户画像分析（深度背调 · 精准开发策略）</span>
       <span class="badge" style="background:#805ad5;color:#fff">新功能 V34</span>
@@ -8590,7 +8601,7 @@ function viewTools(root){
   </div>
   
   <!-- V35 AI多语言翻译助手面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #dd6b20;background:linear-gradient(135deg,#fffaf0,#fff)">
+  <div id="tool-panel-4" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #dd6b20;background:linear-gradient(135deg,#fffaf0,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>🌐 AI 多语言翻译助手（外贸专业术语 · 12国语言）</span>
       <span class="badge" style="background:#dd6b20;color:#fff">新功能 V35</span>
@@ -8685,7 +8696,7 @@ function viewTools(root){
   </div>
   
   <!-- V36 AI客户回复分析与一键回复助手面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #319795;background:linear-gradient(135deg,#f0fdfa,#fff)">
+  <div id="tool-panel-5" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #319795;background:linear-gradient(135deg,#f0fdfa,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>💬 AI 客户回复分析与一键回复助手（8类回复智能分类 · 回复策略 · 英文草稿）</span>
       <span class="badge" style="background:#319795;color:#fff">新功能 V36</span>
@@ -8754,7 +8765,7 @@ function viewTools(root){
   </div>
   
   <!-- V37 产品报价计算器与PI生成器面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#fff)">
+  <div id="tool-panel-6" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>💰 产品报价计算器与PI生成器（4种贸易术语 · 汇率换算 · 一键生成形式发票）</span>
       <span class="badge" style="background:#805ad5;color:#fff">新功能 V37</span>
@@ -8852,7 +8863,7 @@ function viewTools(root){
   </div>
   
   <!-- V38 订单管理与生产跟踪面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #3182ce;background:linear-gradient(135deg,#ebf8ff,#fff)">
+  <div id="tool-panel-7" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #3182ce;background:linear-gradient(135deg,#ebf8ff,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>📦 订单管理与生产跟踪（6阶段进度 · 物流跟踪 · 收款记录 · 交货期预警）</span>
       <div style="display:flex;gap:8px;align-items:center">
@@ -8954,7 +8965,7 @@ function viewTools(root){
   </div>
   
   <!-- V39 产品库管理面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #38a169;background:linear-gradient(135deg,#f0fff4,#fff)">
+  <div id="tool-panel-8" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #38a169;background:linear-gradient(135deg,#f0fff4,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>📚 产品库管理（6大分类 · 成本/包装/MOQ/HS编码 · 一键填充报价）</span>
       <div style="display:flex;gap:8px;align-items:center">
@@ -9019,7 +9030,7 @@ function viewTools(root){
   </div>
   
   <!-- V40 数据导出与备份中心面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #d69e2e;background:linear-gradient(135deg,#fffbeb,#fff)">
+  <div id="tool-panel-9" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #d69e2e;background:linear-gradient(135deg,#fffbeb,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>💾 数据导出与备份中心（CSV导出 · JSON全量备份 · 导入恢复 · 数据安全）</span>
       <span class="badge" style="background:#d69e2e;color:#fff">新功能 V40</span>
@@ -9101,7 +9112,7 @@ function viewTools(root){
   </div>
   
   <!-- V41 客户跟进SOP与任务提醒中心面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #3182ce;background:linear-gradient(135deg,#ebf8ff,#fff)">
+  <div id="tool-panel-10" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #3182ce;background:linear-gradient(135deg,#ebf8ff,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>📋 客户跟进SOP与任务提醒中心（7节点标准流程 · 今日待办 · 逾期预警 · 跟进节奏）</span>
       <div style="display:flex;gap:8px;align-items:center">
@@ -9230,7 +9241,7 @@ function viewTools(root){
   </div>
   
   <!-- V44 销售漏斗与商机管理中心面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#fff)">
+  <div id="tool-panel-11" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>📊 销售漏斗与商机管理中心（6阶段漏斗 · 赢单率预测 · 金额统计 · 阶段推进）</span>
       <div style="display:flex;gap:8px;align-items:center">
@@ -9332,7 +9343,7 @@ function viewTools(root){
   </div>
   
   <!-- V45 邮件模板库与话术中心面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #319795;background:linear-gradient(135deg,#f0fdfa,#fff)">
+  <div id="tool-panel-12" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #319795;background:linear-gradient(135deg,#f0fdfa,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>📧 邮件模板库与话术中心（8大场景 · 16+优质模板 · 变量替换 · AI生成）</span>
       <div style="display:flex;gap:8px;align-items:center">
@@ -9429,7 +9440,7 @@ function viewTools(root){
   </div>
   
   <!-- V47 多语言营销内容生成器面板 -->
-  <div class="card card-pad mb16" style="border-left:4px solid #dd6b20;background:linear-gradient(135deg,#fffaf0,#fff)">
+  <div id="tool-panel-13" class="tool-panel card card-pad mb16" style="display:none" style="border-left:4px solid #dd6b20;background:linear-gradient(135deg,#fffaf0,#fff)">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>✍️ 多语言营销内容生成器（10种内容类型 · 12种语言 · AI一键生成）</span>
       <span class="badge" style="background:#dd6b20;color:#fff">新功能 V47</span>
@@ -9797,6 +9808,34 @@ async function doAiGenerateTemplate(){
   });
   persist();
   toast('✅ AI模板已生成并保存到自定义模板');
+}
+
+/* V75.2 工具箱分类切换 */
+function switchTool(idx){
+  const colors=['#c9a961','#3182ce','#25D366','#805ad5','#319795','#d69e2e','#e53e3e','#2b6cb0','#2f855a','#718096','#b7791f','#6b46c1','#c53030','#dd6b20'];
+  for(let i=0;i<14;i++){
+    const p=document.getElementById('tool-panel-'+i);
+    if(p) p.style.display='none';
+  }
+  const sp=document.getElementById('tool-panel-'+idx);
+  if(sp) sp.style.display='block';
+  for(let i=0;i<14;i++){
+    const n=document.getElementById('toolNav-'+i);
+    if(n){
+      if(i===idx){
+        n.style.background=colors[i];
+        n.style.color='#fff';
+        n.style.boxShadow='0 2px 8px '+colors[i]+'40';
+        n.style.border='none';
+      }else{
+        n.style.background='#fff';
+        n.style.color='#4a5568';
+        n.style.boxShadow='none';
+        n.style.border='1px solid #e2e8f0';
+      }
+    }
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 /* AI生图 - 选择模板 */

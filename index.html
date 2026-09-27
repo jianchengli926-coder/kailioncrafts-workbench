@@ -1881,6 +1881,56 @@ function renderCommunicationTimeline(cid){
   }).join('');
 }
 
+/* V75.3 完整客户跟进时间线（整合所有活动） */
+function renderCustomerTimeline(cid){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c) return '';
+  const events = [];
+  // 1. 沟通记录
+  const comms = getCustomerCommunications(cid);
+  comms.forEach(r=>{
+    const type = COMM_TYPES.find(t=>t.id===r.type) || COMM_TYPES[7];
+    events.push({time:r.createdAt, icon:type.icon, color:type.color, label:type.label, content:r.content.substring(0,100), type:'comm'});
+  });
+  // 2. 开发信
+  const drafts = (S.drafts||[]).filter(d=>d.customerId===cid);
+  drafts.forEach(d=>{
+    events.push({time:d.createdAt, icon:'✉️', color:'#3182ce', label:'开发信', content:(d.subject||'').substring(0,80), type:'draft'});
+  });
+  // 3. 报价
+  const quotes = (S.quotes||[]).filter(q=>q.customerId===cid);
+  quotes.forEach(q=>{
+    events.push({time:q.createdAt, icon:'💰', color:'#805ad5', label:'报价单', content:'报价 '+q.quoteNo+' - $'+(q.totalAmount||0), type:'quote'});
+  });
+  // 4. 样品
+  const samples = (S.samples||[]).filter(s=>s.customerId===cid);
+  samples.forEach(s=>{
+    events.push({time:s.createdAt, icon:'📦', color:'#dd6b20', label:'样品', content:'样品 '+s.sampleNo+' - '+(s.status||''), type:'sample'});
+  });
+  // 5. 订单
+  const orders = (S.orders||[]).filter(o=>o.customerId===cid);
+  orders.forEach(o=>{
+    events.push({time:o.createdAt, icon:'📋', color:'#38a169', label:'订单', content:'订单 '+o.orderNo+' - $'+(o.amount||0), type:'order'});
+  });
+  // 6. 客户创建
+  events.push({time:c.createdAt, icon:'🎉', color:'#c9a961', label:'客户创建', content:'客户 '+c.company+' 已创建', type:'create'});
+  
+  // 按时间倒序排列
+  events.sort((a,b)=>new Date(b.time)-new Date(a.time));
+  
+  if(!events.length){
+    return '<div style="text-align:center;padding:20px;color:#a0aec0;font-size:13px">暂无跟进记录</div>';
+  }
+  
+  return events.slice(0,20).map(e=>{
+    const time = new Date(e.time);
+    const timeStr = time.getFullYear()+'-'+String(time.getMonth()+1).padStart(2,'0')+'-'+String(time.getDate()).padStart(2,'0')+' '+String(time.getHours()).padStart(2,'0')+':'+String(time.getMinutes()).padStart(2,'0');
+    const daysAgo = Math.floor((Date.now()-e.time)/(1000*60*60*24));
+    const timeLabel = daysAgo===0?'今天':daysAgo===1?'昨天':daysAgo+'天前';
+    return '<div style="display:flex;gap:10px;margin-bottom:12px;position:relative"><div style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+e.color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;position:relative;z-index:1">'+e.icon+'</div><div style="flex:1;background:#f8fafc;border-radius:6px;padding:8px 10px;border:1px solid #e2e8f0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><span style="font-size:11px;font-weight:600;color:'+e.color+'">'+e.label+'</span><span style="font-size:10px;color:#718096">'+timeStr+' · '+timeLabel+'</span></div><div style="font-size:12px;line-height:1.5;color:#2d3748">'+esc(e.content)+'</div></div></div>';
+  }).join('') + (events.length>20?'<div style="text-align:center;padding:8px;color:#a0aec0;font-size:11px">共 '+events.length+' 条记录，显示最近20条</div>':'');
+}
+
 /* V48 打开添加沟通记录弹窗 */
 function openAddCommunication(cid){
   const c = S.customers.find(x=>x.id===cid);
@@ -4025,6 +4075,69 @@ function viewDashboard(root){
       </div>
     </div>
 
+    <!-- V75.3 客户增长趋势折线图 -->
+    <div class="card card-pad mb16" style="border-left:4px solid #38a169">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📈 客户增长趋势（近30天）</span>
+        <div style="display:flex;gap:12px;align-items:center">
+          <span style="font-size:11px;color:#718096">累计：<b style="color:#2d3748;font-size:14px">${S.customers.length}</b></span>
+          <span style="font-size:11px;color:#718096">本月新增：<b style="color:#38a169;font-size:14px">${getTodayNewCustomers()}</b></span>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        ${(() => {
+          // 计算近30天每天的客户累计数
+          const days = 30;
+          const dailyData = [];
+          for(let i=days-1;i>=0;i--){
+            const date = new Date();
+            date.setDate(date.getDate()-i);
+            date.setHours(0,0,0,0);
+            const count = S.customers.filter(c=>new Date(c.createdAt)<=date).length;
+            dailyData.push({date:date, count:count, label:(date.getMonth()+1)+'/'+date.getDate()});
+          }
+          const max = Math.max(...dailyData.map(d=>d.count), 1);
+          const min = Math.min(...dailyData.map(d=>d.count), 0);
+          const range = max - min || 1;
+          const w = 800, h = 200, pad = 40;
+          const chartW = w - pad*2, chartH = h - pad*2;
+          // 生成折线路径
+          let points = dailyData.map((d,i)=>{
+            const x = pad + (i/(days-1))*chartW;
+            const y = pad + chartH - ((d.count-min)/range)*chartH;
+            return {x:x, y:y, ...d};
+          });
+          const linePath = points.map((p,i)=> (i===0?'M':'L')+p.x+' '+p.y).join(' ');
+          const areaPath = linePath + ' L'+points[points.length-1].x+' '+(pad+chartH)+' L'+points[0].x+' '+(pad+chartH)+' Z';
+          // 生成网格线
+          let gridLines = '';
+          for(let i=0;i<=4;i++){
+            const y = pad + (i/4)*chartH;
+            const val = Math.round(max - (i/4)*range);
+            gridLines += '<line x1="'+pad+'" y1="'+y+'" x2="'+(w-pad)+'" y2="'+y+'" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4"/><text x="'+(pad-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="#a0aec0">'+val+'</text>';
+          }
+          // 生成X轴标签（每5天一个）
+          let xLabels = '';
+          points.forEach((p,i)=>{
+            if(i%5===0 || i===points.length-1){
+              xLabels += '<text x="'+p.x+'" y="'+(h-pad+16)+'" text-anchor="middle" font-size="10" fill="#718096">'+p.label+'</text>';
+            }
+          });
+          // 生成数据点
+          let dataPoints = points.map((p,i)=>{
+            if(i%5===0 || i===points.length-1){
+              return '<circle cx="'+p.x+'" cy="'+p.y+'" r="4" fill="#38a169" stroke="#fff" stroke-width="2"><title>'+p.label+': '+p.count+'个客户</title></circle>';
+            }
+            return '';
+          }).join('');
+          return '<svg width="100%" height="'+h+'" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="xMidYMid meet">'+gridLines+'<defs><linearGradient id="areaGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#38a169;stop-opacity:0.3"/><stop offset="100%" style="stop-color:#38a169;stop-opacity:0.05"/></linearGradient></defs><path d="'+areaPath+'" fill="url(#areaGrad)"/><path d="'+linePath+'" fill="none" stroke="#38a169" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'+dataPoints+xLabels+'</svg>';
+        })()}
+      </div>
+      <div class="text-sm text-muted mt8" style="border-top:1px solid #e2e8f0;padding-top:8px">
+        💡 趋势图展示近30天客户累计增长情况，鼠标悬停数据点可查看具体日期和客户数
+      </div>
+    </div>
+
     <!-- V61 工作台使用统计 -->
       <div class="card card-pad" style="border-left:4px solid #c9a961">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -5546,6 +5659,23 @@ function openCustomerDetail(cid){
             return '<div style="display:flex;gap:10px;margin-bottom:14px"><div style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+type.color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px">'+type.icon+'</div><div style="flex:1;background:#f8fafc;border-radius:8px;padding:10px;border:1px solid #e2e8f0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-size:11px;font-weight:600;color:'+type.color+'">'+type.label+'</span><span style="font-size:10px;color:#718096">'+timeStr+' · '+timeLabel+'</span></div><div style="font-size:12px;line-height:1.6;color:#2d3748;white-space:pre-wrap;max-height:80px;overflow:hidden">'+esc(r.content.substring(0,150))+(r.content.length>150?'...':'')+'</div>'+(r.nextFollowup?'<div style="margin-top:4px;font-size:10px;color:#dd6b20">📅 下次：'+esc(r.nextFollowup)+'</div>':'')+'<div style="margin-top:6px;text-align:right"><button class="btn btn-outline btn-sm" style="font-size:10px;padding:2px 6px" onclick="if(confirm(\'确定删除？\')){deleteCommunication(\'"+r.id+"\');openCustomerDetail(\'"+cid+"\');}">删除</button></div></div></div>';
           }).join('') + (comms.length>10?'<div style="text-align:center;padding:8px;color:#718096;font-size:12px">还有 '+(comms.length-10)+' 条记录，共 '+comms.length+' 条</div>':'');
         })()}
+      </div>
+
+      <!-- V75.3 完整客户跟进时间线 -->
+      <div class="card card-pad mb16" style="border-left:4px solid #c9a961;background:linear-gradient(135deg,#fdfbf7,#fff)">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📊 完整跟进时间线（所有活动）</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span class="badge" style="background:#3182ce;color:#fff;font-size:10px">✉️ 开发信</span>
+            <span class="badge" style="background:#805ad5;color:#fff;font-size:10px">💰 报价</span>
+            <span class="badge" style="background:#dd6b20;color:#fff;font-size:10px">📦 样品</span>
+            <span class="badge" style="background:#38a169;color:#fff;font-size:10px">📋 订单</span>
+            <span class="badge" style="background:#c9a961;color:#fff;font-size:10px">🎉 创建</span>
+          </div>
+        </div>
+        <div style="max-height:400px;overflow-y:auto;padding-right:8px">
+          ${renderCustomerTimeline(cid)}
+        </div>
       </div>
 
       <div class="card card-pad mb16">
@@ -8656,14 +8786,15 @@ const AGENTS=[
   {emoji:'📡',name:'近期信号Agent',role:'捕捉采购信号和动态',status:'idle'},
   {emoji:'✉️',name:'开发信Agent',role:'个性化开发信撰写',status:'idle'},
   {emoji:'💬',name:'社媒运营Agent',role:'社媒内容和互动',status:'idle'},
-  {emoji:'✍️',name:'内容创作Agent',role:'博客和SEO内容',status:'idle'}
+  {emoji:'✍️',name:'内容创作Agent',role:'博客和SEO内容',status:'idle'},
+  {emoji:'📚',name:'知识库专家Agent',role:'深度分析知识库并推荐应用策略',status:'idle'}
 ];
 let agentTab='team';
 let flowStep=0,flowLogs=[],flowRunning=false;
 function viewAgents(root){
   if(agentTab==='flow') return viewAIFlow(root);
   root.innerHTML = `
-  <div class="page-head"><h2>🤖 AI Agent 团队</h2><p class="sub">AI CEO 调度，11个专业Agent协同获客</p></div>
+  <div class="page-head"><h2>🤖 AI Agent 团队</h2><p class="sub">AI CEO 调度，12个专业Agent协同获客</p></div>
   <div class="flex gap8 mb16">
     <button class="btn ${agentTab==='team'?'btn-gold':'btn-outline'}" onclick="agentTab='team';renderView()">👥 Agent团队</button>
     <button class="btn ${agentTab==='flow'?'btn-gold':'btn-outline'}" onclick="agentTab='flow';renderView()">⚡ 全流程自动化</button>
@@ -8846,7 +8977,8 @@ function runAgents(){
     '📡 近期信号Agent：3家客户近期有采购动态，与'+kb.categories[1]?.name+'品类相关',
     '✉️ 开发信Agent：生成12封个性化开发信，已注入公司'+kb.company.core_advantages.length+'大核心优势和'+kb.certifications.length+'张认证',
     '💬 社媒运营Agent：准备领英加好友附言，融入'+kb.company.brand+'品牌定位',
-    '✍️ 内容创作Agent：推荐2篇博客选题，基于知识库SEO关键词和热门产品'
+    '✍️ 内容创作Agent：推荐2篇博客选题，基于知识库SEO关键词和热门产品',
+    '📚 知识库专家Agent：深度分析知识库'+kb.product_count+'个产品/'+kb.categories.length+'大品类/'+kb.certifications.length+'张认证，推荐3个知识库应用策略：①客户开发信自动注入公司优势和认证 ②报价时优先推荐知识库热门产品 ③跟进SOP使用知识库开发信模板'
   ];
   msgs.forEach((m,i)=>{
     setTimeout(()=>{

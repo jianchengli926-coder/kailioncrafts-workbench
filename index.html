@@ -3930,7 +3930,102 @@ function viewDashboard(root){
           ⏰ 建议每天优先处理今日待跟进，超时客户需立即联系
         </div>
       </div>
-      <!-- V61 工作台使用统计 -->
+    </div>
+
+    <!-- V75.3 客户分布可视化图表 -->
+    <div class="grid-3 mb16">
+      <!-- 客户来源分布饼图 -->
+      <div class="card card-pad">
+        <div class="card-title">🎯 客户来源分布</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+          <div style="flex:0 0 120px">
+            ${(() => {
+              const sources = {};
+              S.customers.forEach(c=>{ sources[c.source||'未知'] = (sources[c.source||'未知']||0)+1; });
+              const entries = Object.entries(sources).sort((a,b)=>b[1]-a[1]);
+              const total = S.customers.length || 1;
+              const colors = ['#3182ce','#38a169','#dd6b20','#805ad5','#e53e3e','#319795'];
+              let offset = 0;
+              const r = 50, cx = 60, cy = 60;
+              let segments = '';
+              entries.forEach((e,i)=>{
+                const frac = e[1]/total;
+                const len = frac * 2 * Math.PI * r;
+                const color = colors[i % colors.length];
+                segments += '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="20" stroke-dasharray="'+len+' '+(2*Math.PI*r-len)+'" stroke-dashoffset="'+(-offset)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';
+                offset += len;
+              });
+              return '<svg width="120" height="120" viewBox="0 0 120 120">'+segments+'<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" font-size="16" font-weight="bold" fill="#2d3748">'+total+'</text><text x="'+cx+'" y="'+(cy+12)+'" text-anchor="middle" font-size="9" fill="#718096">客户</text></svg>';
+            })()}
+          </div>
+          <div style="flex:1;font-size:11px">
+            ${(() => {
+              const sources = {};
+              S.customers.forEach(c=>{ sources[c.source||'未知'] = (sources[c.source||'未知']||0)+1; });
+              const entries = Object.entries(sources).sort((a,b)=>b[1]-a[1]);
+              const total = S.customers.length || 1;
+              const colors = ['#3182ce','#38a169','#dd6b20','#805ad5','#e53e3e','#319795'];
+              return entries.slice(0,5).map((e,i)=>'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="width:8px;height:8px;background:'+colors[i%colors.length]+';border-radius:50%;display:inline-block"></span><span style="flex:1;color:#4a5568">'+e[0]+'</span><span style="font-weight:bold;color:#2d3748">'+e[1]+'</span><span style="color:#a0aec0;font-size:10px">'+Math.round(e[1]/total*100)+'%</span></div>').join('');
+            })()}
+          </div>
+        </div>
+      </div>
+
+      <!-- 客户国家分布条形图 -->
+      <div class="card card-pad">
+        <div class="card-title">🌍 客户国家分布 TOP8</div>
+        <div style="margin-top:12px">
+          ${(() => {
+            const countries = {};
+            S.customers.forEach(c=>{ countries[c.country||'未知'] = (countries[c.country||'未知']||0)+1; });
+            const entries = Object.entries(countries).sort((a,b)=>b[1]-a[1]).slice(0,8);
+            const max = Math.max(...entries.map(e=>e[1]), 1);
+            const colors = ['#3182ce','#2c5282','#2b6cb0','#4299e1','#63b3ed','#90cdf4','#bee3f8','#ebf8ff'];
+            return entries.map((e,i)=>'<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="color:#4a5568">'+e[0]+'</span><span style="font-weight:bold;color:#2d3748">'+e[1]+'</span></div><div style="background:#f0f4f8;border-radius:3px;height:10px;overflow:hidden"><div style="width:'+Math.round(e[1]/max*100)+'%;height:100%;background:'+colors[i%colors.length]+';border-radius:3px;transition:width .8s"></div></div></div>').join('');
+          })()}
+        </div>
+      </div>
+
+      <!-- 客户状态分布环形图 -->
+      <div class="card card-pad">
+        <div class="card-title">📊 客户状态分布</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+          <div style="flex:0 0 120px">
+            ${(() => {
+              const statuses = {};
+              S.customers.forEach(c=>{ statuses[c.status||'未知'] = (statuses[c.status||'未知']||0)+1; });
+              const entries = Object.entries(statuses).sort((a,b)=>b[1]-a[1]);
+              const total = S.customers.length || 1;
+              const colorMap = {'待跟进':'#dd6b20','跟进中':'#3182ce','已回复':'#38a169','已报价':'#805ad5','已成交':'#c9a961','已流失':'#a0aec0'};
+              let offset = 0;
+              const r = 50, cx = 60, cy = 60;
+              let segments = '';
+              entries.forEach((e,i)=>{
+                const frac = e[1]/total;
+                const len = frac * 2 * Math.PI * r;
+                const color = colorMap[e[0]] || '#a0aec0';
+                segments += '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="20" stroke-dasharray="'+len+' '+(2*Math.PI*r-len)+'" stroke-dashoffset="'+(-offset)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';
+                offset += len;
+              });
+              const activeCount = S.customers.filter(c=>c.status!=='已流失').length;
+              return '<svg width="120" height="120" viewBox="0 0 120 120">'+segments+'<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" font-size="16" font-weight="bold" fill="#2d3748">'+activeCount+'</text><text x="'+cx+'" y="'+(cy+12)+'" text-anchor="middle" font-size="9" fill="#718096">活跃客户</text></svg>';
+            })()}
+          </div>
+          <div style="flex:1;font-size:11px">
+            ${(() => {
+              const statuses = {};
+              S.customers.forEach(c=>{ statuses[c.status||'未知'] = (statuses[c.status||'未知']||0)+1; });
+              const entries = Object.entries(statuses).sort((a,b)=>b[1]-a[1]);
+              const total = S.customers.length || 1;
+              const colorMap = {'待跟进':'#dd6b20','跟进中':'#3182ce','已回复':'#38a169','已报价':'#805ad5','已成交':'#c9a961','已流失':'#a0aec0'};
+              return entries.map((e,i)=>'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="width:8px;height:8px;background:'+(colorMap[e[0]]||'#a0aec0')+';border-radius:50%;display:inline-block"></span><span style="flex:1;color:#4a5568">'+e[0]+'</span><span style="font-weight:bold;color:#2d3748">'+e[1]+'</span><span style="color:#a0aec0;font-size:10px">'+Math.round(e[1]/total*100)+'%</span></div>').join('');
+            })()}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- V61 工作台使用统计 -->
       <div class="card card-pad" style="border-left:4px solid #c9a961">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
           <span>📊 工作台使用统计</span>

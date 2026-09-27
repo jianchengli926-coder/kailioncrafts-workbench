@@ -3685,6 +3685,23 @@ function viewDashboard(root){
       </div>
     </div>
 
+    <!-- V75.3 知识库快速入口 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fdfbf7,#f9f6f0);border-left:4px solid #c9a961">
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="font-size:32px">📊</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:14px;color:#8b6914">外贸客户开发知识库</div>
+          <div style="font-size:12px;color:#718096;margin-top:2px">
+            ${PROSPECT_KB.categories.length}大品类 · ${PROSPECT_KB.categories.reduce((s,c)=>s+c.count,0)}+SKU · ${PROSPECT_KB.markets.length}大目标市场 · ${PROSPECT_KB.personas.length}类客户画像 · ${PROSPECT_KB.certifications.length}张认证证书 · ${PROSPECT_KB.email_templates.length}套开发信模板
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-gold btn-sm" style="font-size:12px" onclick="prospectKB=true;prospectKBTab='company';go('knowledge')">📚 查看知识库</button>
+          <button class="btn btn-outline btn-sm" style="font-size:12px;background:#fff" onclick="go('customers')">🎯 智能匹配客户</button>
+        </div>
+      </div>
+    </div>
+
     <!-- V30.0 开发漏斗可视化 -->
     <div class="card card-pad mb16">
       <div class="card-title">🔄 开发漏斗 DEVELOPMENT PIPELINE</div>
@@ -7464,7 +7481,7 @@ function seoKw(){
 function seoContent(){
   return `<div class="card card-pad mb16">
     <div class="card-title">📝 内容营销（${S.contents.length}篇）
-      <button class="btn btn-gold btn-sm" onclick="toast('🤖 AI生成文章中...')">🤖 AI生成文章</button></div>
+      <button class="btn btn-gold btn-sm" onclick="openSEOArticleGenerator()">🤖 AI生成文章</button></div>
     <table class="tbl"><thead><tr><th>标题</th><th>类型</th><th>状态</th><th>发布日期</th><th>字数</th><th>质量分</th></tr></thead>
     <tbody>${S.contents.map(c=>`<tr>
       <td>${esc(c.title)}</td><td class="text-sm">${c.type}</td>
@@ -7503,6 +7520,133 @@ function seoLink(){
     <tbody>${S.backlinks.map(b=>`<tr><td class="mono">${esc(b.site)}</td><td class="text-sm">${b.type}</td>
       <td><b>${b.da}</b></td><td><span class="badge ${stColor[b.status]}">${b.status}</span></td></tr>`).join('')}</tbody></table></div>`;
 }
+
+
+/* V75.3 基于知识库生成SEO文章 */
+function openSEOArticleGenerator(){
+  const kb = PROSPECT_KB;
+  openModal(`
+    <div class="modal-head"><h3>📝 基于知识库生成SEO文章</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="card card-pad mb12" style="background:#f0f4f8;border:none">
+        <div class="text-xs" style="line-height:1.8">
+          <b>知识库已注入：</b>${kb.company.brand} · ${kb.categories.length}大品类 · ${kb.certifications.length}张认证 · ${kb.markets.length}大市场
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="text-xs text-muted">文章类型</label>
+          <select id="seoArticleType" class="form-control">
+            <option value="product">产品介绍文</option>
+            <option value="guide">购买指南/How-to</option>
+            <option value="comparison">对比评测文</option>
+            <option value="industry">行业资讯文</option>
+            <option value="company">公司故事文</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-muted">目标品类</label>
+          <select id="seoArticleCat" class="form-control">
+            ${kb.categories.map(c=>'<option value="'+c.name+'">'+c.name+' ('+c.count+'SKU)</option>').join('')}
+          </select>
+        </div>
+      </div>
+      <div class="mt12">
+        <label class="text-xs text-muted">目标关键词</label>
+        <input id="seoArticleKeyword" class="form-control" placeholder="例如：best kitchen scissors 2026" value="best kitchen scissors">
+      </div>
+      <div class="mt12">
+        <label class="text-xs text-muted">目标市场</label>
+        <select id="seoArticleMarket" class="form-control">
+          ${kb.markets.map(m=>'<option value="'+m.name+'">'+m.name+'</option>').join('')}
+        </select>
+      </div>
+      <div id="seoArticleResult" class="mt12" style="display:none">
+        <div class="text-xs text-muted mb4"><b>AI生成结果：</b></div>
+        <div id="seoArticleOutput" style="background:#f8fafc;padding:12px;border-radius:6px;font-size:12px;white-space:pre-wrap;max-height:350px;overflow-y:auto;border:1px solid #e2e8f0"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button id="seoArticleGenBtn" class="btn btn-gold" onclick="doGenerateSEOArticle()">🚀 生成文章</button>
+    </div>`);
+}
+
+async function doGenerateSEOArticle(){
+  const kb = PROSPECT_KB;
+  const type = document.getElementById('seoArticleType').value;
+  const cat = document.getElementById('seoArticleCat').value;
+  const keyword = document.getElementById('seoArticleKeyword').value.trim();
+  const market = document.getElementById('seoArticleMarket').value;
+  if(!keyword){ toast('请输入目标关键词'); return; }
+  
+  const btn = document.getElementById('seoArticleGenBtn');
+  btn.disabled = true; btn.textContent = '⏳ 生成中...';
+  
+  const catInfo = kb.categories.find(c=>c.name===cat) || kb.categories[0];
+  const marketInfo = kb.markets.find(m=>m.name===market) || kb.markets[0];
+  
+  const typeLabels = {product:'产品介绍',guide:'购买指南',comparison:'对比评测',industry:'行业资讯',company:'公司故事'};
+  
+  const prompt = `你是${kb.company.brand}的SEO内容营销专家。请为以下关键词生成一篇英文SEO优化文章。
+
+【关键词】${keyword}
+【文章类型】${typeLabels[type]||type}
+【目标品类】${cat}（${catInfo.sub_cats.join('、')}，${catInfo.count}SKU）
+【目标市场】${market}（主推：${marketInfo.key_products.join('、')}）
+
+【公司知识库】
+公司：${kb.company.name_cn}（${kb.company.brand}）
+Slogan：${kb.company.slogan_en}
+创始人：${kb.company.founder}
+地点：${kb.company.location}
+核心优势：${kb.company.core_advantages.join('；')}
+产品品类：${kb.categories.map(x=>x.name).join('、')}
+认证：${kb.certifications.map(x=>x.name).join('、')}
+出口国家：${kb.company.export_countries}
+成本优势：${kb.company.cost_advantage}
+经营哲学：${kb.company.philosophy}
+产业背景：${kb.industry.title}，产量${kb.industry.domestic_output_share}，出口${kb.industry.export_share}，${kb.industry.heritage}
+
+【SEO要求】
+1. 标题包含关键词，H1-H3层级清晰
+2. 开头100字内包含关键词并给出核心结论
+3. 正文800-1200词，自然融入公司优势和产品信息
+4. 包含FAQ部分（3-5个问答，匹配用户搜索意图）
+5. 结尾有明确的CTA（行动号召），引导用户联系我们
+6. 自然提及我们的认证和产业优势，不要生硬堆砌
+7. 元描述（Meta Description）150-160字符
+
+【输出格式】
+先写Meta Description，然后空一行写完整文章（包含标题和正文）。`;
+  
+  const r = await callAI(prompt, {purpose:'content', temperature:0.5});
+  btn.disabled = false; btn.textContent = '🚀 生成文章';
+  
+  if(r.error){ toast('生成失败: '+r.error); return; }
+  
+  document.getElementById('seoArticleResult').style.display = 'block';
+  document.getElementById('seoArticleOutput').textContent = r.content;
+  
+  // 保存到内容列表
+  if(!S.contents) S.contents = [];
+  const lines = r.content.split('\n');
+  let title = keyword;
+  for(const line of lines){
+    if(line.startsWith('#')||line.startsWith('Title:')){
+      title = line.replace(/^#+\s*/,'').replace(/^Title:\s*/i,'').trim();
+      break;
+    }
+  }
+  S.contents.unshift({
+    id:uid(), title:title.substring(0,80), type:typeLabels[type]||type,
+    status:'草稿', date:new Date().toISOString(), words:r.content.split(/\s+/).length,
+    score:75, content:r.content, keyword, category:cat
+  });
+  persist();
+  toast('✅ SEO文章已生成并保存到内容列表');
+}
+
 
 /* V5 业绩战报 */
 function viewReports(root){

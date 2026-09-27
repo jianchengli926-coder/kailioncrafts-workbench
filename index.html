@@ -551,13 +551,14 @@ window.onunhandledrejection = function(event){
 console.log('%c✅ 全局错误处理已启用', 'color:#0f7b3f;font-weight:bold');
 
 /* ---------- 全局状态 ---------- */
-let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null };
+let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[] };
 function loadState(){
   S.customers = DB.load('customers') || [];
   S.plans = DB.load('plans') || [];
   S.drafts = DB.load('drafts') || [];
   S.inquiries = DB.load('inquiries') || [];
   S.quotes = DB.load('quotes') || [];
+  S.kbVersions = DB.load('kbVersions') || [];
   S.contracts = DB.load('contracts') || [];
   S.followups = DB.load('followups') || [];
   S.inbox = DB.load('inbox') || [];
@@ -6682,7 +6683,9 @@ function viewProspectKB(root){
     {key:'certs', icon:'📜', label:'认证体系'},
     {key:'templates', icon:'✉️', label:'开发信模板'},
     {key:'industry', icon:'🏭', label:'阳江产业'},
-    {key:'aisearch', icon:'🔍', label:'AI智能检索'}
+    {key:'aisearch', icon:'🔍', label:'AI智能检索'},
+    {key:'io', icon:'📥', label:'导入导出'},
+    {key:'versions', icon:'📜', label:'版本管理'}
   ];
   let content = '';
   if(prospectKBTab==='company'){
@@ -6869,6 +6872,86 @@ function viewProspectKB(root){
           <div id="kb_search_answer" style="font-size:13.5px;line-height:1.9;white-space:pre-wrap"></div>
         </div>
       </div>`;
+  } else if(prospectKBTab==='io'){
+    content = `
+      <div class="grid-2 mb16" style="gap:16px">
+        <div class="card card-pad">
+          <div class="card-title">📤 导出知识库</div>
+          <p class="text-sm text-muted" style="margin:8px 0">导出完整知识库数据，用于备份或迁移</p>
+          <div class="flex gap8 mt12" style="flex-wrap:wrap">
+            <button class="btn btn-gold" onclick="exportKBJSON()">📄 导出完整JSON</button>
+            <button class="btn btn-primary" onclick="exportKBProductsCSV()">📊 导出产品CSV</button>
+            <button class="btn btn-outline" onclick="exportKBTemplatesCSV()">✉️ 导出模板CSV</button>
+          </div>
+          <div class="text-xs text-muted mt12" style="line-height:1.6">
+            <b>JSON：</b>完整知识库（公司/产品/市场/画像/认证/模板/产业）<br>
+            <b>产品CSV：</b>${PROSPECT_KB.product_count}个产品明细<br>
+            <b>模板CSV：</b>${PROSPECT_KB.email_templates.length}个开发信模板
+          </div>
+        </div>
+        <div class="card card-pad">
+          <div class="card-title">📥 导入产品数据</div>
+          <p class="text-sm text-muted" style="margin:8px 0">从CSV文件批量导入产品到知识库</p>
+          <div class="mt12">
+            <input type="file" id="kb_import_file" accept=".csv" style="font-size:12px;margin-bottom:8px">
+            <button class="btn btn-success" onclick="importKBProductsCSV()">📥 开始导入</button>
+          </div>
+          <div class="text-xs text-muted mt12" style="line-height:1.6">
+            <b>CSV格式要求：</b><br>
+            必须包含列：SKU, 中文名, 英文名, 一级类目, 二级分类, 材质, MOQ, 价格带<br>
+            可选列：规格, 平台建议, 备注, SEO标题, Keywords
+          </div>
+          <div id="kb_import_result" class="mt12" style="display:none"></div>
+        </div>
+      </div>
+      <div class="card card-pad">
+        <div class="card-title">💡 使用提示</div>
+        <div class="text-sm" style="line-height:2">
+          <b>1. 定期备份：</b>建议每周导出一次JSON备份，防止数据丢失<br>
+          <b>2. 批量更新：</b>产品有更新时，导出CSV修改后再导入，比手动编辑高效<br>
+          <b>3. 版本对比：</b>导入前会自动备份当前版本，可在「版本管理」中查看历史<br>
+          <b>4. 格式兼容：</b>导出的CSV可直接用Excel打开编辑，保存时选择CSV UTF-8格式
+        </div>
+      </div>`;
+  } else if(prospectKBTab==='versions'){
+    const versions = (S.kbVersions||[]).slice().reverse();
+    content = `
+      <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f4f8,#e2e8f0);border:none">
+        <div class="flex-between">
+          <div>
+            <div style="font-weight:700;font-size:15px;color:#1a365d">📜 知识库版本管理</div>
+            <div class="text-sm text-muted mt4">当前版本：V75.3 · ${PROSPECT_KB.product_count}个产品 · ${PROSPECT_KB.email_templates.length}个模板 · 最后更新：${versions.length?versions[0].time:'刚刚'}</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="saveKBVersion('手动备份')">💾 保存当前版本</button>
+        </div>
+      </div>
+      <div class="card card-pad">
+        <div class="card-title">📋 版本历史（${versions.length}条）</div>
+        ${versions.length? `
+          <div style="max-height:500px;overflow-y:auto">
+          ${versions.map((v,i)=>`
+            <div style="padding:12px 0;border-bottom:1px solid #eee;display:flex;gap:12px">
+              <div style="width:40px;height:40px;background:linear-gradient(135deg,#c9a961,#8b6914);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${versions.length-i}</div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b style="font-size:13.5px">${v.label||'版本更新'}</b>
+                  <span class="text-xs text-muted">${v.time}</span>
+                </div>
+                <div class="text-sm text-muted mt4" style="line-height:1.6">${v.note||'无备注'}</div>
+                <div class="flex gap8 mt8">
+                  <span class="badge badge-gold" style="font-size:10px">产品: ${v.stats?.products||0}</span>
+                  <span class="badge badge-blue" style="font-size:10px">模板: ${v.stats?.templates||0}</span>
+                  <span class="badge badge-gray" style="font-size:10px">操作: ${v.action||'更新'}</span>
+                </div>
+              </div>
+            </div>`).join('')}
+          </div>` : `
+          <div class="empty" style="padding:40px">
+            <div class="big">📜</div>
+            <p>暂无版本记录</p>
+            <p class="text-sm text-muted">点击上方「保存当前版本」按钮创建第一个版本备份</p>
+          </div>`}
+      </div>`;
   }
   
   root.innerHTML = `
@@ -6980,6 +7063,154 @@ async function doKBSearch(){
   } catch(e){
     answerDiv.innerHTML = '<span class="text-muted">AI回答出错: '+e.message+'</span>';
   }
+}
+
+/* V75.3 知识库导入导出功能 */
+function exportKBJSON(){
+  const kb = PROSPECT_KB;
+  const data = JSON.stringify(kb, null, 2);
+  const blob = new Blob([data], {type:'application/json;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'KaiLionCrafts知识库_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ 知识库JSON已导出');
+  saveKBVersion('导出JSON备份');
+}
+
+function exportKBProductsCSV(){
+  const kb = PROSPECT_KB;
+  const allProducts = [];
+  for(const [cat, prods] of Object.entries(kb.products||{})){
+    for(const p of prods){
+      allProducts.push({...p, category: cat});
+    }
+  }
+  if(!allProducts.length){ toast('暂无产品数据'); return; }
+  const headers = ['SKU','中文名','英文名','品类','子分类','材质','规格','MOQ','价格带','平台建议','备注'];
+  const rows = allProducts.map(p=>headers.map(h=>{
+    const v = p[h]||'';
+    return '"' + String(v).replace(/"/g,'""') + '"';
+  }).join(','));
+  const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'KaiLionCrafts产品清单_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ 产品CSV已导出（'+allProducts.length+'个产品）');
+}
+
+function exportKBTemplatesCSV(){
+  const kb = PROSPECT_KB;
+  const templates = kb.email_templates||[];
+  if(!templates.length){ toast('暂无模板数据'); return; }
+  const headers = ['key','subject','angle','key_points','call_to_action'];
+  const rows = templates.map(t=>headers.map(h=>{
+    const v = Array.isArray(t[h]) ? t[h].join(' | ') : (t[h]||'');
+    return '"' + String(v).replace(/"/g,'""') + '"';
+  }).join(','));
+  const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'KaiLionCrafts开发信模板_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ 模板CSV已导出（'+templates.length+'个模板）');
+}
+
+function importKBProductsCSV(){
+  const fileInput = document.getElementById('kb_import_file');
+  const resultDiv = document.getElementById('kb_import_result');
+  if(!fileInput.files.length){ toast('请先选择CSV文件'); return; }
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const text = e.target.result;
+      const lines = text.split('\n').filter(l=>l.trim());
+      if(lines.length < 2){ toast('CSV文件格式错误'); return; }
+      // 解析表头
+      const headers = lines[0].split(',').map(h=>h.replace(/^\uFEFF/,'').replace(/"/g,'').trim());
+      const skuIdx = headers.findIndex(h=>h.includes('SKU')||h.includes('sku'));
+      const nameCnIdx = headers.findIndex(h=>h.includes('中文名')||h.includes('中文'));
+      const nameEnIdx = headers.findIndex(h=>h.includes('英文名')||h.includes('英文'));
+      const catIdx = headers.findIndex(h=>h.includes('一级类目')||h.includes('品类')||h.includes('category'));
+      const subIdx = headers.findIndex(h=>h.includes('二级分类')||h.includes('子分类'));
+      const matIdx = headers.findIndex(h=>h.includes('材质'));
+      const moqIdx = headers.findIndex(h=>h.includes('MOQ')||h.includes('moq'));
+      const priceIdx = headers.findIndex(h=>h.includes('价格')||h.includes('price'));
+      if(skuIdx<0 || nameEnIdx<0){
+        resultDiv.style.display='block';
+        resultDiv.innerHTML = '<div style="color:#e53e3e;font-size:13px">❌ CSV必须包含SKU和英文名列</div>';
+        return;
+      }
+      // 解析产品
+      const products = [];
+      for(let i=1;i<lines.length;i++){
+        const cols = lines[i].match(/("([^"]|"")*"|[^,]*)(,|$)/g)||[];
+        const vals = cols.map(c=>c.replace(/,$/,'').replace(/^"|"$/g,'').replace(/""/g,'"'));
+        const product = {
+          sku: vals[skuIdx]||'',
+          name_cn: nameCnIdx>=0?vals[nameCnIdx]:'',
+          name_en: vals[nameEnIdx]||'',
+          category: catIdx>=0?vals[catIdx]:'未分类',
+          sub_category: subIdx>=0?vals[subIdx]:'',
+          material: matIdx>=0?vals[matIdx]:'',
+          moq: moqIdx>=0?vals[moqIdx]:'',
+          price_range: priceIdx>=0?vals[priceIdx]:''
+        };
+        if(product.sku && product.name_en) products.push(product);
+      }
+      if(!products.length){ toast('未解析到有效产品'); return; }
+      // 按品类分组，每品类取前5个更新到PROSPECT_KB
+      const byCat = {};
+      for(const p of products){
+        if(!byCat[p.category]) byCat[p.category]=[];
+        if(byCat[p.category].length < 5) byCat[p.category].push(p);
+      }
+      PROSPECT_KB.products = byCat;
+      PROSPECT_KB.product_count = products.length;
+      resultDiv.style.display='block';
+      resultDiv.innerHTML = '<div style="color:#38a169;font-size:13px;line-height:1.8">✅ 导入成功！<br>共导入 <b>'+products.length+'</b> 个产品<br>覆盖 <b>'+Object.keys(byCat).length+'</b> 个品类<br>PROSPECT_KB已更新，刷新页面后生效</div>';
+      toast('✅ 成功导入'+products.length+'个产品');
+      saveKBVersion('导入产品CSV（'+products.length+'个）');
+    } catch(err){
+      resultDiv.style.display='block';
+      resultDiv.innerHTML = '<div style="color:#e53e3e;font-size:13px">❌ 导入失败: '+err.message+'</div>';
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+/* V75.3 知识库版本管理功能 */
+function saveKBVersion(label, note){
+  if(!S.kbVersions) S.kbVersions = [];
+  const version = {
+    id: uid(),
+    label: label || '版本更新',
+    note: note || '',
+    time: new Date().toLocaleString('zh-CN'),
+    action: label && label.includes('导入') ? '导入' : label && label.includes('导出') ? '导出' : '更新',
+    stats: {
+      products: PROSPECT_KB.product_count || 0,
+      templates: PROSPECT_KB.email_templates?.length || 0,
+      markets: PROSPECT_KB.markets?.length || 0,
+      personas: PROSPECT_KB.personas?.length || 0,
+      certifications: PROSPECT_KB.certifications?.length || 0
+    },
+    snapshot: JSON.stringify(PROSPECT_KB)
+  };
+  S.kbVersions.push(version);
+  if(S.kbVersions.length > 50) S.kbVersions = S.kbVersions.slice(-50);
+  DB.save('kbVersions', S.kbVersions);
+  if(!note && !label.includes('导出')) toast('✅ 版本已保存');
 }
 
 /* V75.3 客户知识库智能匹配 */

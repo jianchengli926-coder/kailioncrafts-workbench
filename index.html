@@ -2024,8 +2024,20 @@ async function generateReplySuggestion(cid){
     return `[${date} ${type}] ${r.content.substring(0,200)}`;
   }).join('\n');
   
-  const prompt = `你是一位资深外贸业务员助手。请根据以下客户沟通历史，给出下一步跟进的回复建议。
-
+  // V75.3 注入知识库上下文
+  const kb = PROSPECT_KB;
+  const kbMatch = getKBMatchForCustomer(c);
+  const kbContext = `
+【我们的公司】${kb.company.name}（${kb.company.brand}）
+【核心优势】${kb.company.core_advantages.join('；')}
+【产品品类】${kb.categories.map(x=>x.name).join('、')}
+【认证】${kb.certifications.map(x=>x.name).join('、')}
+【匹配客户画像】${kbMatch.persona.name}（痛点：${kbMatch.persona.pain_points.join('、')}）
+【匹配目标市场】${kbMatch.market.name}（主推：${kbMatch.market.key_products.join('、')}）
+【经营哲学】${kb.company.philosophy}
+  `;
+  const prompt = `你是${kb.company.brand}的资深外贸业务员助手。请根据以下客户沟通历史，给出下一步跟进的回复建议。
+${kbContext}
 客户公司：${c.company}
 客户国家：${c.country}
 客户产品：${c.products}
@@ -2038,8 +2050,9 @@ ${historyText}
 请给出：
 1. 客户当前意向分析（1-2句话）
 2. 下一步最佳跟进方式（邮件/WhatsApp/电话）
-3. 具体的回复话术建议（50-80词，英文）
+3. 具体的回复话术建议（50-80词，英文，自然融入我们的公司优势和匹配卖点）
 4. 跟进时机建议
+5. 可以推荐的产品品类（基于匹配市场）
 
 请用中文回复分析，英文回复话术。`;
 
@@ -6778,6 +6791,7 @@ function renderKBMatchCard(cid){
     + '<button class="btn btn-outline btn-sm" style="font-size:11px" onclick="prospectKB=true;prospectKBTab=\'templates\';closeDrawer();go(\'knowledge\')">查看全部</button><button class=\"btn btn-primary btn-sm\" style=\"font-size:11px\" onclick=\"generateEmailWithKB(cid)\">🤖 AI生成开发信</button></div></div>'
     + '<div style="background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;margin-top:10px">'
     + '<div class="text-xs" style="color:#805ad5;font-weight:700;margin-bottom:6px">💎 公司核心卖点（开发信必提）</div>'
+    + '<div class="flex gap8 mt8" style="flex-wrap:wrap"><button class="btn btn-sm" style="font-size:11px;background:linear-gradient(135deg,#805ad5,#6b46c1);color:#fff" onclick="generateDevStrategyWithKB(\'' + cid + '\')">🎯 生成开发策略</button></div>'
     + '<div style="font-size:12px;line-height:1.9;color:#555">' + PROSPECT_KB.company.core_advantages.slice(0,4).map(function(a,i){return '<span style="display:inline-block;margin-right:8px">'+(i+1)+'. '+a+'</span>'}).join('') + '</div></div></div>';
 }
 
@@ -6865,13 +6879,13 @@ async function doGenerateEmailWithKB(cid){
 模板卖点：${match.template.key_points.join('、')}
 
 【公司知识库】
-公司：${kb.company.name}（${kb.company.brand}）
-定位：${kb.company.positioning}
+公司：${kb.company.name_cn}（${kb.company.brand}）
+定位：${kb.company.slogan_en}
 核心优势：${kb.company.core_advantages.join('；')}
 产品品类：${kb.categories.map(x=>x.name+'('+x.sku_count+'SKU)').join('、')}
 认证：${kb.certifications.map(x=>x.name).join('、')}
 经营哲学：${kb.company.philosophy}
-产业背景：${kb.industry.city}是中国刀剪之都，产量占全国${kb.industry.national_output_share}，出口占全国${kb.industry.export_share}
+产业背景：${kb.industry.title}，产量${kb.industry.domestic_output_share}，出口${kb.industry.export_share}
 
 ${extra?'【额外要求】'+extra:''}
 
@@ -6909,6 +6923,100 @@ ${extra?'【额外要求】'+extra:''}
   });
   persist();
   toast('✅ 开发信已生成并保存到草稿箱');
+}
+
+
+
+/* V75.3 基于知识库生成客户开发策略 */
+async function generateDevStrategyWithKB(cid){
+  const c = S.customers.find(x=>x.id===cid); if(!c){toast('客户不存在');return;}
+  const match = getKBMatchForCustomer(c);
+  const kb = PROSPECT_KB;
+  
+  openModal(`
+    <div class="modal-head"><h3>🎯 基于知识库生成开发策略</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div class="card card-pad mb12" style="background:#faf5ff;border:1px solid #e9d8fd">
+        <div class="text-xs" style="line-height:1.8">
+          <b>客户：</b>${esc(c.company)} (${esc(c.country)})<br>
+          <b>匹配画像：</b><span style="color:#805ad5">${match.persona.name}</span><br>
+          <b>匹配市场：</b><span style="color:#3182ce">${match.market.name}</span><br>
+          <b>画像痛点：</b>${match.persona.pain_points.join('、')}
+        </div>
+      </div>
+      <div id="devStrategyResult" style="display:none">
+        <div class="text-xs text-muted mb4"><b>AI生成的开发策略：</b></div>
+        <div id="devStrategyOutput" style="background:#f8fafc;padding:12px;border-radius:6px;font-size:12px;white-space:pre-wrap;max-height:400px;overflow-y:auto;border:1px solid #e2e8f0"></div>
+      </div>
+      <div id="devStrategyLoading" class="text-center py16" style="color:#805ad5">
+        <div style="font-size:24px;margin-bottom:8px">🤖</div>
+        <div class="text-sm">AI正在基于知识库深度分析客户开发策略...</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+      <button id="devStrategyCopyBtn" class="btn btn-gold" style="display:none" onclick="copyText(window._lastDevStrategy);toast('已复制到剪贴板')">📋 复制策略</button>
+    </div>`);
+  
+  const prompt = `你是${kb.company.brand}的外贸开发策略专家。请为以下客户制定一份详细的客户开发策略。
+
+【客户信息】
+公司：${c.company}
+国家：${c.country}
+类型：${c.customerType||'—'}
+主营：${c.mainProducts||'—'}
+评分：${c.scores?.total||0}分（${c.scores?.grade||'C'}级）
+状态：${c.status||'—'}
+
+【知识库匹配结果】
+客户画像：${match.persona.name}
+画像痛点：${match.persona.pain_points.join('、')}
+切入角度：${match.persona.email_angle}
+目标市场：${match.market.name}
+市场主推：${match.market.key_products.join('、')}
+营销角度：${match.market.marketing_angle}
+
+【公司知识库】
+公司：${kb.company.name_cn}（${kb.company.brand}）
+定位：${kb.company.slogan_en}
+核心优势：${kb.company.core_advantages.join('；')}
+产品品类：${kb.categories.map(x=>x.name+'('+x.sku_count+'SKU)').join('、')}
+认证：${kb.certifications.map(x=>x.name).join('、')}
+合作工厂：${kb.company.factories}大家族工厂（股权模式）
+经营哲学：${kb.company.philosophy}
+产业背景：${kb.industry.title}，产量${kb.industry.domestic_output_share}，出口${kb.industry.export_share}
+
+【请输出以下内容】
+1. 客户价值评估（高/中/低，及理由）
+2. 推荐切入产品（1-3个品类，说明理由）
+3. 核心卖点提炼（针对该客户痛点的3个卖点）
+4. 开发信主题建议（2-3个备选）
+5. 跟进节奏建议（第1/3/7/14天分别做什么）
+6. 报价策略建议（MOQ/价格区间/付款方式）
+7. 样品策略建议（是否寄样/寄什么/何时寄）
+8. 风险提示与应对
+
+请用中文回复，结构清晰，可直接执行。`;
+  
+  try {
+    const r = await callAI(prompt, {purpose:'strategy', temperature:0.4});
+    if(r.error){ toast('生成失败: '+r.error); closeModal(); return; }
+    
+    window._lastDevStrategy = r.content;
+    document.getElementById('devStrategyLoading').style.display = 'none';
+    document.getElementById('devStrategyResult').style.display = 'block';
+    document.getElementById('devStrategyOutput').textContent = r.content;
+    document.getElementById('devStrategyCopyBtn').style.display = 'inline-block';
+    
+    // 保存到客户备注
+    if(!c.notes) c.notes = '';
+    c.notes += '\n\n【AI开发策略 ' + new Date().toLocaleDateString() + '】\n' + r.content.substring(0,500) + '...';
+    persist();
+    toast('✅ 开发策略已生成并保存到客户备注');
+  } catch(e) {
+    toast('生成失败: ' + (e.message||e));
+    closeModal();
+  }
 }
 
 
@@ -10187,7 +10295,7 @@ async function doAiGenerateTemplate(){
   // V75.3 注入知识库上下文
   const kb = PROSPECT_KB;
   const kbContext = `
-【公司背景】${kb.company.name}（${kb.company.brand}），${kb.company.founded_year}年成立，${kb.company.location}
+【公司背景】${kb.company.name}（${kb.company.brand}），${kb.company.location}，${kb.company.factories}大家族工厂
 【核心优势】${kb.company.core_advantages.join('；')}
 【产品品类】${kb.categories.map(c=>c.name+'('+c.sku_count+'SKU)').join('、')}
 【认证体系】${kb.certifications.map(c=>c.name).join('、')}
@@ -10632,7 +10740,19 @@ const PROFILE_PROMPT = `你是资深外贸客户背调专家。请根据以下�
 async function generateCustomerProfile(customerInfo, depth){
   if(!customerInfo || !customerInfo.trim()) return {content:null, error:'请输入客户信息'};
   const depthCfg = PROFILE_DEPTHS.find(d=>d.id===depth) || PROFILE_DEPTHS[1];
-  let prompt = PROFILE_PROMPT.replace('{customerInfo}', customerInfo);
+  // V75.3 注入知识库上下文
+  const kb = PROSPECT_KB;
+  const kbSuffix = `\n\n【我们的公司背景】
+公司：${kb.company.name_cn}（${kb.company.brand}）
+定位：${kb.company.slogan_en}
+核心优势：${kb.company.core_advantages.join('；')}
+产品品类：${kb.categories.map(x=>x.name+'('+x.sku_count+'SKU)').join('、')}
+目标市场：${kb.markets.map(x=>x.name).join('、')}
+认证：${kb.certifications.map(x=>x.name).join('、')}
+产业背景：${kb.industry.city}是中国刀剪之都，产量占全国${kb.industry.national_output_share}
+
+请在分析客户时，结合我们的公司背景，评估该客户与我们的匹配度，并在"开发建议"部分推荐适合的产品品类和切入角度。`;
+  let prompt = PROFILE_PROMPT.replace('{customerInfo}', customerInfo) + kbSuffix;
   if(depth === 'quick'){
     prompt += '\n\n【注意】这是快速分析，请只输出前3个部分，每个部分简洁明了，总字数控制在500字以内。';
   } else if(depth === 'standard'){

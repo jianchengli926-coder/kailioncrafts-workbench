@@ -6509,8 +6509,214 @@ async function aiAsk(){
  * ============================================================ */
 let knowCat='全部', knowQ='';
 let knowBrain=false;
+let prospectKB=false;
+
+/* V75.3 外贸客户开发知识库 - 集成数据 */
+const PROSPECT_KB = {
+  company: {"brand": "KaiLionCrafts · 锴利匠心", "name_cn": "阳江市锴利国际贸易有限公司", "name_en": "Yangjiang Kaili International Trading Co., Ltd.", "slogan_en": "Forged in Yangjiang. Trusted Worldwide.", "founder": "Leo Li (李建成)", "location": "广东阳江阳东区", "website": "www.kailioncrafts.com", "email": "info@kailioncrafts.com", "phone": "+86 132 5069 1884", "factories": 4, "export_countries": "130+", "cost_advantage": "低于市场均价20%+", "certifications": ["CE", "FDA", "LFGB", "RoHS"], "core_advantages": ["工厂直供价 - 无中间商加价", "优先生产排期 - 股权所有者话语权", "创始人亲自质控 - 从原料到包装", "全程透明化 - 实时生产照片视频", "铁腕IP保护 - 严格NDA和反跳单协议", "一站式采购 - 4大工厂统一品牌", "免费营销视频 - 专业4K拍摄制作", "线上工厂参观 - 创始人亲自直播带看"], "philosophy": "Trust First · Value Second · Price Last（信任为先·价值为本·价格为末）", "mission": "让阳江好产品被世界看见，让工厂走出来，让人才留下来"},
+  categories: [{"name": "厨房用品", "count": 59, "sub_cats": ["砧板", "削皮器", "压蒜器", "厨房夹", "刮刀"]}, {"name": "剪刀", "count": 52, "sub_cats": ["厨房剪", "多功能剪"]}, {"name": "厨刀", "count": 50, "sub_cats": ["主厨刀", "厨刀"]}, {"name": "户外刀", "count": 29, "sub_cats": ["固定刃", "户外刀", "折叠刀"]}, {"name": "多功能剪刀", "count": 5, "sub_cats": ["家用", "厨房剪", "重型剪", "钛系剪", "多功能剪"]}, {"name": "厨房刀", "count": 5, "sub_cats": ["削片刀", "厨刀", "切片刀", "削皮刀", "厨刀套装"]}],
+  markets: [{"name": "北美市场 (美国/加拿大)", "key_products": ["厨房剪刀", "多功能工具", "户外刀", "砧板"], "marketing_angle": "家族工厂直供 + 免费营销素材 + 亚马逊爆款", "key_buyers": ["亚马逊卖家", "独立站DTC品牌", "连锁零售商", "户外用品经销商"]}, {"name": "欧洲市场 (欧盟/英国)", "key_products": ["厨刀套装", "厨房配件", "高端礼品剪"], "marketing_angle": "阳江1400年锻造传承 + 欧洲标准认证 + 可持续材料", "key_buyers": ["品牌商", "高端百货", "专业厨具店", "礼品公司"]}, {"name": "东南亚市场", "key_products": ["基础厨刀", "日常剪刀", "厨房小工具"], "marketing_angle": "高性价比 + 快速交货 + 小批量起订", "key_buyers": ["批发商", "零售商", "电商卖家"]}, {"name": "中东市场", "key_products": ["高端厨刀", "礼品套装", "户外刀"], "marketing_angle": "高端定制 + 礼品包装 + 大马士革钢", "key_buyers": ["高端礼品商", "酒店采购", "私人定制"]}, {"name": "大洋洲市场 (澳洲/新西兰)", "key_products": ["户外刀", "BBQ工具", "厨房剪刀"], "marketing_angle": "户外生活方式 + 耐用品质 + 澳洲本地仓发货", "key_buyers": ["户外用品店", "BBQ品牌", "电商卖家"]}],
+  personas: [{"name": "亚马逊卖家", "pain_points": ["需要差异化产品", "需要营销图片视频", "需要稳定供应链", "需要合规认证"], "what_we_offer": ["免费4K产品图和视频", "小批量起订", "FDA/LFGB认证齐全", "独家产品定制"], "email_angle": "帮您打造亚马逊爆款 - 免费提供listing图片视频"}, {"name": "独立站DTC品牌", "pain_points": ["需要品牌故事", "需要独家产品", "需要快速打样", "需要内容素材"], "what_we_offer": ["ODM独家定制", "品牌故事支持", "7天快速打样", "工厂视频素材"], "email_angle": "为您的品牌打造独家产品线 - 从设计到出货一站式"}, {"name": "批发商/经销商", "pain_points": ["需要价格优势", "需要稳定供货", "需要快速交货", "需要品类齐全"], "what_we_offer": ["工厂直供价低20%+", "4大工厂一站式采购", "优先排期", "130+国家出口经验"], "email_angle": "阳江工厂直供 - 比您当前供应商便宜20%"}, {"name": "连锁零售商", "pain_points": ["需要大规模产能", "需要严格质控", "需要合规审计", "需要长期稳定"], "what_we_offer": ["4家族工厂产能保障", "创始人亲自质控", "全套认证", "透明供应链"], "email_angle": "通过零售连锁审计的阳江工厂 - 邀请线上验厂"}],
+  certifications: [{"category": "food_contact", "name": "SGS LFGB", "desc": "德国食品级接触材料测试", "status": "PASS"}, {"category": "food_contact", "name": "US FDA 21 CFR 109.6", "desc": "美国FDA可萃取铅测试", "status": "PASS (All 6 replicates <0.005 µg/mL)"}, {"category": "food_contact", "name": "SGS Sensorial DIN 10955", "desc": "感官测试（最新标准）", "status": "PASS"}, {"category": "food_contact", "name": "21 Metals Heavy Metals", "desc": "21种可萃取重金属测试", "status": "All ND, Pass"}, {"category": "safety", "name": "TÜV SÜD Test Report", "desc": "德国TÜV SÜD产品安全测试", "status": "Issued"}, {"category": "safety", "name": "CE Marking", "desc": "欧盟CE认证", "status": "Self-Certified"}, {"category": "safety", "name": "EU RoHS", "desc": "欧盟RoHS有害物质限制", "status": "PASS (9 IEC 62321 standards)"}, {"category": "social_ethical", "name": "amfori BSCI Social Audit", "desc": "商业社会标准认证（社会责任审核）", "status": "C Rating (Improvement Needed)"}, {"category": "social_ethical", "name": "Workforce Metrics", "desc": "98名员工，男女比例50/50，工资超生活工资33%", "status": "Positive Findings"}, {"category": "sustainability", "name": "FSC Chain of Custody", "desc": "森林管理委员会产销监管链认证（可持续木材采购）", "status": "Valid"}, {"category": "material_provenance", "name": "Outokumpu Stainless Steel Mill Cert", "desc": "德国Outokumpu不锈钢钢厂材质证明 EN 10204-3.1", "status": "Valid"}],
+  email_templates: [{"key": "amazon_seller", "subject": "Free 4K Product Videos for Your Amazon Listing - Yangjiang Knife Factory", "angle": "免费提供亚马逊listing图片视频", "key_points": ["免费4K产品图和视频", "小批量起订", "FDA/LFGB认证", "独家产品定制"], "call_to_action": "Would you like me to send our catalog and free sample videos?"}, {"key": "dtc_brand", "subject": "Exclusive Product Line for Your Brand - ODM from Yangjiang Factory", "angle": "为品牌打造独家产品线", "key_points": ["ODM独家定制", "7天快速打样", "品牌故事支持", "工厂视频素材"], "call_to_action": "Can we schedule a 15-min call to discuss your product roadmap?"}, {"key": "wholesaler", "subject": "20% Lower Cost - Yangjiang Factory Direct Kitchen Knives & Scissors", "angle": "工厂直供比当前供应商便宜20%", "key_points": ["工厂直供价低20%+", "4大工厂一站式采购", "优先排期", "130+国家出口经验"], "call_to_action": "May I send our price list for your comparison?"}, {"key": "retail_chain", "subject": "Audit-Ready Yangjiang Factory - Invitation for Virtual Factory Tour", "angle": "通过零售连锁审计的工厂，邀请线上验厂", "key_points": ["4家族工厂产能保障", "创始人亲自质控", "全套认证", "透明供应链"], "call_to_action": "Would you be available for a 30-min virtual factory tour this week?"}, {"key": "southeast_asia", "subject": "High Quality Kitchen Tools at Factory Price - Yangjiang Direct Supply", "angle": "高性价比+快速交货+小批量起订", "key_points": ["高性价比", "快速交货", "小批量起订", "RCEP关税优势"], "call_to_action": "Can I send our best-selling catalog for your market?"}, {"key": "europe", "subject": "1400 Years of Yangjiang Forging Heritage - CE/LFGB Certified Cutlery", "angle": "阳江1400年锻造传承+欧洲标准认证", "key_points": ["CE/LFGB/RoHS/REACH认证", "可持续材料", "高端设计", "品牌故事"], "call_to_action": "Would you like to receive our premium catalog and certification documents?"}],
+  industry: {"title": "中国刀剪之都 - 阳江", "total_output": "全产业链年产值超550亿元", "market_entities": "市场经营主体超8500家", "employees": "从业人员约20万人", "domestic_output_share": "产量占全国75%", "export_share": "出口量占全国85%", "export_countries": "产品远销全球160多个国家和地区", "export_value_2025": "2025年全市刀剪类产品出口额达41.3亿元", "yangdong_cluster": "阳东区集聚700余家日用五金刀剪生产企业、102家规上企业，全国刀剪30强企业15家落户阳东", "heritage": "1400多年金属锻造历史"}
+};
+
+
+/* V75.3 外贸客户开发知识库面板 */
+let prospectKBTab='company';
+function viewProspectKB(root){
+  const kb = PROSPECT_KB;
+  const tabs = [
+    {key:'company', icon:'🏢', label:'公司概况'},
+    {key:'products', icon:'📦', label:'产品品类'},
+    {key:'markets', icon:'🌍', label:'目标市场'},
+    {key:'personas', icon:'👥', label:'客户画像'},
+    {key:'certs', icon:'📜', label:'认证体系'},
+    {key:'templates', icon:'✉️', label:'开发信模板'},
+    {key:'industry', icon:'🏭', label:'阳江产业'}
+  ];
+  let content = '';
+  if(prospectKBTab==='company'){
+    const c = kb.company;
+    content = `
+      <div class="grid-2 mb16">
+        <div class="card card-pad">
+          <div class="card-title">🏢 ${c.brand}</div>
+          <div style="line-height:2;font-size:13px">
+            <b>中文：</b>${c.name_cn}<br>
+            <b>英文：</b>${c.name_en}<br>
+            <b>标语：</b>${c.slogan_en}<br>
+            <b>创始人：</b>${c.founder}<br>
+            <b>地点：</b>${c.location}<br>
+            <b>官网：</b>${c.website}<br>
+            <b>邮箱：</b>${c.email}<br>
+            <b>电话：</b>${c.phone}
+          </div>
+        </div>
+        <div class="card card-pad">
+          <div class="card-title">📊 核心数据</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+            <div style="background:linear-gradient(135deg,#c9a96122,#c9a96111);padding:16px;border-radius:8px;text-align:center">
+              <div style="font-size:28px;font-weight:700;color:#c9a961">${c.factories}</div>
+              <div style="font-size:12px;color:#888">家族工厂</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#3182ce22,#3182ce11);padding:16px;border-radius:8px;text-align:center">
+              <div style="font-size:28px;font-weight:700;color:#3182ce">${c.export_countries}</div>
+              <div style="font-size:12px;color:#888">出口国家</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#38a16922,#38a16911);padding:16px;border-radius:8px;text-align:center">
+              <div style="font-size:24px;font-weight:700;color:#38a169">${c.cost_advantage}</div>
+              <div style="font-size:12px;color:#888">成本优势</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#805ad522,#805ad511);padding:16px;border-radius:8px;text-align:center">
+              <div style="font-size:24px;font-weight:700;color:#805ad5">${c.certifications.join(' · ')}</div>
+              <div style="font-size:12px;color:#888">国际认证</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card card-pad mb16">
+        <div class="card-title">💎 8大核心优势</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+          ${c.core_advantages.map((a,i)=>`<div style="padding:10px 14px;background:#f9f6f0;border-radius:6px;border-left:3px solid #c9a961;font-size:13px"><b style="color:#c9a961">${i+1}.</b> ${a}</div>`).join('')}
+        </div>
+      </div>
+      <div class="card card-pad">
+        <div class="card-title">🎯 品牌理念</div>
+        <div style="line-height:2;font-size:13px">
+          <b>经营哲学：</b>${c.philosophy}<br>
+          <b>品牌使命：</b>${c.mission}
+        </div>
+      </div>`;
+  } else if(prospectKBTab==='products'){
+    content = `<div class="grid-3 mb16">` + kb.categories.map(cat=>`
+      <div class="card card-pad">
+        <div class="card-title">${cat.name}</div>
+        <div style="font-size:32px;font-weight:700;color:#c9a961;margin:8px 0">${cat.count}<span style="font-size:14px;color:#888">个SKU</span></div>
+        <div style="font-size:12px;color:#666;line-height:1.8">
+          ${cat.sub_cats.map(s=>`<span style="display:inline-block;background:#f0ebe0;padding:2px 8px;border-radius:4px;margin:2px">${s}</span>`).join('')}
+        </div>
+      </div>`).join('') + `</div>
+      <div class="card card-pad">
+        <div class="card-title">📋 完整产品目录</div>
+        <div style="font-size:13px;color:#666;margin-top:8px">
+          共 ${kb.categories.reduce((s,c)=>s+c.count,0)} 个SKU，详细产品数据见 外贸客户开发知识库.json<br>
+          包含：SKU编码、中英文名称、材质、规格、MOQ、价格带、SEO标题、关键词等
+        </div>
+      </div>`;
+  } else if(prospectKBTab==='markets'){
+    content = `<div class="grid-2">` + kb.markets.map(m=>`
+      <div class="card card-pad">
+        <div class="card-title">🌍 ${m.name}</div>
+        <div style="margin-top:10px;font-size:13px;line-height:1.9">
+          <b>关键产品：</b>${m.key_products.join('、')}<br>
+          <b>营销角度：</b>${m.marketing_angle}<br>
+          <b>核心买家：</b>${m.key_buyers.join('、')}
+        </div>
+      </div>`).join('') + `</div>`;
+  } else if(prospectKBTab==='personas'){
+    content = `<div class="grid-2">` + kb.personas.map(p=>`
+      <div class="card card-pad">
+        <div class="card-title">👤 ${p.name}</div>
+        <div style="margin-top:10px;font-size:13px">
+          <div style="background:#fff5f5;padding:10px;border-radius:6px;margin-bottom:8px">
+            <b style="color:#e53e3e">痛点：</b><br>
+            ${p.pain_points.map(x=>`• ${x}`).join('<br>')}
+          </div>
+          <div style="background:#f0fff4;padding:10px;border-radius:6px;margin-bottom:8px">
+            <b style="color:#38a169">我们提供：</b><br>
+            ${p.what_we_offer.map(x=>`• ${x}`).join('<br>')}
+          </div>
+          <div style="background:#ebf8ff;padding:10px;border-radius:6px">
+            <b style="color:#3182ce">开发信切入：</b><br>${p.email_angle}
+          </div>
+        </div>
+      </div>`).join('') + `</div>`;
+  } else if(prospectKBTab==='certs'){
+    const cats = [...new Set(kb.certifications.map(c=>c.category))];
+    content = cats.map(cat=>{
+      const items = kb.certifications.filter(c=>c.category===cat);
+      const catNames = {food_contact:'🍽️ 食品接触认证', safety:'🛡️ 安全认证', social_ethical:'👥 社会责任认证', sustainability:'🌱 可持续发展认证', material_provenance:'🔩 材料溯源认证'};
+      return `<div class="card card-pad mb16">
+        <div class="card-title">${catNames[cat]||cat}</div>
+        <table class="tbl mt8"><thead><tr><th>证书名称</th><th>说明</th><th>状态</th></tr></thead><tbody>
+        ${items.map(c=>`<tr><td><b>${c.name}</b></td><td>${c.desc}</td><td><span style="color:#38a169">${c.status}</span></td></tr>`).join('')}
+        </tbody></table>
+      </div>`;
+    }).join('');
+  } else if(prospectKBTab==='templates'){
+    content = `<div class="grid-2">` + kb.email_templates.map(t=>`
+      <div class="card card-pad">
+        <div class="card-title">✉️ ${t.key}</div>
+        <div style="margin-top:10px;font-size:13px;line-height:1.8">
+          <b>主题：</b><span style="color:#c9a961">${t.subject}</span><br>
+          <b>切入角度：</b>${t.angle}<br>
+          <b>关键卖点：</b><br>
+          ${t.key_points.map(p=>`• ${p}`).join('<br>')}<br>
+          <b>行动号召：</b><span style="color:#3182ce">${t.call_to_action}</span>
+        </div>
+        <button class="btn btn-gold btn-sm mt12" onclick="copyEmailTemplateFromKB('${t.key}')">📋 复制模板</button>
+      </div>`).join('') + `</div>`;
+  } else if(prospectKBTab==='industry'){
+    const ind = kb.industry;
+    content = `<div class="card card-pad mb16">
+      <div class="card-title">🏭 ${ind.title}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px">
+        <div style="background:linear-gradient(135deg,#c9a96122,#c9a96111);padding:20px;border-radius:8px;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#c9a961">550亿+</div>
+          <div style="font-size:12px;color:#888">全产业链年产值</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#3182ce22,#3182ce11);padding:20px;border-radius:8px;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#3182ce">8500+</div>
+          <div style="font-size:12px;color:#888">市场经营主体</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#38a16922,#38a16911);padding:20px;border-radius:8px;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#38a169">20万</div>
+          <div style="font-size:12px;color:#888">从业人员</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#805ad522,#805ad511);padding:20px;border-radius:8px;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#805ad5">75%</div>
+          <div style="font-size:12px;color:#888">产量占全国</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#dd6b2022,#dd6b2011);padding:20px;border-radius:8px;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#dd6b20">85%</div>
+          <div style="font-size:12px;color:#888">出口量占全国</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#d53f8c22,#d53f8c11);padding:20px;border-radius:8px;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#d53f8c">160+</div>
+          <div style="font-size:12px;color:#888">出口国家地区</div>
+        </div>
+      </div>
+    </div>
+    <div class="card card-pad">
+      <div class="card-title">📈 更多产业数据</div>
+      <div style="line-height:2.2;font-size:13px">
+        <b>2025年出口额：</b>${ind.export_value_2025}<br>
+        <b>锻造历史：</b>${ind.heritage}<br>
+        <b>阳东产业集群：</b>${ind.yangdong_cluster}
+      </div>
+    </div>`;
+  }
+  
+  root.innerHTML = `
+    <div class="flex gap8 mb16 flex-wrap">
+      <button class="btn btn-outline" onclick="prospectKB=false;renderView()">← 返回知识库</button>
+      ${tabs.map(t=>`<button class="btn ${prospectKBTab===t.key?'btn-gold':'btn-outline'}" onclick="prospectKBTab='${t.key}';renderView()">${t.icon} ${t.label}</button>`).join('')}
+    </div>
+    ${content}`;
+}
+
+function copyEmailTemplateFromKB(key){
+  const t = PROSPECT_KB.email_templates.find(x=>x.key===key);
+  if(!t) return;
+  const text = `Subject: ${t.subject}\n\nKey Points:\n${t.key_points.map(p=>'- '+p).join('\n')}\n\nCall to Action: ${t.call_to_action}`;
+  navigator.clipboard.writeText(text).then(()=>toast('✅ 模板已复制到剪贴板')).catch(()=>toast('复制失败，请手动复制'));
+}
+
 function viewKnowledge(root){
   if(knowBrain) return viewKnowBrain(root);
+  if(prospectKB) return viewProspectKB(root);
   const cats=['全部',...new Set((S.knowledge||[]).map(k=>k.cat))];
   let list = S.knowledge||[];
   if(knowCat!=='全部') list=list.filter(k=>k.cat===knowCat);
@@ -6520,6 +6726,7 @@ function viewKnowledge(root){
       ${cats.map(c=>`<button class="btn ${knowCat===c?'btn-gold':'btn-outline'}" onclick="knowCat='${c}';renderView()">${c}</button>`).join('')}
       <input class="form-control" style="width:200px;margin-left:auto" placeholder="搜索知识库..." value="${esc(knowQ)}" oninput="knowQ=this.value;renderView()">
       <button class="btn btn-gold" onclick="knowBrain=true;renderView()">🧠 业务大脑</button>
+      <button class="btn" style="background:linear-gradient(135deg,#c9a961,#8b6914);color:#fff" onclick="prospectKB=true;renderView()">📊 外贸开发知识库</button>
       <button class="btn btn-primary" onclick="openKnowForm()">＋ 新增</button>
     </div>
     <div class="grid-12">

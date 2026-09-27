@@ -3479,7 +3479,42 @@ function pager(total, page, pageSize, onGo){
 /* ---------- 全局搜索 ---------- */
 function globalSearch(q){
   if(!q.trim()) return;
-  routeParams = {q:q.trim()}; currentView='customers'; go('customers',{q:q.trim()});
+  const query = q.trim();
+  // V75.3 同时搜索知识库
+  const kbResults = searchKBLocal(query);
+  if(kbResults.length > 0){
+    // 显示知识库搜索结果快捷入口
+    const topResults = kbResults.slice(0,3);
+    const resultHtml = topResults.map(r=>`
+      <div style="padding:8px;background:#fdfbf7;border-radius:6px;margin-bottom:6px;border-left:3px solid #c9a961">
+        <div style="font-size:11px;font-weight:bold;color:#8b6914">${r.type}</div>
+        <div style="font-size:12px;color:#333;margin-top:2px">${r.content.substring(0,80)}...</div>
+      </div>
+    `).join('');
+    openModal(`
+      <div class="modal-head"><h3>🔍 搜索结果</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+      <div class="modal-body">
+        <div class="mb12">
+          <div class="text-xs text-muted mb6" style="font-weight:bold">👥 客户搜索</div>
+          <div style="padding:12px;background:#f0f4f8;border-radius:6px;text-align:center">
+            <div style="font-size:14px">正在搜索客户：<b>${query}</b></div>
+            <button class="btn btn-primary btn-sm mt8" onclick="closeModal();routeParams={q:'${query}'};currentView='customers';go('customers',{q:'${query}'})">查看客户搜索结果 →</button>
+          </div>
+        </div>
+        <div>
+          <div class="text-xs text-muted mb6" style="font-weight:bold;display:flex;justify-content:space-between;align-items:center">
+            <span>📚 知识库搜索结果（${kbResults.length}条）</span>
+            <button class="btn btn-outline btn-sm" style="font-size:10px" onclick="closeModal();prospectKB=true;prospectKBTab='aisearch';go('knowledge');setTimeout(()=>{const el=document.getElementById('kb_search_input');if(el){el.value='${query}';doKBSearch();}},500)">AI深度检索 →</button>
+          </div>
+          ${resultHtml}
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+      </div>`);
+  } else {
+    routeParams = {q:query}; currentView='customers'; go('customers',{q:query});
+  }
 }
 
 /* ============================================================
@@ -5179,6 +5214,8 @@ function openCustomerDetail(cid){
           <button class="btn btn-sm" style="font-size:12px;background:#dd6b20;color:#fff" onclick="quickKBAction('${cid}','marketing')">✍️ 生成营销内容</button>
           <button class="btn btn-sm" style="font-size:12px;background:#805ad5;color:#fff" onclick="quickKBAction('${cid}','search')">🔍 AI检索客户相关</button>
           <button class="btn btn-sm" style="font-size:12px;background:#3182ce;color:#fff" onclick="quickKBAction('${cid}','profile')">👥 深度客户画像</button>
+          <button class="btn btn-sm" style="font-size:12px;background:#c9a961;color:#fff" onclick="quickKBAction('${cid}','seo')">📝 生成SEO文章</button>
+          <button class="btn btn-sm" style="font-size:12px;background:#e53e3e;color:#fff" onclick="quickKBAction('${cid}','expo')">🎪 展会资料包</button>
         </div>
       </div>
 <div class="card card-pad mb16">
@@ -5549,6 +5586,14 @@ function quickKBAction(cid, action){
     case 'profile':
       go('tools'); switchTool(3);
       setTimeout(()=>{ const el=document.getElementById('profileCustomerInfo'); if(el) el.value=customerInfo; toast('✅ 已填充客户信息到画像工具'); }, 300);
+      break;
+    case 'seo':
+      go('seo');
+      setTimeout(()=>{ openSEOArticleGenerator(); toast('✅ 已打开SEO文章生成器，基于客户产品生成'); }, 300);
+      break;
+    case 'expo':
+      go('expos');
+      toast('✅ 已打开展会管理，查看展会资料包');
       break;
   }
 }
@@ -8153,6 +8198,13 @@ function openSEOArticleGenerator(){
       <div class="mt12">
         <label class="text-xs text-muted">目标关键词</label>
         <input id="seoArticleKeyword" class="form-control" placeholder="例如：best kitchen scissors 2026" value="best kitchen scissors">
+        <!-- V75.3 知识库热门关键词推荐 -->
+        <div class="mt6" style="display:flex;gap:4px;flex-wrap:wrap">
+          <span class="text-xs text-muted" style="line-height:2">🔥 热门：</span>
+          ${['best kitchen scissors 2026','stainless steel kitchen shears','professional chef knife set','outdoor camping knife','wholesale kitchen tools','Yangjiang knife manufacturer'].map(k=>`
+            <span class="badge" style="cursor:pointer;font-size:10px;background:#f0f4f8;color:#4a5568;padding:2px 8px" onclick="document.getElementById('seoArticleKeyword').value='${k}'">${k}</span>
+          `).join('')}
+        </div>
       </div>
       <div class="mt12">
         <label class="text-xs text-muted">目标市场</label>

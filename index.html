@@ -10186,7 +10186,23 @@ function viewTools(root){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <!-- 左侧：产品信息 -->
       <div>
-        <div class="text-xs text-muted mb6" style="color:#805ad5;font-weight:bold">📦 产品信息</div>
+        <div class="text-xs text-muted mb6" style="color:#805ad5;font-weight:bold;display:flex;justify-content:space-between;align-items:center">
+          <span>📦 产品信息</span>
+          <button class="btn btn-outline btn-sm" style="font-size:10px;padding:2px 8px;background:#fff" onclick="showKBProductPicker()">📚 从知识库选</button>
+        </div>
+        <!-- 知识库产品选择器 -->
+        <div id="kbProductPicker" style="display:none;margin-bottom:8px;padding:8px;background:#faf5ff;border-radius:6px;border:1px solid #d6bcfa">
+          <div class="text-xs text-muted mb6">选择知识库热门产品（点击自动填充）：</div>
+          <div style="max-height:120px;overflow-y:auto">
+          ${(() => {
+            const allProds = [];
+            for(const [cat, prods] of Object.entries(PROSPECT_KB.products||{})){
+              for(const p of prods){ allProds.push({...p, category: cat}); }
+            }
+            return allProds.map((p,i)=>`<div style="padding:4px 6px;cursor:pointer;font-size:11px;border-radius:4px;margin-bottom:2px" onmouseover="this.style.background='#ede9fe'" onmouseout="this.style.background='transparent'" onclick="fillKBProductToQuote(${i})">${p.name_en||p.name_cn} <span class="text-muted">(${p.category})</span></div>`).join('');
+          })()}
+          </div>
+        </div>
         <div class="mb8"><input id="qProductName" class="form-control" placeholder="品名（如：厨房剪刀）" style="font-size:12px"></div>
         <div class="mb8"><input id="qModel" class="form-control" placeholder="型号（如：KS-001）" style="font-size:12px"></div>
         <div class="mb8"><input id="qMaterial" class="form-control" placeholder="材质（如：3Cr13不锈钢）" style="font-size:12px"></div>
@@ -10381,10 +10397,11 @@ function viewTools(root){
       <span>📚 产品库管理（6大分类 · 成本/包装/MOQ/HS编码 · 一键填充报价）</span>
       <div style="display:flex;gap:8px;align-items:center">
         <span class="badge" style="background:#38a169;color:#fff">新功能 V39</span>
+        <button class="btn" style="background:#c9a961;color:#fff;font-size:12px;padding:4px 12px" onclick="importProductsFromKB()">📚 从知识库导入</button>
         <button class="btn" style="background:#38a169;color:#fff;font-size:12px;padding:4px 12px" onclick="openProductForm()">➕ 新增产品</button>
       </div>
     </div>
-    <p class="text-sm text-muted mb12">保存常用产品信息，报价时一键填充，与报价计算器和订单管理紧密配合，避免重复输入</p>
+    <p class="text-sm text-muted mb12">保存常用产品信息，报价时一键填充，与报价计算器和订单管理紧密配合，避免重复输入。点击「从知识库导入」可一键导入知识库中的热门产品</p>
     
     <!-- 产品统计和分类筛选 -->
     ${(() => {
@@ -10556,6 +10573,25 @@ function viewTools(root){
         <button class="btn" style="background:#3182ce;color:#fff;font-size:12px;padding:4px 16px" onclick="createFollowupPlan(document.getElementById('sopCustomerName').value.trim())">🚀 创建计划</button>
       </div>
       <div class="text-xs text-muted mt6" style="font-size:10px">创建后自动生成Day0/3/7/14/30/60/90共7个跟进任务</div>
+    </div>
+    
+    <!-- V75.3 知识库跟进模板推荐 -->
+    <div class="mb12" style="background:linear-gradient(135deg,#fdfbf7,#f9f6f0);padding:10px;border-radius:6px;border:1px solid #e8dcc8">
+      <div class="text-xs mb6" style="color:#8b6914;font-weight:bold;display:flex;justify-content:space-between;align-items:center">
+        <span>📚 知识库跟进模板推荐（点击一键复制）</span>
+        <button class="btn btn-outline btn-sm" style="font-size:10px;padding:2px 8px;background:#fff" onclick="prospectKB=true;prospectKBTab='templates';go('knowledge')">查看全部</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+        ${(PROSPECT_KB.email_templates||[]).slice(0,6).map((t,i)=>`
+          <div style="padding:8px;background:#fff;border-radius:6px;border:1px solid #e8dcc8;cursor:pointer" onclick="copyText('${(t.subject||'')}') ;toast('已复制模板主题')" title="${t.angle||''}">
+            <div style="font-size:11px;font-weight:bold;color:#8b6914">${t.icon||'✉️'} ${t.label||t.key||'模板'+(i+1)}</div>
+            <div style="font-size:10px;color:#666;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.subject||t.angle||''}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="text-xs text-muted mt6" style="font-size:10px;line-height:1.5">
+        <b>跟进节奏建议：</b>Day0首次联系 → Day3产品推荐 → Day7报价跟进 → Day14样品确认 → Day30订单推进 → Day60深度合作 → Day90长期维护
+      </div>
     </div>
     
     <!-- 任务统计 -->
@@ -12539,6 +12575,59 @@ function deleteProduct(id){
 }
 
 /* 打开新增/编辑产品弹窗 */
+function showKBProductPicker(){
+  const picker = document.getElementById('kbProductPicker');
+  if(picker) picker.style.display = picker.style.display==='none' ? 'block' : 'none';
+}
+function fillKBProductToQuote(idx){
+  const allProds = [];
+  for(const [cat, prods] of Object.entries(PROSPECT_KB.products||{})){
+    for(const p of prods){ allProds.push({...p, category: cat}); }
+  }
+  const p = allProds[idx];
+  if(!p) return;
+  const nameEl = document.getElementById('qProductName');
+  const modelEl = document.getElementById('qModel');
+  const materialEl = document.getElementById('qMaterial');
+  const specEl = document.getElementById('qSpec');
+  if(nameEl) nameEl.value = p.name_en || p.name_cn || '';
+  if(modelEl) modelEl.value = p.sku || '';
+  if(materialEl) materialEl.value = p.material || '';
+  if(specEl) specEl.value = p.spec || '';
+  document.getElementById('kbProductPicker').style.display = 'none';
+  toast('✅ 已填充产品：' + (p.name_en||p.name_cn));
+}
+function importProductsFromKB(){
+  const kbProducts = PROSPECT_KB.products || {};
+  if(!S.products) S.products = [];
+  let imported = 0;
+  let skipped = 0;
+  for(const [category, prods] of Object.entries(kbProducts)){
+    for(const p of prods){
+      const exists = S.products.find(x=>x.model===p.sku || x.name===p.name_en);
+      if(exists){ skipped++; continue; }
+      const catMap = {'厨房用品':'kitchen','剪刀':'scissors','厨刀':'kitchen_knife','户外刀':'outdoor','多功能剪刀':'multi_scissors','厨房刀':'chef_knife'};
+      const catId = catMap[category] || 'kitchen';
+      S.products.push({
+        id: uid(),
+        name: p.name_en || p.name_cn || '未命名产品',
+        model: p.sku || '',
+        category: catId,
+        material: p.material || '',
+        spec: p.spec || '',
+        moq: p.moq || '',
+        cost: '',
+        price: p.price_range || '',
+        keywords: (p.seo_keywords || '').split(',').slice(0,5).join(','),
+        createdAt: Date.now()
+      });
+      imported++;
+    }
+  }
+  DB.save('products', S.products);
+  renderView();
+  toast('✅ 从知识库导入 '+imported+' 个产品' + (skipped>0?'，跳过 '+skipped+' 个已存在':''));
+}
 function openProductForm(editId){
   const product = editId ? S.products.find(p=>p.id===editId) : null;
   openModal(`

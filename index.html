@@ -1568,7 +1568,33 @@ async function runModelSpeedTest(){
 /* V46 渲染测速结果 */
 function renderSpeedTestResults(results){
   if(!results.length) return '<div style="text-align:center;padding:20px;color:#999">暂无测速结果</div>';
-  return results.map((r,idx)=>{
+  // V75.3 延迟对比可视化图表
+  const okResults = results.filter(r=>r.ok).sort((a,b)=>a.latency-b.latency);
+  let chartHtml = '';
+  if(okResults.length>=2){
+    const maxLatency = Math.max(...okResults.map(r=>r.latency), 1);
+    const chartBars = okResults.slice(0,6).map((r,i)=>{
+      const cfg = r.cfg || (S.apis||[]).find(a=>a.id===r.id);
+      const name = cfg ? cfg.name : r.model;
+      const width = Math.max((r.latency/maxLatency)*100, 5);
+      const color = i===0?'#38a169':i===1?'#3182ce':i===2?'#d69e2e':'#a0aec0';
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        '<div style="width:100px;font-size:11px;color:#4a5568;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+name+'">'+name+'</div>' +
+        '<div style="flex:1;background:#f0f4f8;border-radius:4px;height:18px;overflow:hidden;position:relative">' +
+        '<div style="width:'+width+'%;height:100%;background:linear-gradient(90deg,'+color+','+color+'cc);border-radius:4px;transition:width .5s"></div>' +
+        '<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:'+color+'">'+r.latency+'ms</span>' +
+        '</div></div>';
+    }).join('');
+    const fastest = okResults[0];
+    const slowest = okResults[okResults.length-1];
+    const avgLatency = Math.round(okResults.reduce((s,r)=>s+r.latency,0)/okResults.length);
+    chartHtml = '<div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:14px;border-radius:8px;margin-bottom:12px;border:1px solid #bbf7d0">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+      '<span style="font-size:12px;font-weight:700;color:#166534">📊 延迟对比（越快越靠左）</span>' +
+      '<span style="font-size:11px;color:#16a34a">最快: '+fastest.latency+'ms · 平均: '+avgLatency+'ms</span>' +
+      '</div>' + chartBars + '</div>';
+  }
+  return chartHtml + results.map((r,idx)=>{
     const cfg = r.cfg || (S.apis||[]).find(a=>a.id===r.id);
     if(!cfg) return '';
     const isFast = r.ok && r.latency < 800;
@@ -4144,6 +4170,70 @@ function viewDashboard(root){
       </div>
       <div class="text-sm text-muted mt8" style="border-top:1px solid #e2e8f0;padding-top:8px">
         💡 趋势图展示近30天客户累计增长情况，鼠标悬停数据点可查看具体日期和客户数
+      </div>
+    </div>
+
+    <!-- V75.3 客户价值分布直方图 -->
+    <div class="card card-pad mb16" style="border-left:4px solid #805ad5">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📊 客户价值分布（6维度综合评估）</span>
+        <div style="display:flex;gap:12px;align-items:center">
+          <span style="font-size:11px;color:#718096">平均价值：<b style="color:#805ad5;font-size:14px">${
+            S.customers.length ? Math.round(S.customers.reduce((s,c)=>{
+              const quality = Math.min(100, (c.scores?.total||0)*1.2);
+              const potential = c.customerType==='品牌商'?90:c.customerType==='批发商'?80:c.customerType==='电商'?70:60;
+              const loyalty = c.isOld?85:c.status==='已成交'?75:c.status==='已回复'?60:40;
+              const profit = c.scores?.grade==='A'?85:c.scores?.grade==='B'?70:55;
+              return s + Math.round((quality+potential+60+loyalty+profit+65)/6);
+            },0)/S.customers.length) : 0
+          }</b></span>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        ${(() => {
+          // 计算每个客户的价值指数
+          const values = S.customers.map(c=>{
+            const quality = Math.min(100, (c.scores?.total||0)*1.2);
+            const potential = c.customerType==='品牌商'?90:c.customerType==='批发商'?80:c.customerType==='电商'?70:60;
+            const active = 50;
+            const loyalty = c.isOld?85:c.status==='已成交'?75:c.status==='已回复'?60:40;
+            const profit = c.scores?.grade==='A'?85:c.scores?.grade==='B'?70:55;
+            const growth = c.country==='美国'?85:c.country==='德国'?80:c.country==='英国'?75:65;
+            return Math.round((quality+potential+active+loyalty+profit+growth)/6);
+          });
+          // 分5个区间
+          const bins = [
+            {label:'0-20', min:0, max:20, count:0, color:'#e53e3e'},
+            {label:'21-40', min:21, max:40, count:0, color:'#dd6b20'},
+            {label:'41-60', min:41, max:60, count:0, color:'#d69e2e'},
+            {label:'61-80', min:61, max:80, count:0, color:'#38a169'},
+            {label:'81-100', min:81, max:100, count:0, color:'#805ad5'}
+          ];
+          values.forEach(v=>{
+            for(const b of bins){
+              if(v>=b.min && v<=b.max){ b.count++; break; }
+            }
+          });
+          const max = Math.max(...bins.map(b=>b.count), 1);
+          const avgValue = values.length ? Math.round(values.reduce((s,v)=>s+v,0)/values.length) : 0;
+          const highValueCount = values.filter(v=>v>=70).length;
+          return '<div style="display:flex;gap:16px;align-items:flex-end;height:180px;padding:0 20px">' +
+            bins.map(b=>'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">' +
+              '<div style="font-size:18px;font-weight:800;color:'+b.color+'">'+b.count+'</div>' +
+              '<div style="width:100%;max-width:80px;background:linear-gradient(180deg,'+b.color+','+b.color+'cc);border-radius:6px 6px 0 0;height:'+Math.max(b.count/max*120,8)+'px;transition:height .5s"></div>' +
+              '<div style="font-size:11px;color:#718096;font-weight:600">'+b.label+'</div>' +
+              '<div style="font-size:10px;color:#a0aec0">'+(values.length?Math.round(b.count/values.length*100):0)+'%</div>' +
+            '</div>').join('') +
+            '</div>' +
+            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;padding-top:12px;border-top:1px solid #e2e8f0">' +
+            '<div style="text-align:center"><div style="font-size:11px;color:#718096">平均价值指数</div><div style="font-size:22px;font-weight:800;color:#805ad5">'+avgValue+'</div></div>' +
+            '<div style="text-align:center"><div style="font-size:11px;color:#718096">高价值客户(≥70)</div><div style="font-size:22px;font-weight:800;color:#38a169">'+highValueCount+'</div></div>' +
+            '<div style="text-align:center"><div style="font-size:11px;color:#718096">高价值占比</div><div style="font-size:22px;font-weight:800;color:#c9a961">'+(values.length?Math.round(highValueCount/values.length*100):0)+'%</div></div>' +
+            '</div>';
+        })()}
+      </div>
+      <div class="text-sm text-muted mt8" style="border-top:1px solid #e2e8f0;padding-top:8px">
+        💡 客户价值指数基于6维度综合评估（质量/潜力/活跃/忠诚/利润/增长），≥70分为高价值客户，建议优先跟进
       </div>
     </div>
 

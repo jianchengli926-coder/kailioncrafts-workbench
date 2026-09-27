@@ -3686,19 +3686,46 @@ function viewDashboard(root){
       </div>
     </div>
 
-    <!-- V75.3 知识库快速入口 -->
+    <!-- V75.3 知识库快速入口（增强版） -->
     <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fdfbf7,#f9f6f0);border-left:4px solid #c9a961">
-      <div style="display:flex;align-items:center;gap:16px">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
         <div style="font-size:32px">📊</div>
         <div style="flex:1">
           <div style="font-weight:700;font-size:14px;color:#8b6914">外贸客户开发知识库</div>
           <div style="font-size:12px;color:#718096;margin-top:2px">
-            ${PROSPECT_KB.categories.length}大品类 · ${PROSPECT_KB.categories.reduce((s,c)=>s+c.count,0)}+SKU · ${PROSPECT_KB.markets.length}大目标市场 · ${PROSPECT_KB.personas.length}类客户画像 · ${PROSPECT_KB.certifications.length}张认证证书 · ${PROSPECT_KB.email_templates.length}套开发信模板
+            智能驱动客户开发 · 21大业务场景全覆盖 · AI检索+导入导出+版本管理
           </div>
         </div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-gold btn-sm" style="font-size:12px" onclick="prospectKB=true;prospectKBTab='company';go('knowledge')">📚 查看知识库</button>
+          <button class="btn btn-sm" style="font-size:12px;background:#805ad5;color:#fff" onclick="prospectKB=true;prospectKBTab='aisearch';go('knowledge')">🔍 AI检索</button>
           <button class="btn btn-outline btn-sm" style="font-size:12px;background:#fff" onclick="go('customers')">🎯 智能匹配客户</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+        <div style="text-align:center;padding:8px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:18px;font-weight:800;color:#c9a961">${PROSPECT_KB.product_count||200}</div>
+          <div style="font-size:10px;color:#718096">产品SKU</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:18px;font-weight:800;color:#3182ce">${PROSPECT_KB.categories.length}</div>
+          <div style="font-size:10px;color:#718096">产品品类</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:18px;font-weight:800;color:#38a169">${PROSPECT_KB.markets.length}</div>
+          <div style="font-size:10px;color:#718096">目标市场</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:18px;font-weight:800;color:#805ad5">${PROSPECT_KB.personas.length}</div>
+          <div style="font-size:10px;color:#718096">客户画像</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:18px;font-weight:800;color:#e53e3e">${PROSPECT_KB.certifications.length}</div>
+          <div style="font-size:10px;color:#718096">认证证书</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="font-size:18px;font-weight:800;color:#dd6b20">${PROSPECT_KB.email_templates.length}</div>
+          <div style="font-size:10px;color:#718096">开发信模板</div>
         </div>
       </div>
     </div>
@@ -6970,6 +6997,22 @@ function copyEmailTemplateFromKB(key){
 }
 
 /* V75.3 知识库AI智能检索 */
+/* V75.3 工具箱AI功能通用知识库上下文 */
+function getToolKBContext(extraInfo){
+  const kb = PROSPECT_KB;
+  let ctx = `【我们的公司】${kb.company.name_cn}（${kb.company.brand}）
+【公司简介】${kb.company.intro_short || '阳江市锴利国际贸易有限公司，家族工厂股权模式，4大家族工厂，出口130+国家'}
+【核心优势】${kb.company.core_advantages.join('；')}
+【成本优势】${kb.company.cost_advantage}
+【产品品类】${kb.categories.map(x=>x.name+'('+x.count+'SKU)').join('、')}
+【认证资质】${kb.certifications.map(x=>x.name).join('、')}
+【经营哲学】${kb.company.philosophy}
+【品牌标语】${kb.company.slogan_en}`;
+  if(extraInfo) ctx += '\n【额外信息】' + extraInfo;
+  return ctx;
+}
+
+
 function searchKBLocal(query){
   const kb = PROSPECT_KB;
   const q = query.toLowerCase();
@@ -8118,7 +8161,9 @@ Slogan：${kb.company.slogan_en}
 【输出格式】
 先写Meta Description，然后空一行写完整文章（包含标题和正文）。`;
   
-  const r = await callAI(prompt, {purpose:'content', temperature:0.5});
+  // V75.3 注入知识库上下文
+  const kbPrompt = '你是'+PROSPECT_KB.company.brand+'的营销内容专家。\n'+getToolKBContext('产品：'+product+'；特点：'+features)+'\n\n'+prompt;
+  const r = await callAI(kbPrompt, {purpose:'content', temperature:0.5});
   btn.disabled = false; btn.textContent = '🚀 生成文章';
   
   if(r.error){ toast('生成失败: '+r.error); return; }
@@ -11365,6 +11410,8 @@ async function generateWAMessage(templateId, customerInfo, language){
     const langName = WA_LANGUAGES.find(l=>l.id===language);
     prompt += '\n\n请用' + (langName?langName.label:language) + '回复。';
   }
+  // V75.3 注入知识库上下文
+  prompt = '你是'+PROSPECT_KB.company.brand+'的外贸业务员。\n'+getToolKBContext(customerInfo?'客户信息：'+customerInfo:'')+'\n\n'+prompt;
   const result = await callAI([{role:'user',content:prompt}], {purpose:'whatsapp_msg'});
   if(result.error) return {content:null, error:result.error};
   // 保存历史
@@ -11542,6 +11589,8 @@ async function generateCustomerProfile(customerInfo, depth){
   } else if(depth === 'standard'){
     prompt += '\n\n【注意】这是标准分析，请输出前6个部分，每个部分适度展开，总字数控制在1200字以内。';
   }
+  // V75.3 注入知识库上下文
+  prompt = '你是'+PROSPECT_KB.company.brand+'的客户画像分析师。\n'+getToolKBContext()+'\n\n'+prompt;
   const result = await callAI([{role:'user',content:prompt}], {purpose:'customer_profile', temperature:0.3});
   if(result.error) return {content:null, error:result.error};
   // 保存历史
@@ -11848,6 +11897,8 @@ ${context || '五金刀剪产品出口，主营厨房剪刀、厨师刀、美容
 - 本次回复后预期：
 - 下一步动作：
 - 跟进时间点：`;
+  // V75.3 注入知识库上下文
+  prompt = '你是'+PROSPECT_KB.company.brand+'的外贸回复专家。\n'+getToolKBContext()+'\n\n'+prompt;
   const result = await callAI([{role:'user',content:prompt}], {purpose:'reply_analysis', temperature:0.3});
   if(result.error) return {error:result.error};
   // 保存历史

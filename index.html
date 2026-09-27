@@ -5091,7 +5091,9 @@ function openCustomerDetail(cid){
         </div>
       </div>
 
-      <div class="card card-pad mb16">
+      
+      ${renderKBMatchCard(cid)}
+<div class="card card-pad mb16">
         <div class="card-title">🏢 公司背调</div>
         <div class="text-sm" style="line-height:2">
           <div>👥 规模：<b>${esc(c.companySize||'—')} 人</b> · 年营收估算 <b>$5M-$20M</b></div>
@@ -6713,6 +6715,72 @@ function copyEmailTemplateFromKB(key){
   const text = `Subject: ${t.subject}\n\nKey Points:\n${t.key_points.map(p=>'- '+p).join('\n')}\n\nCall to Action: ${t.call_to_action}`;
   navigator.clipboard.writeText(text).then(()=>toast('✅ 模板已复制到剪贴板')).catch(()=>toast('复制失败，请手动复制'));
 }
+
+/* V75.3 客户知识库智能匹配 */
+function getKBMatchForCustomer(c){
+  const kb = PROSPECT_KB;
+  const country = (c.country||'').toLowerCase();
+  const type = (c.customerType||'').toLowerCase();
+  const tags = (c.tags||[]).join(' ').toLowerCase();
+  
+  let matchedPersona = null;
+  if(type.includes('amazon')||tags.includes('amazon')||type.includes('电商')) matchedPersona = kb.personas.find(p=>p.name.includes('亚马逊'));
+  else if(type.includes('brand')||type.includes('dtc')||tags.includes('品牌')) matchedPersona = kb.personas.find(p=>p.name.includes('DTC'));
+  else if(type.includes('wholesale')||type.includes('批发')||type.includes('distributor')) matchedPersona = kb.personas.find(p=>p.name.includes('批发'));
+  else if(type.includes('retail')||type.includes('零售')||type.includes('chain')) matchedPersona = kb.personas.find(p=>p.name.includes('连锁'));
+  if(!matchedPersona) matchedPersona = kb.personas[0];
+  
+  let matchedMarket = kb.markets[0];
+  const mk = [
+    [['usa','us ','united states','america','canada','美国','加拿大'], 0],
+    [['germany','uk ','united kingdom','france','italy','spain','europe','德国','英国','法国','欧洲'], 1],
+    [['vietnam','thailand','malaysia','philippines','indonesia','singapore','东南亚','越南','泰国'], 2],
+    [['uae','dubai','saudi','qatar','middle east','中东','阿联酋','迪拜'], 3],
+    [['australia','new zealand','澳洲','澳大利亚','新西兰'], 4]
+  ];
+  for(const [kws, idx] of mk){
+    if(kws.some(kw=>country.includes(kw))){ matchedMarket = kb.markets[idx]; break; }
+  }
+  
+  let matchedTemplate = kb.email_templates[0];
+  if(matchedPersona){
+    const pn = matchedPersona.name;
+    if(pn.includes('亚马逊')) matchedTemplate = kb.email_templates.find(t=>t.key==='amazon_seller')||kb.email_templates[0];
+    else if(pn.includes('DTC')) matchedTemplate = kb.email_templates.find(t=>t.key==='dtc_brand')||kb.email_templates[0];
+    else if(pn.includes('批发')) matchedTemplate = kb.email_templates.find(t=>t.key==='wholesaler')||kb.email_templates[0];
+    else if(pn.includes('连锁')) matchedTemplate = kb.email_templates.find(t=>t.key==='retail_chain')||kb.email_templates[0];
+  }
+  
+  return {persona: matchedPersona, market: matchedMarket, template: matchedTemplate};
+}
+
+function renderKBMatchCard(cid){
+  const c = S.customers.find(x=>x.id===cid); if(!c) return '';
+  const match = getKBMatchForCustomer(c);
+  const p = match.persona, m = match.market, t = match.template;
+  
+  return '<div class="card card-pad mb16" style="border-left:4px solid #c9a961;background:linear-gradient(135deg,#fdfbf7,#f9f6f0)">'
+    + '<div class="card-title" style="display:flex;justify-content:space-between;align-items:center">'
+    + '<span>📊 知识库智能匹配</span><span class="text-xs text-muted">基于客户画像自动匹配</span></div>'
+    + '<div class="grid-2" style="gap:12px;margin-top:10px">'
+    + '<div style="background:#fff;padding:10px;border-radius:6px;border:1px solid #eee">'
+    + '<div class="text-xs" style="color:#c9a961;font-weight:700;margin-bottom:6px">👤 匹配客户画像</div>'
+    + '<div style="font-size:13px;font-weight:600">' + p.name + '</div>'
+    + '<div class="text-xs text-muted mt4" style="line-height:1.6"><b>痛点：</b>' + p.pain_points.slice(0,2).join('、') + '<br><b>切入：</b>' + p.email_angle + '</div></div>'
+    + '<div style="background:#fff;padding:10px;border-radius:6px;border:1px solid #eee">'
+    + '<div class="text-xs" style="color:#3182ce;font-weight:700;margin-bottom:6px">🌍 匹配目标市场</div>'
+    + '<div style="font-size:13px;font-weight:600">' + m.name + '</div>'
+    + '<div class="text-xs text-muted mt4" style="line-height:1.6"><b>主推：</b>' + m.key_products.slice(0,2).join('、') + '<br><b>角度：</b>' + m.marketing_angle.substring(0,40) + '...</div></div></div>'
+    + '<div style="background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;margin-top:10px">'
+    + '<div class="text-xs" style="color:#38a169;font-weight:700;margin-bottom:6px">✉️ 推荐开发信模板</div>'
+    + '<div style="font-size:12px;line-height:1.7"><b>主题：</b><span style="color:#c9a961">' + t.subject + '</span><br><b>卖点：</b>' + t.key_points.slice(0,3).join(' | ') + '</div>'
+    + '<div class="flex gap8 mt8"><button class="btn btn-gold btn-sm" style="font-size:11px" onclick="copyEmailTemplateFromKB(\'' + t.key + '\')">📋 复制模板</button>'
+    + '<button class="btn btn-outline btn-sm" style="font-size:11px" onclick="prospectKB=true;prospectKBTab=\'templates\';closeDrawer();go(\'knowledge\')">查看全部模板</button></div></div>'
+    + '<div style="background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;margin-top:10px">'
+    + '<div class="text-xs" style="color:#805ad5;font-weight:700;margin-bottom:6px">💎 公司核心卖点（开发信必提）</div>'
+    + '<div style="font-size:12px;line-height:1.9;color:#555">' + PROSPECT_KB.company.core_advantages.slice(0,4).map(function(a,i){return '<span style="display:inline-block;margin-right:8px">'+(i+1)+'. '+a+'</span>'}).join('') + '</div></div></div>';
+}
+
 
 function viewKnowledge(root){
   if(knowBrain) return viewKnowBrain(root);

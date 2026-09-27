@@ -3765,6 +3765,61 @@ function viewDashboard(root){
       </div>
     </div>
 
+    <!-- V75.3 知识库使用统计面板 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f4f8,#e2e8f0);border-left:4px solid #4a5568">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:28px">📈</div>
+          <div>
+            <div style="font-weight:700;font-size:14px;color:#2d3748">知识库使用统计</div>
+            <div style="font-size:11px;color:#718096;margin-top:2px">实时监控知识库使用情况与数据完整度</div>
+          </div>
+        </div>
+        <span class="badge" style="background:#4a5568;color:#fff">实时</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+        <div style="padding:10px;background:#fff;border-radius:8px;border:1px solid #e2e8f0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="font-size:16px">🔍</span>
+            <span style="font-size:11px;color:#718096">AI检索次数</span>
+          </div>
+          <div style="font-size:22px;font-weight:800;color:#3182ce">${S.kbSearchCount||0}</div>
+          <div style="font-size:10px;color:#a0aec0;margin-top:2px">累计知识库AI检索</div>
+        </div>
+        <div style="padding:10px;background:#fff;border-radius:8px;border:1px solid #e2e8f0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="font-size:16px">✉️</span>
+            <span style="font-size:11px;color:#718096">知识库开发信</span>
+          </div>
+          <div style="font-size:22px;font-weight:800;color:#38a169">${S.kbEmailCount||0}</div>
+          <div style="font-size:10px;color:#a0aec0;margin-top:2px">基于知识库生成开发信</div>
+        </div>
+        <div style="padding:10px;background:#fff;border-radius:8px;border:1px solid #e2e8f0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="font-size:16px">📦</span>
+            <span style="font-size:11px;color:#718096">产品库导入</span>
+          </div>
+          <div style="font-size:22px;font-weight:800;color:#805ad5">${S.products.length}</div>
+          <div style="font-size:10px;color:#a0aec0;margin-top:2px">从知识库导入产品数</div>
+        </div>
+        <div style="padding:10px;background:#fff;border-radius:8px;border:1px solid #e2e8f0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="font-size:16px">📊</span>
+            <span style="font-size:11px;color:#718096">数据完整度</span>
+          </div>
+          <div style="font-size:22px;font-weight:800;color:#dd6b20">95%</div>
+          <div style="width:100%;height:6px;background:#e2e8f0;border-radius:3px;margin-top:4px">
+            <div style="width:95%;height:100%;background:linear-gradient(90deg,#dd6b20,#c9a961);border-radius:3px"></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff" onclick="prospectKB=true;prospectKBTab='versions';go('knowledge')">📋 版本历史</button>
+        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff" onclick="prospectKB=true;prospectKBTab='import';go('knowledge')">📥 导入导出</button>
+        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff" onclick="saveKBVersion('手动备份','数据看板手动保存版本');toast('✅ 已保存知识库版本')">💾 保存当前版本</button>
+      </div>
+    </div>
+
     <!-- V30.0 开发漏斗可视化 -->
     <div class="card card-pad mb16">
       <div class="card-title">🔄 开发漏斗 DEVELOPMENT PIPELINE</div>
@@ -4504,6 +4559,20 @@ function openBatchOps(){
             <button class="btn btn-outline" onclick="document.getElementById('batchFollowDate').value='${new Date(Date.now()+7*86400000).toISOString().slice(0,10)}'">7天后</button>
           </div>
         </div>
+        <!-- V75.3 知识库批量操作 -->
+        <div class="card card-pad" style="background:#fdfbf7;border-color:#e8dcc8;grid-column:1/-1">
+          <div style="font-weight:700;color:#8b6914;margin-bottom:10px">📚 知识库批量操作</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <div style="font-size:12px;color:#718096;margin-bottom:8px">为选中客户批量生成知识库匹配报告（画像/市场/模板/卖点）</div>
+              <button class="btn" style="width:100%;background:#c9a961;color:#fff" onclick="batchKBMatch()">🎯 批量知识库匹配</button>
+            </div>
+            <div>
+              <div style="font-size:12px;color:#718096;margin-bottom:8px">基于知识库为选中客户批量生成个性化开发信草稿</div>
+              <button class="btn" style="width:100%;background:#8b6914;color:#fff" onclick="batchKBEmail()">✉️ 批量生成开发信</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div style="margin-top:16px;padding:12px;background:#f7fafc;border-radius:8px;font-size:12px;color:#718096">
         💡 提示：批量操作会立即生效并保存。已选 ${count} 个客户：${S.customers.filter(c=>custFilter.selected.includes(c.id)).slice(0,5).map(c=>c.company).join('、')}${count>5?' 等':''}
@@ -5051,6 +5120,55 @@ function mergeCustomers(groupKey){
   logAction('customer', '合并客户', `合并${otherIds.length}个客户到${main.company}`);
   closeModal();
   renderView();
+}
+function batchKBMatch(){
+  const ids = custFilter.selected;
+  if(!ids.length){ toast('请先选择客户'); return; }
+  let matched = 0;
+  ids.forEach(id=>{
+    const c = S.customers.find(x=>x.id===id);
+    if(c){
+      const match = getKBMatchForCustomer(c);
+      c.kbMatch = match;
+      matched++;
+    }
+  });
+  DB.save('customers', S.customers);
+  closeModal();
+  toast(`✅ 已为 ${matched} 个客户生成知识库匹配报告`);
+  renderView();
+}
+function batchKBEmail(){
+  const ids = custFilter.selected;
+  if(!ids.length){ toast('请先选择客户'); return; }
+  closeModal();
+  go('drafts');
+  setTimeout(()=>{
+    let count = 0;
+    ids.forEach(id=>{
+      const c = S.customers.find(x=>x.id===id);
+      if(c){
+        const match = getKBMatchForCustomer(c);
+        const template = (PROSPECT_KB.email_templates||[])[0] || {};
+        const draft = {
+          id: uid(),
+          customerId: id,
+          customerName: c.company,
+          subject: template.subject || 'Re: Partnership Inquiry - ' + c.company,
+          body: `Hi ${c.contact.name || 'there'},\n\nI hope this email finds you well. I came across ${c.company} and was impressed by your business in ${c.country}.\n\n${match.sellingPoints ? match.sellingPoints.substring(0,200) : ''}\n\nWe are KaiLionCrafts, a leading manufacturer of kitchen knives, scissors, and outdoor tools from Yangjiang, China. With over 200 SKUs and CE/FDA/LFGB certifications, we can provide you with high-quality products at competitive prices.\n\nWould you be interested in receiving our product catalog and latest price list?\n\nBest regards,\nLeo Li\nKaiLionCrafts`,
+          status: '草稿',
+          createdAt: new Date().toISOString(),
+          fromKB: true
+        };
+        S.drafts = S.drafts || [];
+        S.drafts.unshift(draft);
+        count++;
+      }
+    });
+    DB.save('drafts', S.drafts);
+    toast(`✅ 已基于知识库生成 ${count} 封开发信草稿`);
+    renderView();
+  }, 500);
 }
 function batchSetFollowUp(){
   const date = document.getElementById('batchFollowDate').value;
@@ -6232,6 +6350,69 @@ function viewSettings(root){
       <div class="divider"></div>
       <b class="text-sm">阶梯提成：</b><span class="text-sm">&nbsp;毛利&lt;5万→5% · 5-10万→8% · 10-20万→10% · &gt;20万→12%</span>
     </div>
+    <!-- V75.3 知识库配置 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fdfbf7,#f9f6f0);border-left:4px solid #c9a961">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📚 外贸客户开发知识库配置</span>
+        <span class="badge" style="background:#c9a961;color:#fff">V75.3</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">
+        <div>
+          <div class="text-xs text-muted mb6" style="font-weight:bold">⚙️ 知识库开关</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+              <input type="checkbox" ${S.kbEnabled!==false?'checked':''} onchange="S.kbEnabled=this.checked;DB.save('settings',S.settings);toast(this.checked?'✅ 知识库已启用':'⚠️ 知识库已禁用')">
+              <span>启用知识库全局注入（AI功能自动引用知识库）</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+              <input type="checkbox" ${S.kbAutoMatch!==false?'checked':''} onchange="S.kbAutoMatch=this.checked;DB.save('settings',S.settings);toast(this.checked?'✅ 自动匹配已启用':'⚠️ 自动匹配已禁用')">
+              <span>客户详情页自动匹配知识库（画像/市场/模板/卖点）</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+              <input type="checkbox" ${S.kbSearchInGlobal!==false?'checked':''} onchange="S.kbSearchInGlobal=this.checked;DB.save('settings',S.settings);toast(this.checked?'✅ 全局搜索已启用':'⚠️ 全局搜索已禁用')">
+              <span>全局搜索同时检索知识库</span>
+            </label>
+          </div>
+        </div>
+        <div>
+          <div class="text-xs text-muted mb6" style="font-weight:bold">📊 知识库数据统计</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div style="padding:8px;background:#fff;border-radius:6px;text-align:center">
+              <div style="font-size:18px;font-weight:800;color:#c9a961">${PROSPECT_KB.product_count||200}</div>
+              <div style="font-size:10px;color:#718096">产品SKU</div>
+            </div>
+            <div style="padding:8px;background:#fff;border-radius:6px;text-align:center">
+              <div style="font-size:18px;font-weight:800;color:#3182ce">${PROSPECT_KB.categories.length}</div>
+              <div style="font-size:10px;color:#718096">产品品类</div>
+            </div>
+            <div style="padding:8px;background:#fff;border-radius:6px;text-align:center">
+              <div style="font-size:18px;font-weight:800;color:#38a169">${PROSPECT_KB.markets.length}</div>
+              <div style="font-size:10px;color:#718096">目标市场</div>
+            </div>
+            <div style="padding:8px;background:#fff;border-radius:6px;text-align:center">
+              <div style="font-size:18px;font-weight:800;color:#805ad5">${PROSPECT_KB.personas.length}</div>
+              <div style="font-size:10px;color:#718096">客户画像</div>
+            </div>
+            <div style="padding:8px;background:#fff;border-radius:6px;text-align:center">
+              <div style="font-size:18px;font-weight:800;color:#e53e3e">${PROSPECT_KB.certifications.length}</div>
+              <div style="font-size:10px;color:#718096">认证证书</div>
+            </div>
+            <div style="padding:8px;background:#fff;border-radius:6px;text-align:center">
+              <div style="font-size:18px;font-weight:800;color:#dd6b20">${PROSPECT_KB.email_templates.length}</div>
+              <div style="font-size:10px;color:#718096">开发信模板</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+        <button class="btn btn-gold btn-sm" onclick="prospectKB=true;prospectKBTab='company';go('knowledge')">📚 查看完整知识库</button>
+        <button class="btn btn-outline btn-sm" onclick="prospectKB=true;prospectKBTab='aisearch';go('knowledge')">🔍 AI智能检索</button>
+        <button class="btn btn-outline btn-sm" onclick="prospectKB=true;prospectKBTab='import';go('knowledge')">📥 导入导出</button>
+        <button class="btn btn-outline btn-sm" onclick="prospectKB=true;prospectKBTab='versions';go('knowledge')">📋 版本管理</button>
+        <button class="btn btn-outline btn-sm" onclick="saveKBVersion('设置页备份','从设置页面手动保存');toast('✅ 已保存知识库版本')">💾 保存当前版本</button>
+      </div>
+    </div>
+
     <div class="card card-pad mb16"><div class="card-title">📋 获客资料（AI写开发信时自动引用）</div>
       <div class="grid-2">
         <div><b class="text-sm">业务背景</b>

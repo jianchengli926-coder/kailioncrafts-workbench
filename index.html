@@ -4315,6 +4315,90 @@ function viewDashboard(root){
       </div>
     </div>
 
+    <!-- V75.3 业绩预测仪表盘 -->
+    <div class="card card-pad mb16" style="border-left:4px solid #d69e2e;background:linear-gradient(135deg,#fffbeb,#fff)">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📈 业绩预测仪表盘（历史趋势·未来预测·目标达成）</span>
+        <div style="display:flex;gap:8px">
+          <span class="badge" style="background:#d69e2e;color:#fff;font-size:10px">AI预测</span>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        ${(() => {
+          const now = new Date();
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          // 计算近6个月每月订单金额
+          const monthlyData = [];
+          for(let i=5;i>=0;i--){
+            const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+            const nextMonth = new Date(d.getFullYear(), d.getMonth()+1, 1);
+            const monthOrders = S.orders.filter(o=>{
+              const od = new Date(o.createdAt||o.date||0);
+              return od>=d && od<nextMonth;
+            });
+            const amount = monthOrders.reduce((s,o)=>s+(parseFloat(o.totalAmount||o.amount||0)||0),0);
+            monthlyData.push({
+              label: (d.getMonth()+1)+'月',
+              amount: amount,
+              count: monthOrders.length,
+              isCurrent: i===0
+            });
+          }
+          // 简单线性回归预测下一个月
+          const n = monthlyData.length;
+          const sumX = monthlyData.reduce((s,_,i)=>s+i,0);
+          const sumY = monthlyData.reduce((s,d)=>s+d.amount,0);
+          const sumXY = monthlyData.reduce((s,d,i)=>s+i*d.amount,0);
+          const sumX2 = monthlyData.reduce((s,_,i)=>s+i*i,0);
+          const slope = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX || 1);
+          const intercept = (sumY - slope*sumX) / n;
+          const predicted = Math.max(0, Math.round(slope*n + intercept));
+          const avgAmount = Math.round(monthlyData.reduce((s,d)=>s+d.amount,0)/n);
+          const totalAmount = monthlyData.reduce((s,d)=>s+d.amount,0);
+          const maxAmount = Math.max(...monthlyData.map(d=>d.amount), predicted, 1);
+          
+          // 生成柱状图
+          const chartW = 800, chartH = 180, pad = 40;
+          const barW = (chartW - pad*2) / 7 * 0.6;
+          let bars = '';
+          monthlyData.forEach((d,i)=>{
+            const x = pad + (i+0.2)*((chartW-pad*2)/7);
+            const h = (d.amount/maxAmount)*(chartH-pad*2);
+            const y = pad + (chartH-pad*2) - h;
+            const color = d.isCurrent ? '#d69e2e' : '#3182ce';
+            bars += '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+h+'" fill="'+color+'" rx="4"><title>'+d.label+': $'+d.amount.toLocaleString()+' ('+d.count+'单)</title></rect>';
+            bars += '<text x="'+(x+barW/2)+'" y="'+(chartH-pad+16)+'" text-anchor="middle" font-size="11" fill="#718096">'+d.label+'</text>';
+            if(d.amount>0) bars += '<text x="'+(x+barW/2)+'" y="'+(y-6)+'" text-anchor="middle" font-size="10" fill="#4a5568" font-weight="600">$'+(d.amount/1000).toFixed(1)+'k</text>';
+          });
+          // 预测柱（虚线）
+          const predX = pad + (6+0.2)*((chartW-pad*2)/7);
+          const predH = (predicted/maxAmount)*(chartH-pad*2);
+          const predY = pad + (chartH-pad*2) - predH;
+          bars += '<rect x="'+predX+'" y="'+predY+'" width="'+barW+'" height="'+predH+'" fill="#805ad5" fill-opacity="0.3" stroke="#805ad5" stroke-width="2" stroke-dasharray="5,3" rx="4"><title>预测: $'+predicted.toLocaleString()+'</title></rect>';
+          bars += '<text x="'+(predX+barW/2)+'" y="'+(chartH-pad+16)+'" text-anchor="middle" font-size="11" fill="#805ad5" font-weight="700">预测</text>';
+          if(predicted>0) bars += '<text x="'+(predX+barW/2)+'" y="'+(predY-6)+'" text-anchor="middle" font-size="10" fill="#805ad5" font-weight="700">$'+(predicted/1000).toFixed(1)+'k</text>';
+          // 网格线
+          let grid = '';
+          for(let i=0;i<=4;i++){
+            const y = pad + (i/4)*(chartH-pad*2);
+            const val = Math.round(maxAmount - (i/4)*maxAmount);
+            grid += '<line x1="'+pad+'" y1="'+y+'" x2="'+(chartW-pad)+'" y2="'+y+'" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4"/><text x="'+(pad-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="#a0aec0">$'+(val/1000).toFixed(0)+'k</text>';
+          }
+          
+          return '<svg width="100%" height="'+chartH+'" viewBox="0 0 '+chartW+' '+chartH+'" preserveAspectRatio="xMidYMid meet">'+grid+bars+'</svg>' +
+            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0">' +
+            '<div style="text-align:center"><div style="font-size:11px;color:#718096">近6月总业绩</div><div style="font-size:20px;font-weight:800;color:#2b6cb0">$'+(totalAmount/1000).toFixed(1)+'k</div></div>' +
+            '<div style="text-align:center"><div style="font-size:11px;color:#718096">月均业绩</div><div style="font-size:20px;font-weight:800;color:#38a169">$'+(avgAmount/1000).toFixed(1)+'k</div></div>' +
+            '<div style="text-align:center"><div style="font-size:11px;color:#718096">下月预测</div><div style="font-size:20px;font-weight:800;color:#805ad5">$'+(predicted/1000).toFixed(1)+'k</div></div>' +
+            '<div style="text-align:center"><div style="font-size:11px;color:#718096">增长趋势</div><div style="font-size:20px;font-weight:800;color:'+(slope>=0?'#38a169':'#e53e3e')+'">'+(slope>=0?'📈 上升':'📉 下降')+'</div></div>' +
+            '</div>';
+        })()}
+      </div>
+      <div class="text-sm text-muted mt8" style="border-top:1px solid #e2e8f0;padding-top:8px">
+        💡 基于近6个月订单数据，使用线性回归算法预测下月业绩，仅供参考
+      </div>
+    </div>
+
     <!-- V61 工作台使用统计 -->
       <div class="card card-pad" style="border-left:4px solid #c9a961">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -4882,6 +4966,16 @@ function viewCustomers(root){
   if(custFilter.source) list = list.filter(c=>c.source===custFilter.source);
   if(custFilter.status) list = list.filter(c=>c.status===custFilter.status);
   if(custFilter.tag) list = list.filter(c=>(c.tags||[]).includes(custFilter.tag));
+  if(custFilter.status) list = list.filter(c=>c.status===custFilter.status);
+  if(custFilter.customerType) list = list.filter(c=>c.customerType===custFilter.customerType);
+  if(custFilter.followDays){
+    const days = parseInt(custFilter.followDays);
+    list = list.filter(c=>{
+      const lastFollow = c.followUpHistory && c.followUpHistory.length ? 
+        Math.max(...c.followUpHistory.map(h=>h.t||h.createdAt||0)) : (c.createdAt||0);
+      return (Date.now()-lastFollow)/(1000*60*60*24) >= days;
+    });
+  }
   if(custFilter.view==='new') list = list.filter(c=>!c.isOld);
   if(custFilter.view==='old') list = list.filter(c=>c.isOld);
   if(custFilter.q){ const q=custFilter.q.toLowerCase(); list = list.filter(c=>(c.company+c.contact.email+c.products).toLowerCase().includes(q)); }
@@ -4965,6 +5059,27 @@ function viewCustomers(root){
         <select class="form-control" style="width:140px" onchange="custFilter.tag=this.value;custFilter.page=1;renderView()">
           <option value="">全部标签</option>${PRESET_TAGS.map(t=>`<option value="${t.label}" ${custFilter.tag===t.label?'selected':''}>${t.label}</option>`).join('')}
         </select>
+        <select class="form-control" style="width:120px" onchange="custFilter.status=this.value;custFilter.page=1;renderView()">
+          <option value="">全部状态</option>
+          <option value="新客户" ${custFilter.status==='新客户'?'selected':''}>新客户</option>
+          <option value="已回复" ${custFilter.status==='已回复'?'selected':''}>已回复</option>
+          <option value="已成交" ${custFilter.status==='已成交'?'selected':''}>已成交</option>
+          <option value="已流失" ${custFilter.status==='已流失'?'selected':''}>已流失</option>
+        </select>
+        <select class="form-control" style="width:120px" onchange="custFilter.customerType=this.value;custFilter.page=1;renderView()">
+          <option value="">全部类型</option>
+          <option value="品牌商" ${custFilter.customerType==='品牌商'?'selected':''}>品牌商</option>
+          <option value="批发商" ${custFilter.customerType==='批发商'?'selected':''}>批发商</option>
+          <option value="电商" ${custFilter.customerType==='电商'?'selected':''}>电商</option>
+          <option value="零售商" ${custFilter.customerType==='零售商'?'selected':''}>零售商</option>
+        </select>
+        <select class="form-control" style="width:130px" onchange="custFilter.followDays=this.value;custFilter.page=1;renderView()">
+          <option value="">跟进时间</option>
+          <option value="7" ${custFilter.followDays==='7'?'selected':''}>7天未跟进</option>
+          <option value="14" ${custFilter.followDays==='14'?'selected':''}>14天未跟进</option>
+          <option value="30" ${custFilter.followDays==='30'?'selected':''}>30天未跟进</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="resetCustomerFilter()" style="white-space:nowrap">🔄 重置</button>
       </div>
       <button class="btn btn-primary" onclick="openCustomerForm()">＋ 添加客户</button>
     </div>
@@ -6232,6 +6347,12 @@ function openCustomerDetail(cid){
 }
 
 /* ---------- 添加 / 编辑客户 ---------- */
+function resetCustomerFilter(){
+  custFilter = {q:'', grade:'', country:'', source:'', tag:'', status:'', customerType:'', followDays:'', view:'all', page:1, selected:[]};
+  renderView();
+  toast('✅ 筛选条件已重置');
+}
+
 function openCustomerForm(cid){
   const c = cid ? S.customers.find(x=>x.id===cid) : null;
   const v = c || {company:'',website:'',country:'美国',customerType:'进口商',source:'谷歌搜索',products:'',contact:{name:'',title:'',email:'',whatsapp:'',phone:''}};
@@ -8921,8 +9042,130 @@ function renderApiSettings(){
           </tr>`).join('')}</tbody>
       </table></div>`;
     })()}
+  </div>
+
+  <!-- V75.3 数据一键备份与恢复 -->
+  <div class="card card-pad mb16" style="border-left:4px solid #2f855a;background:linear-gradient(135deg,#f0fff4,#fff)">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>💾 数据一键备份与恢复（全局数据安全）</span>
+      <span class="badge" style="background:#2f855a;color:#fff;font-size:10px">数据安全</span>
+    </div>
+    <p class="text-sm text-muted mb12">一键导出所有工作台数据为JSON备份文件，支持从备份文件恢复全部数据，确保数据安全不丢失</p>
+    
+    <!-- 数据统计 -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+      <div style="background:#ebf8ff;padding:10px;border-radius:6px;text-align:center">
+        <div style="font-size:20px;font-weight:bold;color:#2b6cb0">${S.customers.length}</div>
+        <div style="font-size:10px;color:#666">客户数据</div>
+      </div>
+      <div style="background:#f0fff4;padding:10px;border-radius:6px;text-align:center">
+        <div style="font-size:20px;font-weight:bold;color:#276749">${S.drafts.length}</div>
+        <div style="font-size:10px;color:#666">开发信</div>
+      </div>
+      <div style="background:#faf5ff;padding:10px;border-radius:6px;text-align:center">
+        <div style="font-size:20px;font-weight:bold;color:#6b46c1">${S.products.length}</div>
+        <div style="font-size:10px;color:#666">产品数据</div>
+      </div>
+      <div style="background:#fffbeb;padding:10px;border-radius:6px;text-align:center">
+        <div style="font-size:20px;font-weight:bold;color:#92400e">${S.orders.length}</div>
+        <div style="font-size:10px;color:#666">订单数据</div>
+      </div>
+    </div>
+    
+    <!-- 操作按钮 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button class="btn btn-primary" onclick="exportAllData()" style="padding:14px;font-size:14px;font-weight:600">
+        📤 一键导出全部数据
+        <div style="font-size:11px;font-weight:400;opacity:0.9;margin-top:4px">导出为JSON备份文件</div>
+      </button>
+      <button class="btn" style="padding:14px;font-size:14px;font-weight:600;background:#fff;color:#2f855a;border:2px solid #2f855a" onclick="document.getElementById('importDataFile').click()">
+        📥 从备份文件恢复
+        <div style="font-size:11px;font-weight:400;opacity:0.8;margin-top:4px">选择JSON文件导入恢复</div>
+      </button>
+      <input type="file" id="importDataFile" accept=".json" style="display:none" onchange="importAllData(this)">
+    </div>
+    
+    <!-- 警告提示 -->
+    <div style="margin-top:14px;padding:10px;background:#fffbeb;border-radius:6px;border:1px solid #fbd38d">
+      <div style="font-size:11px;color:#92400e;font-weight:600;margin-bottom:4px">⚠️ 注意事项</div>
+      <div style="font-size:11px;color:#744210;line-height:1.6">
+        1. 导出的备份文件包含所有工作台数据，请妥善保管<br>
+        2. 恢复数据会覆盖当前所有数据，操作前建议先导出备份<br>
+        3. 建议定期（每周/每月）导出备份，防止数据丢失
+      </div>
+    </div>
   </div>`;
 }
+
+/* V75.3 数据一键导出与恢复 */
+function exportAllData(){
+  const data = {};
+  // 导出所有S对象中的数据
+  const keys = Object.keys(S);
+  keys.forEach(k=>{
+    if(k!=='currentView' && k!=='currentCustomer' && k!=='currentDraft'){
+      data[k] = S[k];
+    }
+  });
+  // 添加元信息
+  data._backupMeta = {
+    version: 'V75.3',
+    exportTime: new Date().toISOString(),
+    exportDate: new Date().toLocaleDateString('zh-CN'),
+    customerCount: S.customers.length,
+    draftCount: S.drafts.length,
+    productCount: S.products.length,
+    orderCount: S.orders.length
+  };
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'kailion_workbench_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  toast('✅ 全部数据已导出为备份文件');
+  logAction('data_export', '导出全部数据', '客户'+S.customers.length+'/开发信'+S.drafts.length+'/产品'+S.products.length);
+}
+
+function importAllData(input){
+  const file = input.files[0];
+  if(!file) return;
+  
+  if(!confirm('确定要从备份文件恢复数据吗？这将覆盖当前所有数据，建议先导出当前数据备份。')){
+    input.value = '';
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!data._backupMeta){
+        toast('❌ 无效的备份文件格式');
+        return;
+      }
+      // 恢复数据
+      Object.keys(data).forEach(k=>{
+        if(k!=='_backupMeta'){
+          S[k] = data[k];
+        }
+      });
+      persist();
+      toast('✅ 数据恢复成功！页面即将刷新');
+      logAction('data_import', '从备份恢复数据', '备份时间:'+data._backupMeta.exportDate);
+      setTimeout(()=>location.reload(), 1500);
+    }catch(err){
+      toast('❌ 备份文件解析失败: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
 function openApiForm(aid){
   const a = aid? S.apis.find(x=>x.id===aid):{name:'',type:'openai',baseURL:'https://wawapi.top/v1',apiKey:'',model:'gpt-4o-mini',temperature:0.7};
   const show = aid? b64dec(a.apiKey):'';

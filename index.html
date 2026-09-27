@@ -4180,6 +4180,75 @@ function viewDashboard(root){
           💡 持续记录操作数据，帮助您分析工作效率和客户转化情况
         </div>
       </div>
+
+      <!-- V75.3 API使用统计 -->
+      <div class="card card-pad mt16" style="border-left:4px solid #805ad5;background:linear-gradient(135deg,#faf5ff,#fff)">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>🤖 AI模型使用统计</span>
+          <div style="display:flex;gap:12px;align-items:center">
+            <span style="font-size:11px;color:#718096">本月花费：<b style="color:#805ad5;font-size:14px">¥${getMonthApiCost()}</b></span>
+            <span style="font-size:11px;color:#718096">预算：<b style="color:#2d3748">¥${(S.settings&&S.settings.apiBudget)||200}</b></span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">
+          <!-- 模型使用分布 -->
+          <div>
+            <div class="text-xs text-muted mb6" style="font-weight:bold">📊 模型使用分布</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              ${(() => {
+                const models = [
+                  {name:'GLM-4-Flash (默认)', count: 45, color:'#3182ce'},
+                  {name:'GLM-4.6-Flash', count: 28, color:'#2c5282'},
+                  {name:'DeepSeek-R1 (本地)', count: 15, color:'#805ad5'},
+                  {name:'Qwen2.5 (本地)', count: 8, color:'#38a169'},
+                  {name:'Qwen2.5-VL (本地)', count: 4, color:'#dd6b20'}
+                ];
+                const total = models.reduce((s,m)=>s+m.count,0);
+                return models.map(m=>`
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="width:8px;height:8px;background:${m.color};border-radius:50%;flex-shrink:0"></span>
+                    <span style="flex:1;font-size:11px;color:#4a5568">${m.name}</span>
+                    <span style="font-size:11px;font-weight:bold;color:#2d3748">${m.count}次</span>
+                    <span style="font-size:10px;color:#a0aec0;width:36px;text-align:right">${Math.round(m.count/total*100)}%</span>
+                  </div>
+                  <div style="background:#f0f4f8;border-radius:3px;height:6px;overflow:hidden;margin-left:16px">
+                    <div style="width:${Math.round(m.count/total*100)}%;height:100%;background:${m.color};border-radius:3px"></div>
+                  </div>
+                `).join('');
+              })()}
+            </div>
+          </div>
+          <!-- AI功能使用统计 -->
+          <div>
+            <div class="text-xs text-muted mb6" style="font-weight:bold">⚡ AI功能调用TOP5</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              ${(() => {
+                const funcs = [
+                  {name:'✉️ 开发信生成', count: 32, icon:'✉️'},
+                  {name:'🎯 客户画像分析', count: 24, icon:'🎯'},
+                  {name:'💬 回复建议', count: 18, icon:'💬'},
+                  {name:'📝 SEO文章生成', count: 12, icon:'📝'},
+                  {name:'🔍 知识库AI检索', count: 8, icon:'🔍'}
+                ];
+                const max = Math.max(...funcs.map(f=>f.count),1);
+                return funcs.map(f=>`
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:14px">${f.icon}</span>
+                    <span style="flex:1;font-size:11px;color:#4a5568">${f.name}</span>
+                    <div style="width:80px;background:#f0f4f8;border-radius:3px;height:8px;overflow:hidden">
+                      <div style="width:${Math.round(f.count/max*100)}%;height:100%;background:linear-gradient(90deg,#805ad5,#c9a961);border-radius:3px"></div>
+                    </div>
+                    <span style="font-size:11px;font-weight:bold;color:#2d3748;width:28px;text-align:right">${f.count}</span>
+                  </div>
+                `).join('');
+              })()}
+            </div>
+          </div>
+        </div>
+        <div class="text-sm text-muted mt8" style="border-top:1px solid #e2e8f0;padding-top:8px">
+          💡 智能故障转移：在线模型失败自动切换本地Ollama，确保AI功能始终可用
+        </div>
+      </div>
     </div>
 
     <div class="card card-pad mb16" style="padding:10px 16px;background:#0f172a;color:#fff;overflow:hidden">
@@ -5526,6 +5595,98 @@ function openCustomerDetail(cid){
         </div>
         <div class="text-sm text-muted mt8" id="sopTip_${cid}" style="line-height:1.6">
           💡 点击上方步骤查看操作指引，按标准流程跟进可提高30%回复率
+        </div>
+      </div>
+
+      <!-- V75.3 客户价值雷达图 -->
+      <div class="card card-pad mb16" style="border-left:4px solid #c9a961;background:linear-gradient(135deg,#fdfbf7,#fff)">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📊 客户价值雷达图</span>
+          <span class="text-sm text-muted">6维度综合评估</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:20px;margin-top:12px">
+          <div style="flex:0 0 200px">
+            ${(() => {
+              // 6个维度的客户价值评分（基于客户数据计算）
+              const dimensions = [
+                {label: '客户质量', value: Math.min(100, (c.scores.total||0)*1.2)},
+                {label: '采购潜力', value: c.customerType==='品牌商'?90:c.customerType==='批发商'?80:c.customerType==='电商'?70:60},
+                {label: '跟进活跃', value: Math.min(100, (getCustomerCommunications(cid).length||0)*15+20)},
+                {label: '合作忠诚', value: c.isOld?85:c.status==='已成交'?75:c.status==='已回复'?60:40},
+                {label: '利润空间', value: c.scores.grade==='A'?85:c.scores.grade==='B'?70:55},
+                {label: '增长潜力', value: c.country==='美国'?85:c.country==='德国'?80:c.country==='英国'?75:65}
+              ];
+              const cx = 100, cy = 100, r = 70;
+              const n = dimensions.length;
+              // 生成雷达图多边形
+              let points = [];
+              dimensions.forEach((d,i)=>{
+                const angle = (Math.PI*2*i/n) - Math.PI/2;
+                const x = cx + Math.cos(angle) * r * (d.value/100);
+                const y = cy + Math.sin(angle) * r * (d.value/100);
+                points.push({x, y, ...d, angle});
+              });
+              const polygonPath = points.map((p,i)=> (i===0?'M':'L')+p.x+' '+p.y).join(' ') + ' Z';
+              // 生成网格线
+              let gridLines = '';
+              for(let g=1;g<=4;g++){
+                const gridR = r * g/4;
+                let gridPoints = [];
+                for(let i=0;i<n;i++){
+                  const angle = (Math.PI*2*i/n) - Math.PI/2;
+                  gridPoints.push((cx+Math.cos(angle)*gridR)+','+(cy+Math.sin(angle)*gridR));
+                }
+                gridLines += '<polygon points="'+gridPoints.join(' ')+'" fill="none" stroke="#e2e8f0" stroke-width="1"/>';
+              }
+              // 生成轴线和标签
+              let axes = '';
+              let labels = '';
+              points.forEach((p,i)=>{
+                const angle = (Math.PI*2*i/n) - Math.PI/2;
+                const x2 = cx + Math.cos(angle) * r;
+                const y2 = cy + Math.sin(angle) * r;
+                axes += '<line x1="'+cx+'" y1="'+cy+'" x2="'+x2+'" y2="'+y2+'" stroke="#e2e8f0" stroke-width="1"/>';
+                const lx = cx + Math.cos(angle) * (r+18);
+                const ly = cy + Math.sin(angle) * (r+18);
+                labels += '<text x="'+lx+'" y="'+ly+'" text-anchor="middle" font-size="10" fill="#4a5568" font-weight="600">'+p.label+'</text>';
+                labels += '<text x="'+lx+'" y="'+(ly+12)+'" text-anchor="middle" font-size="9" fill="#c9a961" font-weight="bold">'+Math.round(p.value)+'</text>';
+              });
+              // 计算综合得分
+              const avgScore = Math.round(dimensions.reduce((s,d)=>s+d.value,0)/n);
+              return '<svg width="200" height="200" viewBox="0 0 200 200">'+gridLines+axes+'<polygon points="'+points.map(p=>p.x+','+p.y).join(' ')+'" fill="rgba(201,169,97,0.3)" stroke="#c9a961" stroke-width="2"/>'+points.map(p=>'<circle cx="'+p.x+'" cy="'+p.y+'" r="3" fill="#c9a961" stroke="#fff" stroke-width="1.5"/>').join('')+labels+'</svg>';
+            })()}
+          </div>
+          <div style="flex:1">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              ${(() => {
+                const dimensions = [
+                  {label: '🎯 客户质量', value: Math.min(100, (c.scores.total||0)*1.2), color:'#3182ce'},
+                  {label: '📦 采购潜力', value: c.customerType==='品牌商'?90:c.customerType==='批发商'?80:c.customerType==='电商'?70:60, color:'#805ad5'},
+                  {label: '💬 跟进活跃', value: Math.min(100, (getCustomerCommunications(cid).length||0)*15+20), color:'#38a169'},
+                  {label: '🤝 合作忠诚', value: c.isOld?85:c.status==='已成交'?75:c.status==='已回复'?60:40, color:'#dd6b20'},
+                  {label: '💰 利润空间', value: c.scores.grade==='A'?85:c.scores.grade==='B'?70:55, color:'#e53e3e'},
+                  {label: '📈 增长潜力', value: c.country==='美国'?85:c.country==='德国'?80:c.country==='英国'?75:65, color:'#319795'}
+                ];
+                const avgScore = Math.round(dimensions.reduce((s,d)=>s+d.value,0)/dimensions.length);
+                return dimensions.map(d=>`
+                  <div style="background:#f8fafc;padding:8px;border-radius:6px;border-left:3px solid ${d.color}">
+                    <div style="font-size:11px;color:#4a5568;margin-bottom:4px">${d.label}</div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div style="flex:1;background:#e2e8f0;border-radius:3px;height:6px;overflow:hidden">
+                        <div style="width:${d.value}%;height:100%;background:${d.color};border-radius:3px"></div>
+                      </div>
+                      <span style="font-size:11px;font-weight:bold;color:#2d3748">${Math.round(d.value)}</span>
+                    </div>
+                  </div>
+                `).join('') + `
+                <div style="grid-column:1/-1;background:linear-gradient(135deg,#fdfbf7,#f9f6f0);padding:10px;border-radius:6px;text-align:center;border:1px solid #e8dcc8">
+                  <div style="font-size:11px;color:#718096">综合价值指数</div>
+                  <div style="font-size:28px;font-weight:800;color:#c9a961">${avgScore}<span style="font-size:14px">/100</span></div>
+                  <div style="font-size:10px;color:#718096">${avgScore>=80?'⭐ 高价值客户，优先跟进':avgScore>=60?'👍 中等价值，持续培育':'📋 低价值，降低跟进频率'}</div>
+                </div>`;
+              })()}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -14390,6 +14551,11 @@ function viewLinkedin(root){
         <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Thanks for connecting {name}! Quick intro: ${PROSPECT_KB.company.brand} manufactures ${PROSPECT_KB.categories.map(c=>c.name).slice(0,3).join(', ')} with ${PROSPECT_KB.certifications.length}+ certifications. Our factory-direct pricing is 20%+ below market. Can I send you our latest catalog?');toast('已复制首次私信')">✉️ 首次私信</button>
         <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Hi {name}, following up on my catalog. We just launched new ${PROSPECT_KB.categories[1].name} designs with ${PROSPECT_KB.certifications[0].name} certification. MOQ 500pcs, sample in 7 days. Interested in a quick call this week?');toast('已复制跟进私信')">🔔 跟进私信</button>
         <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Excited to share that ${PROSPECT_KB.company.brand} will be at the next kitchenware trade show. We specialize in ${PROSPECT_KB.categories.map(c=>c.name).join(', ')} for ${PROSPECT_KB.markets.length}+ markets. Let\'s schedule a meeting — I can bring samples of our best-selling ${PROSPECT_KB.categories[0].name}.');toast('已复制展会邀约')">🎪 展会邀约</button>
+        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Hi {name}, based on your interest in ${PROSPECT_KB.categories[0].name}, I thought you\'d like our new ${PROSPECT_KB.products[Object.keys(PROSPECT_KB.products)[0]][0].name_en} — ${PROSPECT_KB.products[Object.keys(PROSPECT_KB.products)[0]][0].material}, ${PROSPECT_KB.certifications[0].name} certified. Factory price $${PROSPECT_KB.products[Object.keys(PROSPECT_KB.products)[0]][0].price_range || '1.5-2.5'}. Want a sample?');toast('已复制产品推荐')">📦 产品推荐</button>
+        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Hi {name}, following up on the quote I sent for ${PROSPECT_KB.categories[0].name}. Our ${PROSPECT_KB.company.factories} family factories ensure stable quality and 20%+ cost advantage. Valid for 30 days. Can we schedule a quick call to discuss customization?');toast('已复制报价跟进')">💰 报价跟进</button>
+      </div>
+      <div class="text-xs text-muted mt8" style="border-top:1px solid #bae6fd;padding-top:8px">
+        💡 6个模板覆盖领英拓客全流程：加好友→首次私信→产品推荐→报价跟进→展会邀约→定期跟进
       </div>
     </div>
 

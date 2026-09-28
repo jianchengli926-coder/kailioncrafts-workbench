@@ -17430,6 +17430,198 @@ function viewAutoSearch(root){
       </div>
     </div>
 
+    <!-- V75.3 AI精准客户画像筛选器（参考Facebook受众筛选） -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1px solid #fecaca">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#991b1b;font-size:16px">🎯 AI精准客户画像筛选器</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">参考Facebook广告受众筛选，多维度精准定位你的理想客户</div>
+        </div>
+        <button class="btn btn-sm" style="background:#dc2626;color:#fff" onclick="generateIdealCustomerProfile()">✨ AI生成理想客户画像</button>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <!-- 国家地区 -->
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px">🌍 目标国家/地区</div>
+          <select id="filter_country" class="form-control" style="font-size:12px">
+            <option value="">全部国家</option>
+            <option value="US">🇺🇸 美国</option>
+            <option value="DE">🇩🇪 德国</option>
+            <option value="GB">🇬🇧 英国</option>
+            <option value="FR">🇫🇷 法国</option>
+            <option value="CA">🇨🇦 加拿大</option>
+            <option value="AU">🇦🇺 澳大利亚</option>
+            <option value="JP">🇯🇵 日本</option>
+            <option value="NL">🇳🇱 荷兰</option>
+            <option value="SE">🇸🇪 瑞典</option>
+            <option value="IT">🇮🇹 意大利</option>
+            <option value="ES">🇪🇸 西班牙</option>
+            <option value="MX">🇲🇽 墨西哥</option>
+            <option value="BR">🇧🇷 巴西</option>
+            <option value="AE">🇦🇪 阿联酋</option>
+          </select>
+        </div>
+        
+        <!-- 企业规模 -->
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px">🏢 企业规模</div>
+          <select id="filter_size" class="form-control" style="font-size:12px">
+            <option value="">不限规模</option>
+            <option value="small">小型 (10-50人)</option>
+            <option value="medium">中型 (50-200人)</option>
+            <option value="large">大型 (200-500人)</option>
+            <option value="enterprise">企业级 (500+人)</option>
+          </select>
+        </div>
+        
+        <!-- 决策人职位 -->
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px">👤 决策人职位</div>
+          <select id="filter_role" class="form-control" style="font-size:12px">
+            <option value="">不限职位</option>
+            <option value="ceo">CEO/创始人</option>
+            <option value="purchasing">采购经理/总监</option>
+            <option value="sourcing">供应链经理</option>
+            <option value="product">产品经理</option>
+            <option value="sales">销售总监</option>
+            <option value="buyer">采购员/Buyer</option>
+          </select>
+        </div>
+        
+        <!-- 客户类型 -->
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px">🏷️ 客户类型</div>
+          <select id="filter_type" class="form-control" style="font-size:12px">
+            <option value="">不限类型</option>
+            <option value="distributor">分销商/批发商</option>
+            <option value="importer">进口商</option>
+            <option value="retailer">零售商/连锁店</option>
+            <option value="brand">品牌商/自有品牌</option>
+            <option value="ecommerce">电商卖家/亚马逊</option>
+            <option value="foodservice">餐饮供应链</option>
+            <option value="manufacturer">制造商/OEM</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- 更多筛选条件 -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px">💰 年采购额预估</div>
+          <select id="filter_revenue" class="form-control" style="font-size:12px">
+            <option value="">不限</option>
+            <option value="low">$10万以下</option>
+            <option value="medium">$10万-$100万</option>
+            <option value="high">$100万-$500万</option>
+            <option value="enterprise">$500万以上</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px">🌐 是否有独立站</div>
+          <select id="filter_website" class="form-control" style="font-size:12px">
+            <option value="">不限</option>
+            <option value="yes">✅ 有独立站</option>
+            <option value="no">❌ 无独立站</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px">💼 是否有LinkedIn</div>
+          <select id="filter_linkedin" class="form-control" style="font-size:12px">
+            <option value="">不限</option>
+            <option value="yes">✅ 有LinkedIn</option>
+            <option value="no">❌ 无LinkedIn</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- AI生成结果 -->
+      <div id="idealProfileResult" style="display:none;margin-top:14px">
+        <div style="background:#fff;padding:14px;border-radius:8px;border:1px solid #fecaca">
+          <div style="font-weight:700;font-size:13px;color:#991b1b;margin-bottom:10px">📋 AI生成的理想客户画像</div>
+          <div id="idealProfileContent"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- V75.3 产品品类智能搜客中心 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#1e40af;font-size:16px">🔪 产品品类智能搜客中心</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">针对四大品类自动生成搜索策略、关键词和目标客户类型</div>
+        </div>
+      </div>
+      
+      <!-- 四大品类卡片 -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">
+        ${[
+          {name:'户外刀', icon:'🏕️', color:'#059669', products:['outdoor knife','camping knife','hunting knife','folding knife','survival knife','tactical knife','fixed blade knife','bushcraft knife'], customers:['户外用品分销商','露营装备进口商','狩猎用品零售商','战术装备品牌商','电商卖家'], markets:['美国','德国','加拿大','澳大利亚','瑞典']},
+          {name:'厨刀', icon:'🔪', color:'#dc2626', products:['chef knife','kitchen knife set','santoku knife','paring knife','bread knife','boning knife','cleaver','damascus knife'], customers:['厨具分销商','厨房用品进口商','百货零售商','品牌商','餐饮供应链'], markets:['美国','德国','英国','日本','法国']},
+          {name:'剪刀', icon:'✂️', color:'#7c3aed', products:['kitchen scissors','poultry shears','herb scissors','seafood scissors','multifunction scissors','pruning shears','tailor scissors','industrial scissors'], customers:['日用品分销商','文具进口商','园艺用品商','裁缝用品商','工业用品商'], markets:['美国','德国','英国','意大利','西班牙']},
+          {name:'厨房用品', icon:'🍳', color:'#d97706', products:['kitchen utensils','cooking tools','kitchen gadget','cutting board','kitchen storage','spice rack','kitchen organizer','baking tools'], customers:['厨房用品分销商','家居用品进口商','百货连锁店','电商卖家','礼品公司'], markets:['美国','德国','英国','加拿大','澳大利亚']}
+        ].map((cat,i)=>`
+          <div style="background:#fff;padding:14px;border-radius:10px;border:2px solid ${cat.color};cursor:pointer;transition:all 0.2s" onclick="selectCategory(${i})" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px ${cat.color}40'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'">
+            <div style="font-size:32px;text-align:center">${cat.icon}</div>
+            <div style="font-weight:700;font-size:15px;color:${cat.color};text-align:center;margin-top:6px">${cat.name}</div>
+            <div style="font-size:10px;color:#64748b;text-align:center;margin-top:4px">${cat.products.length}个关键词 · ${cat.customers.length}类客户</div>
+          </div>
+        `).join('')}
+      </div>
+      
+      <!-- 品类详情展示 -->
+      <div id="categoryDetail" style="background:#fff;padding:14px;border-radius:8px;border:1px solid #bfdbfe">
+        <div style="text-align:center;color:#94a3b8;padding:20px;font-size:13px">👆 点击上方品类卡片，查看该品类的完整搜客策略</div>
+      </div>
+    </div>
+
+    <!-- V75.3 Google高级搜索指令生成器 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#166534;font-size:16px">🔍 Google高级搜索指令生成器</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">自动生成精准Google搜索指令，一键复制直接搜索</div>
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px">产品关键词</div>
+          <input id="gsc_keyword" class="form-control" placeholder="例如：kitchen knife" value="kitchen knife" style="font-size:12px">
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px">目标国家</div>
+          <select id="gsc_country" class="form-control" style="font-size:12px">
+            <option value="">全球</option>
+            <option value="US">美国</option>
+            <option value="DE">德国</option>
+            <option value="GB">英国</option>
+            <option value="FR">法国</option>
+            <option value="CA">加拿大</option>
+            <option value="AU">澳大利亚</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px">客户类型</div>
+          <select id="gsc_type" class="form-control" style="font-size:12px">
+            <option value="distributor">分销商</option>
+            <option value="importer">进口商</option>
+            <option value="wholesaler">批发商</option>
+            <option value="retailer">零售商</option>
+            <option value="manufacturer">制造商</option>
+            <option value="supplier">供应商</option>
+          </select>
+        </div>
+      </div>
+      
+      <button class="btn btn-primary" onclick="generateSearchCommands()">⚡ 生成搜索指令</button>
+      
+      <div id="searchCommandsResult" style="display:none;margin-top:14px">
+        <div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:10px">📋 生成的搜索指令（点击复制）：</div>
+        <div id="searchCommandsList"></div>
+      </div>
+    </div>
+
     <!-- V75.3 多渠道搜客策略指南 -->
     <div class="card card-pad mb16" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -20075,6 +20267,153 @@ function startNaturalSearch(){
   setTimeout(() => {
     if(parsedSearchConditions) applyParsedSearch();
   }, 3000);
+}
+
+
+
+/* V75.3 外贸获客增强功能JS */
+const CATEGORIES = [
+  {name:'户外刀', icon:'🏕️', color:'#059669', products:['outdoor knife','camping knife','hunting knife','folding knife','survival knife','tactical knife','fixed blade knife','bushcraft knife'], customers:['户外用品分销商','露营装备进口商','狩猎用品零售商','战术装备品牌商','电商卖家'], markets:['美国','德国','加拿大','澳大利亚','瑞典'], strategy:'重点搜索户外用品连锁店和露营装备分销商，关注亚马逊户外品类大卖，参加户外展会（如Outdoor Retailer）'},
+  {name:'厨刀', icon:'🔪', color:'#dc2626', products:['chef knife','kitchen knife set','santoku knife','paring knife','bread knife','boning knife','cleaver','damascus knife'], customers:['厨具分销商','厨房用品进口商','百货零售商','品牌商','餐饮供应链'], markets:['美国','德国','英国','日本','法国'], strategy:'重点搜索厨具品牌商和百货连锁店，关注专业厨师用品供应商，参加法兰克福消费品展'},
+  {name:'剪刀', icon:'✂️', color:'#7c3aed', products:['kitchen scissors','poultry shears','herb scissors','seafood scissors','multifunction scissors','pruning shears','tailor scissors','industrial scissors'], customers:['日用品分销商','文具进口商','园艺用品商','裁缝用品商','工业用品商'], markets:['美国','德国','英国','意大利','西班牙'], strategy:'重点搜索日用品批发商和园艺用品商，关注专业裁缝用品品牌，多品类组合销售'},
+  {name:'厨房用品', icon:'🍳', color:'#d97706', products:['kitchen utensils','cooking tools','kitchen gadget','cutting board','kitchen storage','spice rack','kitchen organizer','baking tools'], customers:['厨房用品分销商','家居用品进口商','百货连锁店','电商卖家','礼品公司'], markets:['美国','德国','英国','加拿大','澳大利亚'], strategy:'重点搜索家居用品连锁店和礼品公司，关注厨房收纳品类，套装组合提高客单价'}
+];
+
+function generateIdealCustomerProfile(){
+  const country = document.getElementById('filter_country').value;
+  const size = document.getElementById('filter_size').value;
+  const role = document.getElementById('filter_role').value;
+  const type = document.getElementById('filter_type').value;
+  const revenue = document.getElementById('filter_revenue').value;
+  const website = document.getElementById('filter_website').value;
+  const linkedin = document.getElementById('filter_linkedin').value;
+  
+  const resultEl = document.getElementById('idealProfileResult');
+  const contentEl = document.getElementById('idealProfileContent');
+  resultEl.style.display = 'block';
+  contentEl.innerHTML = '<div style="text-align:center;padding:20px"><div style="font-size:24px;animation:spin 1s linear infinite">🔄</div><div style="margin-top:8px;color:#6b7280">AI正在生成理想客户画像...</div></div>';
+  
+  const prompt = '根据以下筛选条件，生成一份详细的理想客户画像，包括：客户特征描述、典型公司名称示例、关键决策人画像、采购行为特点、痛点需求、触达渠道建议、开发信切入点。筛选条件：国家=' + country + '，企业规模=' + size + '，决策人职位=' + role + '，客户类型=' + type + '，年采购额=' + revenue + '，有独立站=' + website + '，有LinkedIn=' + linkedin + '。产品是厨房刀具和户外用品。';
+  
+  callAI([{role:'user', content:prompt}], {
+    onSuccess: function(response){
+      contentEl.innerHTML = '<div style="font-size:12px;color:#374151;line-height:1.8;white-space:pre-wrap">' + response + '</div>';
+    },
+    onError: function(){
+      contentEl.innerHTML = '<div style="font-size:12px;color:#6b7280;line-height:1.8">AI生成失败，请使用规则生成的基础画像：<br><br>🎯 目标客户：' + (type||'批发商') + '，位于' + (country||'全球') + '<br>🏢 企业规模：' + (size||'不限') + '<br>👤 决策人：' + (role||'采购经理') + '<br>💰 采购能力：' + (revenue||'不限') + '<br><br>💡 建议：优先通过LinkedIn找到决策人，发送个性化开发信，附上产品目录和认证资料。</div>';
+    }
+  });
+}
+
+function selectCategory(idx){
+  const cat = CATEGORIES[idx];
+  const detailEl = document.getElementById('categoryDetail');
+  detailEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div style="font-size:40px">${cat.icon}</div>
+      <div>
+        <div style="font-weight:700;font-size:18px;color:${cat.color}">${cat.name}搜客策略</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">${cat.strategy}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div style="background:#f8fafc;padding:12px;border-radius:8px">
+        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">🔑 核心搜索关键词</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          ${cat.products.map(p=>'<span class="badge" style="background:#dbeafe;color:#1e40af;font-size:10px;padding:3px 8px;cursor:pointer" onclick="copyText(\''+p+'\')">'+p+'</span>').join('')}
+        </div>
+      </div>
+      <div style="background:#f8fafc;padding:12px;border-radius:8px">
+        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">🏢 目标客户类型</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${cat.customers.map(c=>'<div style="font-size:11px;color:#334155">• '+c+'</div>').join('')}
+        </div>
+      </div>
+      <div style="background:#f8fafc;padding:12px;border-radius:8px">
+        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">🌍 重点市场</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          ${cat.markets.map(m=>'<span class="badge" style="background:#dcfce7;color:#166534;font-size:10px;padding:3px 8px">'+m+'</span>').join('')}
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-sm btn-primary" onclick="document.getElementById(\'gsc_keyword\').value=\''+cat.products[0]+'\';generateSearchCommands()">⚡ 生成Google搜索指令</button>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById(\'naturalSearchInput\').value=\'寻找'+cat.name+'的'+cat.customers[0]+'，在'+cat.markets[0]+'市场\'">💬 用自然语言搜客</button>
+    </div>
+  `;
+}
+
+function generateSearchCommands(){
+  const keyword = document.getElementById('gsc_keyword').value.trim();
+  const country = document.getElementById('gsc_country').value;
+  const type = document.getElementById('gsc_type').value;
+  
+  if(!keyword){
+    toast('请输入产品关键词');
+    return;
+  }
+  
+  const typeWords = {
+    distributor: ['distributor','distribution','wholesale distributor'],
+    importer: ['importer','import company','importing'],
+    wholesaler: ['wholesaler','wholesale','bulk supplier'],
+    retailer: ['retailer','retail store','chain store'],
+    manufacturer: ['manufacturer','factory','producer'],
+    supplier: ['supplier','vendor','sourcing']
+  };
+  
+  const countrySites = {
+    US: ['site:.com','site:.us'],
+    DE: ['site:.de'],
+    GB: ['site:.co.uk','site:.uk'],
+    FR: ['site:.fr'],
+    CA: ['site:.ca'],
+    AU: ['site:.com.au']
+  };
+  
+  const commands = [];
+  
+  // 基础搜索
+  commands.push({title:'基础产品+客户类型', cmd: '"' + keyword + '" ' + typeWords[type][0]});
+  
+  // 带国家域名
+  if(country && countrySites[country]){
+    commands.push({title:'国家域名限定', cmd: '"' + keyword + '" ' + typeWords[type][0] + ' ' + countrySites[country][0]});
+  }
+  
+  // intitle搜索
+  commands.push({title:'标题包含关键词', cmd: 'intitle:"' + keyword + '" ' + typeWords[type][1]});
+  
+  // inurl搜索
+  commands.push({title:'URL包含关键词', cmd: 'inurl:"' + keyword + '" ' + typeWords[type][0]});
+  
+  // 联系页面搜索
+  commands.push({title:'找联系页面', cmd: '"' + keyword + '" ' + typeWords[type][0] + ' "contact us"'});
+  
+  // 关于我们页面
+  commands.push({title:'找公司介绍', cmd: '"' + keyword + '" ' + typeWords[type][0] + ' "about us"'});
+  
+  // LinkedIn搜索
+  commands.push({title:'LinkedIn找公司', cmd: 'site:linkedin.com/company "' + keyword + '" ' + typeWords[type][0]});
+  
+  // 采购经理搜索
+  commands.push({title:'找采购经理', cmd: 'site:linkedin.com/in "purchasing manager" "' + keyword + '"'});
+  
+  const resultEl = document.getElementById('searchCommandsResult');
+  const listEl = document.getElementById('searchCommandsList');
+  resultEl.style.display = 'block';
+  
+  listEl.innerHTML = commands.map((c,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#f0fdf4;border-radius:6px;margin-bottom:6px;border:1px solid #bbf7d0">
+      <div style="background:#166534;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;flex-shrink:0">${i+1}</div>
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:700;color:#166534;margin-bottom:2px">${c.title}</div>
+        <div style="font-size:11px;color:#374151;font-family:monospace;background:#fff;padding:4px 8px;border-radius:4px;word-break:break-all">${c.cmd}</div>
+      </div>
+      <button class="btn btn-sm" style="background:#166534;color:#fff;flex-shrink:0" onclick="copyText(\'${c.cmd.replace(/'/g,"\\'")}\')">复制</button>
+      <button class="btn btn-sm" style="background:#3b82f6;color:#fff;flex-shrink:0" onclick="window.open(\'https://www.google.com/search?q=\'+encodeURIComponent(\'${c.cmd.replace(/'/g,"\\'")}\'),\'_blank\')">搜索</button>
+    </div>
+  `).join('');
 }
 
 </script>

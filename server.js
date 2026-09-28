@@ -16,6 +16,7 @@
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
+const crypto = require('crypto');
 const path = require('path');
 const { URL } = require('url');
 const dns = require('dns');
@@ -335,10 +336,7 @@ function proxyRequest(req, res, targetUrl) {
   
   const proxyReq = httpModule.request(options, (proxyRes) => {
     res.writeHead(proxyRes.statusCode, {
-      ...proxyRes.headers,
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-goog-api-key'
+      ...proxyRes.headers
     });
     proxyRes.pipe(res);
   });
@@ -352,7 +350,44 @@ function proxyRequest(req, res, targetUrl) {
 }
 
 // ============ 静态文件服务 ============
+// 敏感文件denylist（禁止通过静态文件路由下载）
+const STATIC_DENYLIST = [
+  'access_config.json', 'search_config.json', 'search_cache.json', 'search_usage.json',
+  '.env', '.git', 'node_modules', '*.log', '*backup*.json', '*backup*.zip',
+  'kb_index.json', 'kb_index_', '公司核心事实清单', '卖点与服务清单',
+  '公司知识库', '.kb_hash_cache', 'kb_meta_docs.json', 'kb_search_tests.json',
+  '外贸客户开发知识库.json',
+  'server.js', 'kb_indexer.py', '*.py', '*.sh', '*.command',
+  'README.md', 'DEPLOY.md', '工作交接文档.md', '工作台功能深度分析报告.md',
+  '完整使用说明书', '工作台使用说明书', '工作台功能思维导图',
+  'package.json', 'package-lock.json'
+];
+
+function isSensitiveStaticPath(filePath) {
+  const normalized = filePath.replace(/\\/g, '/').toLowerCase();
+  for (const pattern of STATIC_DENYLIST) {
+    if (pattern.startsWith('*')) {
+      const keyword = pattern.substring(1).toLowerCase();
+      if (normalized.includes(keyword)) return true;
+    } else if (pattern.endsWith('*')) {
+      const prefix = pattern.substring(0, pattern.length - 1).toLowerCase();
+      if (normalized.includes(prefix)) return true;
+    } else {
+      if (normalized.includes('/' + pattern.toLowerCase()) || normalized.endsWith('/' + pattern.toLowerCase())) return true;
+    }
+  }
+  // 额外检查：.git目录及其子路径
+  if (normalized.includes('/.git')) return true;
+  return false;
+}
+
 function serveStaticFile(req, res, filePath) {
+  // denylist检查：禁止下载敏感文件
+  if (isSensitiveStaticPath(filePath)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('403 Forbidden');
+    return;
+  }
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
       // 如果文件不存在，返回index.html（SPA支持）
@@ -378,8 +413,7 @@ function serveStaticFile(req, res, filePath) {
     res.writeHead(200, {
       'Content-Type': contentType,
       'Content-Length': stats.size,
-      'Cache-Control': cacheControl,
-      'Access-Control-Allow-Origin': '*'
+      'Cache-Control': cacheControl
     });
     
     const stream = fs.createReadStream(filePath);
@@ -396,13 +430,9 @@ const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
   const pathname = decodeURIComponent(reqUrl.pathname);
   
-  // CORS预检
+  // CORS预检（同源策略，不使用通配符）
   if (req.method === 'OPTIONS') {
-    res.writeHead(200, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-goog-api-key'
-    });
+    res.writeHead(204);
     res.end();
     return;
   }
@@ -439,8 +469,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   
-  // Ollama代理API（解决浏览器CORS）
+  // Ollama代理API（公网禁用）
   if (pathname.startsWith('/api/ollama/')) {
+    const scope = getAccessScope(req);
+    if (scope === 'public') {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '公网访问已禁用本地模型接口' }));
+      return;
+    }
     const targetPath = pathname.replace('/api/ollama', '');
     const targetUrl = `${OLLAMA_URL}${targetPath}${reqUrl.search}`;
     log(`Ollama代理: ${req.method} ${targetPath}`, 'REQUEST');
@@ -448,19 +484,50 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   
-  // 在线模型API代理（可选，解决CORS）
+  // 在线模型API代理已关闭（SSRF风险，无明确当前用途）
   if (pathname.startsWith('/api/proxy/')) {
-    const targetUrl = reqUrl.searchParams.get('url');
-    if (targetUrl) {
-      log(`API代理: ${req.method} ${targetUrl.substring(0, 60)}...`, 'REQUEST');
-      proxyRequest(req, res, targetUrl);
-      return;
-    }
+    res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: '代理接口已禁用', reason: 'SSRF安全风险，无明确当前用途' }));
+    return;
   }
   
-  // ============ 访问密码API（服务端存储，可更换，不硬编码） ============
+  // ============ 访问密码API（scrypt哈希+HttpOnly会话+失败限制+公网权限） ============
   
   const ACCESS_CONFIG_FILE = path.join(ROOT_DIR, 'access_config.json');
+  const SESSION_COOKIE_NAME = 'kl_session';
+  const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8小时
+  const MAX_FAILED_ATTEMPTS = 5;
+  const FAIL_LOCKOUT_MS = 60 * 1000; // 1分钟
+  
+  // 内存会话存储（不写磁盘）
+  const activeSessions = new Map();
+  const failedAttempts = new Map(); // ip -> {count, firstFailTime}
+  
+  function hashPassword(password, salt) {
+    return crypto.scryptSync(password, salt, 64).toString('hex');
+  }
+  
+  function verifyPassword(password, config) {
+    if (config.passwordHash && config.salt) {
+      const hash = hashPassword(password, Buffer.from(config.salt, 'hex'));
+      return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(config.passwordHash, 'hex'));
+    }
+    // 兼容旧明文配置（自动迁移）
+    if (config.password && typeof config.password === 'string') {
+      const match = password === config.password;
+      if (match) {
+        // 迁移为哈希
+        const salt = crypto.randomBytes(16);
+        config.passwordHash = hashPassword(password, salt);
+        config.salt = salt.toString('hex');
+        delete config.password; // 移除明文
+        config.migratedAt = new Date().toISOString();
+        saveAccessConfig(config);
+      }
+      return match;
+    }
+    return false;
+  }
   
   function loadAccessConfig() {
     try {
@@ -468,10 +535,18 @@ const server = http.createServer(async (req, res) => {
         return JSON.parse(fs.readFileSync(ACCESS_CONFIG_FILE, 'utf-8'));
       }
     } catch(e) {}
-    // 首次运行：生成随机密码
+    // 首次运行：生成随机密码并立即哈希存储
     const randomPassword = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
-    const config = { password: randomPassword, createdAt: new Date().toISOString(), changed: false };
+    const salt = crypto.randomBytes(16);
+    const config = {
+      passwordHash: hashPassword(randomPassword, salt),
+      salt: salt.toString('hex'),
+      createdAt: new Date().toISOString(),
+      changed: false,
+      tempPassword: randomPassword // 仅首次生成时保留，供用户在终端查看
+    };
     try { fs.writeFileSync(ACCESS_CONFIG_FILE, JSON.stringify(config, null, 2)); } catch(e) {}
+    console.log('\n🔐 首次运行临时密码（请立即修改）: ' + randomPassword + '\n');
     return config;
   }
   
@@ -479,28 +554,90 @@ const server = http.createServer(async (req, res) => {
     try { fs.writeFileSync(ACCESS_CONFIG_FILE, JSON.stringify(config, null, 2)); return true; } catch(e) { return false; }
   }
   
+  function getClientIp(req) {
+    return req.socket.remoteAddress || 'unknown';
+  }
+  
+  function isRateLimited(ip) {
+    const record = failedAttempts.get(ip);
+    if (!record) return false;
+    if (record.count >= MAX_FAILED_ATTEMPTS) {
+      if (Date.now() - record.firstFailTime < FAIL_LOCKOUT_MS) return true;
+      failedAttempts.delete(ip); // 锁定过期，重置
+    }
+    return false;
+  }
+  
+  function recordFailedAttempt(ip) {
+    const record = failedAttempts.get(ip) || { count: 0, firstFailTime: Date.now() };
+    record.count++;
+    failedAttempts.set(ip, record);
+  }
+  
+  function createSession(res) {
+    const token = crypto.randomBytes(32).toString('hex');
+    activeSessions.set(token, { createdAt: Date.now(), expiresAt: Date.now() + SESSION_TTL_MS });
+    res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_MS / 1000}`);
+    return token;
+  }
+  
+  function validateSession(req) {
+    const cookies = req.headers.cookie || '';
+    const match = cookies.match(new RegExp(SESSION_COOKIE_NAME + '=([^;]+)'));
+    if (!match) return false;
+    const token = match[1];
+    const session = activeSessions.get(token);
+    if (!session) return false;
+    if (Date.now() > session.expiresAt) {
+      activeSessions.delete(token);
+      return false;
+    }
+    return true;
+  }
+  
+  function destroySession(res) {
+    res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`);
+  }
+  
   // 访问密码状态（公开，不泄露密码）
   if (pathname === '/api/access/status' && req.method === 'GET') {
     const config = loadAccessConfig();
+    const ip = getClientIp(req);
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({
-      hasPassword: !!config.password,
+      hasPassword: !!(config.passwordHash || config.password),
       isDefault: config.changed === false,
-      passwordHint: config.changed === false ? '首次运行已生成临时密码，请在本机登录后立即修改' : null
+      passwordHint: config.changed === false ? '首次运行已生成临时密码，请在本机登录后立即修改' : null,
+      authenticated: validateSession(req),
+      rateLimited: isRateLimited(ip)
     }));
     return;
   }
   
-  // 验证密码
+  // 验证密码（登录）
   if (pathname === '/api/access/verify' && req.method === 'POST') {
+    const ip = getClientIp(req);
+    if (isRateLimited(ip)) {
+      res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ valid: false, error: '尝试次数过多，请1分钟后再试' }));
+      return;
+    }
     try {
       const body = await readBody(req);
       const config = loadAccessConfig();
-      const valid = body.password === config.password;
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ valid: valid }));
-      if (valid) log('访问密码验证成功', 'SUCCESS');
-      else log('访问密码验证失败', 'WARN');
+      const valid = verifyPassword(body.password, config);
+      if (valid) {
+        failedAttempts.delete(ip);
+        createSession(res);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ valid: true }));
+        log('访问密码验证成功（会话已创建）', 'SUCCESS');
+      } else {
+        recordFailedAttempt(ip);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ valid: false }));
+        log('访问密码验证失败', 'WARN');
+      }
     } catch(e) {
       res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: e.message }));
@@ -508,7 +645,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   
-  // 修改密码（仅本机可调用）
+  // 登出
+  if (pathname === '/api/access/logout' && req.method === 'POST') {
+    destroySession(res);
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+  
+  // 修改密码（仅本机+已验证会话可调用）
   if (pathname === '/api/access/password' && req.method === 'POST') {
     const scope = getAccessScope(req);
     if (scope !== 'local') {
@@ -516,26 +661,38 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: '仅允许在本机修改密码' }));
       return;
     }
+    if (!validateSession(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '请先登录' }));
+      return;
+    }
     try {
       const body = await readBody(req);
       const config = loadAccessConfig();
-      if (body.oldPassword !== config.password) {
+      if (!verifyPassword(body.oldPassword, config)) {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: '旧密码错误' }));
         return;
       }
-      if (!body.newPassword || body.newPassword.length < 4) {
+      if (!body.newPassword || body.newPassword.length < 8) {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ error: '新密码至少4位' }));
+        res.end(JSON.stringify({ error: '新密码至少8位' }));
         return;
       }
-      config.password = body.newPassword;
+      const salt = crypto.randomBytes(16);
+      config.passwordHash = hashPassword(body.newPassword, salt);
+      config.salt = salt.toString('hex');
+      delete config.password; // 确保移除明文
+      delete config.tempPassword; // 移除临时密码
       config.changed = true;
       config.changedAt = new Date().toISOString();
       saveAccessConfig(config);
+      // 使所有现有会话失效，要求重新登录
+      activeSessions.clear();
+      destroySession(res);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ success: true, message: '密码修改成功' }));
-      log('访问密码已修改', 'SUCCESS');
+      res.end(JSON.stringify({ success: true, message: '密码修改成功，请重新登录' }));
+      log('访问密码已修改（scrypt哈希，所有会话已失效）', 'SUCCESS');
     } catch(e) {
       res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: e.message }));
@@ -1386,6 +1543,17 @@ const server = http.createServer(async (req, res) => {
   // ============ 搜索API路由 ============
   
   // 搜索配置（读取/保存）
+  // 公网权限控制：搜索/抓取/配置接口公网禁用
+  const isSearchOrFetchApi = pathname.startsWith('/api/search') || pathname === '/api/fetch';
+  if (isSearchOrFetchApi) {
+    const scope = getAccessScope(req);
+    if (scope === 'public') {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '公网访问已禁用搜索和抓取功能' }));
+      return;
+    }
+  }
+  
   if (pathname === '/api/search/config' && req.method === 'GET') {
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
@@ -1567,7 +1735,12 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/' || pathname === '') {
     filePath = path.join(ROOT_DIR, 'index.html');
   } else {
-    // 防止路径遍历攻击
+    // 防止路径遍历攻击：检测..序列和URL编码的..
+    if (pathname.includes('..') || pathname.includes('%2e') || pathname.includes('%2E')) {
+      res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('403 Forbidden');
+      return;
+    }
     const safePath = path.normalize(pathname).replace(/^(\.\.[\/\\])+/, '');
     filePath = path.join(ROOT_DIR, safePath);
   }

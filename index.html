@@ -22596,6 +22596,183 @@ function renderEmailQualityResult(result, containerId){
   el.innerHTML = html;
 }
 
+
+
+/* ============================================================
+ * 任务八：数据看板 - 基于真实数据计算
+ * ============================================================ */
+
+/* 真实数据看板统计 */
+function getRealDashboardStats(){
+  const customers = S.customers || [];
+  const drafts = S.drafts || [];
+  const quotes = S.quotes || [];
+  const samples = S.samples || [];
+  const tasks = S.tasks || [];
+  
+  // 基础统计
+  const totalCustomers = customers.length;
+  const newCustomers = customers.filter(c=>{
+    if(!c.createdAt) return false;
+    const created = new Date(c.createdAt);
+    const now = new Date();
+    return (now - created) < (30 * 24 * 60 * 60 * 1000);
+  }).length;
+  
+  // 开发信统计
+  const totalEmails = drafts.length;
+  const sentEmails = drafts.filter(d=>d.status==='已人工发送'||d.status==='已发送').length;
+  const repliedCustomers = customers.filter(c=>c.status==='已回复'||c.status==='已成交'||c.status==='已报价').length;
+  const replyRate = totalEmails > 0 ? ((repliedCustomers / totalEmails) * 100).toFixed(1) : '0.0';
+  
+  // 报价统计
+  const totalQuotes = quotes.length;
+  const pendingQuotes = quotes.filter(q=>!q.status||q.status==='待确认'||q.status==='pending').length;
+  
+  // 样品统计
+  const totalSamples = samples.length;
+  const pendingSamples = samples.filter(s=>!s.status||s.status==='待寄出'||s.status==='pending').length;
+  
+  // 成交统计
+  const closedCustomers = customers.filter(c=>c.status==='已成交').length;
+  
+  // 国家分布
+  const countryMap = {};
+  customers.forEach(c=>{
+    if(c.country){
+      countryMap[c.country] = (countryMap[c.country]||0) + 1;
+    }
+  });
+  const topCountries = Object.entries(countryMap)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,8)
+    .map(([country,count])=>({country, count, percentage: totalCustomers>0?((count/totalCustomers)*100).toFixed(1):'0.0'}));
+  
+  // 来源渠道分布
+  const sourceMap = {};
+  customers.forEach(c=>{
+    const source = c.source || c.leadSource || '未知';
+    sourceMap[source] = (sourceMap[source]||0) + 1;
+  });
+  const sourceStats = Object.entries(sourceMap)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([source,count])=>({source, count, percentage: totalCustomers>0?((count/totalCustomers)*100).toFixed(1):'0.0'}));
+  
+  // 客户等级分布
+  const gradeMap = {A:0, B:0, C:0, D:0};
+  customers.forEach(c=>{
+    const grade = c.scores?.grade || 'B';
+    if(gradeMap[grade]!==undefined) gradeMap[grade]++;
+  });
+  
+  // 跟进逾期统计
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const overdueFollowups = customers.filter(c=>{
+    if(!c.nextFollowUp || c.status==='已成交') return false;
+    const next = new Date(c.nextFollowUp);
+    return next < today;
+  }).length;
+  
+  // 意向品类分布
+  const categoryMap = {};
+  customers.forEach(c=>{
+    const cats = c.intentCategories || (c.products?[c.products]:[]);
+    cats.forEach(cat=>{
+      if(cat && cat.trim()){
+        categoryMap[cat.trim()] = (categoryMap[cat.trim()]||0) + 1;
+      }
+    });
+  });
+  const topCategories = Object.entries(categoryMap)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,6)
+    .map(([category,count])=>({category, count}));
+  
+  return {
+    // 基础指标
+    totalCustomers,
+    newCustomers,
+    totalEmails,
+    sentEmails,
+    replyRate,
+    repliedCustomers,
+    totalQuotes,
+    pendingQuotes,
+    totalSamples,
+    pendingSamples,
+    closedCustomers,
+    overdueFollowups,
+    // 分布数据
+    topCountries,
+    sourceStats,
+    gradeMap,
+    topCategories,
+    // 数据状态
+    hasData: totalCustomers > 0,
+    dataTimestamp: new Date().toISOString()
+  };
+}
+
+/* 导出现实数据报告 */
+function exportRealDashboardReport(period='month'){
+  const stats = getRealDashboardStats();
+  const periodLabel = period==='week'?'周':period==='quarter'?'季度':'月';
+  
+  let report = 'KaiLionCrafts 外贸获客工作台 - ' + periodLabel + '度数据报告\n';
+  report += '生成时间：' + new Date().toLocaleString('zh-CN') + '\n';
+  report += '='.repeat(50) + '\n\n';
+  
+  report += '【核心指标】\n';
+  report += '总客户数：' + stats.totalCustomers + '\n';
+  report += '本期新增客户：' + stats.newCustomers + '\n';
+  report += '开发信总数：' + stats.totalEmails + '\n';
+  report += '已发送开发信：' + stats.sentEmails + '\n';
+  report += '回复客户数：' + stats.repliedCustomers + '\n';
+  report += '回复率：' + stats.replyRate + '%\n';
+  report += '报价总数：' + stats.totalQuotes + '\n';
+  report += '待确认报价：' + stats.pendingQuotes + '\n';
+  report += '样品总数：' + stats.totalSamples + '\n';
+  report += '待寄出样品：' + stats.pendingSamples + '\n';
+  report += '成交客户数：' + stats.closedCustomers + '\n';
+  report += '跟进逾期数：' + stats.overdueFollowups + '\n\n';
+  
+  if(stats.topCountries.length){
+    report += '【客户国家分布TOP8】\n';
+    stats.topCountries.forEach((c,i)=>{
+      report += (i+1) + '. ' + c.country + '：' + c.count + '家（' + c.percentage + '%）\n';
+    });
+    report += '\n';
+  }
+  
+  if(stats.sourceStats.length){
+    report += '【来源渠道分布】\n';
+    stats.sourceStats.forEach((s,i)=>{
+      report += (i+1) + '. ' + s.source + '：' + s.count + '家（' + s.percentage + '%）\n';
+    });
+    report += '\n';
+  }
+  
+  report += '【客户等级分布】\n';
+  report += 'A级：' + stats.gradeMap.A + '家\n';
+  report += 'B级：' + stats.gradeMap.B + '家\n';
+  report += 'C级：' + stats.gradeMap.C + '家\n';
+  report += 'D级：' + stats.gradeMap.D + '家\n\n';
+  
+  report += '='.repeat(50) + '\n';
+  report += '备注：本报告基于工作台真实录入数据生成，无数据的指标显示为0。\n';
+  report += '数据来源：工作台本地存储（localStorage）\n';
+  
+  const blob = new Blob([report], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '外贸获客数据报告_' + periodLabel + '_' + new Date().toISOString().slice(0,10) + '.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ ' + periodLabel + '度数据报告已导出');
+}
+
 </script>
 
 <!-- V75.3 全局AI助手悬浮窗 -->

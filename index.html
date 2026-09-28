@@ -23439,6 +23439,245 @@ function getDealReviewSummary(){
   };
 }
 
+
+
+/* ============================================================
+ * 阶段0：IndexedDB 存储层
+ * 用于知识库索引等大体积数据，避免 localStorage 5MB 上限
+ * 客户/开发信等核心数据暂保留 localStorage，提供迁移选项
+ * ============================================================ */
+
+const ARK_DB_NAME = 'kailion_ark_db';
+const ARK_DB_VERSION = 1;
+const ARK_STORE_KB = 'kb_index';
+const ARK_STORE_CACHE = 'data_cache';
+
+let _arkDB = null;
+let _arkDBReady = false;
+
+/* 打开 IndexedDB */
+function openArkDB(){
+  return new Promise((resolve, reject) => {
+    if(_arkDB && _arkDBReady){ resolve(_arkDB); return; }
+    const request = indexedDB.open(ARK_DB_NAME, ARK_DB_VERSION);
+    request.onupgradeneeded = function(e){
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains(ARK_STORE_KB)){
+        const store = db.createObjectStore(ARK_STORE_KB, {keyPath:'id'});
+        store.createIndex('category', 'category', {unique:false});
+        store.createIndex('sensitivity', 'sensitivity', {unique:false});
+        store.createIndex('filePath', 'filePath', {unique:false});
+      }
+      if(!db.objectStoreNames.contains(ARK_STORE_CACHE)){
+        db.createObjectStore(ARK_STORE_CACHE, {keyPath:'key'});
+      }
+    };
+    request.onsuccess = function(e){
+      _arkDB = e.target.result;
+      _arkDBReady = true;
+      resolve(_arkDB);
+    };
+    request.onerror = function(e){
+      reject(new Error('IndexedDB 打开失败: ' + e.target.error));
+    };
+  });
+}
+
+/* 通用 IndexedDB 操作 */
+function arkDBPut(storeName, data){
+  return new Promise(async (resolve, reject) => {
+    try{
+      const db = await openArkDB();
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      const request = store.put(data);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    }catch(e){ reject(e); }
+  });
+}
+
+function arkDBGet(storeName, key){
+  return new Promise(async (resolve, reject) => {
+    try{
+      const db = await openArkDB();
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const request = store.get(key);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    }catch(e){ reject(e); }
+  });
+}
+
+function arkDBGetAll(storeName){
+  return new Promise(async (resolve, reject) => {
+    try{
+      const db = await openArkDB();
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    }catch(e){ reject(e); }
+  });
+}
+
+function arkDBDelete(storeName, key){
+  return new Promise(async (resolve, reject) => {
+    try{
+      const db = await openArkDB();
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      const request = store.delete(key);
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => reject(request.error);
+    }catch(e){ reject(e); }
+  });
+}
+
+function arkDBClear(storeName){
+  return new Promise(async (resolve, reject) => {
+    try{
+      const db = await openArkDB();
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      const request = store.clear();
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => reject(request.error);
+    }catch(e){ reject(e); }
+  });
+}
+
+function arkDBCount(storeName){
+  return new Promise(async (resolve, reject) => {
+    try{
+      const db = await openArkDB();
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const request = store.count();
+      request.onsuccess = () => resolve(request.result || 0);
+      request.onerror = () => reject(request.error);
+    }catch(e){ reject(e); }
+  });
+}
+
+/* 自动备份 localStorage */
+function backupLocalStorage(autoTrigger=false){
+  const data = {};
+  for(let i = 0; i < localStorage.length; i++){
+    const key = localStorage.key(i);
+    if(key && (key.startsWith('kailion_') || key.startsWith('ark_'))){
+      try{
+        data[key] = JSON.parse(localStorage.getItem(key));
+      }catch(e){
+        data[key] = localStorage.getItem(key);
+      }
+    }
+  }
+  const backup = {
+    version: 1,
+    timestamp: new Date().toISOString(),
+    storageEngine: 'localStorage',
+    itemCount: Object.keys(data).length,
+    data: data
+  };
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'kailion_ark_localStorage_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  if(autoTrigger){
+    toast('✅ 已自动备份 localStorage（' + backup.itemCount + ' 项）');
+  }else{
+    toast('✅ localStorage 备份已下载（' + backup.itemCount + ' 项）');
+  }
+  return backup;
+}
+
+/* 存储统计 */
+function getStorageStats(){
+  let lsTotal = 0;
+  let lsCount = 0;
+  for(let i = 0; i < localStorage.length; i++){
+    const key = localStorage.key(i);
+    if(key){
+      lsTotal += (localStorage.getItem(key)||'').length;
+      lsCount++;
+    }
+  }
+  return {
+    localStorage: {
+      items: lsCount,
+      bytes: lsTotal,
+      mb: (lsTotal / 1024 / 1024).toFixed(2),
+      limitMb: 5,
+      usagePercent: ((lsTotal / (5 * 1024 * 1024)) * 100).toFixed(1)
+    },
+    indexeddb: {
+      ready: _arkDBReady,
+      kbSlices: 0,
+      cacheItems: 0
+    }
+  };
+}
+
+/* 异步获取 IndexedDB 统计 */
+async function getIndexedDBStats(){
+  const stats = getStorageStats();
+  if(_arkDBReady){
+    try{
+      stats.indexeddb.kbSlices = await arkDBCount(ARK_STORE_KB);
+      stats.indexeddb.cacheItems = await arkDBCount(ARK_STORE_CACHE);
+    }catch(e){}
+  }
+  return stats;
+}
+
+/* 渲染存储状态面板 */
+function renderStorageStats(containerId){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  getIndexedDBStats().then(stats => {
+    const lsColor = parseFloat(stats.localStorage.usagePercent) > 80 ? '#dc2626' : parseFloat(stats.localStorage.usagePercent) > 60 ? '#d97706' : '#16a34a';
+    el.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+      '<div style="padding:14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">' +
+      '<div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">📦 localStorage</div>' +
+      '<div style="font-size:11px;color:#64748b;margin-bottom:4px">项目数：' + stats.localStorage.items + '</div>' +
+      '<div style="font-size:11px;color:#64748b;margin-bottom:6px">占用：' + stats.localStorage.mb + ' MB / 5 MB</div>' +
+      '<div style="background:#e5e7eb;border-radius:4px;height:6px;overflow:hidden"><div style="width:' + stats.localStorage.usagePercent + '%;background:' + lsColor + ';height:100%"></div></div>' +
+      '<div style="font-size:10px;color:' + lsColor + ';margin-top:4px">' + stats.localStorage.usagePercent + '% 已使用</div>' +
+      '</div>' +
+      '<div style="padding:14px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">' +
+      '<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px">🗄️ IndexedDB</div>' +
+      '<div style="font-size:11px;color:#166534;margin-bottom:4px">状态：' + (stats.indexeddb.ready ? '✅ 已就绪' : '⏳ 初始化中') + '</div>' +
+      '<div style="font-size:11px;color:#166534;margin-bottom:4px">知识库切片：' + stats.indexeddb.kbSlices + '</div>' +
+      '<div style="font-size:11px;color:#166534">缓存项目：' + stats.indexeddb.cacheItems + '</div>' +
+      '<div style="font-size:10px;color:#16a34a;margin-top:4px">无 5MB 上限限制</div>' +
+      '</div></div>';
+  });
+}
+
+/* 初始化 IndexedDB（页面加载时调用） */
+async function initArkDB(){
+  try{
+    await openArkDB();
+    console.log('[ArkDB] IndexedDB 已就绪');
+  }catch(e){
+    console.warn('[ArkDB] IndexedDB 初始化失败，将使用 localStorage 回退:', e.message);
+  }
+}
+
+/* 页面加载时初始化 IndexedDB */
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', initArkDB);
+}else{
+  initArkDB();
+}
+
 </script>
 
 <!-- V75.3 全局AI助手悬浮窗 -->

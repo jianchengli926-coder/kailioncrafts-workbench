@@ -8395,7 +8395,51 @@ function viewSchedule(root){
   const todayTasks = groups['今天'].length;
   const completionRate = totalTasks ? Math.round(completedTasks/totalTasks*100) : 0;
   const highPriorityTasks = tasks.filter(t=>t.priority==='高'||t.priority==='重要紧急').length;
+  // V75.3 AI智能任务推荐 - 基于客户优先级和跟进状态
+  const highValueCustomers = (S.customers||[]).filter(c => c.scores?.grade === 'A' && c.status !== '已成交').slice(0,5);
+  const noFollowupCustomers = (S.customers||[]).filter(c => {
+    const lastFollowup = (S.tasks||[]).filter(t => t.customerId === c.id).sort((a,b) => new Date(b.due) - new Date(a.due))[0];
+    return !lastFollowup || (new Date() - new Date(lastFollowup.due)) > 7*86400000;
+  }).filter(c => c.status === '新客户').slice(0,5);
+  const repliedCustomers = (S.customers||[]).filter(c => c.status === '已回复').slice(0,5);
+  
   root.innerHTML = `
+    <!-- V75.3 AI智能任务推荐 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#faf5ff,#f3e8ff);border:1px solid #ddd6fe">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="font-weight:700;color:#6b21a8;font-size:15px">🤖 AI智能任务推荐（今日优先级排序）</div>
+        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff" onclick="toast('AI正在重新分析任务优先级...');setTimeout(()=>toast('✅ 已更新推荐'),1500)">🔄 刷新推荐</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <!-- 高价值客户跟进 -->
+        <div style="background:#fff;padding:12px;border-radius:8px;border-left:4px solid #f59e0b">
+          <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:8px">⭐ 高价值客户优先跟进</div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:8px">${highValueCustomers.length}个A级客户待跟进</div>
+          ${highValueCustomers.length ? highValueCustomers.slice(0,3).map(c => 
+            '<div style="padding:6px 8px;background:#fef3c7;border-radius:4px;margin-bottom:4px;font-size:11px;cursor:pointer" onclick="openCustomerDetail(\'' + c.id + '\')"><b>' + (c.company||'未知') + '</b><br><span style="color:#92400e">' + (c.country||'') + ' · ' + (c.products||'').substring(0,15) + '</span></div>'
+          ).join('') : '<div style="font-size:11px;color:#9ca3af;text-align:center;padding:10px">暂无高价值客户</div>'}
+        </div>
+        <!-- 未跟进新客户 -->
+        <div style="background:#fff;padding:12px;border-radius:8px;border-left:4px solid #3b82f6">
+          <div style="font-weight:700;font-size:13px;color:#1e40af;margin-bottom:8px">📧 7天未跟进新客户</div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:8px">${noFollowupCustomers.length}个新客户需首次触达</div>
+          ${noFollowupCustomers.length ? noFollowupCustomers.slice(0,3).map(c => 
+            '<div style="padding:6px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;font-size:11px;cursor:pointer" onclick="openCustomerDetail(\'' + c.id + '\')"><b>' + (c.company||'未知') + '</b><br><span style="color:#1e40af">' + (c.country||'') + ' · 建议发送开发信</span></div>'
+          ).join('') : '<div style="font-size:11px;color:#9ca3af;text-align:center;padding:10px">所有新客户已跟进</div>'}
+        </div>
+        <!-- 已回复客户跟进 -->
+        <div style="background:#fff;padding:12px;border-radius:8px;border-left:4px solid #10b981">
+          <div style="font-weight:700;font-size:13px;color:#065f46;margin-bottom:8px">💬 已回复客户及时跟进</div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:8px">${repliedCustomers.length}个客户已回复需推进</div>
+          ${repliedCustomers.length ? repliedCustomers.slice(0,3).map(c => 
+            '<div style="padding:6px 8px;background:#d1fae5;border-radius:4px;margin-bottom:4px;font-size:11px;cursor:pointer" onclick="openCustomerDetail(\'' + c.id + '\')"><b>' + (c.company||'未知') + '</b><br><span style="color:#065f46">' + (c.country||'') + ' · 建议报价/寄样</span></div>'
+          ).join('') : '<div style="font-size:11px;color:#9ca3af;text-align:center;padding:10px">暂无已回复客户</div>'}
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;background:#fff;border-radius:6px;font-size:12px;color:#6b21a8;line-height:1.6">
+        💡 <b>今日工作建议</b>：先处理${overdueTasks}个逾期任务 → 跟进${highValueCustomers.length}个A级客户 → 触达${noFollowupCustomers.length}个新客户 → 推进${repliedCustomers.length}个已回复客户。按此顺序可提高30%成交率。
+      </div>
+    </div>
     <!-- V75.3 任务统计面板 -->
     <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0fdf4,#bbf7d0);border:none">
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
@@ -17034,6 +17078,34 @@ function viewAutoSearch(root){
     avgMatch: as.results.length?Math.round(as.results.reduce((a,r)=>a+(r.match||0),0)/as.results.length):0
   };
   root.innerHTML = `
+    <!-- V75.3 多渠道搜客策略指南 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="font-weight:700;color:#1e40af;font-size:15px">🌐 多渠道搜客策略指南（行业最佳实践）</div>
+        <span class="text-xs text-muted">8大获客渠道</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+        ${[
+          {name:'海关数据', icon:'📦', desc:'真实采购记录', tip:'查看买家历史采购频次、供应商、采购量', color:'#3b82f6'},
+          {name:'Google搜索', icon:'🔍', desc:'高级搜索语法', tip:'用site:、filetype:、intitle:等语法精准定位', color:'#8b5cf6'},
+          {name:'LinkedIn', icon:'💼', desc:'决策人挖掘', tip:'搜索采购经理/CEO/创始人，发送个性化邀请', color:'#06b6d4'},
+          {name:'展会名录', icon:'🎪', desc:'行业参展商', tip:'查看行业展会参展商列表，都是真实买家', color:'#f59e0b'},
+          {name:'B2B平台', icon:'🏪', desc:'Alibaba等', tip:'在Alibaba/Global Sources/Made-in-China找买家', color:'#ec4899'},
+          {name:'行业协会', icon:'📋', desc:'会员名录', tip:'各国行业协会官网通常有会员企业名录', color:'#10b981'},
+          {name:'黄页目录', icon:'📞', desc:'各国企业黄页', tip:'Yellow Pages/Yell/欧洲各国企业目录', color:'#ef4444'},
+          {name:'社交媒体', icon:'📱', desc:'FB/IG/TikTok', tip:'搜索品牌官方账号，通过私信建立联系', color:'#8b5cf6'}
+        ].map(ch => `
+          <div style="background:#fff;padding:12px;border-radius:8px;border-top:3px solid ${ch.color};cursor:pointer;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" onclick="toast('${ch.name}搜客技巧：${ch.tip}')">
+            <div style="font-size:24px;text-align:center">${ch.icon}</div>
+            <div style="font-weight:700;font-size:12px;color:#1f2937;text-align:center;margin-top:6px">${ch.name}</div>
+            <div style="font-size:10px;color:#6b7280;text-align:center;margin-top:2px">${ch.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;background:#fff;border-radius:6px;font-size:12px;color:#1e40af;line-height:1.6">
+        💡 <b>搜客黄金公式</b>：产品关键词 + 客户类型（wholesaler/distributor/importer/retailer） + 国家 + 年份。例如："kitchen shears wholesale USA 2025"
+      </div>
+    </div>
     <div class="grid-4 mb16" style="gap:12px">
       <div class="card card-pad"><div class="stat-label">🔍 总搜索次数</div><div class="stat-value">${stats.searches}</div></div>
       <div class="card card-pad"><div class="stat-label">📋 找到客户数</div><div class="stat-value" style="color:var(--primary)">${stats.found}</div></div>

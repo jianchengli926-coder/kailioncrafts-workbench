@@ -113,83 +113,70 @@ function safeKbPath(relativePath) {
 }
 
 /* 判断访问来源：local / lan / public
- * 安全原则：可由客户端伪造的头（Host、X-Forwarded-For）只能用于降权（判定为公网），
- * 不得用于提升权限（判定为本机/局域网）。
- * 可靠依据：socket.remoteAddress（TCP层IP）、CF-Connecting-IP/CF-Ray（Cloudflare添加）。
+ * 安全原则：可伪造头只能降权，不得提升权限。
+ * 本机判定严格条件（必须同时满足）：
+ *   1. socket IP 为回环地址
+ *   2. 无任何 CF、X-Forwarded、Via 系列代理头
+ *   3. Host 为 localhost 或 127.0.0.1
  */
+const scopeLog = [];
+
 function getAccessScope(req) {
   const cfConnectingIp = req.headers['cf-connecting-ip'];
   const cfRay = req.headers['cf-ray'];
   const xForwardedFor = req.headers['x-forwarded-for'] || '';
+  const xForwardedProto = req.headers['x-forwarded-proto'] || '';
+  const via = req.headers['via'] || '';
   const host = (req.headers.host || '').toLowerCase();
   const socketIp = req.socket.remoteAddress || '';
-  
   const reasons = [];
-  let scope = 'public'; // 默认最严格
-  
-  // === 降权信号（可伪造头，只用于判定为公网）===
-  
-  // Cloudflare特征头（由Cloudflare边缘/cloudflared添加，非客户端可伪造）
-  if (cfConnectingIp || cfRay) {
-    reasons.push('CF头存在(cf-connecting-ip/cf-ray)');
-    scope = 'public';
-  }
-  
-  // Host头包含公网域名（可伪造，用于降权）
-  if (host.includes('prospect.kailioncrafts.com')) {
-    reasons.push('Host头含公网域名');
-    scope = 'public';
-  }
-  
-  // X-Forwarded-For包含公网IP（可伪造，用于降权）
+  let scope = null; // 未判定，有降权信号才设public
+
+  const hasProxyHeaders = !!(cfConnectingIp || cfRay || xForwardedFor || xForwardedProto || via);
+  const hasCfHeaders = !!(cfConnectingIp || cfRay);
+
+  // 降权信号：任一存在即判公网
+  if (hasCfHeaders) { reasons.push('CF头存在→公网'); scope = 'public'; }
+  if (host.includes('prospect.kailioncrafts.com')) { reasons.push('Host含公网域名→公网'); scope = 'public'; }
   if (xForwardedFor) {
     const firstXff = xForwardedFor.split(',')[0].trim();
     const isPrivateXff = firstXff.startsWith('192.168.') || firstXff.startsWith('10.') ||
-      firstXff.startsWith('172.16.') || firstXff.startsWith('172.17.') ||
-      firstXff.startsWith('172.18.') || firstXff.startsWith('172.19.') ||
-      firstXff.startsWith('172.2') || firstXff.startsWith('172.30.') ||
-      firstXff.startsWith('172.31.') || firstXff === '127.0.0.1' || firstXff === '::1';
-    if (!isPrivateXff && firstXff) {
-      reasons.push('X-Forwarded-For含公网IP(' + firstXff + ')');
-      scope = 'public';
-    }
+      firstXff.startsWith('172.1') || firstXff.startsWith('172.2') ||
+      firstXff.startsWith('172.3') || firstXff === '127.0.0.1' || firstXff === '::1';
+    if (!isPrivateXff && firstXff) { reasons.push('XFF含公网IP→公网'); scope = 'public'; }
   }
-  
-  // === 提升权限信号（仅可靠依据：socket.remoteAddress）===
-  // 只有在没有任何降权信号时，才根据socket IP提升权限
-  
-  if (scope !== 'public') {
-    // 不会走到这里，因为scope默认是public
-  }
-  
-  // 检查socket IP（TCP层，相对可靠）
-  const isLocalSocket = socketIp === '127.0.0.1' || socketIp === '::1' || socketIp === '::ffff:127.0.0.1';
-  const isLanSocket = socketIp.startsWith('192.168.') || socketIp.startsWith('10.') ||
+
+  const isLoopback = socketIp === '127.0.0.1' || socketIp === '::1' || socketIp === '::ffff:127.0.0.1';
+  const isLocalhostHost = host === 'localhost' || host === '127.0.0.1' || host.startsWith('localhost:') || host.startsWith('127.0.0.1:');
+  const isLan = socketIp.startsWith('192.168.') || socketIp.startsWith('10.') ||
     socketIp.startsWith('172.16.') || socketIp.startsWith('172.17.') ||
-    socketIp.startsWith('18.') || socketIp.startsWith('172.19.') ||
+    socketIp.startsWith('172.18.') || socketIp.startsWith('172.19.') ||
     socketIp.startsWith('172.2') || socketIp.startsWith('172.30.') ||
     socketIp.startsWith('172.31.') || socketIp.startsWith('::ffff:192.168.') ||
     socketIp.startsWith('::ffff:10.');
-  
-  // 只有在没有降权信号时，才根据socket IP判定
-  if (reasons.length === 0) {
-    if (isLocalSocket) {
+
+  // 无降权信号时，根据socket IP判定
+  if (scope === null) {
+    if (isLoopback && !hasProxyHeaders && isLocalhostHost) {
       scope = 'local';
-      reasons.push('socket IP为本机(' + socketIp + ')');
-    } else if (isLanSocket) {
+      reasons.push('本机:回环+无代理头+Host=localhost');
+    } else if (isLoopback) {
+      if (hasProxyHeaders) reasons.push('回环但有代理头→降权');
+      if (!isLocalhostHost) reasons.push('回环但Host=' + host + '→降权');
+      scope = 'public';
+      reasons.push('不满足本机严格条件→公网');
+    } else if (isLan) {
       scope = 'lan';
-      reasons.push('socket IP为局域网(' + socketIp + ')');
+      reasons.push('socket局域网(' + socketIp + ')');
     } else {
-      reasons.push('socket IP为公网(' + socketIp + ')');
+      scope = 'public';
+      reasons.push('socket公网(' + socketIp + ')');
     }
-  } else {
-    // 有降权信号时，记录socket IP用于调试但不改变判定
-    reasons.push('socket IP=' + socketIp + '（有降权信号，不提升权限）');
   }
-  
-  // 调试日志（仅记录判定结果和依据，不记录请求内容）
-  log('[KB Scope] 判定=' + scope + ' | 依据: ' + reasons.join('; '), 'REQUEST');
-  
+
+  scopeLog.push({ time: new Date().toISOString(), scope, socketIp, host, hasCfHeaders, hasProxyHeaders, reasons });
+  if (scopeLog.length > 20) scopeLog.shift();
+  log('[KB Scope] ' + scope + ' | ' + reasons.join('; '), 'REQUEST');
   return scope;
 }
 
@@ -395,6 +382,23 @@ const server = http.createServer(async (req, res) => {
   }
   
   // ============ 知识库API（只读） ============
+  
+  // 访问范围调试接口（仅本机可访问）
+  if (pathname === '/api/kb/scope-debug') {
+    const scope = getAccessScope(req);
+    if (scope !== 'local') {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '仅本机可访问调试接口' }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({
+      rule: '本机判定需同时满足: 回环IP + 无代理头 + Host=localhost',
+      currentScope: scope,
+      recentRequests: scopeLog
+    }));
+    return;
+  }
   
   // 知识库状态
   if (pathname === '/api/kb/status') {
@@ -606,7 +610,7 @@ const server = http.createServer(async (req, res) => {
       
       // 分类过滤
       if (categories.length > 0) {
-        slices = slices.filter(s => categories.includes(s.category));
+        slices = slices.filter(s => categories.includes(s.category) || categories.includes(s.dirCategory) || categories.includes(s.fmCategory));
       }
       
       // 敏感级别过滤（根据访问范围）

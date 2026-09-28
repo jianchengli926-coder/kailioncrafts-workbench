@@ -17206,6 +17206,57 @@ function viewAutoSearch(root){
     avgMatch: as.results.length?Math.round(as.results.reduce((a,r)=>a+(r.match||0),0)/as.results.length):0
   };
   root.innerHTML = `
+    <!-- V75.3 自然语言智能搜客（参考CRM工作台） -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#faf5ff,#f3e8ff);border:1px solid #ddd6fe">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#6b21a8;font-size:16px">🤖 AI自然语言智能搜客</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">用自然语言描述你要找的客户，AI自动解析为标准搜索条件</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" style="font-size:11px;background:#ede9fe;color:#5b21b6" onclick="setSearchMode('standard')">标准搜索</button>
+          <button class="btn btn-sm" style="font-size:11px;background:#ede9fe;color:#5b21b6" onclick="setSearchMode('natural')">自然语言</button>
+        </div>
+      </div>
+      
+      <!-- 自然语言输入区 -->
+      <div id="naturalSearchPanel">
+        <textarea id="naturalSearchInput" rows="3" placeholder="例如：优先寻找在美国市场销售厨房用品的批发商，要求有独立站和LinkedIn账号，年采购额在10万美金以上..." style="width:100%;padding:12px;border:1px solid #c4b5fd;border-radius:8px;font-size:13px;line-height:1.6;resize:vertical;background:#fff"></textarea>
+        <div class="flex" style="gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="aiParseSearch()">✨ AI解析为搜索条件</button>
+          <button class="btn btn-outline" onclick="startNaturalSearch()">🚀 直接开始搜客</button>
+          <span style="font-size:11px;color:#94a3b8">💡 提示：描述越详细，搜客结果越精准</span>
+        </div>
+        
+        <!-- AI解析结果 -->
+        <div id="aiParseResult" style="display:none;margin-top:14px">
+          <div style="background:#fff;padding:14px;border-radius:8px;border:1px solid #c4b5fd">
+            <div style="font-weight:700;font-size:13px;color:#5b21b6;margin-bottom:10px">📋 AI解析结果</div>
+            <div id="parseContent"></div>
+            <div class="flex" style="gap:8px;margin-top:12px">
+              <button class="btn btn-success btn-sm" onclick="applyParsedSearch()">✅ 应用条件并开始搜客</button>
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('aiParseResult').style.display='none'">重新输入</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 快捷搜索模板 -->
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid #e9d5ff">
+        <div style="font-size:12px;font-weight:700;color:#6b21a8;margin-bottom:8px">⚡ 快捷搜索模板</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${[
+            '美国厨房用品批发商',
+            '德国刀具进口商',
+            '英国户外用品零售商',
+            '欧洲餐饮供应链采购商',
+            '亚马逊大卖卖家',
+            '连锁超市采购经理'
+          ].map(t => '<span class="badge" style="background:#ede9fe;color:#5b21b6;cursor:pointer;padding:6px 12px" onclick="document.getElementById(\'naturalSearchInput\').value=\'' + t + '\'">' + t + '</span>').join('')}
+        </div>
+      </div>
+    </div>
+
     <!-- V75.3 多渠道搜客策略指南 -->
     <div class="card card-pad mb16" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -19721,6 +19772,137 @@ function analyzeCustomerPersona(cid){
   });
 }
 
+
+
+
+/* V75.3 自然语言智能搜客函数 */
+let searchMode = 'natural';
+let parsedSearchConditions = null;
+
+function setSearchMode(mode){
+  searchMode = mode;
+  toast('已切换到' + (mode==='natural'?'自然语言搜索':'标准搜索'));
+}
+
+function aiParseSearch(){
+  const input = document.getElementById('naturalSearchInput').value.trim();
+  if(!input){
+    toast('请先输入你要找的客户描述');
+    return;
+  }
+  
+  const resultEl = document.getElementById('aiParseResult');
+  const contentEl = document.getElementById('parseContent');
+  resultEl.style.display = 'block';
+  contentEl.innerHTML = '<div style="text-align:center;padding:20px"><div style="font-size:24px;animation:spin 1s linear infinite">🔄</div><div style="margin-top:8px;color:#6b7280">AI正在解析搜索条件...</div></div>';
+  
+  const prompt = '请将以下自然语言搜索需求解析为标准搜索条件，返回JSON格式，包含：keyword(产品关键词)、country(目标国家)、customerType(客户类型：批发商/进口商/零售商/品牌商/电商卖家)、minRevenue(最低年采购额，可选)、hasWebsite(是否需要独立站)、hasLinkedin(是否需要LinkedIn)、notes(其他备注)。搜索需求：' + input;
+  
+  callAI([{role:'user', content:prompt}], {
+    onSuccess: function(response){
+      try {
+        // 尝试解析JSON
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if(jsonMatch){
+          parsedSearchConditions = JSON.parse(jsonMatch[0]);
+        } else {
+          parsedSearchConditions = {keyword: input, country: '全球', customerType: '批发商', notes: response};
+        }
+        renderParseResult();
+      } catch(e) {
+        parsedSearchConditions = {keyword: input, country: '全球', customerType: '批发商', notes: 'AI解析结果：' + response};
+        renderParseResult();
+      }
+    },
+    onError: function(){
+      // AI失败时使用规则解析
+      parsedSearchConditions = ruleBasedParse(input);
+      renderParseResult();
+      toast('⚠️ AI解析失败，已使用规则解析');
+    }
+  });
+}
+
+function ruleBasedParse(input){
+  const conditions = {keyword: '', country: '全球', customerType: '批发商', hasWebsite: false, hasLinkedin: false, notes: ''};
+  
+  // 提取国家
+  const countries = ['美国','德国','英国','法国','日本','加拿大','澳大利亚','意大利','西班牙','荷兰','瑞典','挪威','丹麦','芬兰','比利时','奥地利','瑞士','葡萄牙','希腊','波兰','俄罗斯','巴西','墨西哥','阿根廷','智利','南非','埃及','阿联酋','沙特','印度','韩国','新加坡','马来西亚','泰国','越南','印尼','菲律宾'];
+  for(const c of countries){
+    if(input.includes(c)){ conditions.country = c; break; }
+  }
+  
+  // 提取客户类型
+  if(input.includes('批发')) conditions.customerType = '批发商';
+  else if(input.includes('进口')) conditions.customerType = '进口商';
+  else if(input.includes('零售')) conditions.customerType = '零售商';
+  else if(input.includes('品牌')) conditions.customerType = '品牌商';
+  else if(input.includes('电商')||input.includes('亚马逊')||input.includes('Amazon')) conditions.customerType = '电商卖家';
+  
+  // 提取产品关键词
+  const products = ['厨房用品','刀具','厨刀','剪刀','户外刀','厨房剪刀','多功能剪刀','厨具','餐具','烧烤工具','户外用品'];
+  for(const p of products){
+    if(input.includes(p)){ conditions.keyword = p; break; }
+  }
+  if(!conditions.keyword) conditions.keyword = input.substring(0, 20);
+  
+  // 提取其他条件
+  if(input.includes('独立站')||input.includes('网站')) conditions.hasWebsite = true;
+  if(input.includes('LinkedIn')||input.includes('领英')) conditions.hasLinkedin = true;
+  
+  conditions.notes = '规则解析结果';
+  return conditions;
+}
+
+function renderParseResult(){
+  const c = parsedSearchConditions;
+  const contentEl = document.getElementById('parseContent');
+  contentEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div style="padding:10px;background:#f5f3ff;border-radius:6px"><div style="font-size:11px;color:#94a3b8">产品关键词</div><div style="font-weight:700;font-size:13px;color:#5b21b6;margin-top:2px">${c.keyword||'-'}</div></div>
+      <div style="padding:10px;background:#f5f3ff;border-radius:6px"><div style="font-size:11px;color:#94a3b8">目标国家</div><div style="font-weight:700;font-size:13px;color:#5b21b6;margin-top:2px">${c.country||'-'}</div></div>
+      <div style="padding:10px;background:#f5f3ff;border-radius:6px"><div style="font-size:11px;color:#94a3b8">客户类型</div><div style="font-weight:700;font-size:13px;color:#5b21b6;margin-top:2px">${c.customerType||'-'}</div></div>
+      <div style="padding:10px;background:#f5f3ff;border-radius:6px"><div style="font-size:11px;color:#94a3b8">需要独立站</div><div style="font-weight:700;font-size:13px;color:${c.hasWebsite?'#10b981':'#94a3b8'};margin-top:2px">${c.hasWebsite?'✅ 是':'❌ 否'}</div></div>
+      <div style="padding:10px;background:#f5f3ff;border-radius:6px"><div style="font-size:11px;color:#94a3b8">需要LinkedIn</div><div style="font-weight:700;font-size:13px;color:${c.hasLinkedin?'#10b981':'#94a3b8'};margin-top:2px">${c.hasLinkedin?'✅ 是':'❌ 否'}</div></div>
+      <div style="padding:10px;background:#f5f3ff;border-radius:6px"><div style="font-size:11px;color:#94a3b8">备注</div><div style="font-weight:700;font-size:13px;color:#5b21b6;margin-top:2px">${c.notes||'-'}</div></div>
+    </div>
+  `;
+}
+
+function applyParsedSearch(){
+  if(!parsedSearchConditions) return;
+  const c = parsedSearchConditions;
+  
+  // 应用到标准搜索表单
+  if(document.getElementById('as_keyword')) document.getElementById('as_keyword').value = c.keyword || '';
+  if(document.getElementById('as_country') && c.country && c.country !== '全球'){
+    const select = document.getElementById('as_country');
+    for(let i=0;i<select.options.length;i++){
+      if(select.options[i].text.includes(c.country)){
+        select.selectedIndex = i;
+        break;
+      }
+    }
+  }
+  
+  toast('✅ 已应用搜索条件，开始搜客...');
+  setTimeout(() => {
+    if(typeof startAutoSearch === 'function') startAutoSearch();
+  }, 500);
+}
+
+function startNaturalSearch(){
+  const input = document.getElementById('naturalSearchInput').value.trim();
+  if(!input){
+    toast('请先输入你要找的客户描述');
+    return;
+  }
+  // 先解析再搜索
+  aiParseSearch();
+  setTimeout(() => {
+    if(parsedSearchConditions) applyParsedSearch();
+  }, 3000);
+}
 
 </script>
 

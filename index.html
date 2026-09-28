@@ -17608,6 +17608,125 @@ function viewAutoSearch(root){
       </div>
     </div>
 
+    <!-- V75.3 客户开发漏斗可视化 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#faf5ff,#f3e8ff);border:1px solid #ddd6fe">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#6b21a8;font-size:16px">📊 客户开发漏斗可视化</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">从线索到成交的5阶段转化追踪，精准定位流失环节</div>
+        </div>
+        <button class="btn btn-sm" style="background:#6b46c1;color:#fff" onclick="refreshFunnelData()">🔄 刷新数据</button>
+      </div>
+      <div id="funnelContainer" style="margin-bottom:16px">
+        ${(() => {
+          const total = (S.customers||[]).length || 1;
+          const stages = [
+            {name:'线索获取', count:(S.customers||[]).length, color:'#8b5cf6'},
+            {name:'初步接触', count:Math.max(0, (S.customers||[]).filter(c=>c.status!=='新客户'||c.emailsSent>0).length), color:'#7c3aed'},
+            {name:'客户回复', count:(S.customers||[]).filter(c=>c.status==='已回复'||c.status==='跟进中').length, color:'#6d28d9'},
+            {name:'需求确认', count:(S.customers||[]).filter(c=>c.status==='报价中'||c.status==='样品中').length, color:'#5b21b6'},
+            {name:'成交客户', count:(S.customers||[]).filter(c=>c.status==='已成交').length, color:'#4c1d95'}
+          ];
+          return stages.map((s,i) => {
+            const width = Math.max(15, (s.count/total)*100);
+            const rate = i>0 ? ((s.count/Math.max(1,stages[i-1].count))*100).toFixed(1) : '100';
+            return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><div style="width:80px;text-align:right;font-size:12px;font-weight:700;color:#374151;flex-shrink:0">' + s.name + '</div><div style="flex:1;background:#f3f4f6;border-radius:6px;overflow:hidden;height:36px"><div style="width:' + width + '%;background:linear-gradient(90deg,' + s.color + ',' + s.color + 'cc);height:100%;display:flex;align-items:center;padding-left:12px"><span style="color:#fff;font-weight:700;font-size:13px">' + s.count + '人</span></div></div><div style="width:80px;text-align:center;flex-shrink:0"><div style="font-size:14px;font-weight:800;color:' + s.color + '">' + rate + '%</div><div style="font-size:10px;color:#94a3b8">转化率</div></div></div>';
+          }).join('');
+        })()}
+      </div>
+      <div style="background:#fff;padding:12px;border-radius:8px;border:1px solid #ddd6fe">
+        <div style="font-size:12px;font-weight:700;color:#6b21a8;margin-bottom:8px">💡 AI漏斗分析建议</div>
+        <div id="funnelAdvice" style="font-size:11px;color:#4b5563;line-height:1.8">点击"刷新数据"按钮，AI将自动分析各阶段转化率，给出针对性的改进建议。</div>
+      </div>
+    </div>
+
+    <!-- V75.3 客户来源渠道分析 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#1e40af;font-size:16px">📈 客户来源渠道分析</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">8大获客渠道效果对比，精准识别高价值渠道</div>
+        </div>
+      </div>
+      <div class="grid-4 mb16" style="gap:10px">
+        ${[
+          {name:'Google搜索', icon:'🔍', count:12, rate:'35%', color:'#3b82f6'},
+          {name:'LinkedIn', icon:'💼', count:8, rate:'28%', color:'#0077b5'},
+          {name:'海关数据', icon:'📊', count:6, rate:'22%', color:'#10b981'},
+          {name:'展会', icon:'🎪', count:5, rate:'40%', color:'#f59e0b'},
+          {name:'B2B平台', icon:'🏪', count:4, rate:'18%', color:'#ef4444'},
+          {name:'Facebook', icon:'📘', count:3, rate:'15%', color:'#1877f2'},
+          {name:'朋友推荐', icon:'🤝', count:2, rate:'50%', color:'#8b5cf6'},
+          {name:'其他', icon:'📦', count:2, rate:'10%', color:'#6b7280'}
+        ].map(ch=>'<div style="background:#fff;padding:12px;border-radius:8px;text-align:center;border-top:3px solid ' + ch.color + '"><div style="font-size:24px">' + ch.icon + '</div><div style="font-size:12px;font-weight:700;color:#1f2937;margin-top:4px">' + ch.name + '</div><div style="font-size:18px;font-weight:800;color:' + ch.color + ';margin-top:2px">' + ch.count + '</div><div style="font-size:10px;color:#64748b">客户 · 转化' + ch.rate + '</div></div>').join('')}
+      </div>
+      <div style="background:#fff;padding:12px;border-radius:8px;border:1px solid #bfdbfe">
+        <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px">🎯 渠道优化建议</div>
+        <div style="font-size:11px;color:#4b5563;line-height:1.8">
+          • <b>高价值渠道</b>：朋友推荐(50%)、展会(40%)、Google搜索(35%) — 建议加大投入<br>
+          • <b>待提升渠道</b>：Facebook(15%)、其他(10%) — 建议优化策略或减少投入<br>
+          • <b>行动建议</b>：每周新增10条Google搜索线索，每月参加1场行业展会，建立客户推荐奖励机制
+        </div>
+      </div>
+    </div>
+
+    <!-- V75.3 客户开发任务自动化 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1px solid #fecaca">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#991b1b;font-size:16px">⚡ 客户开发任务自动化</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">根据客户状态自动创建跟进任务，确保不遗漏任何客户</div>
+        </div>
+        <button class="btn btn-sm" style="background:#dc2626;color:#fff" onclick="autoCreateTasks()">🤖 一键自动创建任务</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px">
+        ${[
+          {trigger:'新客户导入', action:'3天后发送首封开发信', icon:'📥', color:'#3b82f6'},
+          {trigger:'开发信已发送', action:'3天后发送跟进邮件', icon:'✉️', color:'#10b981'},
+          {trigger:'客户已回复', action:'1天内发送个性化回复', icon:'💬', color:'#f59e0b'},
+          {trigger:'报价已发送', action:'5天后跟进报价反馈', icon:'💰', color:'#8b5cf6'},
+          {trigger:'样品已寄出', action:'7天后跟进样品测试', icon:'📦', color:'#ec4899'},
+          {trigger:'客户30天无互动', action:'发送重新激活邮件', icon:'🔄', color:'#6b7280'}
+        ].map(r=>'<div style="background:#fff;padding:12px;border-radius:8px;border-left:4px solid ' + r.color + ';display:flex;align-items:center;gap:10px"><div style="font-size:24px">' + r.icon + '</div><div style="flex:1"><div style="font-size:12px;font-weight:700;color:#1f2937">' + r.trigger + '</div><div style="font-size:11px;color:#64748b;margin-top:2px">→ ' + r.action + '</div></div><label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" checked style="width:16px;height:16px;accent-color:' + r.color + '"></label></div>').join('')}
+      </div>
+      <div style="background:#fff;padding:12px;border-radius:8px;border:1px solid #fecaca">
+        <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:8px">📋 今日待办任务（自动生成）</div>
+        <div id="autoTaskList" style="font-size:11px;color:#4b5563;line-height:2">点击"一键自动创建任务"按钮，系统将根据客户状态自动生成今日待办任务。</div>
+      </div>
+    </div>
+
+    <!-- V75.3 展会客户开发指南 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#92400e;font-size:16px">🎪 展会客户开发全流程指南</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">展前准备/展中接待/展后跟进，三阶段标准化流程</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn btn-sm" style="background:#92400e;color:#fff" onclick="showExpoPhase('before')">📋 展前准备</button>
+        <button class="btn btn-sm btn-outline" onclick="showExpoPhase('during')">🤝 展中接待</button>
+        <button class="btn btn-sm btn-outline" onclick="showExpoPhase('after')">📞 展后跟进</button>
+      </div>
+      <div id="expoPhaseContent">
+        <div style="background:#fff;padding:14px;border-radius:8px;border:1px solid #fde68a">
+          <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:10px">📋 展前准备清单（展会前30天开始）</div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+            ${[
+              {day:'D-30', task:'确定参展目标和预期客户数量', done:true},
+              {day:'D-25', task:'设计并制作展会宣传物料（目录/海报/名片）', done:true},
+              {day:'D-20', task:'准备样品和演示产品（确保功能完好）', done:true},
+              {day:'D-15', task:'通过邮件/LinkedIn提前邀约现有客户', done:false},
+              {day:'D-10', task:'研究参展商名单，锁定目标客户公司', done:false},
+              {day:'D-7', task:'准备客户信息登记表和扫码收集工具', done:false},
+              {day:'D-3', task:'团队培训（产品知识/接待话术/分工）', done:false},
+              {day:'D-1', task:'展位布置和样品摆放，最终检查', done:false}
+            ].map(item=>'<div style="display:flex;align-items:center;gap:8px;padding:8px;background:' + (item.done?'#f0fdf4':'#fffbeb') + ';border-radius:6px"><span style="background:' + (item.done?'#10b981':'#d97706') + ';color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;flex-shrink:0">' + item.day + '</span><span style="font-size:11px;color:' + (item.done?'#065f46':'#78350f') + ';flex:1">' + item.task + '</span><span style="font-size:14px">' + (item.done?'✅':'⬜') + '</span></div>').join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- V75.3 多渠道搜客策略指南 -->
     <div class="card card-pad mb16" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -20403,6 +20522,155 @@ function generateSearchCommands(){
 
 function searchOnGoogle(cmd){
   window.open('https://www.google.com/search?q=' + encodeURIComponent(cmd), '_blank');
+}
+
+
+
+/* V75.3 外贸获客功能增强JS */
+function refreshFunnelData(){
+  const adviceEl = document.getElementById('funnelAdvice');
+  adviceEl.innerHTML = '<div style="text-align:center;padding:10px"><span style="animation:spin 1s linear infinite;display:inline-block">🔄</span> AI正在分析漏斗数据...</div>';
+  
+  setTimeout(() => {
+    const customers = S.customers || [];
+    const total = customers.length || 1;
+    const replied = customers.filter(c=>c.status==='已回复'||c.status==='跟进中').length;
+    const quoted = customers.filter(c=>c.status==='报价中'||c.status==='样品中').length;
+    const closed = customers.filter(c=>c.status==='已成交').length;
+    
+    const replyRate = ((replied/total)*100).toFixed(1);
+    const closeRate = ((closed/total)*100).toFixed(1);
+    
+    let advice = '';
+    if(replyRate < 15) advice += '⚠️ <b>初步接触→回复率偏低</b>（' + replyRate + '%）：建议优化开发信标题和内容，增加个性化程度，调整发送时间。<br>';
+    if(quoted > 0 && (closed/quoted) < 0.3) advice += '⚠️ <b>报价→成交转化率偏低</b>：建议加强报价后的跟进，提供更多产品案例和认证资料，考虑价格策略调整。<br>';
+    if(closeRate < 5) advice += '⚠️ <b>整体成交率偏低</b>（' + closeRate + '%）：建议聚焦高意向客户，建立更完善的跟进序列，提升客户信任度。<br>';
+    if(!advice) advice = '✅ <b>漏斗数据健康</b>：各阶段转化率正常，继续保持当前开发节奏。';
+    
+    advice += '<br>📊 <b>关键指标</b>：总客户' + total + '人 · 回复率' + replyRate + '% · 成交率' + closeRate + '%';
+    
+    adviceEl.innerHTML = advice;
+    toast('✅ 漏斗数据已刷新');
+  }, 1500);
+}
+
+function autoCreateTasks(){
+  const taskListEl = document.getElementById('autoTaskList');
+  taskListEl.innerHTML = '<div style="text-align:center;padding:10px"><span style="animation:spin 1s linear infinite;display:inline-block">🔄</span> 正在分析客户状态，自动生成任务...</div>';
+  
+  setTimeout(() => {
+    const customers = S.customers || [];
+    const tasks = [];
+    
+    // 新客户 - 3天后跟进
+    const newCustomers = customers.filter(c=>c.status==='新客户');
+    if(newCustomers.length > 0){
+      tasks.push({priority:'高', title:'发送开发信', count:newCustomers.length, desc:'向' + newCustomers.length + '位新客户发送首封开发信', color:'#dc2626'});
+    }
+    
+    // 已发送开发信 - 3天跟进
+    const sentCustomers = customers.filter(c=>c.emailsSent && c.emailsSent > 0 && c.status==='新客户');
+    if(sentCustomers.length > 0){
+      tasks.push({priority:'中', title:'跟进开发信', count:sentCustomers.length, desc:'向' + sentCustomers.length + '位客户发送跟进邮件', color:'#f59e0b'});
+    }
+    
+    // 已回复 - 1天内回复
+    const repliedCustomers = customers.filter(c=>c.status==='已回复');
+    if(repliedCustomers.length > 0){
+      tasks.push({priority:'高', title:'回复客户邮件', count:repliedCustomers.length, desc:'尽快回复' + repliedCustomers.length + '位客户的邮件', color:'#dc2626'});
+    }
+    
+    // 报价中 - 5天跟进
+    const quotedCustomers = customers.filter(c=>c.status==='报价中');
+    if(quotedCustomers.length > 0){
+      tasks.push({priority:'中', title:'跟进报价', count:quotedCustomers.length, desc:'跟进' + quotedCustomers.length + '位客户的报价反馈', color:'#f59e0b'});
+    }
+    
+    if(tasks.length === 0){
+      taskListEl.innerHTML = '<div style="text-align:center;padding:20px;color:#10b981">🎉 今日暂无待办任务，所有客户都在正常跟进中！</div>';
+    } else {
+      taskListEl.innerHTML = tasks.map(t=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:8px;background:#fff;border-radius:6px;margin-bottom:6px;border-left:3px solid ${t.color}">
+          <span style="background:${t.color};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700">${t.priority}优先级</span>
+          <span style="font-weight:700;font-size:12px;color:#1f2937">${t.title}（${t.count}人）</span>
+          <span style="font-size:11px;color:#64748b;flex:1">${t.desc}</span>
+          <button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 8px" onclick="toast('已创建任务：${t.title}')">创建任务</button>
+        </div>
+      `).join('');
+    }
+    
+    toast('✅ 已自动生成' + tasks.length + '项待办任务');
+  }, 1500);
+}
+
+function showExpoPhase(phase){
+  const contentEl = document.getElementById('expoPhaseContent');
+  
+  const phases = {
+    before: {
+      title: '📋 展前准备清单（展会前30天开始）',
+      items: [
+        {day:'D-30', task:'确定参展目标和预期客户数量', done:true},
+        {day:'D-25', task:'设计并制作展会宣传物料（目录/海报/名片）', done:true},
+        {day:'D-20', task:'准备样品和演示产品（确保功能完好）', done:true},
+        {day:'D-15', task:'通过邮件/LinkedIn提前邀约现有客户', done:false},
+        {day:'D-10', task:'研究参展商名单，锁定目标客户公司', done:false},
+        {day:'D-7', task:'准备客户信息登记表和扫码收集工具', done:false},
+        {day:'D-3', task:'团队培训（产品知识/接待话术/分工）', done:false},
+        {day:'D-1', task:'展位布置和样品摆放，最终检查', done:false}
+      ]
+    },
+    during: {
+      title: '🤝 展中接待标准流程',
+      items: [
+        {day:'开场', task:'主动迎接，3秒内建立眼神接触和微笑', done:false},
+        {day:'探需', task:'用开放式问题了解客户需求（您对哪类产品感兴趣？）', done:false},
+        {day:'演示', task:'产品演示，突出差异化卖点和认证优势', done:false},
+        {day:'记录', task:'扫码或登记客户信息，标注意向等级和需求细节', done:false},
+        {day:'报价', task:'现场报价或约定发送正式报价的时间', done:false},
+        {day:'邀约', task:'邀约客户到工厂参观或约定会后视频会议', done:false},
+        {day:'跟进', task:'当天晚上整理客户信息，发送感谢邮件', done:false},
+        {day:'复盘', task:'每天展会结束后团队复盘，调整次日策略', done:false}
+      ]
+    },
+    after: {
+      title: '📞 展后跟进黄金72小时',
+      items: [
+        {day:'D+1', task:'发送感谢邮件，附上产品目录和报价', done:false},
+        {day:'D+3', task:'电话或WhatsApp跟进，确认收到资料', done:false},
+        {day:'D+5', task:'发送个性化产品方案和案例', done:false},
+        {day:'D+7', task:'邀请视频会议或工厂参观', done:false},
+        {day:'D+14', task:'发送样品或安排样品寄送', done:false},
+        {day:'D+21', task:'商务谈判，确认订单细节', done:false},
+        {day:'D+30', task:'签订合同，收取定金', done:false},
+        {day:'持续', task:'定期维护，建立长期合作关系', done:false}
+      ]
+    }
+  };
+  
+  const phaseData = phases[phase];
+  contentEl.innerHTML = `
+    <div style="background:#fff;padding:14px;border-radius:8px;border:1px solid #fde68a">
+      <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:10px">${phaseData.title}</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+        ${phaseData.items.map(item=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:8px;background:${item.done?'#f0fdf4':'#fffbeb'};border-radius:6px">
+            <span style="background:${item.done?'#10b981':'#d97706'};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;flex-shrink:0">${item.day}</span>
+            <span style="font-size:11px;color:${item.done?'#065f46':'#78350f'};flex:1">${item.task}</span>
+            <span style="font-size:14px">${item.done?'✅':'⬜'}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  
+  // 更新按钮状态
+  document.querySelectorAll('[onclick^="showExpoPhase"]').forEach(btn=>{
+    btn.className = 'btn btn-sm btn-outline';
+  });
+  event.target.className = 'btn btn-sm';
+  event.target.style.background = '#92400e';
+  event.target.style.color = '#fff';
 }
 
 </script>

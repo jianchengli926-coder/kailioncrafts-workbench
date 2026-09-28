@@ -1116,7 +1116,7 @@ function seedData(){
       products:'厨师刀套装',
       profile:{business:'伦敦KOL厨师品牌',productLine:'主厨刀套装',needs:'小批量定制LOGO',painPoints:'预算有限重设计',angle:'激光刻LOGO + MOQ200'},
       scores:fin(sc(85,60,88,82)),
-      matchReasons:['网站询盘 private label chef knife set MOQ 200','Instagram 5万粉KOL属性'],
+      matchReasons:['网站询盘 private label chef knife set [MOQ: 待确认]','Instagram 5万粉KOL属性'],
       nextFollowUp:daysLater(1),status:'已回复'})
   ];
 
@@ -1208,10 +1208,10 @@ function seedData(){
     ['Cutlery Supply from Yangjiang — 10-Year OEM Partner for Kitchen Universe','Dear Michael,\n\nI noticed Kitchen Universe expanded its kitchen scissors line across 300+ stores. I am Leo from KaiLionCrafts, working with Yangjiang-based strategic manufacturing partners supplying US retail chains [years: 待确认].\n\n• MOQ: 待确认\n• Certifications: 待确认 (held by manufacturing partners)\n• Lead time: 待确认\n\nOpen to a 15-min call next week? Free sample box first.\n\nBest,\nLeo','引用官网产品页 Kitchen Scissors 分类；引用 LinkedIn 采购经理职位；英语'],
     ['OEM-Messer aus Yangjiang – BSCI-zertifiziert','Sehr geehrter Herr Schmidt,\n\nwir schlagen eine OEM-Partnerschaft vor.\n\n• CE- und GS-konforme Dokumente\n• 1.000 Stück MOQ, 35 Tage Lieferzeit\n• Logo, Verpackung, Schliff\n\nDarf ich ein kostenloses Muster senden?\n\nMit freundlichen Grüßen,\nLeo','德语；引用 About 页家族品牌；强调 CE/GS'],
     ['Kitchen Shears Supply for BritChef — DDP Available','Hi Emma,\n\nSaw your post about looking for new cutlery suppliers. We can offer DDP shipping to solve post-Brexit customs.\n\n• 1,000 pcs MOQ\n• DDP London\n• 30-day lead time\n\nBest,\nLeo','引用 LinkedIn 招聘供应商动态；DDP 解决清关痛点'],
-    ['Wholesale Kitchen Shears — Low MOQ Trial','Hi James,\n\nThanks for your inquiry. For trial orders:\n• 500 pcs MOQ\n• Private label\n• Express air freight\n\nShare your target retail price? I will quote within 24h.\n\nCheers,\nLeo','独立站询盘回复；低 MOQ 测款'],
+    ['Wholesale Kitchen Shears — Low MOQ Trial','Hi James,\n\nThanks for your inquiry. For trial orders:\n• MOQ: 待确认 [演示数据]\n• Private label\n• Express air freight\n\nShare your target retail price? I will quote within 24h.\n\nCheers,\nLeo','独立站询盘回复；低 MOQ 测款'],
     ['Stable Cutlery Supply — Chicago Show Follow-up','Hi David,\n\nGreat meeting you in Chicago. We supply 3 North American distributors on quarterly framework agreements.\n\n• Chef knives, shears, sharpeners\n• 40,000 pcs / quarter\n\nShall I prepare a framework offer?\n\nBest,\nLeo','展会名片；年度框架协议'],
     ['FDA-Compliant Outdoor Knives','Hi Jessica,\n\nNoticed your Amazon bushcraft reviews. We support:\n• Food-grade blade options\n• Compliant blister packaging\n• FBA prep\n\nWant a sample of our folding hunter?\n\nLeo','Amazon 评论；美国运输合规'],
-    ['Private Label Chef Knife Set — MOQ 200','Hi Oliver,\n\nYes, we can do MOQ 200:\n• Laser-engraved logo\n• Minimalist black gift box\n• 40-day lead time\n\nCan I send a mockup this week?\n\nLeo','询盘 MOQ200；KOL 品牌']
+    ['Private Label Chef Knife Set — MOQ 200','Hi Oliver,\n\nMOQ: 待确认 [演示数据]:\n• Laser-engraved logo\n• Minimalist black gift box\n• lead time: 待确认\n\nCan I send a mockup this week?\n\nLeo','询盘 MOQ200；KOL 品牌']
   ];
   handDrafts.forEach((d,i)=>{
     const c = cust[i];
@@ -1275,7 +1275,7 @@ function seedData(){
 
   /* ===== 询盘 ===== */
   S.inquiries = [
-    {id:uid(),customerId:cust[3].id,customerName:cust[3].company,source:'独立站',product:'厨房剪',description:'Wholesale kitchen shears, private label, MOQ 500. Best FOB price?',status:'已报价',priority:'高',
+    {id:uid(),customerId:cust[3].id,customerName:cust[3].company,source:'独立站',product:'厨房剪',description:'Wholesale kitchen shears, private label, MOQ: 待确认. Best FOB price?',status:'已报价',priority:'高',
       aiSuggestions:['24h内回复阶梯价','询问目标零售价','提供样品盒'],history:[{t:daysAgo(2),desc:'官网询盘到达'},{t:daysAgo(1),desc:'开发信人工审核后发送'},{t:daysAgo(0),desc:'已发报价 KL20260920-001'}],createdAt:daysAgo(2)},
     {id:uid(),customerId:cust[11].id,customerName:cust[11].company,source:'独立站',product:'厨师刀套装',description:'Private label chef knife set, MOQ 200, gift box.',status:'跟进中',priority:'高',
       aiSuggestions:['发设计mockup','问预算','两种包装对比'],history:[{t:daysAgo(3),desc:'询盘到达'},{t:daysAgo(2),desc:'已发开发信，客户回复感兴趣'}],createdAt:daysAgo(3)},
@@ -1352,7 +1352,7 @@ function seedData(){
         body:'Hi {{customer_name}},\n\nPer your interest in {{product}}, two options:\n\nOption A (Economy): $1.20/pc, MOQ 1,000\nOption B (Premium): $1.95/pc, MOQ 500\n\nWhich direction fits your market better?\n\nLeo'},
       {id:uid(),name:'行业动态切入',scene:'行情分享',lang:'英语',
         subject:'Yangjiang Cutlery Market Update — Q4 2026',
-        body:'Hi {{customer_name}},\n\nThought this might be useful: raw material prices in Yangjiang have stabilized after Q3, and lead times are back to 30 days.\n\nIf you are planning Q4 orders, now is a good window.\n\nHappy to share our latest price list.\n\nLeo'},
+        body:'Hi {{customer_name}},\n\nThought this might be useful: raw material prices in Yangjiang have stabilized after Q3, and lead times: 待确认.\n\nIf you are planning Q4 orders, now is a good window.\n\nHappy to share our latest price list.\n\nLeo'},
       {id:uid(),name:'同区域出货案例',scene:'案例证明',lang:'英语',
         subject:'We Just Shipped 20,000 pcs to Your Region',
         body:'Hi {{customer_name}},\n\nWe recently completed a 20,000-pc shipment to a distributor in {{country}} — same product category as {{product}}.\n\nFramework agreement, quarterly reorders. Would you like a reference?\n\nLeo'},
@@ -1370,7 +1370,7 @@ function seedData(){
         body:'Hi {{customer_name}},\n\nWe have expanded production capacity and updated our {{product}} pricing for Q4.\n\nIf you are still sourcing, we can offer a slightly better rate for committed volumes.\n\nWorth a quick call?\n\nLeo'},
       {id:uid(),name:'客户来访跟进',scene:'展会/会面后',lang:'英语',
         subject:'Nice Meeting You — Next Steps for {{product}}',
-        body:'Hi {{customer_name}},\n\nGreat meeting you. As discussed: \n\n• Specs: {{product}} 8", 5Cr15Mov\n• MOQ: 1,000 pcs\n• Target lead time: 30 days\n\nI will send the formal quote within 48h. Anything else to add?\n\nLeo'}
+        body:'Hi {{customer_name}},\n\nGreat meeting you. As discussed: \n\n• Specs: {{product}} 8", 5Cr15Mov\n• MOQ: 待确认\n• Target lead time: 待确认\n\nI will send the formal quote within 48h. Anything else to add?\n\nLeo'}
     ]
   };
 
@@ -1402,6 +1402,12 @@ function seedData(){
     c.isOld = S.contracts.some(ct=>ct.customerId===c.id);
   });
   persist();
+
+  // 标记所有演示数据
+  if(S.customers) S.customers.forEach(c => c.isDemo = true);
+  if(S.leads) S.leads.forEach(l => l.isDemo = true);
+  if(S.quotes) S.quotes.forEach(q => q.isDemo = true);
+  if(S.orders) S.orders.forEach(o => o.isDemo = true);
 }
 
 /* ============================================================
@@ -1706,8 +1712,71 @@ function getFallbackChain(opts={}){
   return sorted.filter(a=>{ if(seen.has(a.id)) return false; seen.add(a.id); return true; });
 }
 
+// ============ 运行时事实过滤层（P1最终验收）============
+// 所有对外AI调用在发送前必须经过此过滤，防止旧工具绕过事实访问层
+// 规则：confirmed允许；pending→待确认；internal仅内部；confidential/noOutbound禁止；demo不当真实事实
+const FACT_SANITIZE_RULES = [
+  // 具体数字类 → 待确认
+  {pattern: /MOQ\s*(?:from\s*)?\d+(?:,\d+)?\s*(?:pcs|pieces|units)?/gi, replacement: 'MOQ: 待确认'},
+  {pattern: /\d+(?:,\d+)?\s*(?:pcs|pieces)\s+MOQ/gi, replacement: 'MOQ: 待确认'},
+  {pattern: /(?:lead\s+time|delivery)\s*(?:is|of)?\s*\d+[-–—]?\d*\s*(?:day|days|week|weeks)/gi, replacement: 'lead time: 待确认'},
+  {pattern: /\d+[-–—]?\d*\s*(?:day|days)\s+(?:lead|delivery)/gi, replacement: 'lead time: 待确认'},
+  {pattern: /(?:over|more than|\d+)\s*\+?\s*SKUs?/gi, replacement: 'SKU count: 待确认'},
+  {pattern: /\d+\s*(?:factories|factory|plants|manufacturing\s+bases)/gi, replacement: 'strategic manufacturing partners [count: 待确认]'},
+  {pattern: /export(?:ing)?\s+(?:to\s+)?(?:over|more than)?\s*\d+\+?\s*(?:countries|nations|markets)/gi, replacement: 'export countries: 待确认'},
+  // 价格优势百分比 → 待确认
+  {pattern: /\d+\s*%\s*(?:below|lower|cheaper|cost\s+reduction|savings?|discount)/gi, replacement: 'cost advantage: 待确认'},
+  {pattern: /(?:reduce|cut|save)\s+.*?\d+\s*%/gi, replacement: 'cost optimization: 待确认'},
+  // 工厂所有权 → 安全表述
+  {pattern: /family\s+factories?/gi, replacement: 'strategic manufacturing partners'},
+  {pattern: /\bown\s+factory\b/gi, replacement: 'strategic manufacturing partners'},
+  {pattern: /\bour\s+factory\b/gi, replacement: 'strategic manufacturing partners'},
+  {pattern: /\bour\s+factories\b/gi, replacement: 'strategic manufacturing partners'},
+  {pattern: /factory\s+direct/gi, replacement: 'supply chain direct [待确认]'},
+  // 认证名（在公司事实上下文中）→ 待确认
+  {pattern: /\b(?:CE|FDA|LFGB|RoHS|REACH|BSCI|ISO\s?9001|ISO\s?14001|SGS|TÜV|TUV)\s*(?:certified|certification|certificate|compliant|compliance)?/gi, replacement: 'certifications: 待确认 (held by manufacturing partners)'},
+  // 免费服务承诺 → 待确认
+  {pattern: /free\s+(?:sample|samples|shipping|video|videos|photo|photos|marketing\s+material|4K)/gi, replacement: '[free service: 待确认]'},
+  // 客户案例编造 → 待确认
+  {pattern: /case\s+study\s*[:：]?[^.]{0,80}\d+\s*%/gi, replacement: '[case study: 待确认 - replace with real client data]'},
+];
+
+const FACT_CONSTRAINT_PROMPT = '\n\n【事实约束·强制】未在公司事实库中确认的SKU数、认证、产能、MOQ、交期、客户案例、出口国家数一律输出"待确认"，不得编造具体数字；合作工厂必须表述为strategic manufacturing partners，不得写成KaiLionCrafts自有工厂或自有认证；不得输出成本、底价、利润、价格优势百分比、免费服务承诺；所有AI输出为草稿，需人工审核后发送。';
+
+function sanitizeFactsForAI(messages){
+  if(!messages) return messages;
+  const isString = typeof messages === 'string';
+  const msgs = isString ? [{role:'user', content:messages}] : JSON.parse(JSON.stringify(messages));
+  let sanitizedCount = 0;
+  for(const msg of msgs){
+    if(!msg.content) continue;
+    let text = msg.content;
+    for(const rule of FACT_SANITIZE_RULES){
+      const before = text;
+      text = text.replace(rule.pattern, rule.replacement);
+      if(text !== before) sanitizedCount++;
+    }
+    // system message追加事实约束
+    if(msg.role === 'system' && !text.includes('事实约束')){
+      text += FACT_CONSTRAINT_PROMPT;
+    }
+    msg.content = text;
+  }
+  // 如果没有system message，在第一条user message前追加约束（通过在第一条添加）
+  const hasSystem = msgs.some(m => m.role === 'system');
+  if(!hasSystem && msgs.length > 0 && !msgs[0].content.includes('事实约束')){
+    msgs[0].content = FACT_CONSTRAINT_PROMPT.trim() + '\n\n' + msgs[0].content;
+  }
+  if(sanitizedCount > 0){
+    console.log('[事实过滤] 已过滤 ' + sanitizedCount + ' 处敏感事实');
+  }
+  return isString ? msgs[0].content : msgs;
+}
+
 async function callAI(messages, opts={}){
   opts = opts||{};
+  // 运行时事实过滤：所有对外AI调用必须经过此层，防止旧工具绕过事实访问层
+  messages = sanitizeFactsForAI(messages);
   const chain = getFallbackChain(opts);
   if(!chain.length){ logApiCall('模拟模式',opts.purpose||'general',0,0,0,'mock'); return {content:null, usage:{}, error:null, mock:true, model:'模拟模式'}; }
   if(opts.modelConfigId){
@@ -2461,6 +2530,8 @@ ${historyText}
 /* V31 AI图像生成 - 支持智谱CogView-3-Flash */
 async function callAIImage(prompt, opts={}){
   opts = opts||{};
+  // 运行时事实过滤
+  prompt = sanitizeFactsForAI(prompt);
   let cfgs = (S.apis||[]).filter(a=>a.enabled && a.model && a.model.toLowerCase().includes('cogview'));
   if(!cfgs.length){
     const zhipuCfgs = (S.apis||[]).filter(a=>a.enabled && a.type==='zhipu');
@@ -2517,6 +2588,8 @@ const IMAGE_SIZES = [
 /* V32 AI视觉理解 - 支持智谱GLM-4.6V-Flash图片分析 */
 async function callAIVision(imageUrl, prompt, opts={}){
   opts = opts||{};
+  // 运行时事实过滤
+  prompt = sanitizeFactsForAI(prompt);
   let cfgs = (S.apis||[]).filter(a=>a.enabled && a.model && (a.model.toLowerCase().includes('4.6v') || a.model.toLowerCase().includes('vl') || a.model.toLowerCase().includes('vision')));
   if(!cfgs.length){
     const zhipuCfgs = (S.apis||[]).filter(a=>a.enabled && a.type==='zhipu');
@@ -2592,7 +2665,7 @@ function seedExtra(){
        records:[{date:daysAgo(45),amount:18500,method:'T/T',note:'全款'}]}
     ];
   }
-  if(!S.customers || !S.customers.length) return;
+  if(!S.customers || !S.customers.filter(c=>!c.isDemo).length) return;
   // 公海池：把第 20-23 个客户 owner 设为 null
   S.customers.forEach((c,i)=>{ if(i>=20 && i<=23 && !c.isOld) c.owner=null; });
   // V7：给客户分配风险等级
@@ -3358,9 +3431,9 @@ function getTodayDrafts(){ return S.drafts.filter(d=>isToday(d.createdAt)).lengt
 function getTodayFollowups(){ return (S.followups||[]).filter(f=>isToday(f.createdAt)).length; }
 function getTodayComms(){ return (S.communications||[]).filter(c=>isToday(c.createdAt)).length; }
 function getReplyRate(){
-  if(!S.customers.length) return 0;
+  if(!S.customers.filter(c=>!c.isDemo).length) return 0;
   const replied = S.customers.filter(c=>c.status==='已回复').length;
-  return Math.round((replied / S.customers.length) * 100);
+  return Math.round((replied / S.customers.filter(c=>!c.isDemo).length) * 100);
 }
 
 
@@ -4003,7 +4076,7 @@ function viewDashboard(root){
     if(!c.tags) c.tags = [];
   });
 
-  const total = S.customers.length;
+  const total = S.customers.filter(c=>!c.isDemo).length;
   const plansRunning = S.plans.filter(p=>p.status==='running').length;
   const today = new Date().toISOString().slice(0,10);
   const todayDay = new Date().toDateString();
@@ -4327,7 +4400,7 @@ function viewDashboard(root){
               const sources = {};
               S.customers.forEach(c=>{ sources[c.source||'未知'] = (sources[c.source||'未知']||0)+1; });
               const entries = Object.entries(sources).sort((a,b)=>b[1]-a[1]);
-              const total = S.customers.length || 1;
+              const total = S.customers.filter(c=>!c.isDemo).length || 1;
               const colors = ['#3182ce','#38a169','#dd6b20','#805ad5','#e53e3e','#319795'];
               let offset = 0;
               const r = 50, cx = 60, cy = 60;
@@ -4347,7 +4420,7 @@ function viewDashboard(root){
               const sources = {};
               S.customers.forEach(c=>{ sources[c.source||'未知'] = (sources[c.source||'未知']||0)+1; });
               const entries = Object.entries(sources).sort((a,b)=>b[1]-a[1]);
-              const total = S.customers.length || 1;
+              const total = S.customers.filter(c=>!c.isDemo).length || 1;
               const colors = ['#3182ce','#38a169','#dd6b20','#805ad5','#e53e3e','#319795'];
               return entries.slice(0,5).map((e,i)=>'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="width:8px;height:8px;background:'+colors[i%colors.length]+';border-radius:50%;display:inline-block"></span><span style="flex:1;color:#4a5568">'+e[0]+'</span><span style="font-weight:bold;color:#2d3748">'+e[1]+'</span><span style="color:#a0aec0;font-size:10px">'+Math.round(e[1]/total*100)+'%</span></div>').join('');
             })()}
@@ -4379,7 +4452,7 @@ function viewDashboard(root){
               const statuses = {};
               S.customers.forEach(c=>{ statuses[c.status||'未知'] = (statuses[c.status||'未知']||0)+1; });
               const entries = Object.entries(statuses).sort((a,b)=>b[1]-a[1]);
-              const total = S.customers.length || 1;
+              const total = S.customers.filter(c=>!c.isDemo).length || 1;
               const colorMap = {'待跟进':'#dd6b20','跟进中':'#3182ce','已回复':'#38a169','已报价':'#805ad5','已成交':'#c9a961','已流失':'#a0aec0'};
               let offset = 0;
               const r = 50, cx = 60, cy = 60;
@@ -4400,7 +4473,7 @@ function viewDashboard(root){
               const statuses = {};
               S.customers.forEach(c=>{ statuses[c.status||'未知'] = (statuses[c.status||'未知']||0)+1; });
               const entries = Object.entries(statuses).sort((a,b)=>b[1]-a[1]);
-              const total = S.customers.length || 1;
+              const total = S.customers.filter(c=>!c.isDemo).length || 1;
               const colorMap = {'待跟进':'#dd6b20','跟进中':'#3182ce','已回复':'#38a169','已报价':'#805ad5','已成交':'#c9a961','已流失':'#a0aec0'};
               return entries.map((e,i)=>'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="width:8px;height:8px;background:'+(colorMap[e[0]]||'#a0aec0')+';border-radius:50%;display:inline-block"></span><span style="flex:1;color:#4a5568">'+e[0]+'</span><span style="font-weight:bold;color:#2d3748">'+e[1]+'</span><span style="color:#a0aec0;font-size:10px">'+Math.round(e[1]/total*100)+'%</span></div>').join('');
             })()}
@@ -4414,7 +4487,7 @@ function viewDashboard(root){
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         <span>📈 客户增长趋势（近30天）</span>
         <div style="display:flex;gap:12px;align-items:center">
-          <span style="font-size:11px;color:#718096">累计：<b style="color:#2d3748;font-size:14px">${S.customers.length}</b></span>
+          <span style="font-size:11px;color:#718096">累计：<b style="color:#2d3748;font-size:14px">${S.customers.filter(c=>!c.isDemo).length}</b></span>
           <span style="font-size:11px;color:#718096">本月新增：<b style="color:#38a169;font-size:14px">${getTodayNewCustomers()}</b></span>
         </div>
       </div>
@@ -4478,13 +4551,13 @@ function viewDashboard(root){
         <span>📊 客户价值分布（6维度综合评估）</span>
         <div style="display:flex;gap:12px;align-items:center">
           <span style="font-size:11px;color:#718096">平均价值：<b style="color:#805ad5;font-size:14px">${
-            S.customers.length ? Math.round(S.customers.reduce((s,c)=>{
+            S.customers.filter(c=>!c.isDemo).length ? Math.round(S.customers.reduce((s,c)=>{
               const quality = Math.min(100, (c.scores?.total||0)*1.2);
               const potential = c.customerType==='品牌商'?90:c.customerType==='批发商'?80:c.customerType==='电商'?70:60;
               const loyalty = c.isOld?85:c.status==='已成交'?75:c.status==='已回复'?60:40;
               const profit = c.scores?.grade==='A'?85:c.scores?.grade==='B'?70:55;
               return s + Math.round((quality+potential+60+loyalty+profit+65)/6);
-            },0)/S.customers.length) : 0
+            },0)/S.customers.filter(c=>!c.isDemo).length) : 0
           }</b></span>
         </div>
       </div>
@@ -4813,10 +4886,10 @@ function viewDashboard(root){
 
     <div class="card card-pad mb16" style="padding:10px 16px;background:#0f172a;color:#fff;overflow:hidden">
       <div style="display:flex;gap:32px;white-space:nowrap;animation:ticker 20s linear infinite">
-        <span>🆕 今日新线索 <b>${S.customers.length?12:0}</b></span>
+        <span>🆕 今日新线索 <b>${S.customers.filter(c=>!c.isDemo).length?12:0}</b></span>
         <span>⏰ 超时未回邮件 <b>5</b> 封</span>
         <span>🤝 待移交客户 <b>2</b></span>
-        <span>📈 本周新增客户 <b>${S.customers.length?12:0}</b></span>
+        <span>📈 本周新增客户 <b>${S.customers.filter(c=>!c.isDemo).length?12:0}</b></span>
         <span>💰 本月成交金额 <b>$${(S.contracts.reduce((a,c)=>a+c.amount,0)/10000).toFixed(1)}K</b></span>
         <span>✂️ 样品在途 <b>${(S.samples||[]).filter(x=>x.status==='运输中'||x.status==='在途').length}</b></span>
       </div>
@@ -5350,18 +5423,18 @@ function viewCustomers(root){
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
         <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
           <div style="font-size:11px;color:#718096;margin-bottom:4px">👥 客户总数</div>
-          <div style="font-size:28px;font-weight:800;color:#2b6cb0">${S.customers.length}</div>
+          <div style="font-size:28px;font-weight:800;color:#2b6cb0">${S.customers.filter(c=>!c.isDemo).length}</div>
           <div style="font-size:11px;color:#718096;margin-top:2px">${newCount}新 + ${oldCount}老</div>
         </div>
         <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
           <div style="font-size:11px;color:#718096;margin-bottom:4px">⭐ A级客户</div>
           <div style="font-size:28px;font-weight:800;color:#c9a961">${aCount}</div>
-          <div style="font-size:11px;color:#718096;margin-top:2px">占比 ${S.customers.length?Math.round(aCount/S.customers.length*100):0}%</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">占比 ${S.customers.filter(c=>!c.isDemo).length?Math.round(aCount/S.customers.filter(c=>!c.isDemo).length*100):0}%</div>
         </div>
         <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
           <div style="font-size:11px;color:#718096;margin-bottom:4px">💬 已回复客户</div>
           <div style="font-size:28px;font-weight:800;color:#276749">${repliedCount}</div>
-          <div style="font-size:11px;color:#718096;margin-top:2px">回复率 ${S.customers.length?Math.round(repliedCount/S.customers.length*100):0}%</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">回复率 ${S.customers.filter(c=>!c.isDemo).length?Math.round(repliedCount/S.customers.filter(c=>!c.isDemo).length*100):0}%</div>
         </div>
         <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
           <div style="font-size:11px;color:#718096;margin-bottom:4px">🌍 覆盖国家</div>
@@ -5374,9 +5447,9 @@ function viewCustomers(root){
         <div style="font-size:12px;font-weight:700;color:#2d3748;margin-bottom:8px">📊 客户分级分布</div>
         <div style="display:flex;gap:12px;align-items:center">
           <div style="flex:1;display:flex;gap:4px;height:24px;border-radius:4px;overflow:hidden">
-            <div style="background:linear-gradient(135deg,#c9a961,#d4af37);width:${S.customers.length?aCount/S.customers.length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${aCount>0?'30px':'0'}">${aCount>0?'A '+aCount:''}</div>
-            <div style="background:linear-gradient(135deg,#3182ce,#2c5282);width:${S.customers.length?bCount/S.customers.length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${bCount>0?'30px':'0'}">${bCount>0?'B '+bCount:''}</div>
-            <div style="background:linear-gradient(135deg,#a0aec0,#718096);width:${S.customers.length?cCount/S.customers.length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${cCount>0?'30px':'0'}">${cCount>0?'C '+cCount:''}</div>
+            <div style="background:linear-gradient(135deg,#c9a961,#d4af37);width:${S.customers.filter(c=>!c.isDemo).length?aCount/S.customers.filter(c=>!c.isDemo).length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${aCount>0?'30px':'0'}">${aCount>0?'A '+aCount:''}</div>
+            <div style="background:linear-gradient(135deg,#3182ce,#2c5282);width:${S.customers.filter(c=>!c.isDemo).length?bCount/S.customers.filter(c=>!c.isDemo).length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${bCount>0?'30px':'0'}">${bCount>0?'B '+bCount:''}</div>
+            <div style="background:linear-gradient(135deg,#a0aec0,#718096);width:${S.customers.filter(c=>!c.isDemo).length?cCount/S.customers.filter(c=>!c.isDemo).length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${cCount>0?'30px':'0'}">${cCount>0?'C '+cCount:''}</div>
           </div>
           <div style="display:flex;gap:12px;font-size:11px">
             <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#c9a961;border-radius:2px"></span>A级 ${aCount}</span>
@@ -7787,7 +7860,7 @@ function saveCustomer(cid){
       followUpHistory:[], timeline:[], tags:[], intentCategories:[],
       quoteHistory:[], sampleHistory:[], orderHistory:[],
       blacklisted:false, unsubscribe:false, companySize:'', decisionMaker:'', annualPurchase:''}, data));
-    addTimelineEvent(S.customers[S.customers.length-1].id, 'system', '客户创建', '通过手动添加创建客户记录');
+    addTimelineEvent(S.customers[S.customers.filter(c=>!c.isDemo).length-1].id, 'system', '客户创建', '通过手动添加创建客户记录');
     toast('客户已添加');
   }
   persist(); closeModal(); renderView();
@@ -11560,7 +11633,7 @@ function renderApiSettings(){
     <!-- 数据统计 -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
       <div style="background:#ebf8ff;padding:10px;border-radius:6px;text-align:center">
-        <div style="font-size:20px;font-weight:bold;color:#2b6cb0">${S.customers.length}</div>
+        <div style="font-size:20px;font-weight:bold;color:#2b6cb0">${S.customers.filter(c=>!c.isDemo).length}</div>
         <div style="font-size:10px;color:#666">客户数据</div>
       </div>
       <div style="background:#f0fff4;padding:10px;border-radius:6px;text-align:center">
@@ -11617,7 +11690,7 @@ function exportAllData(){
     version: 'V75.3',
     exportTime: new Date().toISOString(),
     exportDate: new Date().toLocaleDateString('zh-CN'),
-    customerCount: S.customers.length,
+    customerCount: S.customers.filter(c=>!c.isDemo).length,
     draftCount: S.drafts.length,
     productCount: S.products.length,
     orderCount: S.orders.length
@@ -11633,7 +11706,7 @@ function exportAllData(){
   document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
   toast('✅ 全部数据已导出为备份文件');
-  logAction('data_export', '导出全部数据', '客户'+S.customers.length+'/开发信'+S.drafts.length+'/产品'+S.products.length);
+  logAction('data_export', '导出全部数据', '客户'+S.customers.filter(c=>!c.isDemo).length+'/开发信'+S.drafts.length+'/产品'+S.products.length);
 }
 
 function importAllData(input){
@@ -11880,7 +11953,7 @@ function renderChannelEffect(){
   return Object.entries(ch).sort((a,b)=>b[1]-a[1]).map(function(kv){
     const k=kv[0],v=kv[1];
     const avg=Math.round(S.customers.filter(function(c){return c.source===k;}).reduce(function(a,c){return a+c.scores.total;},0)/v);
-    const w=Math.round(v/S.customers.length*100);
+    const w=Math.round(v/S.customers.filter(c=>!c.isDemo).length*100);
     return '<div style="margin-bottom:6px">'+
       '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">'+
       '<span>'+k+'</span><b>'+v+'家·均匹配'+avg+'分</b></div>'+
@@ -13181,7 +13254,7 @@ function viewOutreach(root){
         <div class="stat-trend up">多渠道沟通历史</div></div>
       <div class="stat-card"><span class="stat-icon">✅</span>
         <div class="stat-label">已回复客户</div><div class="stat-value">${replyRate}</div>
-        <div class="stat-trend ${replyRate>0?'up':'down'}">回复率 ${Math.round(replyRate/Math.max(S.customers.length,1)*100)}%</div></div>
+        <div class="stat-trend ${replyRate>0?'up':'down'}">回复率 ${Math.round(replyRate/Math.max(S.customers.filter(c=>!c.isDemo).length,1)*100)}%</div></div>
       <div class="stat-card gold"><span class="stat-icon">🎯</span>
         <div class="stat-label">待触达客户</div><div class="stat-value">${S.customers.filter(c=>c.status!=='已回复').length}</div>
         <div class="stat-trend down">需要持续跟进</div></div>
@@ -13229,12 +13302,12 @@ function viewOutreach(root){
         </div>
         <div style="background:#f7fafc;padding:14px;border-radius:8px">
           <div class="text-sm text-muted">客户回复率</div>
-          <div style="font-size:24px;font-weight:700;color:#276749;margin-top:4px">${Math.round(replyRate/Math.max(S.customers.length,1)*100)}%</div>
-          <div class="text-xs text-muted" style="margin-top:4px">${replyRate}/${S.customers.length} 客户已回复</div>
+          <div style="font-size:24px;font-weight:700;color:#276749;margin-top:4px">${Math.round(replyRate/Math.max(S.customers.filter(c=>!c.isDemo).length,1)*100)}%</div>
+          <div class="text-xs text-muted" style="margin-top:4px">${replyRate}/${S.customers.filter(c=>!c.isDemo).length} 客户已回复</div>
         </div>
         <div style="background:#f7fafc;padding:14px;border-radius:8px">
           <div class="text-sm text-muted">平均沟通次数</div>
-          <div style="font-size:24px;font-weight:700;color:#975a16;margin-top:4px">${(communications/Math.max(S.customers.length,1)).toFixed(1)}</div>
+          <div style="font-size:24px;font-weight:700;color:#975a16;margin-top:4px">${(communications/Math.max(S.customers.filter(c=>!c.isDemo).length,1)).toFixed(1)}</div>
           <div class="text-xs text-muted" style="margin-top:4px">每客户平均沟通</div>
         </div>
       </div>
@@ -17713,7 +17786,7 @@ function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.set
   loadState();
   seedExtra();
   if(DB.load('theme')==='dark') document.body.classList.add('dark');
-  if(!S.customers || !S.customers.length){ seedData(); }
+  if(!S.customers || !S.customers.filter(c=>!c.isDemo).length){ seedData(); }
   // 延迟到所有script块加载完成后再渲染，避免第二个script块中的函数未定义
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded',()=>go('dashboard'));
@@ -21169,7 +21242,7 @@ async function prospectExecuteSearch(){
 function checkInCustomerDB(url){
   try{
     const domain = new URL(url).hostname;
-    if(S.customers && S.customers.length > 0){
+    if(S.customers && S.customers.filter(c=>!c.isDemo).length > 0){
       return S.customers.some(c=>{
         if(c.website){ try{ return new URL(c.website).hostname===domain }catch(e){} }
         return false;
@@ -24083,7 +24156,7 @@ function runSelfCheck(){
       if(!Array.isArray(S.customers)) return {pass:false, detail:'S.customers 不是数组'};
       const invalid = S.customers.filter(c=>!c.id || !c.company);
       if(invalid.length > 0) return {pass:true, warn:true, detail:'有 ' + invalid.length + ' 个客户缺少id或company字段'};
-      return {pass:true, detail:S.customers.length + ' 个客户，结构完整'};
+      return {pass:true, detail:S.customers.filter(c=>!c.isDemo).length + ' 个客户，结构完整'};
     }
   });
   

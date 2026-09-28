@@ -1712,6 +1712,206 @@ function getFallbackChain(opts={}){
   return sorted.filter(a=>{ if(seen.has(a.id)) return false; seen.add(a.id); return true; });
 }
 
+// ============ AI Provider 状态跟踪与主备故障转移（V75.4） ============
+const AI_PROVIDER_STATUS = {
+  primaryProvider: 'glm',
+  currentProvider: null,
+  currentModel: null,
+  fallbackOccurred: false,
+  fallbackCount: 0,
+  lastError: null,
+  lastErrorTime: null,
+  lastLatency: null,
+  lastSuccessTime: null,
+  glmConfigured: false,
+  ollamaModels: [],
+  ollamaDetected: false,
+  ollamaLastDetect: null,
+  chainHistory: []
+};
+
+// 从Ollama /api/tags动态检测本地模型（仅文本/推理模型，排除嵌入模型）
+async function detectOllamaModels(baseURL='http://localhost:11434'){
+  try{
+    const r = await fetch(baseURL + '/api/tags', {method:'GET', signal:AbortSignal.timeout(5000)});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j = await r.json();
+    const models = (j.models||[]).filter(m => {
+      const name = m.name || '';
+      // 排除嵌入模型和非文本模型
+      return !/embed|nomic|bge|m3e|multilingual-e5/i.test(name);
+    }).map(m => ({
+      name: m.name,
+      size: m.size || 0,
+      modified: m.modified_at || ''
+    }));
+    AI_PROVIDER_STATUS.ollamaModels = models;
+    AI_PROVIDER_STATUS.ollamaDetected = true;
+    AI_PROVIDER_STATUS.ollamaLastDetect = new Date().toISOString();
+    console.log('[Ollama检测] 发现 ' + models.length + ' 个可用模型:', models.map(m=>m.name).join(', '));
+    return models;
+  }catch(e){
+    AI_PROVIDER_STATUS.ollamaDetected = false;
+    AI_PROVIDER_STATUS.ollamaModels = [];
+    console.log('[Ollama检测] 失败: ' + e.message);
+    return [];
+  }
+}
+
+// 记录Provider状态
+function recordProviderStatus(provider, model, success, error, latency, fallbackCount){
+  AI_PROVIDER_STATUS.currentProvider = provider;
+  AI_PROVIDER_STATUS.currentModel = model;
+  AI_PROVIDER_STATUS.fallbackOccurred = fallbackCount > 0;
+  AI_PROVIDER_STATUS.fallbackCount = fallbackCount;
+  AI_PROVIDER_STATUS.lastLatency = latency;
+  if(success){
+    AI_PROVIDER_STATUS.lastSuccessTime = new Date().toISOString();
+    AI_PROVIDER_STATUS.lastError = null;
+  }else{
+    AI_PROVIDER_STATUS.lastError = error ? String(error).substring(0,200) : '未知错误';
+    AI_PROVIDER_STATUS.lastErrorTime = new Date().toISOString();
+  }
+  AI_PROVIDER_STATUS.chainHistory.push({
+    time: new Date().toISOString(),
+    provider, model, success,
+    error: error ? String(error).substring(0,100) : null,
+    latency, fallbackCount
+  });
+  if(AI_PROVIDER_STATUS.chainHistory.length > 50) AI_PROVIDER_STATUS.chainHistory.shift();
+}
+
+// 模型链路测试（仅本机可用）
+async function testModelChain(){
+  const results = [];
+  const testMsg = [{role:'user', content:'回复"OK"两个字，不要其他内容。'}];
+  
+  // 测试1：GLM主模型
+  console.log('[链路测试] 测试1: GLM主模型');
+  const glmCfgs = (S.apis||[]).filter(a => a.enabled && a.type==='zhipu' && a.caps && a.caps.assistant);
+  if(glmCfgs.length){
+    const cfg = glmCfgs[0];
+    const t0 = performance.now();
+    try{
+      const r = await callAI(testMsg, {modelConfigId: cfg.id, purpose:'chain-test'});
+      results.push({name:'GLM主模型('+cfg.model+')', ok: !r.error, latency: r.latency||Math.round(performance.now()-t0), error: r.error, content: (r.content||'').substring(0,50)});
+    }catch(e){
+      results.push({name:'GLM主模型('+cfg.model+')', ok:false, latency:Math.round(performance.now()-t0), error:e.message});
+    }
+  }else{
+    results.push({name:'GLM主模型', ok:false, latency:0, error:'未找到启用的GLM模型'});
+  }
+  
+  // 测试2：Ollama本地模型
+  console.log('[链路测试] 测试2: Ollama本地模型');
+  const localCfgs = (S.apis||[]).filter(a => a.enabled && a.type==='ollama' && a.caps && a.caps.assistant);
+  for(let i=0; i<Math.min(localCfgs.length, 2); i++){
+    const cfg = localCfgs[i];
+    const t0 = performance.now();
+    try{
+      const r = await callAI(testMsg, {modelConfigId: cfg.id, purpose:'chain-test'});
+      results.push({name:'本地模型'+(i+1)+'('+cfg.model+')', ok: !r.error, latency: r.latency||Math.round(performance.now()-t0), error: r.error, content: (r.content||'').substring(0,50)});
+    }catch(e){
+      results.push({name:'本地模型'+(i+1)+'('+cfg.model+')', ok:false, latency:Math.round(performance.now()-t0), error:e.message});
+    }
+  }
+  
+  // 测试3：事实过滤
+  console.log('[链路测试] 测试3: 事实过滤');
+  const factTest = [{role:'user', content:'我们的MOQ是500 pcs，交期30天，有CE和FDA认证，比市场低20%，有4家工厂，出口130+国家。'}];
+  const sanitized = sanitizeFactsForAI(factTest);
+  const hasMOQ = /MOQ\s*(?:from\s*)?\d+/i.test(sanitized[0].content);
+  const hasLeadTime = /\d+\s*(?:day|days)\s+(?:lead|delivery)/i.test(sanitized[0].content);
+  const hasCert = /(?:CE|FDA|LFGB)\s*(?:certified|certification)?/i.test(sanitized[0].content);
+  const hasCost = /\d+\s*%\s*(?:below|lower|cheaper)/i.test(sanitized[0].content);
+  const hasFactory = /\d+\s*(?:factories|factory)/i.test(sanitized[0].content);
+  const hasExport = /\d+\+?\s*(?:countries|nations)/i.test(sanitized[0].content);
+  const factPass = !hasMOQ && !hasLeadTime && !hasCert && !hasCost && !hasFactory && !hasExport;
+  results.push({name:'事实过滤(sanitizeFactsForAI)', ok: factPass, latency:0, error: factPass?null:'存在未过滤的敏感事实', content: factPass?'所有敏感事实已替换为待确认':'检测到未过滤内容'});
+  
+  return results;
+}
+
+// 渲染模型状态面板
+function renderProviderStatus(){
+  const el = document.getElementById('providerStatusPanel');
+  if(!el) return;
+  const s = AI_PROVIDER_STATUS;
+  const glmOk = (S.apis||[]).some(a => a.enabled && a.type==='zhipu');
+  const localCount = (S.apis||[]).filter(a => a.enabled && a.type==='ollama').length;
+  
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+      <div style="background:#f0f4f8;padding:10px;border-radius:6px">
+        <div style="color:#718096;font-size:11px">首选 Provider</div>
+        <div style="font-weight:600;color:#2d3748">${s.primaryProvider.toUpperCase()}</div>
+      </div>
+      <div style="background:#f0f4f8;padding:10px;border-radius:6px">
+        <div style="color:#718096;font-size:11px">当前实际 Provider</div>
+        <div style="font-weight:600;color:${s.currentProvider==='glm'?'#38a169':'#d69e2e'}">${s.currentProvider ? s.currentProvider.toUpperCase() : '未调用'}</div>
+      </div>
+      <div style="background:#f0f4f8;padding:10px;border-radius:6px">
+        <div style="color:#718096;font-size:11px">当前模型</div>
+        <div style="font-weight:600;color:#2d3748;font-size:12px">${s.currentModel || '未调用'}</div>
+      </div>
+      <div style="background:#f0f4f8;padding:10px;border-radius:6px">
+        <div style="color:#718096;font-size:11px">故障转移</div>
+        <div style="font-weight:600;color:${s.fallbackOccurred?'#d69e2e':'#38a169'}">${s.fallbackOccurred?'已发生('+s.fallbackCount+'次)':'未发生'}</div>
+      </div>
+      <div style="background:#f0f4f8;padding:10px;border-radius:6px">
+        <div style="color:#718096;font-size:11px">GLM 配置</div>
+        <div style="font-weight:600;color:${glmOk?'#38a169':'#e53e3e'}">${glmOk?'已配置':'未配置'}</div>
+      </div>
+      <div style="background:#f0f4f8;padding:10px;border-radius:6px">
+        <div style="color:#718096;font-size:11px">本地 Ollama 模型</div>
+        <div style="font-weight:600;color:${localCount>0?'#38a169':'#e53e3e'}">${localCount} 个${s.ollamaDetected?' (已动态检测)':''}</div>
+      </div>
+      <div style="background:#f0f4f8;padding:10px;border-radius:6px;grid-column:span 2">
+        <div style="color:#718096;font-size:11px">最近一次响应时间</div>
+        <div style="font-weight:600;color:#2d3748">${s.lastLatency ? s.lastLatency+' ms' : '无记录'}</div>
+      </div>
+      ${s.lastError ? `
+      <div style="background:#fff5f5;padding:10px;border-radius:6px;grid-column:span 2;border-left:3px solid #e53e3e">
+        <div style="color:#c53030;font-size:11px">最近失败原因</div>
+        <div style="color:#742a2a;font-size:12px;word-break:break-all">${s.lastError}</div>
+        <div style="color:#a0aec0;font-size:10px;margin-top:2px">${s.lastErrorTime || ''}</div>
+      </div>` : ''}
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="detectOllamaModels().then(r=>{alert('检测到 '+r.length+' 个本地模型: '+r.map(m=>m.name).join(', '));renderProviderStatus();})">🔍 检测本地模型</button>
+      <button class="btn btn-sm" style="background:#4299e1;color:#fff" onclick="runChainTest()">🧪 模型链路测试</button>
+    </div>
+    <div id="chainTestResult" style="margin-top:12px"></div>
+  `;
+}
+
+// 运行链路测试并显示结果
+async function runChainTest(){
+  const el = document.getElementById('chainTestResult');
+  if(!el) return;
+  el.innerHTML = '<div style="padding:12px;background:#ebf8ff;border-radius:6px;color:#2b6cb0">⏳ 正在测试模型链路，请稍候...</div>';
+  try{
+    const results = await testModelChain();
+    let html = '<table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px">';
+    html += '<tr style="background:#edf2f7"><th style="padding:6px;text-align:left">测试项</th><th style="padding:6px">结果</th><th style="padding:6px">耗时</th><th style="padding:6px">详情</th></tr>';
+    for(const r of results){
+      html += `<tr style="border-bottom:1px solid #e2e8f0">
+        <td style="padding:6px">${r.name}</td>
+        <td style="padding:6px;text-align:center"><span style="color:${r.ok?'#38a169':'#e53e3e'};font-weight:600">${r.ok?'✅ 通过':'❌ 失败'}</span></td>
+        <td style="padding:6px;text-align:center">${r.latency}ms</td>
+        <td style="padding:6px;font-size:11px;color:${r.ok?'#4a5568':'#c53030'};max-width:200px;word-break:break-all">${r.error || r.content || ''}</td>
+      </tr>`;
+    }
+    html += '</table>';
+    const passCount = results.filter(r=>r.ok).length;
+    html += `<div style="margin-top:8px;font-size:13px;font-weight:600;color:${passCount===results.length?'#38a169':'#d69e2e'}">通过 ${passCount}/${results.length}</div>`;
+    el.innerHTML = html;
+  }catch(e){
+    el.innerHTML = '<div style="padding:12px;background:#fff5f5;border-radius:6px;color:#c53030">测试失败: '+e.message+'</div>';
+  }
+}
+
+
 // ============ 运行时事实过滤层（P1最终验收）============
 // 所有对外AI调用在发送前必须经过此过滤，防止旧工具绕过事实访问层
 // 规则：confirmed允许；pending→待确认；internal仅内部；confidential/noOutbound禁止；demo不当真实事实
@@ -1734,11 +1934,30 @@ const FACT_SANITIZE_RULES = [
   {pattern: /\bour\s+factories\b/gi, replacement: 'strategic manufacturing partners'},
   {pattern: /factory\s+direct/gi, replacement: 'supply chain direct [待确认]'},
   // 认证名（在公司事实上下文中）→ 待确认
-  {pattern: /\b(?:CE|FDA|LFGB|RoHS|REACH|BSCI|ISO\s?9001|ISO\s?14001|SGS|TÜV|TUV)\s*(?:certified|certification|certificate|compliant|compliance)?/gi, replacement: 'certifications: 待确认 (held by manufacturing partners)'},
+  {pattern: /(?:^|[^a-zA-Z0-9])(?:CE|FDA|LFGB|RoHS|REACH|BSCI|ISO\s?9001|ISO\s?14001|SGS|TÜV|TUV)(?:\s*(?:certified|certification|certificate|compliant|compliance|认证|证书))?/gi, replacement: ' certifications: 待确认 (held by manufacturing partners)'},
   // 免费服务承诺 → 待确认
   {pattern: /free\s+(?:sample|samples|shipping|video|videos|photo|photos|marketing\s+material|4K)/gi, replacement: '[free service: 待确认]'},
   // 客户案例编造 → 待确认
   {pattern: /case\s+study\s*[:：]?[^.]{0,80}\d+\s*%/gi, replacement: '[case study: 待确认 - replace with real client data]'},
+  // ========== 中文上下文过滤规则（V75.4新增） ==========
+  // 中文MOQ数字 → 待确认
+  {pattern: /MOQ[^\d]{0,5}\d+(?:,\d+)?\s*(?:个|件|只|把|套|pcs|pieces)?/gi, replacement: 'MOQ: 待确认'},
+  // 中文交期数字 → 待确认
+  {pattern: /(?:交期|交货期|交付周期|生产周期)[^\d]{0,5}\d+\s*(?:天|日|周|星期|个月|月)/gi, replacement: '交期: 待确认'},
+  // 中文工厂数量 → 安全表述
+  {pattern: /\d+\s*(?:家|个|座)\s*(?:工厂|生产基地|制造厂|车间)/gi, replacement: 'strategic manufacturing partners [数量: 待确认]'},
+  // 中文出口国家数量 → 待确认
+  {pattern: /出口[^\d]{0,10}\d+\+?\s*(?:多个)?\s*(?:国家|地区|市场)/gi, replacement: '出口国家: 待确认'},
+  // 中文价格优势百分比 → 待确认
+  {pattern: /(?:比|较|低于|便宜|降低|节省|优惠)[^\d]{0,10}\d+\s*%/gi, replacement: '价格优势: 待确认'},
+  // 中文SKU数量 → 待确认
+  {pattern: /(?:SKU|产品|款式|型号)[^\d]{0,5}\d+\+?\s*(?:个|款|种|SKU)?/gi, replacement: 'SKU数量: 待确认'},
+  // 中文产能数字 → 待确认
+  {pattern: /(?:产能|产量|月产|年产)[^\d]{0,5}\d+\s*(?:万|亿)?\s*(?:把|只|件|个|pcs|套)/gi, replacement: '产能: 待确认'},
+  // 中文"自有工厂" → 安全表述
+  {pattern: /(?:自有|自己的|我们的)\s*(?:工厂|生产线|生产基地)/gi, replacement: 'strategic manufacturing partners'},
+  // 中文"家族工厂" → 安全表述
+  {pattern: /家族\s*(?:工厂|企业|产业)/gi, replacement: 'strategic manufacturing partners'},
 ];
 
 const FACT_CONSTRAINT_PROMPT = '\n\n【事实约束·强制】未在公司事实库中确认的SKU数、认证、产能、MOQ、交期、客户案例、出口国家数一律输出"待确认"，不得编造具体数字；合作工厂必须表述为strategic manufacturing partners，不得写成KaiLionCrafts自有工厂或自有认证；不得输出成本、底价、利润、价格优势百分比、免费服务承诺；所有AI输出为草稿，需人工审核后发送。';
@@ -1807,6 +2026,9 @@ async function callAI(messages, opts={}){
       errors.push(cfg.name+': 预算已用完');
       continue;
     }
+    // V75.4 GLM主模型重试1次（仅第一个在线模型，且不是预算跳过的情况）
+    let retryCount = 0;
+    const shouldRetry = (i===0 && cfg.type!=='ollama' && !isModelRecentlyFailed(cfg.id));
     try{
       const controller = new AbortController();
       // V73 差异化超时：Gemini网络不稳定用15秒快速失败，其他模型用30秒
@@ -1849,16 +2071,29 @@ async function callAI(messages, opts={}){
       const cost = calcApiCost(cfg.model, it, ot);
       logApiCall(cfg.model, opts.purpose||'general', it, ot, cost, 'success');
       if(i>0) console.log('[故障转移] 第'+(i+1)+'个模型成功: '+cfg.name);
+      // V75.4 记录Provider状态
+      const providerType = cfg.type==='ollama' ? 'ollama' : (cfg.type==='gemini' ? 'gemini' : 'glm');
+      recordProviderStatus(providerType, cfg.model, true, null, Math.round(performance.now()-t0), i);
       return { content:content, usage:usage, latency:Math.round(performance.now()-t0), error:null, mock:false, model:cfg.model, cost:cost, fallbackCount:i };
     }catch(e){
       errors.push(cfg.name+': '+e.message);
       logApiCall(cfg.model,opts.purpose||'general',0,0,0,'error');
+      // V75.4 GLM主模型重试1次
+      if(shouldRetry && retryCount===0 && !opts.modelConfigId){
+        retryCount++;
+        console.log('[故障转移] GLM主模型失败，自动重试第1次...');
+        errors.push(cfg.name+': 第1次失败，自动重试');
+        i--; // 重新尝试当前模型
+        continue;
+      }
       // V73 记录失败缓存（本地模型不记录，因为本地模型总是最后兜底）
       if(cfg.type!=='ollama') markModelFailed(cfg.id, e.message);
       continue;
     }
   }
   const errMsg = '所有模型均调用失败：'+errors.slice(0,3).join('; ');
+  // V75.4 记录全部失败状态
+  recordProviderStatus('all', '全部失败', false, errMsg, null, chain.length);
   return {content:null,usage:{},error:errMsg, mock:false, model:'全部失败', fallbackCount:chain.length};
 }
 function aiUsage(u){ return u&&u.total_tokens?`消耗 tokens: prompt ${u.prompt_tokens||'?'} + completion ${u.completion_tokens||'?'} = ${u.total_tokens}`:''; }
@@ -7225,6 +7460,8 @@ function updateGuideStep(){
 // 页面加载时检查是否需要显示欢迎引导
 document.addEventListener('DOMContentLoaded', function(){
   setTimeout(fetchKBStatus, 500);
+  // V75.4 页面初始化时自动检测Ollama本地模型
+  setTimeout(()=>{ if(typeof detectOllamaModels==='function'){ detectOllamaModels().then(()=>{ if(typeof renderProviderStatus==='function') renderProviderStatus(); }); } }, 2000);
   try{ migrateData(); }catch(e){ console.error('数据迁移失败:', e); }
   const welcomeShown = localStorage.getItem('kailion_welcome_shown');
   if(!welcomeShown){
@@ -11210,6 +11447,10 @@ function renderApiSettings(){
   <div class="card card-pad mb16">
     <div class="card-title">🔌 API 模型配置
       <button class="btn btn-primary btn-sm" onclick="openApiForm()">＋ 新增配置</button></div>
+    <div id="providerStatusPanel" style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,#f7fafc,#edf2f7);border:1px solid #e2e8f0;border-radius:10px">
+      <div style="font-weight:600;color:#2d3748;font-size:14px;margin-bottom:10px">📊 AI Provider 主备状态</div>
+      <div style="font-size:12px;color:#718096;margin-bottom:8px">GLM在线中转 → 本地Ollama模型，自动故障转移</div>
+    </div>
     <div class="table-wrap"><table class="tbl">
       <colgroup><col style="width:20%"><col style="width:12%"><col style="width:18%"><col style="width:12%"><col style="width:14%"><col style="width:24%"></colgroup>
       <thead><tr><th>名称</th><th>类型</th><th>Base URL</th><th>模型</th><th>状态</th><th>操作</th></tr></thead>

@@ -353,6 +353,7 @@ function proxyRequest(req, res, targetUrl) {
 // 敏感文件denylist（禁止通过静态文件路由下载）
 const STATIC_DENYLIST = [
   'access_config.json', 'search_config.json', 'search_cache.json', 'search_usage.json',
+  'api_config.json',
   '.env', '.git', 'node_modules', '*.log', '*backup*.json', '*backup*.zip',
   'kb_index.json', 'kb_index_', '公司核心事实清单', '卖点与服务清单',
   '公司知识库', '.kb_hash_cache', 'kb_meta_docs.json', 'kb_search_tests.json',

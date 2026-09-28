@@ -23,6 +23,9 @@ search_config.json
 search_cache.json
 search_usage.json
 
+# AI模型运行时配置（含API Key，不进Git）
+api_config.json
+
 # 卖点与服务清单（含内部底价/成本，不进Git）
 卖点与服务清单_待补充.md
 

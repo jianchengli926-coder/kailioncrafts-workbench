@@ -35,6 +35,8 @@ const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 允许局域网访问
 const ROOT_DIR = __dirname;
 const OLLAMA_URL = 'http://localhost:11434';
+const KB_ROOT = path.join(ROOT_DIR, '公司知识库备份_v5.7_2026-09-28');
+const KB_INDEX_FILE = path.join(ROOT_DIR, 'kb_index.json');
 
 // 在线模型API端点（用于健康检查）
 const ONLINE_APIS = [
@@ -83,6 +85,81 @@ function log(msg, type = 'INFO') {
 function getMimeType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   return MIME_TYPES[ext] || 'application/octet-stream';
+}
+
+/* 路径穿越防护：确保请求路径在知识库根目录内 */
+function safeKbPath(relativePath) {
+  if (!relativePath) return null;
+  // 拒绝绝对路径
+  if (path.isAbsolute(relativePath)) return null;
+  // 拒绝包含..的路径
+  if (relativePath.includes('..')) return null;
+  // 规范化路径
+  const normalized = path.normalize(relativePath);
+  // 再次检查
+  if (normalized.startsWith('..')) return null;
+  const fullPath = path.join(KB_ROOT, normalized);
+  // 确保在KB_ROOT内
+  if (!fullPath.startsWith(KB_ROOT)) return null;
+  // 检查符号链接（如果存在且指向目录外则拒绝）
+  try {
+    const realPath = fs.realpathSync(fullPath);
+    const realKbRoot = fs.realpathSync(KB_ROOT);
+    if (!realPath.startsWith(realKbRoot)) return null;
+  } catch (e) {
+    // 文件不存在时realpathSync会抛错，这是正常的
+  }
+  return fullPath;
+}
+
+/* 判断访问来源：local / lan / public */
+function getAccessScope(req) {
+  const cfConnectingIp = req.headers['cf-connecting-ip'];
+  const cfRay = req.headers['cf-ray'];
+  const xForwardedFor = req.headers['x-forwarded-for'];
+  const host = (req.headers.host || '').toLowerCase();
+  
+  // Cloudflare Tunnel / Cloudflare CDN 特征
+  if (cfConnectingIp || cfRay || host.includes('prospect.kailioncrafts.com')) {
+    return 'public';
+  }
+  
+  // 获取客户端IP
+  let clientIp = req.socket.remoteAddress || '';
+  if (xForwardedFor) {
+    clientIp = xForwardedFor.split(',')[0].trim();
+  }
+  
+  // 本机
+  if (clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1') {
+    // 但如果Host是公网域名，仍按公网处理
+    if (host.includes('prospect.kailioncrafts.com')) return 'public';
+    return 'local';
+  }
+  
+  // 局域网私网段
+  if (clientIp.startsWith('192.168.') || clientIp.startsWith('10.') || 
+      clientIp.startsWith('172.16.') || clientIp.startsWith('172.17.') ||
+      clientIp.startsWith('172.18.') || clientIp.startsWith('172.19.') ||
+      clientIp.startsWith('172.2') || clientIp.startsWith('172.30.') ||
+      clientIp.startsWith('172.31.') || clientIp.startsWith('::ffff:192.168.') ||
+      clientIp.startsWith('::ffff:10.')) {
+    return 'lan';
+  }
+  
+  // 判断不确定时按公网处理
+  return 'public';
+}
+
+/* 根据访问范围过滤切片敏感级别 */
+function filterSlicesByScope(slices, scope) {
+  if (scope === 'local') {
+    return slices; // 本机可访问所有级别
+  } else if (scope === 'lan') {
+    return slices.filter(s => s.sensitivity === 'public' || s.sensitivity === 'internal');
+  } else {
+    return slices.filter(s => s.sensitivity === 'public');
+  }
 }
 
 // ============ 健康检查 ============
@@ -268,6 +345,171 @@ const server = http.createServer(async (req, res) => {
       proxyRequest(req, res, targetUrl);
       return;
     }
+  }
+  
+  // ============ 知识库API（只读） ============
+  
+  // 知识库状态
+  if (pathname === '/api/kb/status') {
+    const scope = getAccessScope(req);
+    try {
+      if (fs.existsSync(KB_INDEX_FILE)) {
+        const indexData = JSON.parse(fs.readFileSync(KB_INDEX_FILE, 'utf-8'));
+        const stats = indexData.stats || {};
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          available: true,
+          kbVersion: indexData.kbVersion || 'v5.7',
+          generatedAt: indexData.generatedAtReadable || indexData.generatedAt,
+          totalFiles: stats.total_files || 0,
+          totalSlices: stats.total_slices || 0,
+          byCategory: stats.by_category || {},
+          bySensitivity: stats.by_sensitivity || {},
+          authorityHigh: stats.authority_high || 0,
+          deprecated: stats.deprecated || 0,
+          noOutbound: stats.no_outbound || 0,
+          accessScope: scope,
+          kbRootExists: fs.existsSync(KB_ROOT)
+        }, null, 2));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          available: false,
+          error: '索引文件不存在，请先运行 生成知识库索引.command',
+          accessScope: scope
+        }));
+      }
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ available: false, error: e.message }));
+    }
+    log(`知识库状态: scope=${scope}`, 'REQUEST');
+    return;
+  }
+  
+  // 知识库索引（支持分页和分类过滤）
+  if (pathname === '/api/kb/index') {
+    const scope = getAccessScope(req);
+    const category = reqUrl.searchParams.get('category');
+    const page = parseInt(reqUrl.searchParams.get('page') || '0');
+    const pageSize = parseInt(reqUrl.searchParams.get('pageSize') || '500');
+    
+    try {
+      if (!fs.existsSync(KB_INDEX_FILE)) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '索引文件不存在' }));
+        return;
+      }
+      const indexData = JSON.parse(fs.readFileSync(KB_INDEX_FILE, 'utf-8'));
+      let slices = indexData.slices || [];
+      
+      // 分类过滤
+      if (category) {
+        slices = slices.filter(s => s.category === category);
+      }
+      
+      // 敏感级别过滤（根据访问范围）
+      const beforeFilter = slices.length;
+      slices = filterSlicesByScope(slices, scope);
+      const afterFilter = slices.length;
+      
+      // 分页
+      const total = slices.length;
+      const start = page * pageSize;
+      const paged = slices.slice(start, start + pageSize);
+      
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        kbVersion: indexData.kbVersion,
+        generatedAt: indexData.generatedAtReadable,
+        accessScope: scope,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+        filteredBySensitivity: beforeFilter - afterFilter,
+        slices: paged
+      }, null, 2));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    log(`知识库索引: scope=${scope}, category=${category || 'all'}, page=${page}`, 'REQUEST');
+    return;
+  }
+  
+  // 知识库单个文件内容
+  if (pathname === '/api/kb/file') {
+    const scope = getAccessScope(req);
+    const relativePath = reqUrl.searchParams.get('path');
+    
+    if (!relativePath) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '缺少path参数' }));
+      return;
+    }
+    
+    // 路径穿越防护
+    const fullPath = safeKbPath(relativePath);
+    if (!fullPath) {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '路径被拒绝（路径穿越防护）', path: relativePath }));
+      log(`知识库文件访问被拒绝(路径穿越): ${relativePath}`, 'WARN');
+      return;
+    }
+    
+    // 检查文件是否存在
+    if (!fs.existsSync(fullPath)) {
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '文件不存在', path: relativePath }));
+      return;
+    }
+    
+    // 公网访问时检查文件敏感级别
+    if (scope === 'public') {
+      // 读取frontmatter检查sensitivity
+      try {
+        const content = fs.readFileSync(fullPath, 'utf-8');
+        const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+        if (fmMatch) {
+          const sensMatch = fmMatch[1].match(/sensitivity:\s*(\w+)/);
+          if (sensMatch) {
+            const sensitivity = sensMatch[1].toLowerCase();
+            if (sensitivity !== 'public') {
+              res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+              res.end(JSON.stringify({ error: '公网访问仅允许public级别文件', sensitivity }));
+              log(`知识库文件公网访问被拒绝: ${relativePath} (${sensitivity})`, 'WARN');
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        // 读取失败时按公网严格策略拒绝
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '无法验证文件敏感级别，公网访问被拒绝' }));
+        return;
+      }
+    }
+    
+    // 读取并返回文件内容
+    try {
+      const content = fs.readFileSync(fullPath, 'utf-8');
+      const stats = fs.statSync(fullPath);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        path: relativePath,
+        fileName: path.basename(relativePath),
+        size: stats.size,
+        lastModified: stats.mtime.toISOString(),
+        accessScope: scope,
+        content
+      }, null, 2));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    log(`知识库文件: scope=${scope}, ${relativePath}`, 'REQUEST');
+    return;
   }
   
   // ============ 静态文件 ============

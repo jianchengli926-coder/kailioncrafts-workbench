@@ -20308,39 +20308,51 @@ function generateIdealCustomerProfile(){
 function selectCategory(idx){
   const cat = CATEGORIES[idx];
   const detailEl = document.getElementById('categoryDetail');
-  detailEl.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-      <div style="font-size:40px">${cat.icon}</div>
-      <div>
-        <div style="font-weight:700;font-size:18px;color:${cat.color}">${cat.name}搜客策略</div>
-        <div style="font-size:12px;color:#64748b;margin-top:2px">${cat.strategy}</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-      <div style="background:#f8fafc;padding:12px;border-radius:8px">
-        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">🔑 核心搜索关键词</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">
-          ${cat.products.map(p=>'<span class="badge" style="background:#dbeafe;color:#1e40af;font-size:10px;padding:3px 8px;cursor:pointer" onclick="copyText(\''+p+'\')">'+p+'</span>').join('')}
-        </div>
-      </div>
-      <div style="background:#f8fafc;padding:12px;border-radius:8px">
-        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">🏢 目标客户类型</div>
-        <div style="display:flex;flex-direction:column;gap:4px">
-          ${cat.customers.map(c=>'<div style="font-size:11px;color:#334155">• '+c+'</div>').join('')}
-        </div>
-      </div>
-      <div style="background:#f8fafc;padding:12px;border-radius:8px">
-        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">🌍 重点市场</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">
-          ${cat.markets.map(m=>'<span class="badge" style="background:#dcfce7;color:#166534;font-size:10px;padding:3px 8px">'+m+'</span>').join('')}
-        </div>
-      </div>
-    </div>
-    <div style="margin-top:12px;display:flex;gap:8px">
-      <button class="btn btn-sm btn-primary" onclick="document.getElementById(\'gsc_keyword\').value=\''+cat.products[0]+'\';generateSearchCommands()">⚡ 生成Google搜索指令</button>
-      <button class="btn btn-sm btn-outline" onclick="document.getElementById(\'naturalSearchInput\').value=\'寻找'+cat.name+'的'+cat.customers[0]+'，在'+cat.markets[0]+'市场\'">💬 用自然语言搜客</button>
-    </div>
-  `;
+  const productsHtml = cat.products.map(function(p){
+    return '<span class="badge" style="background:#dbeafe;color:#1e40af;font-size:10px;padding:3px 8px;cursor:pointer" onclick="copyText(\'' + p.replace(/'/g, "\\'") + '\')">' + p + '</span>';
+  }).join('');
+  const customersHtml = cat.customers.map(function(c){
+    return '<div style="font-size:11px;color:#334155">• ' + c + '</div>';
+  }).join('');
+  const marketsHtml = cat.markets.map(function(m){
+    return '<span class="badge" style="background:#dcfce7;color:#166534;font-size:10px;padding:3px 8px">' + m + '</span>';
+  }).join('');
+  
+  detailEl.innerHTML = 
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">' +
+      '<div style="font-size:40px">' + cat.icon + '</div>' +
+      '<div>' +
+        '<div style="font-weight:700;font-size:18px;color:' + cat.color + '">' + cat.name + '搜客策略</div>' +
+        '<div style="font-size:12px;color:#64748b;margin-top:2px">' + cat.strategy + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">' +
+      '<div style="background:#f8fafc;padding:12px;border-radius:8px">' +
+        '<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">🔑 核心搜索关键词</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:4px">' + productsHtml + '</div>' +
+      '</div>' +
+      '<div style="background:#f8fafc;padding:12px;border-radius:8px">' +
+        '<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">🏢 目标客户类型</div>' +
+        '<div style="display:flex;flex-direction:column;gap:4px">' + customersHtml + '</div>' +
+      '</div>' +
+      '<div style="background:#f8fafc;padding:12px;border-radius:8px">' +
+        '<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">🌍 重点市场</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:4px">' + marketsHtml + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="margin-top:12px;display:flex;gap:8px">' +
+      '<button class="btn btn-sm btn-primary" onclick="applyCategoryToSearch(\'' + cat.products[0].replace(/'/g, "\\'") + '\')">⚡ 生成Google搜索指令</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="applyCategoryToNatural(\'' + cat.name.replace(/'/g, "\\'") + '\',\'' + cat.customers[0].replace(/'/g, "\\'") + '\',\'' + cat.markets[0].replace(/'/g, "\\'") + '\')">💬 用自然语言搜客</button>' +
+    '</div>';
+}
+
+function applyCategoryToSearch(keyword){
+  document.getElementById('gsc_keyword').value = keyword;
+  generateSearchCommands();
+}
+
+function applyCategoryToNatural(name, customer, market){
+  document.getElementById('naturalSearchInput').value = '寻找' + name + '的' + customer + '，在' + market + '市场';
 }
 
 function generateSearchCommands(){
@@ -20372,48 +20384,39 @@ function generateSearchCommands(){
   };
   
   const commands = [];
-  
-  // 基础搜索
   commands.push({title:'基础产品+客户类型', cmd: '"' + keyword + '" ' + typeWords[type][0]});
-  
-  // 带国家域名
   if(country && countrySites[country]){
     commands.push({title:'国家域名限定', cmd: '"' + keyword + '" ' + typeWords[type][0] + ' ' + countrySites[country][0]});
   }
-  
-  // intitle搜索
   commands.push({title:'标题包含关键词', cmd: 'intitle:"' + keyword + '" ' + typeWords[type][1]});
-  
-  // inurl搜索
   commands.push({title:'URL包含关键词', cmd: 'inurl:"' + keyword + '" ' + typeWords[type][0]});
-  
-  // 联系页面搜索
   commands.push({title:'找联系页面', cmd: '"' + keyword + '" ' + typeWords[type][0] + ' "contact us"'});
-  
-  // 关于我们页面
   commands.push({title:'找公司介绍', cmd: '"' + keyword + '" ' + typeWords[type][0] + ' "about us"'});
-  
-  // LinkedIn搜索
   commands.push({title:'LinkedIn找公司', cmd: 'site:linkedin.com/company "' + keyword + '" ' + typeWords[type][0]});
-  
-  // 采购经理搜索
   commands.push({title:'找采购经理', cmd: 'site:linkedin.com/in "purchasing manager" "' + keyword + '"'});
   
   const resultEl = document.getElementById('searchCommandsResult');
   const listEl = document.getElementById('searchCommandsList');
   resultEl.style.display = 'block';
   
-  listEl.innerHTML = commands.map((c,i)=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#f0fdf4;border-radius:6px;margin-bottom:6px;border:1px solid #bbf7d0">
-      <div style="background:#166534;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;flex-shrink:0">${i+1}</div>
-      <div style="flex:1">
-        <div style="font-size:11px;font-weight:700;color:#166534;margin-bottom:2px">${c.title}</div>
-        <div style="font-size:11px;color:#374151;font-family:monospace;background:#fff;padding:4px 8px;border-radius:4px;word-break:break-all">${c.cmd}</div>
-      </div>
-      <button class="btn btn-sm" style="background:#166534;color:#fff;flex-shrink:0" onclick="copyText(\'${c.cmd.replace(/'/g,"\\'")}\')">复制</button>
-      <button class="btn btn-sm" style="background:#3b82f6;color:#fff;flex-shrink:0" onclick="window.open(\'https://www.google.com/search?q=\'+encodeURIComponent(\'${c.cmd.replace(/'/g,"\\'")}\'),\'_blank\')">搜索</button>
-    </div>
-  `).join('');
+  let html = '';
+  commands.forEach(function(c, i){
+    const cmdEscaped = c.cmd.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px;background:#f0fdf4;border-radius:6px;margin-bottom:6px;border:1px solid #bbf7d0">' +
+      '<div style="background:#166534;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;flex-shrink:0">' + (i+1) + '</div>' +
+      '<div style="flex:1">' +
+        '<div style="font-size:11px;font-weight:700;color:#166534;margin-bottom:2px">' + c.title + '</div>' +
+        '<div style="font-size:11px;color:#374151;font-family:monospace;background:#fff;padding:4px 8px;border-radius:4px;word-break:break-all">' + c.cmd + '</div>' +
+      '</div>' +
+      '<button class="btn btn-sm" style="background:#166534;color:#fff;flex-shrink:0" onclick="copyText(\'' + cmdEscaped + '\')">复制</button>' +
+      '<button class="btn btn-sm" style="background:#3b82f6;color:#fff;flex-shrink:0" onclick="searchOnGoogle(\'' + cmdEscaped + '\')">搜索</button>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
+}
+
+function searchOnGoogle(cmd){
+  window.open('https://www.google.com/search?q=' + encodeURIComponent(cmd), '_blank');
 }
 
 </script>

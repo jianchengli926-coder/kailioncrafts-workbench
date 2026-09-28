@@ -1,3 +1,51 @@
+# 🔐 安全架构与事实源（2026-09-28 更新）
+
+## 登录与会话
+- 密码使用 scrypt + salt 哈希存储，不明文存储、不硬编码
+- HttpOnly + SameSite Cookie 会话，有效期8小时
+- 前端以服务端会话为准，sessionStorage仅作UI状态
+- 5次失败/IP锁定1分钟，修改密码仅本机+已验证会话
+
+## 三种访问边界
+| 能力 | 本机 | 局域网 | 公网 |
+|------|------|--------|------|
+| 页面+知识库public | ✅ | ✅ | ✅ |
+| 知识库internal | ✅ | ✅ | ❌ |
+| 知识库confidential | ✅ | ❌ | ❌ |
+| 搜索/抓取/AI/Ollama | ✅ | ✅ | ❌ |
+| 修改密码/数据导出 | ✅ | ❌ | ❌ |
+
+## 安全加固
+- 敏感静态文件denylist（25类）：access_config.json、search_config.json、kb_index.json、server.js、.git等
+- /api/proxy/ 已关闭（403）
+- CORS同源策略，无通配符
+- SSRF连接层防御（DNS重绑定防护）
+- 路径遍历防护（..和%2e检测）
+
+## 知识库真实状态
+- 481个Markdown文件，7277个切片
+- public 4721 / internal 2483 / confidential 73
+- 服务端关键词检索，向量检索暂未启用
+
+## Tavily搜索
+- API Key未配置时，搜索功能安全暂停，不发起请求
+- Key仅存本机search_config.json（已.gitignore），不硬编码
+- 免费额度1000 credits/月（以官网为准）
+
+## 公司事实源规则
+- confirmed: 已确认可对外 | pending: 待确认输出"待确认"
+- internal: 仅内部 | noOutbound: 禁止对外 | deprecated: 不可用
+- 统一访问层：getCompanyFact()、getSafeFactoryDescription()
+- 禁止对外：工厂数量、SKU数、MOQ、交期、产能、认证归属、成本、底价、利润、价格优势%、免费服务承诺、"家族工厂"、"全认证"
+- 合作工厂统一表述：strategic manufacturing partners / local manufacturing network
+
+## 模块状态
+- 阶段1已完成：知识库接入、精准开发模块A+B、P0安全加固、P1事实源统一
+- 模块C（公司深度分析）/ 模块D（痛点识别）：未开发
+- 尚未进行：真实Tavily搜索测试、公网真实攻击面验证、局域网跨域验收
+
+---
+
 # 锴利外贸获客工作台 - 本地服务器部署指南
 
 ## 📋 目录

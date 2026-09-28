@@ -4123,7 +4123,7 @@ function viewDashboard(root){
       </div>
       <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
         <div style="text-align:center;padding:8px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
-          <div style="font-size:18px;font-weight:800;color:#c9a961">${PROSPECT_KB.product_count||200}</div>
+          <div style="font-size:18px;font-weight:800;color:#c9a961">${PROSPECT_KB.product_count||0}<span style="font-size:10px;color:#999">演示</span></div>
           <div style="font-size:10px;color:#718096">产品SKU</div>
         </div>
         <div style="text-align:center;padding:8px;background:#fff;border-radius:6px;border:1px solid #e2e8f0">
@@ -8964,7 +8964,7 @@ function openInqDetail(iid){
         <div class="card-title" style="font-size:13px">📦 知识库快速回复（一键复制）</div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">
           <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left" onclick="copyText('Thank you for your inquiry about ${esc(i.product)}. We are ${PROSPECT_KB.company.brand}, a ${PROSPECT_KB.company.location}-based manufacturer working with ${PROSPECT_KB.company.factories} strategic manufacturing partners [factory count: 待确认]. We can provide ${esc(i.product)} with ${PROSPECT_KB.company.cost_advantage} cost advantage. May I send you our catalog and best price?');toast('已复制询盘回复模板')">✉️ 询盘回复模板</button>
-          <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left" onclick="copyText('Certifications: ${PROSPECT_KB.certifications.map(c=>c.name).join(', ')}. Full audit reports and test certificates available upon request.');toast('已复制认证清单')">📜 认证资质清单</button>
+          <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left" onclick="copyText('Certifications: 待确认 (held by strategic manufacturing partners, not KaiLionCrafts-owned). Full audit reports available upon request after verification.');toast('已复制认证清单')">📜 认证资质清单</button>
           <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left" onclick="copyText('We specialize in ${PROSPECT_KB.categories.map(c=>c.name).join(', ')}, with a wide range of SKUs [SKU count: 待确认]. MOQ and samples: 待确认 - please verify before sending.');toast('已复制产品介绍')">📦 产品品类介绍</button>
           <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left" onclick="copyText('${PROSPECT_KB.company.core_advantages.slice(0,3).map((a,i)=>(i+1)+'. '+a).join('\n')}');toast('已复制核心卖点')">💎 核心卖点3条</button>
         </div>
@@ -9198,7 +9198,7 @@ function viewSettings(root){
           <div class="text-xs text-muted mb6" style="font-weight:bold">📊 知识库数据统计</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
             <div style="padding:8px;background:#fff;border-radius:6px;text-align:center">
-              <div style="font-size:18px;font-weight:800;color:#c9a961">${PROSPECT_KB.product_count||200}</div>
+              <div style="font-size:18px;font-weight:800;color:#c9a961">${PROSPECT_KB.product_count||0}<span style="font-size:10px;color:#999">演示</span></div>
               <div style="font-size:10px;color:#718096">产品SKU</div>
             </div>
             <div style="padding:8px;background:#fff;border-radius:6px;text-align:center">
@@ -9940,6 +9940,12 @@ let kbSearchState = {query:'', results:[], loading:false, category:'', status:nu
 // ⚠️ PROSPECT_KB 中的 factories/export_countries/certifications/categories.count 为演示数据
 // 对外AI输出必须通过 getCompanyFact()/getSafeFactoryDescription() 统一访问层
 // 未在公司事实库中确认的字段，AI不得输出具体数字
+// ⚠️ PROSPECT_KB 完整标记：以下所有数据均为演示数据（demo）
+// 对外AI输出禁止直接读取以下字段：categories.count、certifications、factories、
+// export_countries、cost_advantage、product_count、industry、core_advantages
+// 必须通过 getCompanyFact()/getSafeFactoryDescription() 统一访问层读取 confirmed 字段
+// pending 字段只能输出"待确认"，noOutbound 字段完全排除
+const PROSPECT_KB_DEMO_FIELDS = ['categories.count','certifications','factories','export_countries','cost_advantage','product_count','industry','core_advantages'];
 const PROSPECT_KB = {
   company: {"brand": "KaiLionCrafts · 锴利匠心", "name_cn": "阳江市锴利国际贸易有限公司", "name_en": "Yangjiang Kaili International Trading Co., Ltd.", "slogan_en": "Forged in Yangjiang. Trusted Worldwide.", "founder": "Leo Li (李建成)", "location": "广东阳江阳东区", "website": "www.kailioncrafts.com", "email": "info@kailioncrafts.com", "phone": "+86 132 5069 1884", "factories": 4, "export_countries": "130+", "cost_advantage": "具有竞争力的成本优势", "certifications": ["CE", "FDA", "LFGB", "RoHS"], "core_advantages": ["工厂直供价 - 无中间商加价", "优先生产排期 - 股权所有者话语权", "创始人亲自质控 - 从原料到包装", "全程透明化 - 实时生产照片视频", "铁腕IP保护 - 严格NDA和反跳单协议", "一站式采购 - 多品类统一品牌", "免费营销视频 - 专业4K拍摄制作", "线上工厂参观 - 创始人亲自直播带看"], "philosophy": "Trust First · Value Second · Price Last（信任为先·价值为本·价格为末）", "mission": "让阳江好产品被世界看见，让工厂走出来，让人才留下来"},
   categories: [{"name": "厨房用品", "count": 59, "sub_cats": ["砧板", "削皮器", "压蒜器", "厨房夹", "刮刀"]}, {"name": "剪刀", "count": 52, "sub_cats": ["厨房剪", "多功能剪"]}, {"name": "厨刀", "count": 50, "sub_cats": ["主厨刀", "厨刀"]}, {"name": "户外刀", "count": 29, "sub_cats": ["固定刃", "户外刀", "折叠刀"]}, {"name": "多功能剪刀", "count": 5, "sub_cats": ["家用", "厨房剪", "重型剪", "钛系剪", "多功能剪"]}, {"name": "厨房刀", "count": 5, "sub_cats": ["削片刀", "厨刀", "切片刀", "削皮刀", "厨刀套装"]}],
@@ -10259,8 +10265,8 @@ function getToolKBContext(extraInfo){
 【公司简介】${kb.company.intro_short || '阳江市锴利国际贸易有限公司，本地供应链协同模式，阳江本地多个制造基地，产品远销全球多个国家和地区'}
 【核心优势】${kb.company.core_advantages.join('；')}
 【成本优势】${kb.company.cost_advantage}
-【产品品类】${kb.categories.map(x=>x.name+'('+x.count+'SKU)').join('、')}
-【认证资质】${kb.certifications.map(x=>x.name).join('、')}
+【产品品类】${kb.categories.map(x=>x.name).join('、')} [SKU数量:待确认]
+【认证资质】待确认（合作工厂持有，非公司自有）
 【经营哲学】${kb.company.philosophy}
 【品牌标语】${kb.company.slogan_en}`;
   if(extraInfo) ctx += '\n【额外信息】' + extraInfo;
@@ -10275,7 +10281,7 @@ function searchKBLocal(query){
   // 搜索公司信息
   const companyText = JSON.stringify(kb.company).toLowerCase();
   if(q.split(' ').some(w=>companyText.includes(w))){
-    results.push({type:'公司信息', content: `${kb.company.brand} - ${kb.company.name_cn}，创始人${kb.company.founder}，${getSafeFactoryDescription()}，出口${kb.company.export_countries}国家，${kb.company.cost_advantage}`});
+    results.push({type:'公司信息', content: `${kb.company.brand} - ${kb.company.name_cn}，创始人${kb.company.founder}，${getSafeFactoryDescription()}，出口国家:待确认，成本优势:待确认`});
   }
   // 搜索产品
   for(const [cat, prods] of Object.entries(kb.products||{})){
@@ -10339,12 +10345,12 @@ async function doKBSearch(){
   // 构建知识库上下文
   const kb = PROSPECT_KB;
   const context = `
-【公司信息】${kb.company.brand}，${kb.company.name_cn}，创始人${kb.company.founder}，${getSafeFactoryDescription()}，出口${kb.company.export_countries}国家，${kb.company.cost_advantage}。核心优势：${kb.company.core_advantages.slice(0,5).join('；')}。
-【产品品类】${kb.categories.map(c=>c.name+'('+c.count+'SKU)').join('、')}，共${kb.product_count}+产品。
+【公司信息】${kb.company.brand}，${kb.company.name_cn}，创始人${kb.company.founder}，${getSafeFactoryDescription()}，出口国家:待确认，成本优势:待确认。核心优势:待确认（需从公司事实库读取）。
+【产品品类】${kb.categories.map(c=>c.name).join('、')} [SKU数量:待确认]。
 【目标市场】${kb.markets.map(m=>m.name.split(' ')[0]).join('、')}。
 【客户画像】${kb.personas.map(p=>p.name).join('、')}。
-【认证资质】${kb.certifications.map(c=>c.name).join('、')}。
-【阳江产业】${kb.industry.title}，${kb.industry.total_output}，产量占全国${kb.industry.domestic_output_share}，出口占全国${kb.industry.export_share}。
+【认证资质】待确认（合作工厂持有，非公司自有）。
+【阳江产业背景（公开数据，非公司自有）】${kb.industry.title}，${kb.industry.total_output}，产量占全国${kb.industry.domestic_output_share}，出口占全国${kb.industry.export_share}。[来源:阳江产业公开统计，年份待确认]
 【检索到的相关资料】${localResults.map(r=>r.type+': '+r.content).join('\n')}
 `;
   // 调用AI回答
@@ -10695,10 +10701,10 @@ async function doGenerateEmailWithKB(cid){
 公司：${kb.company.name_cn}（${kb.company.brand}）
 定位：${kb.company.slogan_en}
 核心优势：${kb.company.core_advantages.join('；')}
-产品品类：${kb.categories.map(x=>x.name+'('+x.sku_count+'SKU)').join('、')}
-认证：${kb.certifications.map(x=>x.name).join('、')}
+产品品类：${kb.categories.map(x=>x.name).join('、')} [SKU数量:待确认]
+认证：待确认（合作工厂持有，非公司自有）
 经营哲学：${kb.company.philosophy}
-产业背景：${kb.industry.title}，产量${kb.industry.domestic_output_share}，出口${kb.industry.export_share}
+产业背景（公开数据，非公司自有）：${kb.industry.title}，产量${kb.industry.domestic_output_share}，出口${kb.industry.export_share} [来源:阳江产业公开统计]
 
 ${extra?'【额外要求】'+extra:''}
 
@@ -10793,11 +10799,11 @@ async function generateDevStrategyWithKB(cid){
 公司：${kb.company.name_cn}（${kb.company.brand}）
 定位：${kb.company.slogan_en}
 核心优势：${kb.company.core_advantages.join('；')}
-产品品类：${kb.categories.map(x=>x.name+'('+x.sku_count+'SKU)').join('、')}
-认证：${kb.certifications.map(x=>x.name).join('、')}
+产品品类：${kb.categories.map(x=>x.name).join('、')} [SKU数量:待确认]
+认证：待确认（合作工厂持有，非公司自有）
 合作工厂：${getSafeFactoryDescription()}（股权模式）
 经营哲学：${kb.company.philosophy}
-产业背景：${kb.industry.title}，产量${kb.industry.domestic_output_share}，出口${kb.industry.export_share}
+产业背景（公开数据，非公司自有）：${kb.industry.title}，产量${kb.industry.domestic_output_share}，出口${kb.industry.export_share} [来源:阳江产业公开统计]
 
 【请输出以下内容】
 1. 客户价值评估（高/中/低，及理由）
@@ -12036,11 +12042,11 @@ Slogan：${kb.company.slogan_en}
 地点：${kb.company.location}
 核心优势：${kb.company.core_advantages.join('；')}
 产品品类：${kb.categories.map(x=>x.name).join('、')}
-认证：${kb.certifications.map(x=>x.name).join('、')}
-出口国家：${kb.company.export_countries}
+认证：待确认（合作工厂持有，非公司自有）
+出口国家：待确认
 成本优势：${kb.company.cost_advantage}
 经营哲学：${kb.company.philosophy}
-产业背景：${kb.industry.title}，产量${kb.industry.domestic_output_share}，出口${kb.industry.export_share}，${kb.industry.heritage}
+产业背景（公开数据，非公司自有）：${kb.industry.title}，产量${kb.industry.domestic_output_share}，出口${kb.industry.export_share} [来源:阳江产业公开统计]，${kb.industry.heritage}
 
 【SEO要求】
 1. 标题包含关键词，H1-H3层级清晰
@@ -12355,7 +12361,7 @@ function runAgents(){
     '✉️ 开发信Agent：生成12封个性化开发信，已注入公司'+kb.company.core_advantages.length+'大核心优势和'+kb.certifications.length+'张认证',
     '💬 社媒运营Agent：准备领英加好友附言，融入'+kb.company.brand+'品牌定位',
     '✍️ 内容创作Agent：推荐2篇博客选题，基于知识库SEO关键词和热门产品',
-    '📚 知识库专家Agent：深度分析知识库'+kb.product_count+'个产品/'+kb.categories.length+'大品类/'+kb.certifications.length+'张认证，推荐3个知识库应用策略：①客户开发信自动注入公司优势和认证 ②报价时优先推荐知识库热门产品 ③跟进SOP使用知识库开发信模板'
+    '📚 知识库专家Agent：深度分析知识库 [产品数量:待确认]/'+kb.categories.length+'大品类/[认证数量:待确认]，推荐3个知识库应用策略：①客户开发信自动注入公司优势（需从事实库读取confirmed字段） ②报价时优先推荐知识库热门产品 ③跟进SOP使用知识库开发信模板'
   ];
   msgs.forEach((m,i)=>{
     setTimeout(()=>{
@@ -12468,16 +12474,16 @@ function viewExpos(root){
       <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #eee">
         <div style="font-size:12px;font-weight:700;color:#8b6914;margin-bottom:6px">🏢 公司30秒介绍</div>
         <div class="text-xs text-muted" style="line-height:1.6;margin-bottom:8px">
-          ${PROSPECT_KB.company.name_cn}（${PROSPECT_KB.company.brand}），${PROSPECT_KB.company.location}，${PROSPECT_KB.company.factories}大本地供应链协同模式，出口${PROSPECT_KB.company.export_countries}，成本低于市场${PROSPECT_KB.company.cost_advantage}
+          ${PROSPECT_KB.company.name_cn}（${PROSPECT_KB.company.brand}），${PROSPECT_KB.company.location}，与阳江本地多个制造基地深度战略合作、本地供应链协同 [工厂数量:待确认，出口国家:待确认，成本优势:待确认]
         </div>
-        <button class="btn btn-gold btn-sm" style="font-size:11px;width:100%" onclick="copyText('${PROSPECT_KB.company.name_cn} (${PROSPECT_KB.company.brand}), ${PROSPECT_KB.company.location}, ${PROSPECT_KB.company.factories} strategic manufacturing partners equity model, exporting to ${PROSPECT_KB.company.export_countries}, cost ${PROSPECT_KB.company.cost_advantage} lower than market.');toast('已复制公司介绍')">📋 复制英文版</button>
+        <button class="btn btn-gold btn-sm" style="font-size:11px;width:100%" onclick="copyText('${PROSPECT_KB.company.name_cn} (${PROSPECT_KB.company.brand}), ${PROSPECT_KB.company.location}, working with multiple strategic manufacturing partners in Yangjiang [factory count: 待确认, export countries: 待确认, cost advantage: 待确认].');toast('已复制公司介绍')">📋 复制英文版</button>
       </div>
       <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #eee">
         <div style="font-size:12px;font-weight:700;color:#2b6cb0;margin-bottom:6px">📦 产品品类一句话</div>
         <div class="text-xs text-muted" style="line-height:1.6;margin-bottom:8px">
           ${PROSPECT_KB.categories.map(c=>c.name+'('+c.count+'SKU)').join('、')}
         </div>
-        <button class="btn btn-primary btn-sm" style="font-size:11px;width:100%" onclick="copyText('We specialize in ${PROSPECT_KB.categories.map(c=>c.name).join(', ')}, with ${PROSPECT_KB.categories.reduce((s,c)=>s+c.count,0)}+ SKUs available.');toast('已复制产品介绍')">📋 复制英文版</button>
+        <button class="btn btn-primary btn-sm" style="font-size:11px;width:100%" onclick="copyText('We specialize in ${PROSPECT_KB.categories.map(c=>c.name).join(', ')}, with a wide range of SKUs available [SKU count: 待确认].');toast('已复制产品介绍')">📋 复制英文版</button>
       </div>
       <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #eee">
         <div style="font-size:12px;font-weight:700;color:#276749;margin-bottom:6px">📜 认证资质清单</div>
@@ -15950,10 +15956,10 @@ async function generateCustomerProfile(customerInfo, depth){
 公司：${kb.company.name_cn}（${kb.company.brand}）
 定位：${kb.company.slogan_en}
 核心优势：${kb.company.core_advantages.join('；')}
-产品品类：${kb.categories.map(x=>x.name+'('+x.sku_count+'SKU)').join('、')}
+产品品类：${kb.categories.map(x=>x.name).join('、')} [SKU数量:待确认]
 目标市场：${kb.markets.map(x=>x.name).join('、')}
-认证：${kb.certifications.map(x=>x.name).join('、')}
-产业背景：${kb.industry.city}是中国刀剪之都，产量占全国${kb.industry.national_output_share}
+认证：待确认（合作工厂持有，非公司自有）
+产业背景（公开数据，非公司自有）：${kb.industry.city}是中国刀剪之都，产量占全国${kb.industry.national_output_share} [来源:阳江产业公开统计]
 
 请在分析客户时，结合我们的公司背景，评估该客户与我们的匹配度，并在"开发建议"部分推荐适合的产品品类和切入角度。`;
   let prompt = PROFILE_PROMPT.replace('{customerInfo}', customerInfo) + kbSuffix;
@@ -19328,12 +19334,12 @@ function viewLinkedin(root){
         <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff" onclick="linkedinTab='message';go('linkedin')">去AI站内信</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px">
-        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Hi {name}, I noticed {company} specializes in kitchenware. We are ${PROSPECT_KB.company.brand}, a ${PROSPECT_KB.company.location}-based manufacturer working with ${PROSPECT_KB.company.factories} strategic manufacturing partners [factory count: 待确认]. Would love to connect and share how we can help reduce your sourcing cost by 20%+.');toast('已复制好友申请话术')">👋 好友申请话术</button>
+        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Hi {name}, I noticed {company} specializes in kitchenware. We are ${PROSPECT_KB.company.brand}, working with strategic manufacturing partners in Yangjiang [factory count: 待确认]. Would love to connect and share how we can help optimize your sourcing [cost advantage: 待确认].');toast('已复制好友申请话术')">👋 好友申请话术</button>
         <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Thanks for connecting {name}! Quick intro: ${PROSPECT_KB.company.brand} manufactures ${PROSPECT_KB.categories.map(c=>c.name).slice(0,3).join(', ')} with ${PROSPECT_KB.certifications.length}+ certifications. Our factory-direct pricing is 20%+ below market. Can I send you our latest catalog?');toast('已复制首次私信')">✉️ 首次私信</button>
         <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Hi {name}, following up on my catalog. We just launched new ${PROSPECT_KB.categories[1].name} designs with ${PROSPECT_KB.certifications[0].name} certification. MOQ 500pcs, sample in 7 days. Interested in a quick call this week?');toast('已复制跟进私信')">🔔 跟进私信</button>
         <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Excited to share that ${PROSPECT_KB.company.brand} will be at the next kitchenware trade show. We specialize in ${PROSPECT_KB.categories.map(c=>c.name).join(', ')} for ${PROSPECT_KB.markets.length}+ markets. Let\'s schedule a meeting — I can bring samples of our best-selling ${PROSPECT_KB.categories[0].name}.');toast('已复制展会邀约')">🎪 展会邀约</button>
         <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Hi {name}, based on your interest in ${PROSPECT_KB.categories[0].name}, I thought you\'d like our new ${PROSPECT_KB.products[Object.keys(PROSPECT_KB.products)[0]][0].name_en} — ${PROSPECT_KB.products[Object.keys(PROSPECT_KB.products)[0]][0].material}, ${PROSPECT_KB.certifications[0].name} certified. Factory price $${PROSPECT_KB.products[Object.keys(PROSPECT_KB.products)[0]][0].price_range || '1.5-2.5'}. Want a sample?');toast('已复制产品推荐')">📦 产品推荐</button>
-        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Hi {name}, following up on the quote I sent for ${PROSPECT_KB.categories[0].name}. Our ${PROSPECT_KB.company.factories} strategic manufacturing partners ensure stable quality and 20%+ cost advantage. Valid for 30 days. Can we schedule a quick call to discuss customization?');toast('已复制报价跟进')">💰 报价跟进</button>
+        <button class="btn btn-outline btn-sm" style="font-size:11px;background:#fff;text-align:left;padding:10px" onclick="copyText('Hi {name}, following up on the quote I sent for ${PROSPECT_KB.categories[0].name}. Our strategic manufacturing partners ensure stable quality [cost advantage: 待确认]. Quote validity: 待确认. Can we schedule a quick call to discuss customization?');toast('已复制报价跟进')">💰 报价跟进</button>
       </div>
       <div class="text-xs text-muted mt8" style="border-top:1px solid #bae6fd;padding-top:8px">
         💡 6个模板覆盖领英拓客全流程：加好友→首次私信→产品推荐→报价跟进→展会邀约→定期跟进

@@ -37,6 +37,7 @@ const ROOT_DIR = __dirname;
 const OLLAMA_URL = 'http://localhost:11434';
 const KB_ROOT = path.join(ROOT_DIR, '公司知识库备份_v5.7_2026-09-28');
 const KB_INDEX_FILE = path.join(ROOT_DIR, 'kb_index.json');
+const KB_META_DOCS_FILE = path.join(ROOT_DIR, 'kb_meta_docs.json');
 
 // 在线模型API端点（用于健康检查）
 const ONLINE_APIS = [
@@ -190,6 +191,81 @@ function filterSlicesByScope(slices, scope) {
     return slices.filter(s => s.sensitivity === 'public');
   }
 }
+
+/* 中文2-gram + 英文词元 分词 */
+function tokenizeQuery(q) {
+  const tokens = [];
+  const parts = q.toLowerCase().split(/\s+/).filter(p => p.length > 0);
+  for (const part of parts) {
+    if (/[\u4e00-\u9fa5]/.test(part)) {
+      tokens.push({ term: part, type: 'cn-original', weight: 3 });
+      for (let i = 0; i < part.length - 1; i++) {
+        const bigram = part.substring(i, i + 2);
+        if (!tokens.find(t => t.term === bigram)) {
+          tokens.push({ term: bigram, type: 'cn-bigram', weight: 1 });
+        }
+      }
+    } else {
+      tokens.push({ term: part, type: 'en', weight: 1 });
+    }
+  }
+  return tokens;
+}
+
+/* 改进版检索：标题链>文件名>正文，AND优先，元文档降权，同文件最多2结果 */
+function searchSlicesV2(slices, q, metaDocs) {
+  const tokens = tokenizeQuery(q);
+  const originalTerms = tokens.filter(t => t.type !== 'cn-bigram').map(t => t.term);
+  const queryContainsMetaKeyword = metaDocs.boostKeywords.some(kw => q.toLowerCase().includes(kw.toLowerCase()));
+  
+  const scored = [];
+  const fileResultCount = {};
+  
+  for (const slice of slices) {
+    let score = 0;
+    const matchedTerms = [];
+    const titleText = (slice.titleChain || []).join(' ').toLowerCase();
+    const bodyText = (slice.text || '').toLowerCase();
+    const fileName = (slice.fileName || '').toLowerCase();
+    const filePath = (slice.filePath || '').toLowerCase();
+    
+    let allOriginalHit = true;
+    
+    for (const token of tokens) {
+      const kw = token.term;
+      let hits = 0;
+      if (titleText.includes(kw)) { hits += 4; if (!matchedTerms.includes(kw)) matchedTerms.push(kw); }
+      if (fileName.includes(kw) || filePath.includes(kw)) { hits += 2; if (!matchedTerms.includes(kw)) matchedTerms.push(kw); }
+      if (bodyText.includes(kw)) { hits += 1; if (!matchedTerms.includes(kw)) matchedTerms.push(kw); }
+      if (hits === 0 && token.type !== 'cn-bigram') allOriginalHit = false;
+      score += hits * token.weight;
+    }
+    
+    if (score === 0) continue;
+    if (allOriginalHit && originalTerms.length > 1) score *= 2.5;
+    // 单匹配降权：只匹配了1个原词且非AND的，降权50%
+    const matchedOriginalCount = originalTerms.filter(t => matchedTerms.includes(t)).length;
+    if (!allOriginalHit && matchedOriginalCount <= 1 && originalTerms.length > 1) score *= 0.5;
+    if (slice.authority === 'high') score *= 1.5;
+    if (slice.deprecated) score *= 0.3;
+    if (slice.noOutbound) score *= 0.5;
+    
+    const isMeta = metaDocs.metaPatterns.some(p =>
+      slice.filePath.includes(p) || slice.fileName.includes(p) || titleText.includes(p)
+    );
+    if (isMeta && !queryContainsMetaKeyword) score *= metaDocs.metaPenalty;
+    
+    const fp = slice.filePath;
+    fileResultCount[fp] = (fileResultCount[fp] || 0) + 1;
+    if (fileResultCount[fp] > 2) continue;
+    
+    scored.push({ slice, score: Math.round(score * 100) / 100, matchedTerms, allOriginalHit });
+  }
+  
+  scored.sort((a, b) => b.score - a.score);
+  return scored.filter(r => r.score >= 3);
+}
+
 
 /* 转义正则特殊字符 */
 function escapeRegex(str) {
@@ -415,7 +491,7 @@ const server = http.createServer(async (req, res) => {
           totalFiles: stats.total_files || 0,
           totalSlices: stats.total_slices || 0,
           byCategory: stats.by_category || {},
-          bySensitivity: stats.by_sensitivity || {},
+          bySensitivity: scope === 'public' ? { public: (stats.by_sensitivity || {}).public || 0 } : (stats.by_sensitivity || {}),
           authorityHigh: stats.authority_high || 0,
           deprecated: stats.deprecated || 0,
           noOutbound: stats.no_outbound || 0,
@@ -619,86 +695,71 @@ const server = http.createServer(async (req, res) => {
       // 跳过no_outbound切片（对外场景不引用财务数据）
       // 注意：本机内部分析场景仍可通过/api/kb/index获取
       
-      // 关键词检索 + 排序
-      const keywords = q.toLowerCase().split(/\s+/).filter(k => k.length > 0);
-      const scored = [];
-      for (const slice of slices) {
-        let score = 0;
-        const titleText = (slice.titleChain || []).join(' ').toLowerCase();
+      // 加载元文档配置
+      let metaDocs = { metaPatterns: [], boostKeywords: [], metaPenalty: 0.3 };
+      try {
+        if (fs.existsSync(KB_META_DOCS_FILE)) {
+          metaDocs = JSON.parse(fs.readFileSync(KB_META_DOCS_FILE, 'utf-8'));
+        }
+      } catch(e) { log('元文档配置读取失败: ' + e.message, 'ERROR'); }
+      
+      // 改进版检索（V2）
+      const results = searchSlicesV2(slices, q, metaDocs);
+      const totalMatches = results.length;
+      const topResults = results.slice(0, topK);
+      
+      const scored = topResults.map(r => {
+        const slice = r.slice;
+        let snippet = '';
         const bodyText = (slice.text || '').toLowerCase();
-        const fileName = (slice.fileName || '').toLowerCase();
-        
-        for (const kw of keywords) {
-          // 标题命中权重×5
-          const titleHits = (titleText.match(new RegExp(escapeRegex(kw), 'g')) || []).length;
-          score += titleHits * 5;
-          // 文件名命中权重×3
-          const fileHits = (fileName.match(new RegExp(escapeRegex(kw), 'g')) || []).length;
-          score += fileHits * 3;
-          // 正文命中权重×1
-          const bodyHits = (bodyText.match(new RegExp(escapeRegex(kw), 'g')) || []).length;
-          score += bodyHits * 1;
-        }
-        
-        // authority=high加权×2
-        if (slice.authority === 'high') {
-          score *= 2;
-        }
-        // deprecated降权×0.3
-        if (slice.deprecated) {
-          score *= 0.3;
-        }
-        // no_outbound降权×0.5
-        if (slice.noOutbound) {
-          score *= 0.5;
-        }
-        
-        if (score > 0) {
-          // 提取命中片段（前后各100字）
-          let snippet = '';
-          const firstKw = keywords[0];
-          const idx = bodyText.indexOf(firstKw);
-          if (idx >= 0) {
-            const start = Math.max(0, idx - 100);
-            const end = Math.min(slice.text.length, idx + firstKw.length + 100);
-            snippet = (start > 0 ? '...' : '') + slice.text.substring(start, end) + (end < slice.text.length ? '...' : '');
-          } else {
-            snippet = slice.text.substring(0, 200) + '...';
+        // 提取所有匹配词的上下文，优先选择包含最多匹配词的片段
+        const matchPositions = [];
+        for (const term of r.matchedTerms) {
+          let idx = bodyText.indexOf(term);
+          while (idx >= 0 && matchPositions.length < 5) {
+            matchPositions.push(idx);
+            idx = bodyText.indexOf(term, idx + 1);
           }
-          
-          scored.push({
-            id: slice.id,
-            filePath: slice.filePath,
-            fileName: slice.fileName,
-            category: slice.category,
-            titleChain: slice.titleChain,
-            snippet,
-            sensitivity: slice.sensitivity,
-            authority: slice.authority,
-            deprecated: slice.deprecated,
-            noOutbound: slice.noOutbound,
-            version: slice.version,
-            lastUpdated: slice.lastUpdated,
-            score: Math.round(score * 100) / 100
-          });
         }
-      }
-      
-      // 按分数降序
-      scored.sort((a, b) => b.score - a.score);
-      
-      // 只返回topK
-      const results = scored.slice(0, topK);
+        if (matchPositions.length > 0) {
+          // 选择第一个匹配位置，扩大窗口到300字以包含更多匹配词
+          const idx = matchPositions[0];
+          const start = Math.max(0, idx - 100);
+          const end = Math.min(slice.text.length, idx + 200);
+          snippet = (start > 0 ? '...' : '') + slice.text.substring(start, end) + (end < slice.text.length ? '...' : '');
+        }
+        if (!snippet) snippet = slice.text.substring(0, 200) + '...';
+        
+        return {
+          id: slice.id,
+          filePath: slice.filePath,
+          fileName: slice.fileName,
+          category: slice.category,
+          dirCategory: slice.dirCategory,
+          fmCategory: slice.fmCategory,
+          titleChain: slice.titleChain,
+          snippet,
+          sensitivity: slice.sensitivity,
+          authority: slice.authority,
+          deprecated: slice.deprecated,
+          noOutbound: slice.noOutbound,
+          version: slice.version,
+          lastUpdated: slice.lastUpdated,
+          score: r.score,
+          matchedTerms: r.matchedTerms,
+          allOriginalHit: r.allOriginalHit
+        };
+      });
       
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         query: q,
         accessScope: scope,
         totalCandidates: slices.length,
-        totalMatches: scored.length,
-        returned: results.length,
+        totalMatches: totalMatches,
+        returned: scored.length,
         topK,
-        results
+        results: scored
       }, null, 2));
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });

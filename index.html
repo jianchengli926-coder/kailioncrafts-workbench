@@ -13197,7 +13197,7 @@ function viewTools(root){
       ['🎯','客户画像','#805ad5'],['🌐','翻译助手','#319795'],['💡','回复助手','#d69e2e'],
       ['💰','报价PI','#e53e3e'],['📦','订单跟踪','#2b6cb0'],['📚','产品库','#2f855a'],
       ['💾','数据备份','#718096'],['📋','跟进SOP','#b7791f'],['📊','销售漏斗','#6b46c1'],
-      ['📧','邮件模板','#c53030'],['✍️','营销内容','#dd6b20'],['🤖','AI写作','#2b6cb0'],['👥','客户公池','#319795'],['📋','开发SOP','#b7791f'],['📊','绩效看板','#6b46c1'],['💬','即刻沟通','#25D366']
+      ['📧','邮件模板','#c53030'],['✍️','营销内容','#dd6b20'],['🤖','AI写作','#2b6cb0'],['👥','客户公池','#319795'],['📋','开发SOP','#b7791f'],['📊','绩效看板','#6b46c1'],['💬','即刻沟通','#25D366'],['🗣️','开发话术','#0891b2']
     ].map((t,i)=>`<div id="toolNav-${i}" onclick="switchTool(${i})" style="cursor:pointer;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;transition:all 0.2s;${i===0?'background:'+t[2]+';color:#fff;box-shadow:0 2px 8px '+t[2]+'40':'background:#fff;color:#4a5568;border:1px solid #e2e8f0'}">${t[0]} ${t[1]}</div>`).join('')}
   </div>
   
@@ -14680,6 +14680,66 @@ function viewTools(root){
       `).join('')}
     </div>
   </div>
+  <!-- V75.3 客户开发话术库面板 -->
+  <div id="tool-panel-19" class="tool-panel card card-pad mb16" style="border-left:4px solid #0891b2;background:linear-gradient(135deg,#ecfeff,#cffafe);display:none">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🗣️ 客户开发话术库（10大场景）</span>
+      <span class="badge" style="background:#0891b2;color:#fff">话术 V75.3</span>
+    </div>
+    <p class="text-sm text-muted mb12">覆盖外贸客户开发全流程10大核心场景，即点即用，一键复制</p>
+    
+    <!-- 场景标签 -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+      ${[
+        ['冷启动开发信','📧'],['首次跟进','🔄'],['客户回复后','💬'],['报价跟进','💰'],
+        ['样品跟进','📦'],['异议处理','🛡️'],['催单成交','🔥'],['节日问候','🎄'],
+        ['客户唤醒','⚡'],['转介绍请求','🤝']
+      ].map((s,i)=>'<button class="btn btn-sm ' + (i===0?'':'btn-outline') + '" style="font-size:11px;padding:4px 10px" onclick="showScriptScene(' + i + ',this)">' + s[1] + ' ' + s[0] + '</button>').join('')}
+    </div>
+    
+    <!-- 话术内容区 -->
+    <div id="scriptContent" style="background:#fff;padding:14px;border-radius:8px;border:1px solid #e2e8f0">
+      <div style="font-size:13px;font-weight:700;color:#0891b2;margin-bottom:8px">📧 冷启动开发信话术</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:10px">适用场景：首次联系潜在客户，建立初步联系</div>
+      <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;font-size:12px;line-height:1.8;color:#1f2937;white-space:pre-wrap">Subject: {Product} Manufacturer - Best Price from Yangjiang, China
+
+Hi {ClientName},
+
+This is Leo from KaiLionCrafts, a professional manufacturer of kitchen knives, scissors and outdoor tools in Yangjiang, China.
+
+I found your company through {Source} and noticed that you are in the {Industry} business. Our products might be a good fit for your catalog:
+
+✅ 4 family-owned factories, 20+ years experience
+✅ CE / FDA / LFGB / RoHS certified
+✅ Cost 20% lower than market average
+✅ MOQ from 500 pcs, sample available
+
+Would you be interested in receiving our product catalog and latest price list?
+
+Best regards,
+Leo Li
+KaiLionCrafts | www.kailioncrafts.com
+Email: leo@kailioncrafts.com | WhatsApp: +86 xxx</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-sm" style="background:#0891b2;color:#fff" onclick="copyText(document.getElementById('scriptContent').querySelector('pre')?.textContent || '')">📋 复制话术</button>
+        <button class="btn btn-sm btn-outline" onclick="toast('已应用到开发信编辑器')">✏️ 应用到开发信</button>
+        <button class="btn btn-sm btn-outline" onclick="toast('AI正在生成本地化版本...')">🌍 AI生成本地化</button>
+      </div>
+    </div>
+    
+    <!-- 话术使用技巧 -->
+    <div style="margin-top:14px;background:#fff;padding:12px;border-radius:8px;border:1px solid #e2e8f0">
+      <div style="font-size:12px;font-weight:700;color:#0891b2;margin-bottom:8px">💡 话术使用技巧</div>
+      <div style="font-size:11px;color:#4b5563;line-height:1.8">
+        • <b>个性化</b>：务必替换 {ClientName} {Company} {Product} 等变量，避免群发感<br>
+        • <b>标题优化</b>：标题包含产品关键词和价值点，打开率提升40%<br>
+        • <b>发送时间</b>：目标客户当地时间周二至周四上午9-11点发送最佳<br>
+        • <b>跟进节奏</b>：首封后3天、7天、14天分别跟进，3-7-7标准序列<br>
+        • <b>多渠道配合</b>：邮件+WhatsApp+LinkedIn三管齐下，回复率提升3倍
+      </div>
+    </div>
+  </div>
+
 
   
   <div class="grid-3">
@@ -14949,16 +15009,15 @@ ${kbContext}
 /* V75.2 工具箱分类切换 */
 
 
-  <!-- V75.3 客户公池面板（参考CRM） -->
 function switchTool(idx){
-  const colors=['#c9a961','#3182ce','#25D366','#805ad5','#319795','#d69e2e','#e53e3e','#2b6cb0','#2f855a','#718096','#b7791f','#6b46c1','#c53030','#dd6b20','#2b6cb0','#319795','#b7791f','#6b46c1','#25D366'];
-  for(let i=0;i<19;i++){
+  const colors=['#c9a961','#3182ce','#25D366','#805ad5','#319795','#d69e2e','#e53e3e','#2b6cb0','#2f855a','#718096','#b7791f','#6b46c1','#c53030','#dd6b20','#2b6cb0','#319795','#b7791f','#6b46c1','#25D366','#0891b2'];
+  for(let i=0;i<20;i++){
     const p=document.getElementById('tool-panel-'+i);
     if(p) p.style.display='none';
   }
   const sp=document.getElementById('tool-panel-'+idx);
   if(sp) sp.style.display='block';
-  for(let i=0;i<19;i++){
+  for(let i=0;i<20;i++){
     const n=document.getElementById('toolNav-'+i);
     if(n){
       if(i===idx){
@@ -17724,6 +17783,79 @@ function viewAutoSearch(root){
             ].map(item=>'<div style="display:flex;align-items:center;gap:8px;padding:8px;background:' + (item.done?'#f0fdf4':'#fffbeb') + ';border-radius:6px"><span style="background:' + (item.done?'#10b981':'#d97706') + ';color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;flex-shrink:0">' + item.day + '</span><span style="font-size:11px;color:' + (item.done?'#065f46':'#78350f') + ';flex:1">' + item.task + '</span><span style="font-size:14px">' + (item.done?'✅':'⬜') + '</span></div>').join('')}
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- V75.3 开发信邮件效果追踪模拟器 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#0369a1;font-size:16px">📊 开发信邮件效果追踪模拟器</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">模拟邮件发送效果，分析打开率/点击率/回复率，优化开发信策略</div>
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">发送数量</label>
+          <input id="trackTotal" type="number" value="100" class="form-control" style="font-size:13px;padding:6px 10px">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">产品类型</label>
+          <select class="form-control" style="font-size:13px;padding:6px 10px">
+            <option>厨刀套装</option><option>户外刀</option><option>剪刀</option><option>厨房用品</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">目标市场</label>
+          <select class="form-control" style="font-size:13px;padding:6px 10px">
+            <option>美国</option><option>德国</option><option>英国</option><option>澳大利亚</option><option>加拿大</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn" style="background:#0369a1;color:#fff;width:100%" onclick="simulateEmailTracking()">🚀 模拟追踪</button>
+        </div>
+      </div>
+      
+      <div id="trackResult" style="background:#fff;padding:14px;border-radius:8px;border:1px solid #bae6fd;min-height:100px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px">
+        点击"模拟追踪"按钮，查看邮件发送效果分析
+      </div>
+    </div>
+
+    <!-- V75.3 客户开发ROI投入产出分析 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fdf4ff,#fae8ff);border:1px solid #f5d0fe">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#86198f;font-size:16px">💰 客户开发ROI投入产出分析</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">计算客户开发投入产出比，优化资源配置，最大化收益</div>
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">总投入（$）</label>
+          <input id="roiInvestment" type="number" value="5000" class="form-control" style="font-size:13px;padding:6px 10px">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">开发客户数</label>
+          <input id="roiCustomers" type="number" value="50" class="form-control" style="font-size:13px;padding:6px 10px">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">平均订单（$）</label>
+          <input id="roiAvgOrder" type="number" value="10000" class="form-control" style="font-size:13px;padding:6px 10px">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">预期成交率（%）</label>
+          <input id="roiCloseRate" type="number" value="5" class="form-control" style="font-size:13px;padding:6px 10px">
+        </div>
+      </div>
+      
+      <div style="margin-bottom:14px">
+        <button class="btn" style="background:#86198f;color:#fff" onclick="calculateROI()">📊 计算ROI</button>
+      </div>
+      
+      <div id="roiResult" style="background:#fff;padding:14px;border-radius:8px;border:1px solid #f5d0fe;min-height:100px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px">
+        填写参数后点击"计算ROI"，查看投入产出分析
       </div>
     </div>
 
@@ -20671,6 +20803,138 @@ function showExpoPhase(phase){
   event.target.className = 'btn btn-sm';
   event.target.style.background = '#92400e';
   event.target.style.color = '#fff';
+}
+
+
+
+/* V75.3 客户开发话术库 - 场景切换 */
+const SCRIPT_SCENES = [
+  {name:'冷启动开发信', icon:'📧', desc:'首次联系潜在客户，建立初步联系',
+   subject:'{Product} Manufacturer - Best Price from Yangjiang, China',
+   body:'Hi {ClientName},\n\nThis is Leo from KaiLionCrafts, a professional manufacturer of kitchen knives, scissors and outdoor tools in Yangjiang, China.\n\nI found your company through {Source} and noticed that you are in the {Industry} business. Our products might be a good fit for your catalog:\n\n✅ 4 family-owned factories, 20+ years experience\n✅ CE / FDA / LFGB / RoHS certified\n✅ Cost 20% lower than market average\n✅ MOQ from 500 pcs, sample available\n\nWould you be interested in receiving our product catalog and latest price list?\n\nBest regards,\nLeo Li\nKaiLionCrafts'},
+  {name:'首次跟进', icon:'🔄', desc:'首封开发信后3天未回复，进行第一次跟进',
+   subject:'Following up: {Product} catalog and pricing',
+   body:'Hi {ClientName},\n\nJust following up on my previous email about our {Product} range. I understand you are busy, so I wanted to make sure my email did not get lost.\n\nWe have recently updated our catalog with new designs and competitive pricing. Would it be convenient to schedule a quick 10-minute call this week to discuss your needs?\n\nLooking forward to hearing from you.\n\nBest regards,\nLeo Li'},
+  {name:'客户回复后', icon:'💬', desc:'客户回复后，快速响应并深入沟通',
+   subject:'Re: {Original Subject} - Thanks for your reply!',
+   body:'Hi {ClientName},\n\nThank you for your reply! I am glad to hear you are interested in our {Product}.\n\nRegarding your questions:\n1. {Question1} - {Answer1}\n2. {Question2} - {Answer2}\n\nI have attached our detailed product catalog and price list for your reference. Would you like me to arrange some free samples for evaluation?\n\nBest regards,\nLeo Li'},
+  {name:'报价跟进', icon:'💰', desc:'报价发送后5天，跟进客户反馈',
+   subject:'Following up on quotation for {Product}',
+   body:'Hi {ClientName},\n\nHope you are doing well. I am following up on the quotation I sent on {Date} for {Product}.\n\nHave you had a chance to review it? Please let me know if you have any questions or need any adjustments. We are flexible on pricing for bulk orders.\n\nIf the price is within your range, we can proceed with sample arrangement immediately.\n\nBest regards,\nLeo Li'},
+  {name:'样品跟进', icon:'📦', desc:'样品寄出后7天，跟进样品测试结果',
+   subject:'Sample update: Have you received and tested our {Product}?',
+   body:'Hi {ClientName},\n\nHope you have received the samples we sent via {Courier} (tracking: {TrackingNumber}).\n\nHave you had a chance to test them? We would love to hear your feedback on quality, design, and packaging.\n\nIf any adjustments are needed, we can modify the product according to your requirements. Once you are satisfied with the samples, we can proceed with the bulk order.\n\nBest regards,\nLeo Li'},
+  {name:'异议处理', icon:'🛡️', desc:'客户提出价格/质量/交期等异议时的应对',
+   subject:'Re: Your concerns about {Topic}',
+   body:'Hi {ClientName},\n\nThank you for sharing your concerns. I completely understand your perspective.\n\nRegarding {Concern}:\n• {Point1}\n• {Point2}\n• {Point3}\n\nWe have many customers who initially had similar concerns, but after working with us, they have become long-term partners. Would you be open to a trial order to test our quality and service?\n\nBest regards,\nLeo Li'},
+  {name:'催单成交', icon:'🔥', desc:'客户意向明确但未下单时，推动成交',
+   subject:'Special offer for {Product} - valid this week only',
+   body:'Hi {ClientName},\n\nI hope you have had a chance to evaluate our samples. Based on our previous discussion, I know you are interested in {Product}.\n\nI would like to offer you a special promotion:\n🎁 5% discount on orders placed this week\n🎁 Free custom logo printing\n🎁 Priority production slot\n\nThis offer is valid until {Date}. Would you like to proceed with the order?\n\nBest regards,\nLeo Li'},
+  {name:'节日问候', icon:'🎄', desc:'圣诞节/新年等节日维护客户关系',
+   subject:'Merry Christmas and Happy New Year from KaiLionCrafts!',
+   body:'Hi {ClientName},\n\nAs the year comes to an end, I would like to take this opportunity to thank you for your support and partnership this year.\n\nWe wish you and your family a Merry Christmas and a prosperous New Year! May 2026 bring you success, health, and happiness.\n\nWe look forward to continuing our partnership in the coming year. Please feel free to reach out if you need anything.\n\nWarm regards,\nLeo Li\nKaiLionCrafts Team'},
+  {name:'客户唤醒', icon:'⚡', desc:'客户30天以上无互动，重新激活联系',
+   subject:'Long time no see! New products and special offers for {Company}',
+   body:'Hi {ClientName},\n\nIt has been a while since we last connected. I hope business is going well for you.\n\nWe have recently launched several new products that might interest you:\n🆕 {NewProduct1}\n🆕 {NewProduct2}\n🆕 {NewProduct3}\n\nAs a valued customer, I would like to offer you a special re-activation discount of 8% on your next order.\n\nWould you be interested in catching up over a quick call?\n\nBest regards,\nLeo Li'},
+  {name:'转介绍请求', icon:'🤝', desc:'请求满意客户介绍新客户',
+   subject:'A quick favor - can you introduce us to a colleague?',
+   body:'Hi {ClientName},\n\nI hope you are enjoying our products and service. We truly value our partnership with {Company}.\n\nI wanted to ask if you might know anyone in your network who could benefit from our products. We are looking to connect with {TargetType} in {Region}.\n\nAs a thank you, we offer:\n🤝 5% referral commission on first order\n🤝 Exclusive discounts for your referrals\n🤝 Priority support\n\nNo pressure at all, but if you think of anyone, we would greatly appreciate an introduction.\n\nBest regards,\nLeo Li'}
+];
+
+function showScriptScene(idx, btn){
+  const scene = SCRIPT_SCENES[idx];
+  const contentEl = document.getElementById('scriptContent');
+  if(!contentEl || !scene) return;
+  
+  contentEl.innerHTML = '<div style="font-size:13px;font-weight:700;color:#0891b2;margin-bottom:8px">' + scene.icon + ' ' + scene.name + '话术</div>' +
+    '<div style="font-size:11px;color:#64748b;margin-bottom:10px">适用场景：' + scene.desc + '</div>' +
+    '<div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;font-size:12px;line-height:1.8;color:#1f2937;white-space:pre-wrap">Subject: ' + scene.subject + '\n\n' + scene.body + '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:10px">' +
+    '<button class="btn btn-sm" style="background:#0891b2;color:#fff" onclick="copyText(\'Subject: ' + scene.subject.replace(/'/g, "\'") + '\n\n' + scene.body.replace(/'/g, "\'").replace(/\n/g, '\n') + '\')">📋 复制话术</button>' +
+    '<button class="btn btn-sm btn-outline" onclick="toast(\'已应用到开发信编辑器\')">✏️ 应用到开发信</button>' +
+    '<button class="btn btn-sm btn-outline" onclick="toast(\'AI正在生成本地化版本...\')">🌍 AI生成本地化</button>' +
+    '</div>';
+  
+  // 更新按钮样式
+  document.querySelectorAll('[onclick^="showScriptScene"]').forEach(b=>{
+    b.className = 'btn btn-sm btn-outline';
+  });
+  btn.className = 'btn btn-sm';
+  btn.style.background = '#0891b2';
+  btn.style.color = '#fff';
+}
+
+/* V75.3 开发信邮件效果追踪模拟器 */
+function simulateEmailTracking(){
+  const total = parseInt(document.getElementById('trackTotal')?.value || '100');
+  const openRate = 25 + Math.random() * 15;
+  const clickRate = openRate * (0.3 + Math.random() * 0.2);
+  const replyRate = clickRate * (0.2 + Math.random() * 0.15);
+  const bounceRate = 2 + Math.random() * 5;
+  
+  const opened = Math.round(total * openRate / 100);
+  const clicked = Math.round(total * clickRate / 100);
+  const replied = Math.round(total * replyRate / 100);
+  const bounced = Math.round(total * bounceRate / 100);
+  
+  const resultEl = document.getElementById('trackResult');
+  resultEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">' +
+    '<div style="background:#eff6ff;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px">📧</div><div style="font-size:20px;font-weight:800;color:#3b82f6">' + total + '</div><div style="font-size:10px;color:#64748b">发送总数</div></div>' +
+    '<div style="background:#f0fdf4;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px">👁️</div><div style="font-size:20px;font-weight:800;color:#10b981">' + opened + '</div><div style="font-size:10px;color:#64748b">已打开 (' + openRate.toFixed(1) + '%)</div></div>' +
+    '<div style="background:#fffbeb;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px">🔗</div><div style="font-size:20px;font-weight:800;color:#f59e0b">' + clicked + '</div><div style="font-size:10px;color:#64748b">已点击 (' + clickRate.toFixed(1) + '%)</div></div>' +
+    '<div style="background:#fef2f2;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px">💬</div><div style="font-size:20px;font-weight:800;color:#ef4444">' + replied + '</div><div style="font-size:10px;color:#64748b">已回复 (' + replyRate.toFixed(1) + '%)</div></div>' +
+    '</div>' +
+    '<div style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;color:#4b5563;line-height:1.8">' +
+    '<b>📊 效果分析：</b><br>' +
+    '• 打开率 ' + openRate.toFixed(1) + '% ' + (openRate>30?'✅ 优秀（行业平均20-25%）':'⚠️ 待提升，建议优化标题和发送时间') + '<br>' +
+    '• 点击率 ' + clickRate.toFixed(1) + '% ' + (clickRate>8?'✅ 优秀':'⚠️ 待提升，建议优化CTA和内容') + '<br>' +
+    '• 回复率 ' + replyRate.toFixed(1) + '% ' + (replyRate>3?'✅ 优秀':'⚠️ 待提升，建议增加个性化和价值点') + '<br>' +
+    '• 退信率 ' + bounceRate.toFixed(1) + '% ' + (bounceRate<5?'✅ 正常':'⚠️ 偏高，建议清洗邮箱列表') + '<br><br>' +
+    '<b>💡 优化建议：</b><br>' +
+    (openRate<30?'• 优化邮件标题：包含产品关键词+价值点，避免垃圾邮件触发词<br>':'') +
+    (clickRate<8?'• 增加明确的CTA按钮："View Catalog" "Get Quote" "Request Sample"<br>':'') +
+    (replyRate<3?'• 增强个性化：提及客户公司信息、行业动态、具体需求<br>':'') +
+    '• A/B测试：同时发送2个版本标题，选择效果更好的继续使用' +
+    '</div>';
+  
+  toast('✅ 模拟追踪完成');
+}
+
+/* V75.3 客户开发ROI分析 */
+function calculateROI(){
+  const investment = parseFloat(document.getElementById('roiInvestment')?.value || '5000');
+  const customers = parseInt(document.getElementById('roiCustomers')?.value || '50');
+  const avgOrder = parseFloat(document.getElementById('roiAvgOrder')?.value || '10000');
+  const closeRate = parseFloat(document.getElementById('roiCloseRate')?.value || '5');
+  
+  const closedDeals = Math.round(customers * closeRate / 100);
+  const revenue = closedDeals * avgOrder;
+  const profit = revenue * 0.3; // 假设30%毛利率
+  const roi = ((profit - investment) / investment * 100).toFixed(1);
+  const payback = (investment / (profit / 12)).toFixed(1);
+  
+  const resultEl = document.getElementById('roiResult');
+  resultEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">' +
+    '<div style="background:#eff6ff;padding:14px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#64748b">总投入</div><div style="font-size:22px;font-weight:800;color:#3b82f6">$' + investment.toLocaleString() + '</div></div>' +
+    '<div style="background:#f0fdf4;padding:14px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#64748b">预期营收</div><div style="font-size:22px;font-weight:800;color:#10b981">$' + revenue.toLocaleString() + '</div></div>' +
+    '<div style="background:#fffbeb;padding:14px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#64748b">ROI回报率</div><div style="font-size:22px;font-weight:800;color:' + (roi>0?'#10b981':'#ef4444') + '">' + (roi>0?'+':'') + roi + '%</div></div>' +
+    '</div>' +
+    '<div style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;color:#4b5563;line-height:1.8">' +
+    '<b>📊 详细分析：</b><br>' +
+    '• 开发客户数：' + customers + '人<br>' +
+    '• 预期成交：' + closedDeals + '单（成交率' + closeRate + '%）<br>' +
+    '• 平均订单：$' + avgOrder.toLocaleString() + '<br>' +
+    '• 预期毛利：$' + profit.toLocaleString() + '（按30%毛利率）<br>' +
+    '• 净利润：$' + (profit - investment).toLocaleString() + '<br>' +
+    '• 回本周期：' + payback + '个月<br><br>' +
+    '<b>💡 提升ROI的关键：</b><br>' +
+    '• 提升成交率：每提升1%成交率，营收增加$' + (customers * avgOrder / 100).toLocaleString() + '<br>' +
+    '• 提升客单价：交叉销售、捆绑销售、高端产品推荐<br>' +
+    '• 降低获客成本：优化渠道、提高效率、自动化工具<br>' +
+    '• 缩短成交周期：快速响应、专业报价、高效跟进' +
+    '</div>';
+  
+  toast('✅ ROI分析完成');
 }
 
 </script>

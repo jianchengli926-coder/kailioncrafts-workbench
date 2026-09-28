@@ -597,22 +597,38 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
 
 <script>
 
-/* ============ 密码登录屏障 ============ */
-const LOCK_PASSWORD = "441723";
-function checkLock(e){
+/* ============ 密码登录屏障（服务端验证，可更换，不硬编码） ============ */
+let ACCESS_IS_DEFAULT = false;
+async function checkLock(e){
   e.preventDefault();
   const val = document.getElementById('lockInput').value;
   const err = document.getElementById('lockError');
-  if(val === LOCK_PASSWORD){
-    err.textContent = '';
-    sessionStorage.setItem('kl_unlocked','1');
-    document.getElementById('lockScreen').classList.add('hidden');
-    setTimeout(()=>{ document.getElementById('lockScreen').style.display='none'; },450);
-  }else{
-    err.textContent = '密码错误，请重新输入';
-    document.getElementById('lockInput').value = '';
-    document.getElementById('lockInput').focus();
-    setTimeout(()=>{ err.textContent = ''; },2500);
+  if(!val){ err.textContent = '请输入密码'; return false; }
+  err.textContent = '验证中...';
+  try{
+    const resp = await fetch('/api/access/verify', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: val})
+    });
+    const data = await resp.json();
+    if(data.valid){
+      err.textContent = '';
+      sessionStorage.setItem('kl_unlocked','1');
+      document.getElementById('lockScreen').classList.add('hidden');
+      setTimeout(()=>{ document.getElementById('lockScreen').style.display='none'; },450);
+      // 如果是默认密码，提示修改
+      if(ACCESS_IS_DEFAULT){
+        setTimeout(()=>{ toast('⚠️ 当前使用临时默认密码，请立即在设置中修改密码','err'); },1000);
+      }
+    }else{
+      err.textContent = '密码错误，请重新输入';
+      document.getElementById('lockInput').value = '';
+      document.getElementById('lockInput').focus();
+      setTimeout(()=>{ err.textContent = ''; },2500);
+    }
+  }catch(err2){
+    err.textContent = '验证失败：' + err2.message;
   }
   return false;
 }
@@ -620,7 +636,39 @@ function toggleLockPw(){
   const inp = document.getElementById('lockInput');
   inp.type = inp.type === 'password' ? 'text' : 'password';
 }
-(function(){
+// 修改密码
+async function changeAccessPassword(){
+  const oldPw = prompt('请输入当前密码：');
+  if(!oldPw) return;
+  const newPw = prompt('请输入新密码（至少4位）：');
+  if(!newPw || newPw.length < 4){ toast('新密码至少4位','err'); return; }
+  const confirmPw = prompt('请再次输入新密码：');
+  if(newPw !== confirmPw){ toast('两次输入不一致','err'); return; }
+  try{
+    const resp = await fetch('/api/access/password', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({oldPassword: oldPw, newPassword: newPw})
+    });
+    const data = await resp.json();
+    if(data.success){
+      toast('✅ 密码修改成功，请重新登录');
+      sessionStorage.removeItem('kl_unlocked');
+      setTimeout(()=>{ location.reload(); },1500);
+    }else{
+      toast('❌ ' + (data.error || '修改失败'),'err');
+    }
+  }catch(e){
+    toast('❌ 修改失败：' + e.message,'err');
+  }
+}
+(async function(){
+  // 获取密码状态
+  try{
+    const resp = await fetch('/api/access/status');
+    const data = await resp.json();
+    ACCESS_IS_DEFAULT = data.isDefault;
+  }catch(e){}
   if(sessionStorage.getItem('kl_unlocked') === '1'){
     const ls = document.getElementById('lockScreen');
     if(ls){ ls.style.display='none'; }
@@ -3397,7 +3445,7 @@ function viewManual(c){
       </div>
       <div style="display:flex;gap:12px;margin:10px 0;align-items:flex-start">
         <div style="flex-shrink:0;width:26px;height:26px;background:#c9a961;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">2</div>
-        <div style="flex:1;font-size:13px;padding-top:3px">在密码输入框中输入访问密码：<code>441723</code></div>
+        <div style="flex:1;font-size:13px;padding-top:3px">在密码输入框中输入访问密码（首次运行密码见服务器终端输出，或在本机修改）</div>
       </div>
       <div style="display:flex;gap:12px;margin:10px 0;align-items:flex-start">
         <div style="flex-shrink:0;width:26px;height:26px;background:#c9a961;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">3</div>
@@ -3709,7 +3757,7 @@ function viewManual(c){
       </div>
       <div style="margin-bottom:14px">
         <b style="font-size:14px;color:#1a365d">Q8：访问密码是多少？</b>
-        <p style="font-size:13px;color:#495057;margin:4px 0">A：<code>441723</code>。修改密码需联系管理员修改代码。</p>
+        <p style="font-size:13px;color:#495057;margin:4px 0">A：密码由服务端存储，首次运行自动生成临时密码。在本机登录后，可在设置中点击"修改访问密码"自行更换。</p>
       </div>
     </div>
 
@@ -9044,6 +9092,20 @@ function openContractDetail(cid){
 function viewSettings(root){
   const s = S.settings.company;
   root.innerHTML = `
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fef2f2,#fff);border-left:4px solid #ef4444">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>🔐 安全设置</span>
+        <span class="badge" style="background:#ef4444;color:#fff">重要</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;margin-top:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:4px">访问密码</div>
+          <div style="font-size:12px;color:#6b7280">密码由服务端安全存储，支持自行更换。公网访问时必须输入密码。<span id="accessPwStatus" style="color:#f59e0b">首次运行请查看服务器终端输出的临时密码</span></div>
+        </div>
+        <button class="btn btn-gold" onclick="changeAccessPassword()">🔑 修改访问密码</button>
+      </div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:8px">⚠️ 密码仅允许在本机修改，公网访问时修改接口返回403。密码文件access_config.json不进入Git。</div>
+    </div>
     <div class="card card-pad mb16"><div class="card-title">👥 团队管理</div>
       <table class="tbl mb16"><thead><tr><th>姓名</th><th>角色</th><th>负责市场</th><th>月度目标</th></tr></thead>
       <tbody>

@@ -458,6 +458,91 @@ const server = http.createServer(async (req, res) => {
     }
   }
   
+  // ============ 访问密码API（服务端存储，可更换，不硬编码） ============
+  
+  const ACCESS_CONFIG_FILE = path.join(ROOT_DIR, 'access_config.json');
+  
+  function loadAccessConfig() {
+    try {
+      if (fs.existsSync(ACCESS_CONFIG_FILE)) {
+        return JSON.parse(fs.readFileSync(ACCESS_CONFIG_FILE, 'utf-8'));
+      }
+    } catch(e) {}
+    // 首次运行：生成随机密码
+    const randomPassword = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
+    const config = { password: randomPassword, createdAt: new Date().toISOString(), changed: false };
+    try { fs.writeFileSync(ACCESS_CONFIG_FILE, JSON.stringify(config, null, 2)); } catch(e) {}
+    return config;
+  }
+  
+  function saveAccessConfig(config) {
+    try { fs.writeFileSync(ACCESS_CONFIG_FILE, JSON.stringify(config, null, 2)); return true; } catch(e) { return false; }
+  }
+  
+  // 访问密码状态（公开，不泄露密码）
+  if (pathname === '/api/access/status' && req.method === 'GET') {
+    const config = loadAccessConfig();
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({
+      hasPassword: !!config.password,
+      isDefault: config.changed === false,
+      passwordHint: config.changed === false ? '首次运行已生成临时密码，请在本机登录后立即修改' : null
+    }));
+    return;
+  }
+  
+  // 验证密码
+  if (pathname === '/api/access/verify' && req.method === 'POST') {
+    try {
+      const body = await readBody(req);
+      const config = loadAccessConfig();
+      const valid = body.password === config.password;
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ valid: valid }));
+      if (valid) log('访问密码验证成功', 'SUCCESS');
+      else log('访问密码验证失败', 'WARN');
+    } catch(e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  
+  // 修改密码（仅本机可调用）
+  if (pathname === '/api/access/password' && req.method === 'POST') {
+    const scope = getAccessScope(req);
+    if (scope !== 'local') {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '仅允许在本机修改密码' }));
+      return;
+    }
+    try {
+      const body = await readBody(req);
+      const config = loadAccessConfig();
+      if (body.oldPassword !== config.password) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '旧密码错误' }));
+        return;
+      }
+      if (!body.newPassword || body.newPassword.length < 4) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '新密码至少4位' }));
+        return;
+      }
+      config.password = body.newPassword;
+      config.changed = true;
+      config.changedAt = new Date().toISOString();
+      saveAccessConfig(config);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: true, message: '密码修改成功' }));
+      log('访问密码已修改', 'SUCCESS');
+    } catch(e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  
   // ============ 知识库API（只读） ============
   
   // 访问范围调试接口（仅本机可访问）

@@ -25,3 +25,6 @@ search_usage.json
 
 # 卖点与服务清单（含内部底价/成本，不进Git）
 卖点与服务清单_待补充.md
+
+# 访问密码配置（含密码，不进Git）
+access_config.json

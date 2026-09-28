@@ -22773,6 +22773,178 @@ function exportRealDashboardReport(period='month'){
   toast('✅ ' + periodLabel + '度数据报告已导出');
 }
 
+
+
+/* ============================================================
+ * 任务七：稳定性与工程治理 - 页面加载自检 + 数据完整性检查
+ * ============================================================ */
+
+/* 工作台自检系统 */
+const SELF_CHECK_RESULTS = [];
+
+function runSelfCheck(){
+  SELF_CHECK_RESULTS.length = 0;
+  const checks = [];
+  
+  // 1. 数据结构完整性检查
+  checks.push({
+    name: '客户数据结构',
+    test: () => {
+      if(!Array.isArray(S.customers)) return {pass:false, detail:'S.customers 不是数组'};
+      const invalid = S.customers.filter(c=>!c.id || !c.company);
+      if(invalid.length > 0) return {pass:true, warn:true, detail:'有 ' + invalid.length + ' 个客户缺少id或company字段'};
+      return {pass:true, detail:S.customers.length + ' 个客户，结构完整'};
+    }
+  });
+  
+  checks.push({
+    name: '开发信数据结构',
+    test: () => {
+      if(!Array.isArray(S.drafts)) return {pass:false, detail:'S.drafts 不是数组'};
+      return {pass:true, detail:S.drafts.length + ' 封开发信'};
+    }
+  });
+  
+  checks.push({
+    name: '产品数据结构',
+    test: () => {
+      if(!Array.isArray(S.products)) return {pass:false, detail:'S.products 不是数组'};
+      return {pass:true, detail:S.products.length + ' 个产品'};
+    }
+  });
+  
+  checks.push({
+    name: '报价数据结构',
+    test: () => {
+      if(!Array.isArray(S.quotes)) return {pass:false, detail:'S.quotes 不是数组'};
+      return {pass:true, detail:S.quotes.length + ' 份报价'};
+    }
+  });
+  
+  checks.push({
+    name: '样品数据结构',
+    test: () => {
+      if(!Array.isArray(S.samples)) return {pass:false, detail:'S.samples 不是数组'};
+      return {pass:true, detail:S.samples.length + ' 个样品'};
+    }
+  });
+  
+  // 2. 数据版本检查
+  checks.push({
+    name: '数据版本',
+    test: () => {
+      const version = S.dataVersion || 1;
+      if(version < CURRENT_DATA_VERSION) return {pass:false, detail:'数据版本 v' + version + '，需要迁移到 v' + CURRENT_DATA_VERSION};
+      return {pass:true, detail:'数据版本 v' + version + '（最新）'};
+    }
+  });
+  
+  // 3. localStorage 容量检查
+  checks.push({
+    name: '存储容量',
+    test: () => {
+      try{
+        let total = 0;
+        for(let key in localStorage){
+          if(key.startsWith('kailion_ark_')){
+            total += localStorage.getItem(key).length;
+          }
+        }
+        const mb = (total / 1024 / 1024).toFixed(2);
+        if(total > 4 * 1024 * 1024) return {pass:true, warn:true, detail:'已使用 ' + mb + 'MB，接近浏览器5MB限制'};
+        return {pass:true, detail:'已使用 ' + mb + 'MB'};
+      }catch(e){ return {pass:false, detail:'无法读取存储: ' + e.message}; }
+    }
+  });
+  
+  // 4. 公司事实库检查
+  checks.push({
+    name: '公司事实库',
+    test: () => {
+      if(!S.companyFacts) return {pass:true, warn:true, detail:'未配置公司事实库，AI将不会输出具体数字'};
+      const empty = [];
+      if(!S.companyFacts.skuCount) empty.push('SKU数量');
+      if(!S.companyFacts.certifications || !S.companyFacts.certifications.length) empty.push('认证清单');
+      if(!S.companyFacts.moq) empty.push('MOQ');
+      if(!S.companyFacts.leadTime) empty.push('交期');
+      if(empty.length) return {pass:true, warn:true, detail:'以下字段未填写：' + empty.join('、') + '（AI不会编造这些数字）'};
+      return {pass:true, detail:'公司事实库已完整配置'};
+    }
+  });
+  
+  // 5. AI模型配置检查
+  checks.push({
+    name: 'AI模型配置',
+    test: () => {
+      const config = S.aiConfig || {};
+      const providers = config.providers || [];
+      if(!providers.length) return {pass:true, warn:true, detail:'未配置AI模型供应商，将使用默认模型'};
+      const active = providers.filter(p=>p.enabled);
+      return {pass:true, detail:active.length + '/' + providers.length + ' 个模型供应商已启用'};
+    }
+  });
+  
+  // 执行所有检查
+  let passCount = 0, warnCount = 0, failCount = 0;
+  checks.forEach(check=>{
+    try{
+      const result = check.test();
+      SELF_CHECK_RESULTS.push({name:check.name, ...result});
+      if(result.pass && !result.warn) passCount++;
+      else if(result.pass && result.warn) warnCount++;
+      else failCount++;
+    }catch(e){
+      SELF_CHECK_RESULTS.push({name:check.name, pass:false, detail:'检查异常: ' + e.message});
+      failCount++;
+    }
+  });
+  
+  return {total: checks.length, pass: passCount, warn: warnCount, fail: failCount, results: SELF_CHECK_RESULTS};
+}
+
+/* 渲染自检结果 */
+function renderSelfCheckResults(){
+  const stats = runSelfCheck();
+  const statusColor = stats.fail > 0 ? '#dc2626' : stats.warn > 0 ? '#d97706' : '#16a34a';
+  const statusText = stats.fail > 0 ? '需要修复' : stats.warn > 0 ? '有警告' : '全部通过';
+  
+  let html = '<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:16px;background:#f8fafc;border-radius:12px">' +
+    '<div style="width:60px;height:60px;border-radius:50%;background:' + statusColor + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;font-weight:800">' + (stats.fail > 0 ? '!' : stats.warn > 0 ? '⚠' : '✓') + '</div>' +
+    '<div><div style="font-size:18px;font-weight:700;color:' + statusColor + '">工作台自检：' + statusText + '</div>' +
+    '<div style="font-size:12px;color:#64748b;margin-top:4px">通过 ' + stats.pass + ' 项 | 警告 ' + stats.warn + ' 项 | 失败 ' + stats.fail + ' 项 | 共 ' + stats.total + ' 项</div></div></div>';
+  
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">';
+  stats.results.forEach(r=>{
+    const icon = r.pass && !r.warn ? '✅' : r.pass && r.warn ? '⚠️' : '❌';
+    const bg = r.pass && !r.warn ? '#f0fdf4' : r.pass && r.warn ? '#fffbeb' : '#fef2f2';
+    const border = r.pass && !r.warn ? '#bbf7d0' : r.pass && r.warn ? '#fde68a' : '#fecaca';
+    html += '<div style="padding:12px;background:' + bg + ';border:1px solid ' + border + ';border-radius:8px">' +
+      '<div style="font-size:13px;font-weight:600;color:#1f2937;margin-bottom:4px">' + icon + ' ' + r.name + '</div>' +
+      '<div style="font-size:11px;color:#64748b">' + (r.detail || '') + '</div></div>';
+  });
+  html += '</div>';
+  
+  return html;
+}
+
+/* 控制台错误捕获 */
+window.addEventListener('error', function(e){
+  if(!window._consoleErrors) window._consoleErrors = [];
+  window._consoleErrors.push({
+    message: e.message,
+    source: e.filename,
+    line: e.lineno,
+    col: e.colno,
+    time: new Date().toISOString()
+  });
+  if(window._consoleErrors.length > 50) window._consoleErrors.shift();
+});
+
+/* 获取控制台错误 */
+function getConsoleErrors(){
+  return window._consoleErrors || [];
+}
+
 </script>
 
 <!-- V75.3 全局AI助手悬浮窗 -->

@@ -2063,6 +2063,9 @@ const OUTPUT_SANITIZE_RULES = [
   // 免费样品类
   {pattern: /(?:免费样品|免费寄样|免费提供样品|免费打样)/gi, replacement: '[样品政策: 待确认]'},
   {pattern: /\bfree samples?\b/gi, replacement: '[sample policy: to be confirmed]'},
+  // V75.7 暗示公司拥有工厂的模糊表述 → 与战略制造合作伙伴网络协作
+  {pattern: /(?:战略合作工厂|战略合作伙伴工厂|合作工厂)\s*(?:组成|构成|打造|建立)?\s*(?:的)?\s*(?:制造网络|生产网络|供应链网络|工厂网络|企业|公司)/gi, replacement: '与战略制造合作伙伴网络协作'},
+  {pattern: /(?:由|拥有|具备)\s*(?:战略合作|战略合作伙伴)\s*(?:工厂|制造基地)\s*(?:组成|构成|支持)?/gi, replacement: '与战略制造合作伙伴网络协作'},
 ];
 
 function sanitizeOutput(content){
@@ -2091,6 +2094,28 @@ function setTestFailure(model, value){
 function resetTestFailures(){
   for(const k in AI_TEST_FAILURES) AI_TEST_FAILURES[k] = false;
   console.log('[测试模拟] 所有失败模拟已重置');
+}
+
+// V75.7 测试后完整清理：清除模拟开关、Provider失败缓存、fallback状态
+function cleanupTestState(){
+  // 清除模拟开关
+  for(const k in AI_TEST_FAILURES) AI_TEST_FAILURES[k] = false;
+  // 清除模型失败缓存（localStorage中所有model_fail相关键）
+  try{
+    const keys = Object.keys(localStorage).filter(k => k.indexOf('model_fail') >= 0 || k.indexOf('failedModel') >= 0 || k.indexOf('modelFailed') >= 0);
+    keys.forEach(k => localStorage.removeItem(k));
+    console.log('[测试清理] 清除了 ' + keys.length + ' 个模型失败缓存键');
+  }catch(e){ console.log('[测试清理] 清除失败缓存异常:', e.message); }
+  // 重置Provider状态
+  if(typeof AI_PROVIDER_STATUS !== 'undefined'){
+    AI_PROVIDER_STATUS.currentProvider = null;
+    AI_PROVIDER_STATUS.currentModel = null;
+    AI_PROVIDER_STATUS.fallbackOccurred = false;
+    AI_PROVIDER_STATUS.fallbackCount = 0;
+    AI_PROVIDER_STATUS.lastError = null;
+    AI_PROVIDER_STATUS.lastLatency = null;
+  }
+  console.log('[测试清理] 测试状态已完整清理（模拟开关/失败缓存/Provider状态）');
 }
 function shouldSimulateFailure(cfg){
   if(!cfg || !cfg.model) return false;
@@ -2144,13 +2169,15 @@ async function callAI(messages, opts={}){
       const failMsg = 'TEST_FAILURE: 模拟' + cfg.name + '失败（测试模式）';
       console.log('[测试模拟] ' + failMsg);
       errors.push(cfg.name + ': 模拟失败（测试模式）');
-      if(cfg.type!=='ollama') markModelFailed(cfg.id, '模拟失败');
+      // V75.7 模拟失败不写入正常5分钟失败缓存，避免影响后续真实测试
       continue;
     }
     try{
       const controller = new AbortController();
       // V73 差异化超时：Gemini网络不稳定用15秒快速失败，其他模型用30秒
-      const timeoutMs = cfg.type==='gemini' ? 15000 : 30000;
+      // V75.7 本地大模型（DeepSeek等）单独90秒超时，其他模型30秒，Gemini 15秒
+      const isLocalLargeModel = cfg.type==='ollama' && cfg.model && /deepseek|qwen2.5vl/i.test(cfg.model);
+      const timeoutMs = cfg.type==='gemini' ? 15000 : (isLocalLargeModel ? 90000 : 30000);
       const timeoutId = setTimeout(()=>controller.abort(), timeoutMs);
       let r, j;
       if(cfg.type==='gemini'){

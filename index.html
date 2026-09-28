@@ -452,6 +452,63 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
+
+/* ===== 知识库状态徽章 ===== */
+.kb-status-badge{display:flex;align-items:center;gap:6px;padding:5px 12px;background:linear-gradient(135deg,#f0f7ff,#e8f0fe);border:1px solid #c5d9f0;border-radius:999px;cursor:pointer;transition:all .2s;font-size:12px;white-space:nowrap}
+.kb-status-badge:hover{background:linear-gradient(135deg,#e0efff,#d0e4fd);border-color:#a8c8f0;transform:translateY(-1px)}
+.kb-status-badge.offline{background:linear-gradient(135deg,#fff5f5,#ffe8e8);border-color:#f0c0c0}
+.kb-status-badge.offline .kb-status-text{color:#c53030}
+.kb-status-icon{font-size:14px}
+.kb-status-text{color:#2c5282;font-weight:600}
+.kb-scope-tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-left:4px}
+.kb-scope-local{background:#c6f6d5;color:#22543d}
+.kb-scope-lan{background:#fefcbf;color:#744210}
+.kb-scope-public{background:#fed7d7;color:#742a2a}
+
+/* ===== 知识库检索面板 ===== */
+.kb-search-hero{background:linear-gradient(135deg,#1a365d 0%,#2c5282 100%);color:#fff;border-radius:14px;padding:28px 24px;margin-bottom:18px}
+.kb-search-hero h2{margin:0 0 6px;font-size:22px}
+.kb-search-hero p{margin:0 0 16px;opacity:.8;font-size:13px}
+.kb-search-input-wrap{display:flex;gap:10px;max-width:700px}
+.kb-search-input-wrap input{flex:1;padding:12px 16px;border-radius:10px;border:none;font-size:14px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.kb-search-input-wrap button{padding:12px 24px;border-radius:10px;border:none;background:linear-gradient(135deg,#c9a961,#8b6914);color:#fff;font-weight:700;cursor:pointer;font-size:14px;white-space:nowrap}
+.kb-search-input-wrap button:hover{opacity:.9}
+.kb-stats-row{display:flex;gap:16px;margin-top:14px;flex-wrap:wrap}
+.kb-stat-item{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:8px 14px;font-size:12px}
+.kb-stat-item b{font-size:16px;margin-right:4px}
+
+.kb-result-card{background:#fff;border:1px solid #e4e7eb;border-radius:12px;padding:18px 20px;margin-bottom:12px;transition:all .2s}
+.kb-result-card:hover{border-color:#c5d9f0;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.kb-result-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}
+.kb-result-title{font-size:15px;font-weight:700;color:#1a365d;line-height:1.5}
+.kb-result-title .hl{background:#fef3c7;padding:1px 3px;border-radius:3px;color:#92400e}
+.kb-result-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.kb-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.kb-tag-category{background:#ebf8ff;color:#2c5282}
+.kb-tag-sensitivity{background:#f0fff4;color:#22543d}
+.kb-tag-sensitivity.internal{background:#fffbeb;color:#78350f}
+.kb-tag-sensitivity.confidential{background:#fff5f5;color:#742a2a}
+.kb-tag-authority{background:#fef3c7;color:#92400e;font-weight:700}
+.kb-tag-score{background:#f7fafc;color:#4a5568}
+.kb-result-snippet{font-size:13px;color:#4a5568;line-height:1.8;margin-bottom:10px}
+.kb-result-snippet .hl{background:#fef3c7;padding:1px 2px;border-radius:2px;color:#92400e}
+.kb-result-source{font-size:11px;color:#a0aec0;margin-bottom:10px;font-family:monospace}
+.kb-result-actions{display:flex;gap:8px;align-items:center}
+.kb-feedback-btn{padding:4px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#f7fafc;cursor:pointer;font-size:12px;transition:all .15s}
+.kb-feedback-btn:hover{background:#edf2f7}
+.kb-feedback-btn.active-useful{background:#c6f6d5;border-color:#9ae6b4;color:#22543d}
+.kb-feedback-btn.active-useless{background:#fed7d7;border-color:#feb2b2;color:#742a2a}
+.kb-view-original{padding:4px 12px;border-radius:6px;background:#2c5282;color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:600}
+.kb-view-original:hover{background:#1a365d}
+.kb-expand-btn{padding:4px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;font-size:12px;color:#4a5568}
+.kb-empty{text-align:center;padding:60px 20px;color:#a0aec0}
+.kb-empty .icon{font-size:48px;margin-bottom:12px}
+.kb-loading{text-align:center;padding:40px;color:#718096}
+.kb-loading .spinner{display:inline-block;width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#2c5282;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.kb-filter-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.kb-filter-bar select{padding:8px 12px;border-radius:8px;border:1px solid #e2e8f0;font-size:13px;background:#fff}
+
 </style>
 </head>
 <body>
@@ -511,6 +568,10 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
         <div class="crumb" id="pageCrumb">Dashboard</div>
       </div>
       <div class="topbar-right">
+        <div id="kbStatusBadge" class="kb-status-badge" title="知识库状态" onclick="go('knowledge')">
+          <span class="kb-status-icon">📚</span>
+          <span class="kb-status-text" id="kbStatusText">加载中…</span>
+        </div>
         <div class="search-box">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a96a8" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
           <input placeholder="搜索客户 / 公司 / 邮箱…" onkeydown="if(event.key==='Enter')globalSearch(this.value)">
@@ -6994,6 +7055,7 @@ function updateGuideStep(){
 
 // 页面加载时检查是否需要显示欢迎引导
 document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(fetchKBStatus, 500);
   try{ migrateData(); }catch(e){ console.error('数据迁移失败:', e); }
   const welcomeShown = localStorage.getItem('kailion_welcome_shown');
   if(!welcomeShown){
@@ -9761,6 +9823,8 @@ async function aiAsk(){
 let knowCat='全部', knowQ='';
 let knowBrain=false;
 let prospectKB=false;
+/* 公司知识库检索 - 全局状态 */
+let kbSearchState = {query:'', results:[], loading:false, category:'', status:null, scope:'local', offline:false, expanded:{}, feedback:{}};
 
 /* V75.3 外贸客户开发知识库 - 集成数据 */
 const PROSPECT_KB = {
@@ -10656,9 +10720,194 @@ async function generateDevStrategyWithKB(cid){
 }
 
 
+/* ============================================================
+ * 公司知识库检索 - 连接 /api/kb/search
+ * ============================================================ */
+
+/* 获取知识库状态并更新顶部徽章 */
+async function fetchKBStatus(){
+  try{
+    const resp = await fetch('/api/kb/status');
+    const data = await resp.json();
+    kbSearchState.status = data;
+    kbSearchState.scope = data.accessScope || 'local';
+    kbSearchState.offline = !data.available;
+    const badge = document.getElementById('kbStatusBadge');
+    const text = document.getElementById('kbStatusText');
+    if(badge && text){
+      if(data.available){
+        badge.classList.remove('offline');
+        const scopeLabel = data.accessScope==='local'?'本机':data.accessScope==='lan'?'局域网':'公网';
+        const scopeClass = data.accessScope==='local'?'kb-scope-local':data.accessScope==='lan'?'kb-scope-lan':'kb-scope-public';
+        text.innerHTML = `${data.totalFiles}文件·${data.totalSlices}片 <span class="kb-scope-tag ${scopeClass}">${scopeLabel}</span>`;
+      }else{
+        badge.classList.add('offline');
+        text.textContent = '知识库离线';
+      }
+    }
+  }catch(e){
+    kbSearchState.offline = true;
+    const badge = document.getElementById('kbStatusBadge');
+    const text = document.getElementById('kbStatusText');
+    if(badge && text){ badge.classList.add('offline'); text.textContent = '知识库离线'; }
+  }
+}
+
+/* 执行知识库搜索 */
+async function searchKB(query){
+  if(!query || !query.trim()){ toast('请输入搜索关键词'); return; }
+  kbSearchState.loading = true;
+  kbSearchState.query = query;
+  renderView();
+  try{
+    const url = '/api/kb/search?q=' + encodeURIComponent(query) + '&topK=20' + (kbSearchState.category?'&categories='+kbSearchState.category:'');
+    const resp = await fetch(url);
+    const data = await resp.json();
+    kbSearchState.results = data.results || [];
+    kbSearchState.scope = data.accessScope || 'local';
+  }catch(e){
+    toast('搜索失败: ' + e.message);
+    kbSearchState.results = [];
+  }
+  kbSearchState.loading = false;
+  renderView();
+}
+
+/* 命中词高亮 */
+function kbHighlight(text, terms){
+  if(!text) return '';
+  let result = text;
+  const sorted = (terms||[]).filter(t=>t&&t.length>1).sort((a,b)=>b.length-a.length);
+  for(const term of sorted){
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    result = result.replace(new RegExp(escaped, 'gi'), m=>'<span class="hl">'+m+'</span>');
+  }
+  return result;
+}
+
+/* 有用/无用反馈 - 记录到IndexedDB */
+async function kbFeedback(sliceId, type){
+  kbSearchState.feedback[sliceId] = type;
+  try{
+    if(typeof arkDBPut === 'function'){
+      await arkDBPut('data_cache', {key:'kb_fb_'+sliceId, sliceId, type, time:Date.now()});
+    }
+  }catch(e){ /* 反馈记录失败不影响使用 */ }
+  renderView();
+}
+
+/* 展开/收起结果 */
+function kbToggleExpand(id){
+  kbSearchState.expanded[id] = !kbSearchState.expanded[id];
+  renderView();
+}
+
+/* 查看原文 */
+async function kbViewOriginal(filePath){
+  try{
+    const resp = await fetch('/api/kb/file?path=' + encodeURIComponent(filePath));
+    if(resp.status===403){ toast('该文件在当前访问范围下不可查看'); return; }
+    const data = await resp.json();
+    openModal(`
+      <div class="modal-head"><h3 style="font-size:14px">${esc(filePath)}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <div style="white-space:pre-wrap;font-size:13px;line-height:1.8;font-family:monospace">${esc(data.content||'无内容')}</div>
+      </div>`);
+  }catch(e){ toast('查看原文失败: ' + e.message); }
+}
+
+/* 渲染公司知识库检索面板 */
+function viewKBSearch(root){
+  const isPublic = kbSearchState.scope === 'public';
+  const status = kbSearchState.status || {};
+  
+  let html = `
+  <div class="kb-search-hero">
+    <h2>📚 公司知识库检索</h2>
+    <p>基于 ${status.totalFiles||'—'} 个文件、${status.totalSlices||'—'} 条切片的智能检索 · 访问范围：${kbSearchState.scope==='local'?'本机（全部）':kbSearchState.scope==='lan'?'局域网（public+internal）':'公网（仅public）'}</p>
+    <div class="kb-search-input-wrap">
+      <input id="kbSearchInput" placeholder="搜索：德国 厨房刀具 进口商、价格异议 应对、OEM 定制 包装…" value="${esc(kbSearchState.query)}" onkeydown="if(event.key==='Enter')searchKB(this.value)">
+      <button onclick="searchKB(document.getElementById('kbSearchInput').value)">🔍 搜索</button>
+    </div>
+    <div class="kb-stats-row">
+      <span class="kb-stat-item"><b>${status.totalFiles||'—'}</b>文件</span>
+      <span class="kb-stat-item"><b>${status.totalSlices||'—'}</b>切片</span>
+      <span class="kb-stat-item"><b>${status.authorityHigh||'—'}</b>权威文档</span>
+      ${!isPublic?`<span class="kb-stat-item"><b>${(status.bySensitivity&&status.bySensitivity.confidential)||'—'}</b>机密（仅本机）</span>`:''}
+      <span class="kb-stat-item">最后同步：${status.lastSync||'—'}</span>
+    </div>
+  </div>`;
+  
+  // 分类过滤
+  const cats = ['全部','00_导航与规范','01_公司与品牌','02_产品知识库','03_客户开发与CRM','04_国家地区开发指南','05_独立站与SEO','06_海外仓与订单物流','07_营销与社媒','08_AI工作流与工具','09_行业知识与培训','10_项目路演与政府材料','11_订单与财务'];
+  html += `<div class="kb-filter-bar">
+    <select onchange="kbSearchState.category=this.value==='全部'?'':this.value;if(kbSearchState.query)searchKB(kbSearchState.query)">
+      ${cats.map(c=>`<option ${kbSearchState.category===(c==='全部'?'':c)?'selected':''}>${c}</option>`).join('')}
+    </select>
+    <span style="font-size:12px;color:#718096">选择分类后需重新搜索</span>
+  </div>`;
+  
+  // 加载中
+  if(kbSearchState.loading){
+    html += `<div class="kb-loading"><div class="spinner"></div><div>正在检索知识库…</div></div>`;
+    root.innerHTML = html;
+    return;
+  }
+  
+  // 无结果
+  if(!kbSearchState.query){
+    html += `<div class="kb-empty"><div class="icon">🔍</div><div style="font-size:15px;margin-bottom:8px">输入关键词开始检索公司知识库</div><div style="font-size:13px;color:#a0aec0">支持中文、英文、多词组合（空格分隔）</div></div>`;
+    root.innerHTML = html;
+    return;
+  }
+  
+  if(kbSearchState.results.length===0){
+    html += `<div class="kb-empty"><div class="icon">📭</div><div style="font-size:15px;margin-bottom:8px">未找到相关结果</div><div style="font-size:13px;color:#a0aec0">尝试更换关键词或减少限制条件</div></div>`;
+    root.innerHTML = html;
+    return;
+  }
+  
+  // 结果列表
+  html += `<div style="font-size:13px;color:#718096;margin-bottom:12px">找到 ${kbSearchState.results.length} 条相关结果（按相关度排序）</div>`;
+  
+  for(const r of kbSearchState.results){
+    const titleText = (r.titleChain||[]).join(' > ') || r.fileName;
+    const expanded = kbSearchState.expanded[r.id];
+    const fb = kbSearchState.feedback[r.id];
+    
+    html += `<div class="kb-result-card">
+      <div class="kb-result-header">
+        <div class="kb-result-title">${kbHighlight(esc(titleText), r.matchedTerms)}</div>
+        <div style="flex-shrink:0">
+          ${r.authority==='high'?'<span class="kb-tag kb-tag-authority">⭐ 权威</span>':''}
+          <span class="kb-tag kb-tag-score">${r.score}</span>
+        </div>
+      </div>
+      <div class="kb-result-meta">
+        <span class="kb-tag kb-tag-category">${esc(r.category||r.dirCategory||'—')}</span>
+        ${!isPublic?`<span class="kb-tag kb-tag-sensitivity ${r.sensitivity||''}">${r.sensitivity||'public'}</span>`:''}
+        ${r.allOriginalHit?'<span class="kb-tag" style="background:#c6f6d5;color:#22543d">✓ 全词匹配</span>':''}
+      </div>
+      <div class="kb-result-snippet">${kbHighlight(esc(r.snippet||''), r.matchedTerms)}</div>
+      <div class="kb-result-source">📄 ${esc(r.filePath)} · 更新于 ${r.lastUpdated||'—'}</div>
+      <div class="kb-result-actions">
+        <button class="kb-view-original" onclick="kbViewOriginal('${esc(r.filePath)}')">查看原文</button>
+        <button class="kb-expand-btn" onclick="kbToggleExpand('${r.id}')">${expanded?'收起':'展开'}</button>
+        <span style="margin-left:auto;font-size:11px;color:#a0aec0">反馈：</span>
+        <button class="kb-feedback-btn ${fb==='useful'?'active-useful':''}" onclick="kbFeedback('${r.id}','useful')">👍 有用</button>
+        <button class="kb-feedback-btn ${fb==='useless'?'active-useless':''}" onclick="kbFeedback('${r.id}','useless')">👎 无用</button>
+      </div>
+    </div>`;
+  }
+  
+  root.innerHTML = html;
+}
+
 function viewKnowledge(root){
   if(knowBrain) return viewKnowBrain(root);
   if(prospectKB) return viewProspectKB(root);
+  // 默认显示公司知识库检索（连接/api/kb/search）
+  if(!kbSearchState._showLegacy) return viewKBSearch(root);
   const cats=['全部',...new Set((S.knowledge||[]).map(k=>k.cat))];
   let list = S.knowledge||[];
   if(knowCat!=='全部') list=list.filter(k=>k.cat===knowCat);
@@ -10667,7 +10916,9 @@ function viewKnowledge(root){
     <div class="flex gap8 mb16">
       ${cats.map(c=>`<button class="btn ${knowCat===c?'btn-gold':'btn-outline'}" onclick="knowCat='${c}';renderView()">${c}</button>`).join('')}
       <input class="form-control" style="width:200px;margin-left:auto" placeholder="搜索知识库..." value="${esc(knowQ)}" oninput="knowQ=this.value;renderView()">
-      <button class="btn btn-gold" onclick="knowBrain=true;renderView()">🧠 业务大脑</button>
+      <button class="btn btn-gold" onclick="kbSearchState._showLegacy=false;renderView()">🔍 公司知识库检索</button>
+      <button class="btn btn-outline" onclick="kbSearchState._showLegacy=true;renderView()">📝 业务笔记</button>
+      <button class="btn" onclick="knowBrain=true;renderView()">🧠 业务大脑</button>
       <button class="btn" style="background:linear-gradient(135deg,#c9a961,#8b6914);color:#fff" onclick="prospectKB=true;renderView()">📊 外贸开发知识库</button>
       <button class="btn btn-primary" onclick="openKnowForm()">＋ 新增</button>
     </div>

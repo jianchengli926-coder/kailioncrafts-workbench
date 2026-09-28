@@ -23126,6 +23126,319 @@ function convertLeadToCustomer(leadId){
   return lead;
 }
 
+
+
+/* ============================================================
+ * 任务五：从报价到成交的业务闭环
+ * ============================================================ */
+
+/* 从客户记录一键生成报价 */
+function createQuoteFromCustomer(customerId, items){
+  const customer = S.customers.find(c=>c.id===customerId);
+  if(!customer){ toast('客户不存在','err'); return null; }
+  
+  const quote = {
+    id: 'Q' + Date.now().toString(36).toUpperCase(),
+    customerId: customerId,
+    customerName: customer.company,
+    customerCountry: customer.country,
+    contact: customer.contact?.name || '',
+    email: customer.email || '',
+    items: items || [],
+    subtotal: 0,
+    discount: 0,
+    tax: 0,
+    total: 0,
+    currency: 'USD',
+    paymentTerms: 'T/T 30% deposit, 70% before shipment',
+    validity: '30 days',
+    status: 'draft',
+    version: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    notes: ''
+  };
+  
+  // 计算金额
+  quote.subtotal = quote.items.reduce((sum,item)=>sum + (item.quantity * item.unitPrice), 0);
+  quote.total = quote.subtotal - quote.discount + quote.tax;
+  
+  if(!Array.isArray(S.quotes)) S.quotes = [];
+  S.quotes.push(quote);
+  
+  // 记录到客户时间线
+  addTimelineEvent(customerId, 'quote', '创建报价单', '报价单号：' + quote.id + '，金额：' + quote.currency + ' ' + quote.total.toFixed(2));
+  
+  // 更新客户报价历史
+  if(!customer.quoteHistory) customer.quoteHistory = [];
+  customer.quoteHistory.push({quoteId: quote.id, amount: quote.total, date: quote.createdAt, status: quote.status});
+  
+  saveData();
+  toast('✅ 报价单已创建：' + quote.id);
+  return quote;
+}
+
+/* 报价版本管理 */
+function updateQuoteVersion(quoteId, updates){
+  const quote = S.quotes.find(q=>q.id===quoteId);
+  if(!quote) return null;
+  
+  // 保存旧版本
+  const oldVersion = {...quote};
+  
+  // 更新字段
+  Object.assign(quote, updates);
+  quote.version += 1;
+  quote.updatedAt = new Date().toISOString();
+  
+  // 重新计算金额
+  quote.subtotal = quote.items.reduce((sum,item)=>sum + (item.quantity * item.unitPrice), 0);
+  quote.total = quote.subtotal - quote.discount + quote.tax;
+  
+  // 记录版本变更
+  if(!quote.versionHistory) quote.versionHistory = [];
+  quote.versionHistory.push({
+    version: oldVersion.version,
+    total: oldVersion.total,
+    updatedAt: oldVersion.updatedAt,
+    changes: Object.keys(updates).join(', ')
+  });
+  
+  // 更新客户报价历史
+  const customer = S.customers.find(c=>c.id===quote.customerId);
+  if(customer && customer.quoteHistory){
+    const idx = customer.quoteHistory.findIndex(q=>q.quoteId===quoteId);
+    if(idx >= 0){
+      customer.quoteHistory[idx].amount = quote.total;
+      customer.quoteHistory[idx].status = quote.status;
+    }
+  }
+  
+  addTimelineEvent(quote.customerId, 'quote', '报价更新', '报价单 ' + quoteId + ' 更新至 v' + quote.version);
+  
+  saveData();
+  return quote;
+}
+
+/* 样品跟踪 */
+function createSampleTracking(customerId, sampleData){
+  const customer = S.customers.find(c=>c.id===customerId);
+  if(!customer){ toast('客户不存在','err'); return null; }
+  
+  const sample = {
+    id: 'S' + Date.now().toString(36).toUpperCase(),
+    customerId: customerId,
+    customerName: customer.company,
+    products: sampleData.products || [],
+    status: 'pending',
+    requestedAt: new Date().toISOString(),
+    shippedAt: null,
+    trackingNumber: '',
+    carrier: '',
+    arrivedAt: null,
+    feedback: '',
+    nextAction: '',
+    notes: sampleData.notes || ''
+  };
+  
+  if(!Array.isArray(S.samples)) S.samples = [];
+  S.samples.push(sample);
+  
+  // 记录到客户时间线
+  addTimelineEvent(customerId, 'sample', '样品申请', '样品单号：' + sample.id + '，产品：' + sample.products.map(p=>p.name||p).join(', '));
+  
+  // 更新客户样品历史
+  if(!customer.sampleHistory) customer.sampleHistory = [];
+  customer.sampleHistory.push({sampleId: sample.id, status: sample.status, date: sample.requestedAt});
+  
+  saveData();
+  toast('✅ 样品跟踪已创建：' + sample.id);
+  return sample;
+}
+
+/* 更新样品状态 */
+function updateSampleStatus(sampleId, status, updates){
+  const sample = S.samples.find(s=>s.id===sampleId);
+  if(!sample) return null;
+  
+  const statusFlow = {
+    pending: '待寄出',
+    shipped: '已寄出',
+    in_transit: '运输中',
+    arrived: '已到达',
+    tested: '已测试',
+    feedback_received: '已反馈',
+    completed: '完成',
+    rejected: '拒绝'
+  };
+  
+  sample.status = status;
+  if(status === 'shipped') sample.shippedAt = new Date().toISOString();
+  if(status === 'arrived') sample.arrivedAt = new Date().toISOString();
+  
+  if(updates) Object.assign(sample, updates);
+  sample.updatedAt = new Date().toISOString();
+  
+  // 更新客户样品历史
+  const customer = S.customers.find(c=>c.id===sample.customerId);
+  if(customer && customer.sampleHistory){
+    const idx = customer.sampleHistory.findIndex(s=>s.sampleId===sampleId);
+    if(idx >= 0) customer.sampleHistory[idx].status = status;
+  }
+  
+  addTimelineEvent(sample.customerId, 'sample', '样品状态更新', '样品 ' + sampleId + ' → ' + (statusFlow[status]||status));
+  
+  // 如果样品完成，设置下次跟进提醒
+  if(status === 'feedback_received' && sample.nextAction){
+    addTimelineEvent(sample.customerId, 'system', '样品后续动作', sample.nextAction);
+  }
+  
+  saveData();
+  return sample;
+}
+
+/* OEM/ODM需求单 */
+function createOEMRequirement(customerId, requirements){
+  const customer = S.customers.find(c=>c.id===customerId);
+  if(!customer){ toast('客户不存在','err'); return null; }
+  
+  const oem = {
+    id: 'OEM' + Date.now().toString(36).toUpperCase(),
+    customerId: customerId,
+    customerName: customer.company,
+    type: requirements.type || 'OEM',
+    logo: requirements.logo || '',
+    packaging: requirements.packaging || '',
+    material: requirements.material || '',
+    specifications: requirements.specifications || '',
+    moq: requirements.moq || '',
+    targetPrice: requirements.targetPrice || '',
+    leadTime: requirements.leadTime || '',
+    certifications: requirements.certifications || [],
+    artworkFiles: [],
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    notes: requirements.notes || '',
+    factoryFeedback: ''
+  };
+  
+  if(!Array.isArray(S.oemRequirements)) S.oemRequirements = [];
+  S.oemRequirements.push(oem);
+  
+  addTimelineEvent(customerId, 'oem', '创建OEM/ODM需求单', '需求单号：' + oem.id + '，类型：' + oem.type);
+  
+  saveData();
+  toast('✅ OEM/ODM需求单已创建：' + oem.id);
+  return oem;
+}
+
+/* 导出OEM需求单给工厂 */
+function exportOEMRequirement(oemId){
+  const oem = S.oemRequirements?.find(o=>o.id===oemId);
+  if(!oem){ toast('需求单不存在','err'); return; }
+  
+  let report = 'KaiLionCrafts OEM/ODM 需求单\n';
+  report += '='.repeat(40) + '\n';
+  report += '需求单号：' + oem.id + '\n';
+  report += '客户名称：' + oem.customerName + '\n';
+  report += '需求类型：' + oem.type + '\n';
+  report += '创建时间：' + new Date(oem.createdAt).toLocaleString('zh-CN') + '\n\n';
+  
+  report += '【产品需求】\n';
+  report += 'LOGO要求：' + (oem.logo || '待确认') + '\n';
+  report += '包装要求：' + (oem.packaging || '待确认') + '\n';
+  report += '材质要求：' + (oem.material || '待确认') + '\n';
+  report += '规格要求：' + (oem.specifications || '待确认') + '\n';
+  report += 'MOQ：' + (oem.moq || '待确认') + '\n';
+  report += '目标价格：' + (oem.targetPrice || '待确认') + '\n';
+  report += '交期要求：' + (oem.leadTime || '待确认') + '\n';
+  report += '认证要求：' + (oem.certifications.length ? oem.certifications.join(', ') : '待确认') + '\n\n';
+  
+  report += '【备注】\n' + (oem.notes || '无') + '\n\n';
+  report += '='.repeat(40) + '\n';
+  report += '⚠️ 本需求单由客户提供，具体参数需工厂核实确认\n';
+  
+  const blob = new Blob([report], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'OEM需求单_' + oem.id + '_' + oem.customerName + '.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ OEM需求单已导出');
+}
+
+/* 成交复盘 */
+function createDealReview(customerId, reviewData){
+  const customer = S.customers.find(c=>c.id===customerId);
+  if(!customer){ toast('客户不存在','err'); return null; }
+  
+  const review = {
+    id: 'R' + Date.now().toString(36).toUpperCase(),
+    customerId: customerId,
+    customerName: customer.company,
+    result: reviewData.result || 'won',
+    orderAmount: reviewData.orderAmount || 0,
+    products: reviewData.products || [],
+    winReasons: reviewData.winReasons || [],
+    loseReasons: reviewData.loseReasons || [],
+    lessonsLearned: reviewData.lessonsLearned || '',
+    improvements: reviewData.improvements || '',
+    createdAt: new Date().toISOString(),
+    notes: reviewData.notes || ''
+  };
+  
+  if(!Array.isArray(S.dealReviews)) S.dealReviews = [];
+  S.dealReviews.push(review);
+  
+  // 更新客户状态
+  if(review.result === 'won'){
+    customer.status = '已成交';
+    addTimelineEvent(customerId, 'deal', '成交复盘 - 赢单', '订单金额：' + review.orderAmount + '，赢单原因：' + review.winReasons.join('、'));
+  } else {
+    customer.status = '已丢单';
+    addTimelineEvent(customerId, 'deal', '成交复盘 - 丢单', '丢单原因：' + review.loseReasons.join('、'));
+  }
+  
+  // 更新客户订单历史
+  if(!customer.orderHistory) customer.orderHistory = [];
+  customer.orderHistory.push({reviewId: review.id, amount: review.orderAmount, result: review.result, date: review.createdAt});
+  
+  saveData();
+  toast('✅ 成交复盘已记录');
+  return review;
+}
+
+/* 赢单/丢单原因汇总 */
+function getDealReviewSummary(){
+  const reviews = S.dealReviews || [];
+  if(!reviews.length) return null;
+  
+  const won = reviews.filter(r=>r.result==='won');
+  const lost = reviews.filter(r=>r.result==='lost');
+  const totalAmount = won.reduce((sum,r)=>sum + (r.orderAmount||0), 0);
+  
+  // 汇总赢单原因
+  const winReasonMap = {};
+  won.forEach(r=>r.winReasons.forEach(reason=>{ winReasonMap[reason] = (winReasonMap[reason]||0) + 1; }));
+  
+  // 汇总丢单原因
+  const loseReasonMap = {};
+  lost.forEach(r=>r.loseReasons.forEach(reason=>{ loseReasonMap[reason] = (loseReasonMap[reason]||0) + 1; }));
+  
+  return {
+    total: reviews.length,
+    won: won.length,
+    lost: lost.length,
+    winRate: reviews.length ? ((won.length / reviews.length) * 100).toFixed(1) : '0.0',
+    totalAmount: totalAmount,
+    avgOrderValue: won.length ? (totalAmount / won.length).toFixed(2) : '0',
+    topWinReasons: Object.entries(winReasonMap).sort((a,b)=>b[1]-a[1]).slice(0,5),
+    topLoseReasons: Object.entries(loseReasonMap).sort((a,b)=>b[1]-a[1]).slice(0,5)
+  };
+}
+
 </script>
 
 <!-- V75.3 全局AI助手悬浮窗 -->

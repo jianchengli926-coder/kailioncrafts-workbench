@@ -18,6 +18,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
+const dns = require('dns');
 
 // ============ 全局异常保护（防止进程崩溃退出）============
 process.on('uncaughtException', (err) => {
@@ -849,43 +850,126 @@ const server = http.createServer(async (req, res) => {
     try { fs.writeFileSync(USAGE_FILE, JSON.stringify(usageData, null, 2), 'utf-8'); } catch(e) {}
   }
   
-  // SSRF防护：检查URL是否指向内网
+  // ============ SSRF防护（升级版：连接层IP校验 + DNS重绑定防御） ============
+  
+  // 检查IP是否为内网/保留地址（支持IPv4和IPv6）
+  function isPrivateIP(ip) {
+    if (!ip) return true;
+    // IPv4 点分十进制
+    const v4 = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (v4) {
+      const [, a, b, c, d] = v4.map(Number);
+      if (a === 0) return true;          // 本网络
+      if (a === 10) return true;         // 私网 10.0.0.0/8
+      if (a === 127) return true;        // 回环 127.0.0.0/8
+      if (a === 169 && b === 254) return true; // link-local
+      if (a === 172 && b >= 16 && b <= 31) return true; // 私网 172.16.0.0/12
+      if (a === 192 && b === 168) return true; // 私网 192.168.0.0/16
+      if (a >= 224) return true;         // 组播/保留
+      return false;
+    }
+    // IPv6
+    const v6 = ip.toLowerCase().replace(/^\[|\]$/g, '');
+    if (v6 === '::1' || v6 === '::ffff:127.0.0.1' || v6 === '::ffff:7f00:1') return true;
+    if (v6.startsWith('fc') || v6.startsWith('fd')) return true; // ULA 私网
+    if (v6.startsWith('fe80')) return true; // link-local
+    if (v6 === '::') return true; // 未指定地址
+    return false;
+  }
+  
+  // 将十进制/十六进制数字转换为IPv4点分格式（用于检测绕过）
+  function normalizeNumericIP(hostname) {
+    // 纯十进制数字，如 2130706433 = 127.0.0.1
+    if (/^\d+$/.test(hostname)) {
+      const num = parseInt(hostname, 10);
+      if (num <= 0xFFFFFFFF) {
+        return [(num >>> 24) & 0xFF, (num >>> 16) & 0xFF, (num >>> 8) & 0xFF, num & 0xFF].join('.');
+      }
+    }
+    // 十六进制，如 0x7f000001 = 127.0.0.1
+    if (/^0x[0-9a-fA-F]+$/.test(hostname)) {
+      const num = parseInt(hostname, 16);
+      if (num <= 0xFFFFFFFF) {
+        return [(num >>> 24) & 0xFF, (num >>> 16) & 0xFF, (num >>> 8) & 0xFF, num & 0xFF].join('.');
+      }
+    }
+    return null;
+  }
+  
+  // 自定义DNS lookup：在连接层校验解析后的IP，防御DNS重绑定
+  // 注意：Node.js v22+ 的 http.request 会传递 all:true，此时 dns.lookup 返回数组
+  function safeLookup(hostname, options, callback) {
+    if (typeof options === 'function') { callback = options; options = {}; }
+    const wantAll = options.all === true;
+    dns.lookup(hostname, options, (err, result, family) => {
+      if (err) return callback(err);
+      // 统一处理：all:true 时 result 是 [{address,family}] 数组，否则是单个地址字符串
+      const addrList = wantAll ? (Array.isArray(result) ? result : []) : [{address: result, family: family}];
+      // 检查所有解析到的IP，任何一个是内网/保留地址都拒绝
+      for (const addr of addrList) {
+        if (addr && addr.address && isPrivateIP(addr.address)) {
+          return callback(new Error('SSRF防护：DNS解析到内网/保留地址 ' + addr.address + '（主机: ' + hostname + '）'));
+        }
+      }
+      // 全部安全，按原格式返回
+      if (wantAll) {
+        callback(null, result);
+      } else {
+        callback(null, result, family);
+      }
+    });
+  }
+  
+  // URL安全检查（字符串层面预检查，连接层还有safeLookup二次校验）
   function isUrlSafe(urlStr) {
     try {
       const u = new URL(urlStr);
       const hostname = u.hostname.toLowerCase();
-      // 拒绝localhost和回环地址
-      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return false;
-      // 拒绝私网IP段
-      const ipMatch = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-      if (ipMatch) {
-        const [_, a, b, c, d] = ipMatch.map(Number);
-        if (a === 10) return false;
-        if (a === 172 && b >= 16 && b <= 31) return false;
-        if (a === 192 && b === 168) return false;
-        if (a === 169 && b === 254) return false; // link-local
-        if (a === 0) return false;
-        if (a >= 224) return false; // 组播/保留
-      }
-      // 拒绝metadata服务
-      if (hostname === 'metadata.google.internal' || hostname === '169.254.169.254') return false;
       // 只允许http和https
       if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+      // 拒绝localhost和常见回环
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]') return false;
+      // 检测十进制/十六进制IP绕过
+      const numericIP = normalizeNumericIP(hostname);
+      if (numericIP && isPrivateIP(numericIP)) return false;
+      // 标准IPv4检测
+      const ipMatch = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+      if (ipMatch && isPrivateIP(hostname)) return false;
+      // IPv6检测
+      if (hostname.startsWith('[') && hostname.endsWith(']')) {
+        const inner = hostname.slice(1, -1);
+        if (isPrivateIP(inner)) return false;
+      }
+      // 拒绝0.0.0.0
+      if (hostname === '0.0.0.0') return false;
+      // 拒绝metadata服务
+      if (hostname === 'metadata.google.internal' || hostname === '169.254.169.254') return false;
       return true;
     } catch(e) {
       return false;
     }
   }
   
-  // 网页抓取（带SSRF防护、超时、UA）
+  // 网页抓取（升级版：连接层SSRF校验 + 最多3次重定向 + 2MB响应上限 + 递归重定向校验）
   function fetchUrl(urlStr, opts = {}) {
+    const maxRedirects = opts.maxRedirects !== undefined ? opts.maxRedirects : 3;
+    const timeout = opts.timeout || 15000;
+    const maxSize = opts.maxSize || 2 * 1024 * 1024; // 最大2MB
+    const visited = opts._visited || [];
+    
     return new Promise((resolve, reject) => {
+      // 字符串层面预检查
       if (!isUrlSafe(urlStr)) {
-        reject(new Error('SSRF防护：禁止访问内网或本地地址'));
+        reject(new Error('SSRF防护：禁止访问内网或本地地址（URL预检查失败）'));
         return;
       }
-      const timeout = opts.timeout || 15000;
-      const maxSize = opts.maxSize || 500 * 1024; // 最大500KB
+      // 防止重定向循环
+      if (visited.includes(urlStr)) {
+        reject(new Error('重定向循环检测：' + urlStr));
+        return;
+      }
+      visited.push(urlStr);
+      
       const u = new URL(urlStr);
       const isHttps = u.protocol === 'https:';
       const client = isHttps ? https : http;
@@ -901,26 +985,46 @@ const server = http.createServer(async (req, res) => {
           'Accept-Language': 'en-US,en;q=0.9',
           'Accept-Encoding': 'identity'
         },
-        timeout: timeout
+        timeout: timeout,
+        lookup: safeLookup  // 连接层二次校验：DNS解析后检查IP
       };
       
       const req = client.request(options, (res) => {
-        // 不跟随重定向到内网
+        // 处理重定向（递归，每次都经过isUrlSafe和safeLookup双重校验）
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          const redirectUrl = new URL(res.headers.location, urlStr).href;
-          if (!isUrlSafe(redirectUrl)) {
-            reject(new Error('SSRF防护：重定向目标为内网地址'));
+          if (visited.length > maxRedirects) {
             req.destroy();
+            reject(new Error('重定向次数超过上限(' + maxRedirects + '次)'));
             return;
           }
+          let redirectUrl;
+          try {
+            redirectUrl = new URL(res.headers.location, urlStr).href;
+          } catch(e) {
+            req.destroy();
+            reject(new Error('重定向URL解析失败: ' + e.message));
+            return;
+          }
+          // 重定向目标字符串预检查
+          if (!isUrlSafe(redirectUrl)) {
+            req.destroy();
+            reject(new Error('SSRF防护：重定向目标为内网地址（' + redirectUrl + '）'));
+            return;
+          }
+          req.destroy();
+          // 递归跟随重定向（safeLookup会在连接层再次校验）
+          fetchUrl(redirectUrl, { ...opts, maxRedirects, timeout, maxSize, _visited: visited })
+            .then(resolve).catch(reject);
+          return;
         }
+        
         let data = '';
         let size = 0;
         res.on('data', (chunk) => {
           size += chunk.length;
           if (size > maxSize) {
             req.destroy();
-            reject(new Error('页面内容超过最大限制(' + maxSize + '字节)'));
+            reject(new Error('响应体超过最大限制(' + (maxSize / 1024 / 1024).toFixed(1) + 'MB)，已中止'));
             return;
           }
           data += chunk;
@@ -928,10 +1032,12 @@ const server = http.createServer(async (req, res) => {
         res.on('end', () => {
           resolve({
             url: urlStr,
+            finalUrl: visited[visited.length - 1],
             statusCode: res.statusCode,
             headers: res.headers,
             body: data,
             size: size,
+            redirectCount: visited.length - 1,
             fetchedAt: new Date().toISOString()
           });
         });
@@ -1036,6 +1142,59 @@ const server = http.createServer(async (req, res) => {
       req.on('error', (e) => reject(new Error('Tavily请求失败: ' + e.message)));
       req.on('timeout', () => { req.destroy(); reject(new Error('Tavily请求超时(30s)')); });
       req.write(postData);
+      req.end();
+    });
+  }
+  
+
+  // Tavily官方用量查询（接入官方API，返回真实已用/剩余额度）
+  function tavilyGetUsage() {
+    return new Promise((resolve, reject) => {
+      const config = loadSearchConfig();
+      if (!config.tavilyApiKey) {
+        resolve({ available: false, reason: 'API Key未配置' });
+        return;
+      }
+      const options = {
+        hostname: 'api.tavily.com',
+        port: 443,
+        path: '/usage',
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + config.tavilyApiKey,
+          'Accept': 'application/json'
+        },
+        timeout: 10000
+      };
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            if (result.error) {
+              resolve({ available: false, reason: result.error, httpStatus: res.statusCode });
+              return;
+            }
+            // 解析Tavily返回的用量数据（兼容多种返回格式）
+            const monthlyUsage = result.usage?.monthly?.credits ?? result.usage?.credits ?? result.monthly?.credits ?? 0;
+            const monthlyLimit = result.limit?.monthly?.credits ?? result.limit?.credits ?? result.plan?.monthly_credits ?? 1000;
+            resolve({
+              available: true,
+              httpStatus: res.statusCode,
+              creditsUsed: monthlyUsage,
+              creditsLimit: monthlyLimit,
+              creditsRemaining: Math.max(0, monthlyLimit - monthlyUsage),
+              raw: result,
+              fetchedAt: new Date().toISOString()
+            });
+          } catch(e) {
+            resolve({ available: false, reason: '响应解析失败: ' + e.message, httpStatus: res.statusCode });
+          }
+        });
+      });
+      req.on('error', (e) => resolve({ available: false, reason: '请求失败: ' + e.message }));
+      req.on('timeout', () => { req.destroy(); resolve({ available: false, reason: '请求超时(10s)' }); });
       req.end();
     });
   }
@@ -1194,27 +1353,83 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   
-  // 额度使用统计
+  // 额度使用统计（接入Tavily官方用量，本地计数作补充）
   if (pathname === '/api/search/usage' && req.method === 'GET') {
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     const month = getCurrentMonthKey();
-    const monthly = usageData.monthly[month] || { tavily: 0, searxng: 0, totalQueries: 0 };
-    const freeLimit = 1000; // Tavily免费1000 credits/月
-    const remaining = Math.max(0, freeLimit - (monthly.tavily || 0));
-    const percentUsed = Math.round((monthly.tavily / freeLimit) * 100);
+    const monthly = usageData.monthly[month] || { tavily: 0, searxng: 0, totalQueries: 0, failedQueries: 0, cacheHits: 0 };
+    
+    // 尝试获取Tavily官方用量
+    let officialUsage = null;
+    try {
+      officialUsage = await Promise.race([
+        tavilyGetUsage(),
+        new Promise(resolve => setTimeout(() => resolve({ available: false, reason: '查询超时(8s)' }), 8000))
+      ]);
+    } catch(e) {
+      officialUsage = { available: false, reason: e.message };
+    }
+    
+    // 以官方数据为准，本地计数作补充
+    let creditsUsed, creditsLimit, creditsRemaining, dataSource;
+    if (officialUsage && officialUsage.available) {
+      creditsUsed = officialUsage.creditsUsed;
+      creditsLimit = officialUsage.creditsLimit;
+      creditsRemaining = officialUsage.creditsRemaining;
+      dataSource = 'official';
+    } else {
+      creditsUsed = monthly.tavily || 0;
+      creditsLimit = 1000;
+      creditsRemaining = Math.max(0, creditsLimit - creditsUsed);
+      dataSource = 'local';
+    }
+    
+    const percentUsed = creditsLimit > 0 ? Math.round((creditsUsed / creditsLimit) * 100) : 0;
+    
+    // 本地计数与官方数据差异检测（超过10%时提示）
+    let discrepancyWarning = null;
+    if (officialUsage && officialUsage.available && monthly.tavily > 0) {
+      const diff = Math.abs(officialUsage.creditsUsed - monthly.tavily);
+      const diffPct = officialUsage.creditsUsed > 0 ? (diff / officialUsage.creditsUsed) * 100 : 0;
+      if (diffPct > 10) {
+        discrepancyWarning = '本地计数(' + monthly.tavily + ')与官方数据(' + officialUsage.creditsUsed + ')差异' + diffPct.toFixed(1) + '%，以官方数据为准';
+      }
+    }
+    
+    // 分别估算可发现候选公司数和可深度分析数
+    const searchCreditsPerCompany = 3; // 每家客户约3组搜索词
+    const discoverableCompanies = Math.floor(creditsRemaining / searchCreditsPerCompany);
+    // 深度分析消耗：阶段2完成后按实际消耗更新，当前预估每家约2 credits（抓取+提取不消耗Tavily，AI分析用模型不消耗搜索额度）
+    const deepAnalysisCreditsPerCompany = 0; // 深度分析主要消耗模型token，不消耗Tavily搜索额度
+    const deepAnalyzableCompanies = deepAnalysisCreditsPerCompany > 0 ? Math.floor(creditsRemaining / deepAnalysisCreditsPerCompany) : null;
+    
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({
       month: month,
-      tavilyCreditsUsed: monthly.tavily || 0,
-      tavilyFreeLimit: freeLimit,
-      tavilyRemaining: remaining,
+      dataSource: dataSource,
+      officialAvailable: !!(officialUsage && officialUsage.available),
+      officialReason: officialUsage ? officialUsage.reason : null,
+      tavilyCreditsUsed: creditsUsed,
+      tavilyCreditsLimit: creditsLimit,
+      tavilyRemaining: creditsRemaining,
       tavilyPercentUsed: percentUsed,
+      localCreditsUsed: monthly.tavily || 0,
+      localFailedQueries: monthly.failedQueries || 0,
+      localCacheHits: monthly.cacheHits || 0,
       searxngQueries: monthly.searxng || 0,
       totalQueries: monthly.totalQueries || 0,
-      lowBalanceWarning: remaining < freeLimit * 0.2,
-      estimatePerCompany: { searchCredits: 3, deepAnalysisCredits: 0, note: '每家客户约消耗3个Tavily credits（3组搜索词×basic搜索），深度分析不消耗搜索额度' },
-      estimatedMonthlyCapacity: Math.floor(freeLimit / 3)
+      lowBalanceWarning: creditsRemaining < creditsLimit * 0.2,
+      balanceExhausted: creditsRemaining <= 0,
+      discrepancyWarning: discrepancyWarning,
+      capacity: {
+        discoverableCompanies: discoverableCompanies,
+        discoverableCreditsPerCompany: searchCreditsPerCompany,
+        deepAnalyzableCompanies: deepAnalyzableCompanies,
+        deepAnalysisCreditsPerCompany: deepAnalysisCreditsPerCompany,
+        note: '可发现候选公司按每家3 credits估算（3组搜索词×basic搜索）。深度分析主要消耗模型token，不消耗Tavily搜索额度，阶段2完成后按实际消耗更新。'
+      },
+      usageNote: '失败请求和缓存命中不计入本地消耗。官方数据以Tavily API返回为准。'
     }));
     return;
   }

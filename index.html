@@ -20837,6 +20837,138 @@ async function prospectGenerateQueries(){
 }
 
 // 执行搜索
+
+// ============ 候选公司匹配度评分（规则+可解释，非AI凭感觉打分） ============
+function calculateProspectMatchScore(result, profile) {
+  const details = [];
+  let score = 50; // 基础分50
+  const title = (result.title || '').toLowerCase();
+  const snippet = (result.content || '').toLowerCase();
+  const url = (result.url || '').toLowerCase();
+  const combined = title + ' ' + snippet + ' ' + url;
+  
+  // 维度1：品类关键词匹配（+20，部分匹配+10）
+  const categoryKeywords = {
+    outdoor: ['outdoor knife','camping knife','hunting knife','bushcraft','fixed blade','folding knife','pocket knife','tactical knife'],
+    kitchen: ['kitchen knife','chef knife','cookware','cutlery','kitchen shears','paring knife','santoku','cleaver','knife set'],
+    scissors: ['scissors','shears','pruning shears','garden shears','hair scissors','sewing scissors','tin snips','utility scissors'],
+    kitchenware: ['kitchen gadget','kitchen tool','kitchen accessory','can opener','peeler','grater','measuring cup','cooking utensil']
+  };
+  const selectedCategories = profile?.categories || [];
+  let categoryHit = false;
+  let categoryPartial = false;
+  for (const cat of selectedCategories) {
+    const keywords = categoryKeywords[cat] || [];
+    for (const kw of keywords) {
+      if (combined.includes(kw)) { categoryHit = true; break; }
+    }
+    if (categoryHit) break;
+  }
+  // 通用刀剪关键词
+  const genericKeywords = ['knife','cutlery','blade','shear','scissor','cutting tool','sharp'];
+  for (const kw of genericKeywords) {
+    if (combined.includes(kw)) { categoryPartial = true; break; }
+  }
+  if (categoryHit && selectedCategories.length > 0) {
+    score += 20; details.push({dim:'品类匹配', points:'+20', reason:'命中目标品类关键词', type:'positive'});
+  } else if (categoryPartial) {
+    score += 8; details.push({dim:'品类匹配', points:'+8', reason:'命中通用刀剪关键词（非目标品类）', type:'partial'});
+  } else {
+    details.push({dim:'品类匹配', points:'0', reason:'未检测到品类关键词', type:'neutral'});
+  }
+  
+  // 维度2：目标客户类型匹配（+15）
+  const customerTypeSignals = {
+    '亚马逊卖家': ['amazon.com','amazon.','/dp/','/gp/','seller central','fba','amazon seller'],
+    '独立站卖家': ['shopify','myshopify','woocommerce','bigcommerce','store','shop','online store'],
+    '进口商': ['importer','import','wholesale importer','distribution','sourcing'],
+    '批发商': ['wholesale','wholesaler','bulk','distributor','distribution','b2b'],
+    '品牌商': ['brand','brands','private label','own brand','label'],
+    '连锁零售': ['retail','store chain','chain store','supermarket','department store'],
+    '餐饮供应商': ['restaurant supply','food service','catering supply','hospitality'],
+    '户外用品店': ['outdoor store','camping store','hunting shop','outdoor retailer'],
+    '五金工具店': ['hardware','tool store','home improvement','diy store'],
+    '礼品公司': ['gift','gifts','promotional','corporate gift']
+  };
+  const selectedTypes = profile?.customerTypes || [];
+  let typeHit = false;
+  for (const ctype of selectedTypes) {
+    const signals = customerTypeSignals[ctype] || [];
+    for (const sig of signals) {
+      if (combined.includes(sig)) { typeHit = true; break; }
+    }
+    if (typeHit) break;
+  }
+  if (typeHit && selectedTypes.length > 0) {
+    score += 15; details.push({dim:'客户类型', points:'+15', reason:'命中目标客户类型信号', type:'positive'});
+  } else {
+    details.push({dim:'客户类型', points:'未知', reason:'无法从搜索结果判断客户类型', type:'unknown'});
+  }
+  
+  // 维度3：目标国家匹配（+15）
+  const countrySignals = {
+    'US': ['.com','united states','usa','american','us-based','u.s.'],
+    'DE': ['.de','germany','german','deutsch','deutschland'],
+    'GB': ['.co.uk','uk','united kingdom','british','england'],
+    'FR': ['.fr','france','french','français'],
+    'CA': ['.ca','canada','canadian'],
+    'AU': ['.au','australia','australian','aussie'],
+    'JP': ['.jp','japan','japanese','日本'],
+    'NL': ['.nl','netherlands','dutch','holland'],
+    'SE': ['.se','sweden','swedish','sverige'],
+    'IT': ['.it','italy','italian','italia'],
+    'ES': ['.es','spain','spanish','españa'],
+    'MX': ['.mx','mexico','mexican'],
+    'BR': ['.br','brazil','brazilian','brasil'],
+    'AE': ['.ae','uae','emirates','dubai','abu dhabi'],
+    'KR': ['.kr','korea','korean','한국'],
+    'SG': ['.sg','singapore','singaporean']
+  };
+  const selectedCountries = profile?.countries || [];
+  let countryHit = false;
+  for (const code of selectedCountries) {
+    const signals = countrySignals[code] || [];
+    for (const sig of signals) {
+      if (combined.includes(sig)) { countryHit = true; break; }
+    }
+    if (countryHit) break;
+  }
+  if (countryHit && selectedCountries.length > 0) {
+    score += 15; details.push({dim:'国家匹配', points:'+15', reason:'命中目标国家信号', type:'positive'});
+  } else {
+    details.push({dim:'国家匹配', points:'未知', reason:'无法从搜索结果判断国家（需深度分析确认）', type:'unknown'});
+  }
+  
+  // 维度4：结果类型识别（博客/评测/新闻/目录页扣分）
+  const nonCompanyPatterns = ['blog','review','best ','top ','vs ','compared','comparison','how to','guide','news','article','magazine','forum','reddit','quora','medium.com','pinterest','youtube','wikipedia','directory','listing page','search result'];
+  let isNonCompany = false;
+  for (const pat of nonCompanyPatterns) {
+    if (combined.includes(pat)) { isNonCompany = true; break; }
+  }
+  if (isNonCompany) {
+    score -= 20; details.push({dim:'结果类型', points:'-20', reason:'疑似博客/评测/新闻/目录页，非公司官网', type:'negative'});
+  } else {
+    score += 10; details.push({dim:'结果类型', points:'+10', reason:'疑似公司官网或店铺', type:'positive'});
+  }
+  
+  // 维度5：联系方式（搜索结果中无法判断，标未知）
+  details.push({dim:'联系方式', points:'未知', reason:'搜索结果中无法判断，需深度分析抓取官网确认', type:'unknown'});
+  
+  // 维度6：公司规模（搜索结果中无法判断，标未知）
+  details.push({dim:'公司规模', points:'未知', reason:'搜索结果中无法判断，需深度分析确认', type:'unknown'});
+  
+  // 确保分数在0-100之间
+  score = Math.max(0, Math.min(100, score));
+  
+  return {
+    score: score,
+    level: score >= 80 ? 'A' : score >= 60 ? 'B' : score >= 40 ? 'C' : 'D',
+    details: details,
+    isNonCompany: isNonCompany,
+    calculatedAt: new Date().toISOString()
+  };
+}
+
 async function prospectExecuteSearch(){
   if(prospectSearchRunning){ toast('搜索正在进行中...'); return; }
   if(prospectGeneratedQueries.length === 0){ toast('没有搜索词','err'); return; }
@@ -20868,15 +21000,22 @@ async function prospectExecuteSearch(){
         continue;
       }
       
-      const newResults = (data.results || []).map(r=>({
-        ...r,
-        query: query,
-        searchedAt: new Date().toISOString(),
-        provider: data.provider,
-        selected: false,
-        inCustomerDB: checkInCustomerDB(r.url),
-        inBlacklist: false
-      }));
+      const newResults = (data.results || []).map(r=>{
+        const matchInfo = calculateProspectMatchScore(r, prospectProfile);
+        return {
+          ...r,
+          query: query,
+          searchedAt: new Date().toISOString(),
+          provider: data.provider,
+          selected: false,
+          inCustomerDB: checkInCustomerDB(r.url),
+          inBlacklist: false,
+          matchScore: matchInfo.score,
+          matchLevel: matchInfo.level,
+          matchDetails: matchInfo.details,
+          isNonCompany: matchInfo.isNonCompany
+        };
+      });
       
       // 去重（按域名）
       for(const r of newResults){
@@ -20978,11 +21117,21 @@ function renderProspectSearch(){
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                     <span style="font-weight:700;font-size:14px;color:#1e293b">${r.title||'无标题'}</span>
+                    ${r.matchLevel?`<span style="background:${r.matchLevel==='A'?'#dcfce7':r.matchLevel==='B'?'#fef9c3':r.matchLevel==='C'?'#ffedd5':'#fee2e2'};color:${r.matchLevel==='A'?'#166534':r.matchLevel==='B'?'#854d0e':r.matchLevel==='C'?'#9a3412':'#991b1b'};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer" onclick="document.getElementById('matchDetail_${i}').style.display=document.getElementById('matchDetail_${i}').style.display==='none'?'block':'none'">匹配度 ${r.matchScore}分 (${r.matchLevel}级) ⓘ</span>`:''}
+                    ${r.isNonCompany?'<span style="background:#fef2f2;color:#991b1b;padding:1px 6px;border-radius:4px;font-size:10px">⚠️ 疑似非公司页</span>':''}
                     ${r.inCustomerDB?'<span style="background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:4px;font-size:10px">已在客户库</span>':''}
                     <span style="background:#f3f4f6;color:#6b7280;padding:1px 6px;border-radius:4px;font-size:10px">${r.provider||''}</span>
                   </div>
                   <div style="font-size:12px;color:#3b82f6;margin:4px 0;word-break:break-all"><a href="${r.url}" target="_blank" rel="noopener">${r.url}</a></div>
                   <div style="font-size:12px;color:#6b7280;line-height:1.5">${(r.content||'').substring(0,200)}${(r.content||'').length>200?'...':''}</div>
+                  ${r.matchDetails?`<div id="matchDetail_${i}" style="display:none;margin-top:8px;padding:8px 10px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0">
+                    <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:4px">📊 匹配度评分明细（点击标签可收起）</div>
+                    <table style="width:100%;font-size:11px;border-collapse:collapse">
+                      <thead><tr style="color:#64748b;text-align:left"><th style="padding:2px 4px;width:80px">维度</th><th style="padding:2px 4px;width:50px">得分</th><th style="padding:2px 4px">说明</th></tr></thead>
+                      <tbody>${r.matchDetails.map(d=>`<tr style="border-top:1px solid #f1f5f9"><td style="padding:2px 4px;color:${d.type==='positive'?'#16a34a':d.type==='negative'?'#dc2626':d.type==='unknown'?'#94a3b8':'#65a30d'}">${d.dim}</td><td style="padding:2px 4px;font-weight:700;color:${d.type==='positive'?'#16a34a':d.type==='negative'?'#dc2626':d.type==='unknown'?'#94a3b8':'#65a30d'}">${d.points}</td><td style="padding:2px 4px;color:#64748b">${d.reason}</td></tr>`).join('')}</tbody>
+                    </table>
+                    <div style="font-size:10px;color:#94a3b8;margin-top:4px">说明：无法判断的维度标注"未知"，不给分也不扣分。最终评分基于搜索结果可见信息，深度分析后可更新。</div>
+                  </div>`:''}
                   <div style="font-size:11px;color:#9ca3af;margin-top:4px">搜索词："${r.query||''}" · ${new Date(r.searchedAt).toLocaleString('zh-CN')}</div>
                 </div>
               </div>
@@ -21204,8 +21353,14 @@ async function refreshProspectUsage(){
     const data = await resp.json();
     const el = document.getElementById('prospectUsageInfo');
     if(el){
-      const warning = data.lowBalanceWarning ? '<span style="color:#ef4444;font-weight:700">⚠️ 额度不足！</span>' : '';
-      el.innerHTML = `Tavily本月：<b>${data.tavilyCreditsUsed}</b>/${data.tavilyFreeLimit} credits（剩余${data.tavilyRemaining}，${data.tavilyPercentUsed}%） ${warning} · 预计可开发 <b>${data.estimatedMonthlyCapacity}</b> 家客户 · 总搜索 <b>${data.totalQueries}</b> 次`;
+      const sourceLabel = data.dataSource === 'official' ? '官方数据' : '本地计数';
+      const warning = data.lowBalanceWarning ? '<span style="color:#ef4444;font-weight:700">⚠️ 额度不足（剩余<20%）！</span>' : '';
+      const exhausted = data.balanceExhausted ? '<span style="color:#ef4444;font-weight:700">⛔ 额度已用完，搜索已暂停！</span>' : '';
+      const discrepancy = data.discrepancyWarning ? '<span style="color:#f59e0b;font-size:11px">⚠️ ' + data.discrepancyWarning + '</span>' : '';
+      const deepText = data.capacity.deepAnalyzableCompanies !== null
+        ? `可深度分析约 <b>${data.capacity.deepAnalyzableCompanies}</b> 家`
+        : `可深度分析：<span style="color:#94a3b8">阶段2完成后更新</span>`;
+      el.innerHTML = `Tavily本月：<b>${data.tavilyCreditsUsed}</b>/${data.tavilyCreditsLimit} credits（剩余${data.tavilyRemaining}，${data.tavilyPercentUsed}%，${sourceLabel}） ${warning}${exhausted} · 可发现候选公司约 <b>${data.capacity.discoverableCompanies}</b> 家（每家${data.capacity.discoverableCreditsPerCompany} credits） · ${deepText} · 总搜索 <b>${data.totalQueries}</b> 次${discrepancy ? '<br>' + discrepancy : ''}`;
     }
   }catch(e){
     const el = document.getElementById('prospectUsageInfo');

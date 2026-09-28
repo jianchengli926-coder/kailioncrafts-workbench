@@ -640,6 +640,71 @@ function loadState(){
   S.linkedin = DB.load('linkedin') || {leads:[],messages:[],posts:[],interactions:[],stats:{connections:0,requestsSent:0,replies:0,meetings:0}};
   S.socialMonitor = DB.load('socialMonitor') || {keywords:[],posts:[],painPoints:[],leads:[],lastScan:null};
   S.mailQueue = DB.load('mailQueue') || [];
+  S.dataVersion = DB.load('dataVersion') || 1;
+  S.companyFacts = DB.load('companyFacts') || {brandName:'',companyName:'',foundedYear:'',headquarters:'',businessModel:'',categories:[],skuCount:'',certifications:[],capacity:'',moq:'',leadTime:'',factories:[],exportCountries:'',website:'',verified:false};
+
+/* ============================================================
+ * 数据版本管理与迁移
+ * ============================================================ */
+const CURRENT_DATA_VERSION = 2;
+
+function migrateData(){
+  let migrated = false;
+  const v = S.dataVersion || 1;
+  
+  // v1 -> v2: 扩展客户模型字段
+  if(v < 2){
+    S.customers = (S.customers||[]).map(c=>({
+      ...c,
+      tags: c.tags || [],
+      intentCategories: c.intentCategories || (c.products?[c.products]:[]),
+      lastInteraction: c.lastInteraction || c.createdAt || null,
+      timeline: c.timeline || [],
+      quoteHistory: c.quoteHistory || [],
+      sampleHistory: c.sampleHistory || [],
+      orderHistory: c.orderHistory || [],
+      blacklisted: c.blacklisted || false,
+      unsubscribe: c.unsubscribe || false,
+      leadSource: c.leadSource || c.source || 'manual',
+      leadScore: c.leadScore || (c.scores&&c.scores.total) || 50,
+      companySize: c.companySize || '',
+      decisionMaker: c.decisionMaker || '',
+      annualPurchase: c.annualPurchase || ''
+    }));
+    migrated = true;
+    console.log('[Migration] v1->v2: 客户模型字段扩展完成');
+  }
+  
+  if(migrated){
+    S.dataVersion = CURRENT_DATA_VERSION;
+    DB.save('dataVersion', CURRENT_DATA_VERSION);
+    persist();
+    console.log('[Migration] 数据迁移完成，当前版本 v' + CURRENT_DATA_VERSION);
+  }
+}
+
+/* 客户时间线操作 */
+function addTimelineEvent(cid, type, title, detail='', metadata={}){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c) return;
+  if(!c.timeline) c.timeline = [];
+  c.timeline.unshift({
+    id: uid(),
+    type: type, // email/whatsapp/call/meeting/quote/sample/order/note/system
+    title: title,
+    detail: detail,
+    metadata: metadata,
+    timestamp: Date.now()
+  });
+  c.lastInteraction = Date.now();
+  persist();
+}
+
+function getTimelineEvents(cid, limit=50){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c || !c.timeline) return [];
+  return c.timeline.slice(0, limit);
+}
   S.mailLogs = DB.load('mailLogs') || [];
   S.smtpConfig = DB.load('smtpConfig') || null;
   S.devPlans = DB.load('devPlans') || [];
@@ -1310,7 +1375,19 @@ function defaultKnowledge(){
     // V8 TikTok营销
     {id:uid(),title:'TikTok养号指南',cat:'TikTok营销',tags:'养号,0-30天',content:'前3天只刷不发，每天3-30分钟刷产品相关视频；第4-7天开始发每天1条；前30条不投流。',createdAt:daysAgo(1)},
     {id:uid(),title:'不出镜视频脚本模板',cat:'TikTok营销',tags:'脚本,不出镜',content:'开头3秒钩子(POV/疑问/反常识)→中间产品特写+文字→结尾引导(评论区打关键词/私信要目录)。3个创意：袋子视角/涂鸦变成品/鼠标滑动展示。',createdAt:daysAgo(1)},
-    {id:uid(),title:'TikTok投放技巧',cat:'TikTok营销',tags:'投放,表单',content:'日预算$20-40起步；表单设置4-5个筛选问题(公司名/职位/采购量/目标价/国家)；高曝光低点击换主图，高点击低转化优化落地页。',createdAt:daysAgo(1)},
+    {id:uid(),title:'TikTok投放技巧',cat:'TikTok营销',tags:'投放,表单',content:'日预算$20-40起步；表单设置4-5个    <!-- V75.3 客户数据操作栏 -->
+    <div class="card card-pad mb16" style="padding:12px 16px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:700;color:#2d3748">📦 数据管理：</span>
+        <button class="btn btn-sm btn-outline" onclick="exportCustomersCSV()" style="font-size:11px">📤 导出CSV</button>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('csvImportInput').click()" style="font-size:11px">📥 导入CSV</button>
+        <input type="file" id="csvImportInput" accept=".csv" style="display:none" onchange="importCustomersCSV(this.files[0]);this.value=''">
+        <button class="btn btn-sm btn-outline" onclick="toast('客户时间线功能已集成到客户详情页')" style="font-size:11px">📋 查看时间线说明</button>
+        <span style="margin-left:auto;font-size:11px;color:#718096">支持15个字段自动映射 · 邮箱/公司名去重 · 格式校验</span>
+      </div>
+    </div>
+
+筛选问题(公司名/职位/采购量/目标价/国家)；高曝光低点击换主图，高点击低转化优化落地页。',createdAt:daysAgo(1)},
     // V8 B2B平台运营
     {id:uid(),title:'直通车P4P优化',cat:'B2B平台运营',tags:'P4P,出价',content:'排名=出价×推广评分；3星以上才有资格进前5；高曝光低点击改主图定价，点击正常不下单优化详情页；定期清理否定词。',createdAt:daysAgo(1)},
     {id:uid(),title:'产品星级提升',cat:'B2B平台运营',tags:'星级,产品',content:'5星产品=标题完整+主图≥3张+详情≥5屏+参数完整+信保交易+好评；低效款先改标题关键词再决定是否下架。',createdAt:daysAgo(1)},
@@ -6929,6 +7006,7 @@ function updateGuideStep(){
 
 // 页面加载时检查是否需要显示欢迎引导
 document.addEventListener('DOMContentLoaded', function(){
+  try{ migrateData(); }catch(e){ console.error('数据迁移失败:', e); }
   const welcomeShown = localStorage.getItem('kailion_welcome_shown');
   if(!welcomeShown){
     setTimeout(() => showWelcomeGuide(), 1000);
@@ -7556,8 +7634,14 @@ function saveCustomer(cid){
   };
   if(cid){ Object.assign(S.customers.find(x=>x.id===cid), data); toast('已更新客户'); }
   else {
-    S.customers.push(Object.assign({id:uid(), source:'手动添加', scores:{industry:60,product:60,companyType:60,purchaseSignal:50,contactQuality:70,total:60,grade:'B'},
-      profile:{business:'',productLine:'',needs:'',painPoints:'',angle:''}, matchReasons:[], status:'待跟进', nextFollowUp:daysLater(3), createdAt:now(), followUpHistory:[]}, data));
+    S.customers.push(Object.assign({id:uid(), source:'手动添加', leadSource:'manual',
+      scores:{industry:60,product:60,companyType:60,purchaseSignal:50,contactQuality:70,total:60,grade:'B'},
+      leadScore:60, profile:{business:'',productLine:'',needs:'',painPoints:'',angle:''}, matchReasons:[],
+      status:'待跟进', nextFollowUp:daysLater(3), createdAt:now(), lastInteraction:now(),
+      followUpHistory:[], timeline:[], tags:[], intentCategories:[],
+      quoteHistory:[], sampleHistory:[], orderHistory:[],
+      blacklisted:false, unsubscribe:false, companySize:'', decisionMaker:'', annualPurchase:''}, data));
+    addTimelineEvent(S.customers[S.customers.length-1].id, 'system', '客户创建', '通过手动添加创建客户记录');
     toast('客户已添加');
   }
   persist(); closeModal(); renderView();
@@ -21990,6 +22074,231 @@ function refreshDashboard(){
   if(closedEl) closedEl.textContent = closed;
   
   toast('✅ 数据大屏已刷新');
+}
+
+
+
+/* ============================================================
+ * 客户CSV导入导出
+ * ============================================================ */
+const CUSTOMER_CSV_FIELDS = [
+  {key:'company', label:'公司名', required:true},
+  {key:'country', label:'国家', required:false},
+  {key:'website', label:'官网', required:false},
+  {key:'customerType', label:'客户类型', required:false},
+  {key:'products', label:'意向产品', required:false},
+  {key:'contactName', label:'联系人', required:false},
+  {key:'contactTitle', label:'职位', required:false},
+  {key:'contactEmail', label:'邮箱', required:false},
+  {key:'contactWhatsapp', label:'WhatsApp', required:false},
+  {key:'contactLinkedin', label:'LinkedIn', required:false},
+  {key:'source', label:'来源渠道', required:false},
+  {key:'status', label:'阶段', required:false},
+  {key:'tags', label:'标签', required:false},
+  {key:'notes', label:'备注', required:false}
+];
+
+function exportCustomersCSV(){
+  const customers = S.customers || [];
+  if(!customers.length){ toast('暂无客户数据可导出','err'); return; }
+  
+  const headers = CUSTOMER_CSV_FIELDS.map(f=>f.label);
+  const rows = customers.map(c=>{
+    return CUSTOMER_CSV_FIELDS.map(f=>{
+      let val = '';
+      if(f.key==='contactName') val = c.contact?.name || '';
+      else if(f.key==='contactTitle') val = c.contact?.title || '';
+      else if(f.key==='contactEmail') val = c.contact?.email || '';
+      else if(f.key==='contactWhatsapp') val = c.contact?.whatsapp || '';
+      else if(f.key==='contactLinkedin') val = c.contact?.linkedin || '';
+      else if(f.key==='tags') val = (c.tags||[]).join(';');
+      else val = c[f.key] || '';
+      // CSV转义：包含逗号、引号、换行的字段用双引号包裹
+      if(typeof val==='string' && (val.includes(',')||val.includes('"')||val.includes('\n'))){
+        val = '"' + val.replace(/"/g,'""') + '"';
+      }
+      return val;
+    }).join(',');
+  });
+  
+  const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '客户数据导出_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ 已导出 ' + customers.length + ' 条客户数据');
+  logAction('customer', '导出CSV', '导出' + customers.length + '条客户数据');
+}
+
+function importCustomersCSV(file){
+  if(!file){ toast('请选择CSV文件','err'); return; }
+  
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const text = e.target.result;
+      const result = parseAndImportCSV(text);
+      showImportResult(result);
+    }catch(err){
+      toast('CSV解析失败: ' + err.message, 'err');
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseAndImportCSV(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length < 2){ return {success:0, failed:0, errors:['文件为空或只有表头'], duplicates:0}; }
+  
+  // 解析表头，建立字段映射
+  const headerLine = lines[0];
+  const headers = parseCSVLine(headerLine);
+  const fieldMap = {};
+  headers.forEach((h, idx)=>{
+    const field = CUSTOMER_CSV_FIELDS.find(f=>f.label===h.trim() || f.key===h.trim().toLowerCase());
+    if(field) fieldMap[idx] = field.key;
+  });
+  
+  const result = {success:0, failed:0, duplicates:0, errors:[], details:[]};
+  const existingEmails = new Set((S.customers||[]).map(c=>c.contact?.email?.toLowerCase()).filter(Boolean));
+  const existingCompanies = new Set((S.customers||[]).map(c=>c.company?.toLowerCase()).filter(Boolean));
+  
+  for(let i=1;i<lines.length;i++){
+    const rowNum = i + 1;
+    try{
+      const values = parseCSVLine(lines[i]);
+      const customer = {contact:{}};
+      
+      values.forEach((val, idx)=>{
+        const key = fieldMap[idx];
+        if(!key) return;
+        if(key==='contactName') customer.contact.name = val;
+        else if(key==='contactTitle') customer.contact.title = val;
+        else if(key==='contactEmail') customer.contact.email = val;
+        else if(key==='contactWhatsapp') customer.contact.whatsapp = val;
+        else if(key==='contactLinkedin') customer.contact.linkedin = val;
+        else if(key==='tags') customer.tags = val.split(';').map(t=>t.trim()).filter(Boolean);
+        else customer[key] = val;
+      });
+      
+      // 校验必填字段
+      if(!customer.company || !customer.company.trim()){
+        result.failed++;
+        result.errors.push('第' + rowNum + '行：公司名不能为空');
+        continue;
+      }
+      
+      // 重复检测（邮箱优先，其次公司名）
+      const email = customer.contact?.email?.toLowerCase().trim();
+      const company = customer.company?.toLowerCase().trim();
+      if(email && existingEmails.has(email)){
+        result.duplicates++;
+        result.errors.push('第' + rowNum + '行：邮箱 ' + email + ' 已存在，跳过');
+        continue;
+      }
+      if(company && existingCompanies.has(company)){
+        result.duplicates++;
+        result.errors.push('第' + rowNum + '行：公司 ' + customer.company + ' 已存在，跳过');
+        continue;
+      }
+      
+      // 补全默认字段
+      customer.id = uid();
+      customer.source = customer.source || 'CSV导入';
+      customer.leadSource = customer.source || 'csv';
+      customer.status = customer.status || '待跟进';
+      customer.createdAt = now();
+      customer.lastInteraction = now();
+      customer.nextFollowUp = customer.nextFollowUp || daysLater(3);
+      customer.scores = customer.scores || {industry:60,product:60,companyType:60,purchaseSignal:50,contactQuality:70,total:60,grade:'B'};
+      customer.leadScore = customer.leadScore || 60;
+      customer.profile = customer.profile || {business:'',productLine:'',needs:'',painPoints:'',angle:''};
+      customer.matchReasons = customer.matchReasons || [];
+      customer.followUpHistory = customer.followUpHistory || [];
+      customer.timeline = customer.timeline || [];
+      customer.tags = customer.tags || [];
+      customer.intentCategories = customer.intentCategories || (customer.products?[customer.products]:[]);
+      customer.quoteHistory = customer.quoteHistory || [];
+      customer.sampleHistory = customer.sampleHistory || [];
+      customer.orderHistory = customer.orderHistory || [];
+      customer.blacklisted = customer.blacklisted || false;
+      customer.unsubscribe = customer.unsubscribe || false;
+      if(!customer.contact) customer.contact = {};
+      if(!customer.contact.linkedin) customer.contact.linkedin = '';
+      if(!customer.contact.phone) customer.contact.phone = '';
+      
+      S.customers.push(customer);
+      if(email) existingEmails.add(email);
+      if(company) existingCompanies.add(company);
+      result.success++;
+      result.details.push(customer.company);
+    }catch(err){
+      result.failed++;
+      result.errors.push('第' + rowNum + '行：解析错误 - ' + err.message);
+    }
+  }
+  
+  persist();
+  logAction('import', 'CSV导入', '成功' + result.success + '条，失败' + result.failed + '条，重复' + result.duplicates + '条');
+  return result;
+}
+
+function parseCSVLine(line){
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for(let i=0;i<line.length;i++){
+    const char = line[i];
+    if(inQuotes){
+      if(char==='"'){
+        if(line[i+1]==='"'){ current += '"'; i++; }
+        else inQuotes = false;
+      } else current += char;
+    } else {
+      if(char==='"') inQuotes = true;
+      else if(char===','){ result.push(current); current=''; }
+      else current += char;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function showImportResult(result){
+  const errorList = result.errors.length > 10 ? result.errors.slice(0,10).concat(['... 共' + result.errors.length + '条错误']) : result.errors;
+  openModal(`
+    <div class="modal-head"><h3>📥 CSV导入结果</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+        <div style="background:#f0fdf4;padding:16px;border-radius:8px;text-align:center">
+          <div style="font-size:24px;font-weight:800;color:#166534">${result.success}</div>
+          <div style="font-size:12px;color:#64748b">成功导入</div>
+        </div>
+        <div style="background:#fffbeb;padding:16px;border-radius:8px;text-align:center">
+          <div style="font-size:24px;font-weight:800;color:#92400e">${result.duplicates}</div>
+          <div style="font-size:12px;color:#64748b">重复跳过</div>
+        </div>
+        <div style="background:#fef2f2;padding:16px;border-radius:8px;text-align:center">
+          <div style="font-size:24px;font-weight:800;color:#991b1b">${result.failed}</div>
+          <div style="font-size:12px;color:#64748b">导入失败</div>
+        </div>
+      </div>
+      ${errorList.length ? `
+        <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:8px">⚠️ 错误详情：</div>
+        <div style="background:#fef2f2;padding:12px;border-radius:6px;max-height:200px;overflow-y:auto">
+          ${errorList.map(e=>'<div style="font-size:11px;color:#991b1b;margin-bottom:4px">• ' + e + '</div>').join('')}
+        </div>
+      ` : ''}
+      <div style="margin-top:16px;padding:12px;background:#eff6ff;border-radius:6px;font-size:11px;color:#1e40af">
+        💡 提示：CSV文件需包含表头，支持的字段：公司名(必填)、国家、官网、客户类型、意向产品、联系人、职位、邮箱、WhatsApp、LinkedIn、来源渠道、阶段、标签(分号分隔)、备注
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" onclick="closeModal();renderView()">确定</button>
+    </div>`);
 }
 
 </script>

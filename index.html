@@ -2809,6 +2809,9 @@ function filterCustomersByTag(tagLabel){
   renderView();
   initNotifications();
   initShortcuts();
+  // V75.8 加载Tavily配置和用量状态
+  if(typeof tavilyLoadConfig === 'function') tavilyLoadConfig();
+  if(typeof tavilyLoadUsage === 'function') tavilyLoadUsage();
 }
 
 /* V48 获取标签统计 */
@@ -21564,6 +21567,13 @@ function calculateProspectMatchScore(result, profile) {
 async function prospectExecuteSearch(){
   if(prospectSearchRunning){ toast('搜索正在进行中...'); return; }
   if(prospectGeneratedQueries.length === 0){ toast('没有搜索词','err'); return; }
+  // V75.8 检查Tavily配置
+  if(!tavilyConfigState.hasTavilyKey){
+    toast('未配置 Tavily API Key，无法执行真实联网搜客。请在上方配置卡片中配置 Key。','err');
+    tavilyConfigExpanded = true;
+    renderView();
+    return;
+  }
   
   prospectTab = 'search';
   prospectSearchRunning = true;
@@ -21653,12 +21663,295 @@ function checkInCustomerDB(url){
   return false;
 }
 
+// V75.8 Tavily配置状态（前端缓存，不存储完整Key）
+let tavilyConfigState = { hasTavilyKey: false, maskedKey: '', configuredAt: null, lastUpdated: null, provider: 'tavily' };
+let tavilyUsageState = null;
+let tavilyConfigExpanded = false;
+let tavilyHelpExpanded = false;
+let tavilyKeyInputVisible = false;
+let tavilyReplaceMode = false;
+
+// V75.8 加载Tavily配置状态
+async function tavilyLoadConfig(){
+  try{
+    const res = await fetch('/api/search/config');
+    const data = await res.json();
+    tavilyConfigState = {
+      hasTavilyKey: data.hasTavilyKey,
+      maskedKey: data.maskedKey || '',
+      configuredAt: data.configuredAt,
+      lastUpdated: data.lastUpdated,
+      provider: data.provider || 'tavily'
+    };
+  }catch(e){ console.log('[Tavily配置] 加载失败:', e.message); }
+}
+
+// V75.8 加载Tavily用量
+async function tavilyLoadUsage(){
+  try{
+    const res = await fetch('/api/search/usage');
+    tavilyUsageState = await res.json();
+  }catch(e){ console.log('[Tavily用量] 加载失败:', e.message); }
+}
+
+// V75.8 保存Tavily Key
+async function tavilySaveKey(){
+  const input = document.getElementById('tavilyKeyInput');
+  if(!input) return;
+  const key = input.value.trim();
+  if(!key){ alert('请输入Tavily API Key'); return; }
+  if(key.includes('••••') || key.includes('...')){ alert('请输入完整Key，不要输入掩码'); return; }
+  if(!confirm('保存后，该 Key 将用于精准开发的联网搜客。请确认这是你有权使用的 Tavily 账户。')) return;
+  try{
+    const res = await fetch('/api/search/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ tavilyApiKey: key })
+    });
+    const data = await res.json();
+    if(data.success){
+      tavilyConfigState.hasTavilyKey = data.hasTavilyKey;
+      tavilyConfigState.maskedKey = data.maskedKey || '';
+      input.value = '';
+      tavilyKeyInputVisible = false;
+      tavilyReplaceMode = false;
+      alert('Tavily API Key 已保存');
+      renderView();
+    }else{
+      alert('保存失败: ' + (data.error || '未知错误'));
+    }
+  }catch(e){ alert('保存失败: ' + e.message); }
+}
+
+// V75.8 测试Tavily连接
+async function tavilyTestConnection(){
+  const btn = document.getElementById('tavilyTestBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '测试中...'; }
+  try{
+    const res = await fetch('/api/search/test', { method: 'POST' });
+    const data = await res.json();
+    if(data.success){
+      alert('Tavily连接成功！\n延迟: ' + data.latency + 'ms\n已用: ' + data.creditsUsed + ' credits\n剩余: ' + data.creditsRemaining + ' credits');
+    }else{
+      alert('连接测试: ' + (data.message || data.status || '失败'));
+    }
+  }catch(e){ alert('连接测试失败: ' + e.message); }
+  if(btn){ btn.disabled = false; btn.textContent = '🔌 测试连接'; }
+}
+
+// V75.8 清除Tavily Key
+async function tavilyClearKey(){
+  if(!confirm('确定要清除当前 Tavily API Key 吗？清除后将无法执行联网搜客。')) return;
+  try{
+    const res = await fetch('/api/search/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ clearKey: true })
+    });
+    const data = await res.json();
+    if(data.success){
+      tavilyConfigState.hasTavilyKey = false;
+      tavilyConfigState.maskedKey = '';
+      tavilyConfigState.configuredAt = null;
+      alert('Tavily API Key 已清除');
+      renderView();
+    }
+  }catch(e){ alert('清除失败: ' + e.message); }
+}
+
+// V75.8 刷新额度
+async function tavilyRefreshUsage(){
+  await tavilyLoadUsage();
+  renderView();
+}
+
+// V75.8 切换配置面板展开/折叠
+function tavilyToggleConfig(){
+  tavilyConfigExpanded = !tavilyConfigExpanded;
+  renderView();
+}
+
+// V75.8 切换帮助说明展开/折叠
+function tavilyToggleHelp(){
+  tavilyHelpExpanded = !tavilyHelpExpanded;
+  renderView();
+}
+
+// V75.8 切换Key输入框显示/隐藏
+function tavilyToggleKeyInput(){
+  tavilyKeyInputVisible = !tavilyKeyInputVisible;
+  const input = document.getElementById('tavilyKeyInput');
+  if(input){ input.type = tavilyKeyInputVisible ? 'text' : 'password'; }
+}
+
+// V75.8 进入更换Key模式
+function tavilyStartReplace(){
+  tavilyReplaceMode = true;
+  renderView();
+}
+
+// V75.8 渲染Tavily配置卡片
+function renderTavilyConfigCard(){
+  const hasKey = tavilyConfigState.hasTavilyKey;
+  const usage = tavilyUsageState;
+  const statusColor = hasKey ? '#10b981' : '#ef4444';
+  const statusText = hasKey ? '已配置' : '未配置';
+  const configuredAt = tavilyConfigState.configuredAt ? new Date(tavilyConfigState.configuredAt).toLocaleString('zh-CN') : '-';
+  
+  // 用量显示
+  let usageHtml = '';
+  if(usage && hasKey){
+    const remaining = usage.tavilyRemaining !== undefined ? usage.tavilyRemaining : '-';
+    const used = usage.tavilyCreditsUsed !== undefined ? usage.tavilyCreditsUsed : '-';
+    const limit = usage.tavilyCreditsLimit !== undefined ? usage.tavilyCreditsLimit : '-';
+    const totalQueries = usage.totalQueries || 0;
+    const dataSource = usage.dataSource === 'official' ? '官方数据' : '本地计数';
+    const lowBalance = usage.lowBalanceWarning;
+    const exhausted = usage.balanceExhausted;
+    let balanceStatus = '正常';
+    let balanceColor = '#10b981';
+    if(exhausted){ balanceStatus = '已用完'; balanceColor = '#ef4444'; }
+    else if(lowBalance){ balanceStatus = '接近用完'; balanceColor = '#f59e0b'; }
+    
+    usageHtml = `
+      <div style="background:#f8fafc;padding:10px 14px;border-radius:8px;margin-top:10px;font-size:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-weight:700;color:#334155">📊 本月用量（${dataSource}）</span>
+          <span style="color:${balanceColor};font-weight:700">${balanceStatus}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;color:#475569">
+          <div>已使用 credits: <b style="color:#1e293b">${used}</b></div>
+          <div>剩余 credits: <b style="color:#1e293b">${remaining}</b></div>
+          <div>账户总额度: <b style="color:#1e293b">${limit}</b></div>
+          <div>已执行搜索: <b style="color:#1e293b">${totalQueries}</b> 次</div>
+        </div>
+        <div style="margin-top:6px;color:#647481;font-size:11px">
+          当前剩余：${remaining} credits；实际可执行次数取决于每次搜索的 credits 消耗。
+          ${usage.capacity ? '<br>可发现候选公司约 <b>' + usage.capacity.discoverableCompanies + '</b> 家（每家约' + usage.capacity.discoverableCreditsPerCompany + ' credits）' : ''}
+        </div>
+        ${usage.discrepancyWarning ? '<div style="margin-top:4px;color:#d97706;font-size:11px">⚠️ ' + usage.discrepancyWarning + '</div>' : ''}
+        ${!usage.officialAvailable ? '<div style="margin-top:4px;color:#94a3b8;font-size:11px">ℹ️ 官方额度暂不可获取，显示本地已记录请求数和消耗。</div>' : ''}
+      </div>`;
+  }
+  
+  // 操作按钮
+  let actionsHtml = '';
+  if(!hasKey || tavilyReplaceMode){
+    actionsHtml = `
+      <div style="margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="password" id="tavilyKeyInput" placeholder="粘贴 Tavily API Key（tvly- 开头）" 
+            style="flex:1;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;font-family:monospace"
+            onkeydown="if(event.key==='Enter')tavilySaveKey()">
+          <button class="btn btn-sm btn-outline" onclick="tavilyToggleKeyInput()">${tavilyKeyInputVisible?'🙈':'👁️'}</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-sm btn-primary" onclick="tavilySaveKey()">💾 保存</button>
+          ${tavilyReplaceMode ? '<button class="btn btn-sm btn-outline" onclick="tavilyReplaceMode=false;renderView()">取消</button>' : ''}
+        </div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:6px">保存前请确认：该 Key 将用于精准开发的联网搜客，且你有权使用该 Tavily 账户。</div>
+      </div>`;
+  }else{
+    actionsHtml = `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn btn-sm btn-outline" onclick="tavilyTestConnection()" id="tavilyTestBtn">🔌 测试连接</button>
+        <button class="btn btn-sm btn-outline" onclick="tavilyRefreshUsage()">🔄 刷新额度</button>
+        <button class="btn btn-sm btn-outline" onclick="tavilyStartReplace()">🔑 更换 Key</button>
+        <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#fecaca" onclick="tavilyClearKey()">🗑️ 清除当前 Key</button>
+      </div>`;
+  }
+  
+  // 帮助说明
+  const helpHtml = tavilyHelpExpanded ? `
+    <div style="background:#fffbeb;padding:12px 14px;border-radius:8px;margin-top:10px;border:1px solid #fde68a;font-size:12px;color:#78350f;line-height:1.7">
+      <div style="font-weight:700;margin-bottom:6px">❓ 如何获取 Tavily API Key？</div>
+      <div><b>Tavily 是什么：</b>Tavily 是联网搜索 API，专门为 AI 应用提供网页搜索和研究结果。本工作台只使用它进行海外客户线索发现。</div>
+      <div style="margin-top:6px"><b>获取步骤：</b></div>
+      <ol style="margin:4px 0;padding-left:20px">
+        <li>打开 Tavily 官网（tavily.com）</li>
+        <li>注册或登录账户</li>
+        <li>进入 Dashboard / API Keys</li>
+        <li>创建或复制 API Key（通常以 tvly- 开头）</li>
+        <li>将完整 Key 粘贴到上方配置框</li>
+        <li>点击保存并测试连接</li>
+      </ol>
+      <div style="margin-top:6px"><b>账户与 credits 说明：</b></div>
+      <ul style="margin:4px 0;padding-left:20px">
+        <li>额度属于 Tavily 账户</li>
+        <li>页面显示的是 credits，不一定等于搜索次数</li>
+        <li>不同搜索模式、深度和参数可能消耗不同 credits</li>
+        <li>额度用完后，必须使用你有权管理的其他 Tavily 账户或购买合法额度</li>
+        <li>更换账户前应先手动清除旧 Key，再配置新 Key</li>
+        <li>系统不得自动注册账户、自动创建邮箱或自动轮换 Key 来规避平台限额</li>
+      </ul>
+      <div style="margin-top:6px"><b>安全说明：</b></div>
+      <ul style="margin:4px 0;padding-left:20px">
+        <li>不要把 Key 发到聊天、邮件、截图或 Git</li>
+        <li>不要把 Key 写入 index.html</li>
+        <li>不要把 Key 保存到 localStorage 或 sessionStorage</li>
+        <li>服务端只保存到被 .gitignore 排除的运行时配置（search_config.json）</li>
+        <li>页面只显示掩码（tvly-••••••••abcd）</li>
+        <li>日志和错误信息不得显示 Key</li>
+      </ul>
+    </div>` : '';
+  
+  return `
+    <div class="card card-pad mb16" style="border-left:4px solid #3b82f6">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="tavilyToggleConfig()">
+        <div class="card-title" style="margin:0">🌐 联网搜客 API 配置</div>
+        <span style="font-size:18px;color:#64748b">${tavilyConfigExpanded?'▼':'▶'}</span>
+      </div>
+      ${tavilyConfigExpanded ? `
+      <div style="margin-top:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+          <div style="background:#f0f9ff;padding:8px 12px;border-radius:6px">
+            <div style="color:#64748b">当前 Provider</div>
+            <div style="font-weight:700;color:#0369a1;font-size:14px">Tavily</div>
+          </div>
+          <div style="background:${hasKey?'#f0fdf4':'#fef2f2'};padding:8px 12px;border-radius:6px">
+            <div style="color:#64748b">当前状态</div>
+            <div style="font-weight:700;color:${statusColor};font-size:14px">${statusText}</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:8px;line-height:1.5">
+          用途：搜索海外潜在客户和公司官网（进口商、批发商、品牌商、亚马逊卖家）。<br>
+          <b>不用于 AI 文案生成、开发信、客户分析。</b>与 GPT/GLM/Ollama 模型配置完全独立。
+        </div>
+        ${hasKey ? `
+        <div style="margin-top:10px;background:#f8fafc;padding:8px 12px;border-radius:6px;font-size:12px">
+          <div style="color:#64748b">当前 Key</div>
+          <div style="font-family:monospace;font-weight:700;color:#1e293b;letter-spacing:1px">${tavilyConfigState.maskedKey || '未配置'}</div>
+          <div style="color:#94a3b8;font-size:11px;margin-top:2px">配置时间: ${configuredAt}</div>
+        </div>` : ''}
+        ${actionsHtml}
+        ${usageHtml}
+        <div style="margin-top:10px">
+          <a style="color:#3b82f6;cursor:pointer;font-size:12px;text-decoration:underline" onclick="tavilyToggleHelp()">
+            ${tavilyHelpExpanded?'▼ 收起帮助':'▶ 如何获取 Tavily API Key？'}
+          </a>
+        </div>
+        ${helpHtml}
+        ${!hasKey ? `
+        <div style="margin-top:10px;background:#fef2f2;padding:10px 14px;border-radius:8px;border:1px solid #fecaca;font-size:12px;color:#991b1b">
+          ⚠️ <b>未配置 Tavily，当前不能执行真实联网搜客。</b><br>
+          搜索按钮已禁用。请配置 API Key 后再执行搜索。系统不会自动调用 SearXNG，也不会伪造真实搜索结果。
+        </div>` : ''}
+      </div>
+      ` : `
+      <div style="font-size:12px;color:#64748b;margin-top:8px">
+        Provider: <b>Tavily</b> · 状态: <b style="color:${statusColor}">${statusText}</b>${hasKey ? ' · Key: <span style="font-family:monospace">'+tavilyConfigState.maskedKey+'</span>' : ''} · 点击展开配置
+      </div>
+      `}
+    </div>`;
+}
+
 function renderProspectSearch(){
   return `
+    ${renderTavilyConfigCard()}
     <div class="card card-pad mb16">
       <div class="card-title">🔍 联网搜客（真实搜索）</div>
       <div style="font-size:12px;color:#94a3b8;margin-bottom:14px">
-        基于目标画像，AI生成多组搜索词，调用Tavily真实搜索引擎（免费1000次/月），失败自动降级SearXNG。
+        基于目标画像，AI生成多组搜索词，调用Tavily真实搜索引擎搜索海外潜在客户。
         <span style="color:#f59e0b">⚠️ 请先在"画像设置"中定义画像并生成搜索词。</span>
       </div>
       

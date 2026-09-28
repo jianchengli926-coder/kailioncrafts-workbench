@@ -1595,10 +1595,28 @@ const server = http.createServer(async (req, res) => {
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     const config = loadSearchConfig();
-    // API Key打码返回
-    const maskedKey = config.tavilyApiKey ? config.tavilyApiKey.substring(0, 4) + '...' + config.tavilyApiKey.substring(config.tavilyApiKey.length - 4) : '';
+    // V75.8 掩码格式：tvly-••••••••abcd（前4后4，中间8个点）
+    let maskedKey = '';
+    if (config.tavilyApiKey && config.tavilyApiKey.length > 8) {
+      maskedKey = config.tavilyApiKey.substring(0, 4) + '••••••••' + config.tavilyApiKey.substring(config.tavilyApiKey.length - 4);
+    } else if (config.tavilyApiKey) {
+      maskedKey = config.tavilyApiKey.substring(0, 2) + '••••' + config.tavilyApiKey.substring(config.tavilyApiKey.length - 2);
+    }
+    const hasKey = !!config.tavilyApiKey;
+    const configuredAt = config.configuredAt || null;
+    const lastUpdated = config.lastUpdated || configuredAt || null;
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ tavilyApiKey: maskedKey, hasTavilyKey: !!config.tavilyApiKey, searxngUrl: config.searxngUrl, searchCacheHours: config.searchCacheHours || 24 }));
+    // 不返回完整tavilyApiKey，只返回maskedKey
+    res.end(JSON.stringify({
+      provider: 'tavily',
+      hasTavilyKey: hasKey,
+      maskedKey: maskedKey,
+      configuredAt: configuredAt,
+      lastUpdated: lastUpdated,
+      searchCacheHours: config.searchCacheHours || 24,
+      searxngEnabled: false,
+      note: 'Tavily仅用于精准开发联网搜客，不参与AI文案生成。Key只存服务端search_config.json，不返回前端完整Key。'
+    }));
     return;
   }
   
@@ -1608,17 +1626,79 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readBody(req);
       const config = loadSearchConfig();
-      if (body.tavilyApiKey && body.tavilyApiKey !== '' && !body.tavilyApiKey.includes('...')) {
-        config.tavilyApiKey = body.tavilyApiKey;
+      let action = 'updated';
+      // V75.8 支持清除Key
+      if (body.clearKey === true) {
+        config.tavilyApiKey = '';
+        config.configuredAt = null;
+        action = 'cleared';
+      } else if (body.tavilyApiKey && body.tavilyApiKey !== '' && !body.tavilyApiKey.includes('••••') && !body.tavilyApiKey.includes('...')) {
+        // 只接受完整Key（不含掩码字符），不接受掩码作为新Key
+        config.tavilyApiKey = body.tavilyApiKey.trim();
+        config.configuredAt = new Date().toISOString();
+        action = 'saved';
       }
-      if (body.searxngUrl) config.searxngUrl = body.searxngUrl;
       if (body.searchCacheHours) config.searchCacheHours = parseInt(body.searchCacheHours);
+      config.lastUpdated = new Date().toISOString();
       saveSearchConfig(config);
+      // 不返回完整Key
+      const maskedKey = config.tavilyApiKey && config.tavilyApiKey.length > 8
+        ? config.tavilyApiKey.substring(0, 4) + '••••••••' + config.tavilyApiKey.substring(config.tavilyApiKey.length - 4)
+        : '';
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ success: true, message: '配置已保存' }));
+      res.end(JSON.stringify({ success: true, action: action, hasTavilyKey: !!config.tavilyApiKey, maskedKey: maskedKey, message: action === 'cleared' ? 'Key已清除' : '配置已保存' }));
     } catch(e) {
       res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  
+  // V75.8 Tavily连接测试（不消耗搜索额度，调用usage接口验证Key有效性）
+  if (pathname === '/api/search/test' && req.method === 'POST') {
+    const scope = getAccessScope(req);
+    if (denyIfPublic(req, res, scope)) return;
+    try {
+      const config = loadSearchConfig();
+      if (!config.tavilyApiKey) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: false, status: 'not_configured', message: 'Tavily API Key 未配置' }));
+        return;
+      }
+      // 调用Tavily usage接口验证Key（不消耗搜索credits）
+      const testStart = Date.now();
+      const usageResult = await Promise.race([
+        tavilyGetUsage(),
+        new Promise(resolve => setTimeout(() => resolve({ available: false, reason: '连接超时(10s)' }), 10000))
+      ]);
+      const latency = Date.now() - testStart;
+      if (usageResult && usageResult.available) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          success: true,
+          status: 'connected',
+          latency: latency,
+          creditsUsed: usageResult.creditsUsed,
+          creditsLimit: usageResult.creditsLimit,
+          creditsRemaining: usageResult.creditsRemaining,
+          message: 'Tavily连接成功，Key有效'
+        }));
+      } else {
+        // usage接口不可用时，尝试一次basic搜索（消耗1 credit）验证Key
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          success: false,
+          status: 'usage_unavailable',
+          latency: latency,
+          message: 'Tavily用量接口暂不可用（' + (usageResult ? usageResult.reason : '未知') + '），Key可能有效但无法验证额度'
+        }));
+      }
+    } catch(e) {
+      const errMsg = e.message || '未知错误';
+      // 不泄露Key
+      const safeMsg = errMsg.replace(/tvly-[a-zA-Z0-9]+/g, 'tvly-••••');
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: false, status: 'error', message: '连接测试失败: ' + safeMsg }));
     }
     return;
   }

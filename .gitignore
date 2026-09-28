@@ -3,3 +3,11 @@ _shots/
 *.log
 node_modules/
 备份/
+
+# 知识库与索引（含敏感信息，不进Git）
+公司知识库*/
+kb_index.json
+kb_index_*.json
+*_backup_*.json
+*_backup_*.zip
+localStorage_backup*.json

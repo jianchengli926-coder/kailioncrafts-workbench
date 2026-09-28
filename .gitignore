@@ -17,3 +17,11 @@ localStorage_backup*.json
 
 # 公司核心事实清单（含敏感信息，不进Git）
 公司核心事实清单_待核对.md
+
+# 搜索配置与运行时数据（含API Key，不进Git）
+search_config.json
+search_cache.json
+search_usage.json
+
+# 卖点与服务清单（含内部底价/成本，不进Git）
+卖点与服务清单_待补充.md

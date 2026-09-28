@@ -769,6 +769,499 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+
+  // ============ AI精准客户开发 - 搜索与抓取API ============
+  
+  // 搜索配置文件（用户自行填入Tavily API Key，不硬编码）
+  const SEARCH_CONFIG_FILE = path.join(ROOT_DIR, 'search_config.json');
+  
+  function loadSearchConfig() {
+    try {
+      if (fs.existsSync(SEARCH_CONFIG_FILE)) {
+        return JSON.parse(fs.readFileSync(SEARCH_CONFIG_FILE, 'utf-8'));
+      }
+    } catch(e) { log('搜索配置读取失败: ' + e.message, 'WARN'); }
+    return { tavilyApiKey: '', searxngUrl: 'http://localhost:8888', searchCacheHours: 24 };
+  }
+  
+  function saveSearchConfig(config) {
+    try {
+      fs.writeFileSync(SEARCH_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
+      return true;
+    } catch(e) { return false; }
+  }
+  
+  // 搜索缓存（24小时）
+  const SEARCH_CACHE_FILE = path.join(ROOT_DIR, 'search_cache.json');
+  let searchCache = {};
+  try {
+    if (fs.existsSync(SEARCH_CACHE_FILE)) {
+      searchCache = JSON.parse(fs.readFileSync(SEARCH_CACHE_FILE, 'utf-8'));
+    }
+  } catch(e) { searchCache = {}; }
+  
+  function getCacheKey(provider, query, params) {
+    return provider + ':' + query + ':' + JSON.stringify(params || {});
+  }
+  
+  function getCachedSearch(key, cacheHours) {
+    const entry = searchCache[key];
+    if (!entry) return null;
+    const age = (Date.now() - entry.timestamp) / (1000 * 60 * 60);
+    if (age > (cacheHours || 24)) {
+      delete searchCache[key];
+      return null;
+    }
+    return { ...entry.data, cached: true, cacheAgeHours: Math.round(age * 10) / 10 };
+  }
+  
+  function setCachedSearch(key, data) {
+    searchCache[key] = { timestamp: Date.now(), data };
+    // 限制缓存大小，只保留最近500条
+    const keys = Object.keys(searchCache);
+    if (keys.length > 500) {
+      keys.sort((a,b) => searchCache[a].timestamp - searchCache[b].timestamp);
+      for (let i = 0; i < keys.length - 500; i++) delete searchCache[keys[i]];
+    }
+    try { fs.writeFileSync(SEARCH_CACHE_FILE, JSON.stringify(searchCache), 'utf-8'); } catch(e) {}
+  }
+  
+  // 额度使用统计
+  const USAGE_FILE = path.join(ROOT_DIR, 'search_usage.json');
+  let usageData = { monthly: {} };
+  try {
+    if (fs.existsSync(USAGE_FILE)) {
+      usageData = JSON.parse(fs.readFileSync(USAGE_FILE, 'utf-8'));
+    }
+  } catch(e) { usageData = { monthly: {} }; }
+  
+  function getCurrentMonthKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  
+  function recordUsage(provider, credits, query) {
+    const month = getCurrentMonthKey();
+    if (!usageData.monthly[month]) usageData.monthly[month] = { tavily: 0, searxng: 0, totalQueries: 0, lastQuery: '' };
+    usageData.monthly[month][provider] = (usageData.monthly[month][provider] || 0) + credits;
+    usageData.monthly[month].totalQueries++;
+    usageData.monthly[month].lastQuery = query.substring(0, 100);
+    try { fs.writeFileSync(USAGE_FILE, JSON.stringify(usageData, null, 2), 'utf-8'); } catch(e) {}
+  }
+  
+  // SSRF防护：检查URL是否指向内网
+  function isUrlSafe(urlStr) {
+    try {
+      const u = new URL(urlStr);
+      const hostname = u.hostname.toLowerCase();
+      // 拒绝localhost和回环地址
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return false;
+      // 拒绝私网IP段
+      const ipMatch = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+      if (ipMatch) {
+        const [_, a, b, c, d] = ipMatch.map(Number);
+        if (a === 10) return false;
+        if (a === 172 && b >= 16 && b <= 31) return false;
+        if (a === 192 && b === 168) return false;
+        if (a === 169 && b === 254) return false; // link-local
+        if (a === 0) return false;
+        if (a >= 224) return false; // 组播/保留
+      }
+      // 拒绝metadata服务
+      if (hostname === 'metadata.google.internal' || hostname === '169.254.169.254') return false;
+      // 只允许http和https
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+      return true;
+    } catch(e) {
+      return false;
+    }
+  }
+  
+  // 网页抓取（带SSRF防护、超时、UA）
+  function fetchUrl(urlStr, opts = {}) {
+    return new Promise((resolve, reject) => {
+      if (!isUrlSafe(urlStr)) {
+        reject(new Error('SSRF防护：禁止访问内网或本地地址'));
+        return;
+      }
+      const timeout = opts.timeout || 15000;
+      const maxSize = opts.maxSize || 500 * 1024; // 最大500KB
+      const u = new URL(urlStr);
+      const isHttps = u.protocol === 'https:';
+      const client = isHttps ? https : http;
+      
+      const options = {
+        hostname: u.hostname,
+        port: u.port || (isHttps ? 443 : 80),
+        path: u.pathname + u.search,
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'identity'
+        },
+        timeout: timeout
+      };
+      
+      const req = client.request(options, (res) => {
+        // 不跟随重定向到内网
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          const redirectUrl = new URL(res.headers.location, urlStr).href;
+          if (!isUrlSafe(redirectUrl)) {
+            reject(new Error('SSRF防护：重定向目标为内网地址'));
+            req.destroy();
+            return;
+          }
+        }
+        let data = '';
+        let size = 0;
+        res.on('data', (chunk) => {
+          size += chunk.length;
+          if (size > maxSize) {
+            req.destroy();
+            reject(new Error('页面内容超过最大限制(' + maxSize + '字节)'));
+            return;
+          }
+          data += chunk;
+        });
+        res.on('end', () => {
+          resolve({
+            url: urlStr,
+            statusCode: res.statusCode,
+            headers: res.headers,
+            body: data,
+            size: size,
+            fetchedAt: new Date().toISOString()
+          });
+        });
+      });
+      
+      req.on('error', (e) => reject(e));
+      req.on('timeout', () => { req.destroy(); reject(new Error('请求超时(' + timeout + 'ms)')); });
+      req.end();
+    });
+  }
+  
+  // 从HTML中提取纯文本
+  function extractTextFromHtml(html) {
+    if (!html) return '';
+    let text = html;
+    // 移除script和style
+    text = text.replace(/<script[\s\S]*?<\/script>/gi, ' ');
+    text = text.replace(/<style[\s\S]*?<\/style>/gi, ' ');
+    // 移除注释
+    text = text.replace(/<!--[\s\S]*?-->/g, ' ');
+    // 移除标签
+    text = text.replace(/<[^>]+>/g, ' ');
+    // 解码HTML实体
+    text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    // 清理空白
+    text = text.replace(/\s+/g, ' ').trim();
+    return text;
+  }
+  
+  // Tavily搜索
+  async function tavilySearch(query, opts = {}) {
+    const config = loadSearchConfig();
+    if (!config.tavilyApiKey) {
+      throw new Error('Tavily API Key 未配置。请在设置中填入 API Key，或使用 SearXNG 降级搜索。');
+    }
+    const cacheKey = getCacheKey('tavily', query, opts);
+    const cached = getCachedSearch(cacheKey, config.searchCacheHours);
+    if (cached && !opts.forceRefresh) return cached;
+    
+    const searchDepth = opts.searchDepth || 'basic'; // basic=1 credit, advanced=2 credits
+    const maxResults = Math.min(opts.maxResults || 10, 20);
+    const includeDomains = opts.includeDomains || [];
+    const excludeDomains = opts.excludeDomains || [];
+    
+    const postData = JSON.stringify({
+      api_key: config.tavilyApiKey,
+      query: query,
+      search_depth: searchDepth,
+      max_results: maxResults,
+      include_domains: includeDomains,
+      exclude_domains: excludeDomains,
+      include_answer: false,
+      include_raw_content: false
+    });
+    
+    return new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'api.tavily.com',
+        port: 443,
+        path: '/search',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData)
+        },
+        timeout: 30000
+      };
+      
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            if (result.error) {
+              reject(new Error('Tavily API错误: ' + result.error));
+              return;
+            }
+            const credits = searchDepth === 'advanced' ? 2 : 1;
+            recordUsage('tavily', credits, query);
+            const output = {
+              provider: 'tavily',
+              query: query,
+              searchDepth: searchDepth,
+              results: (result.results || []).map(r => ({
+                title: r.title,
+                url: r.url,
+                content: r.content,
+                score: r.score || 0,
+                source: 'tavily'
+              })),
+              creditsUsed: credits,
+              fetchedAt: new Date().toISOString()
+            };
+            setCachedSearch(cacheKey, output);
+            resolve(output);
+          } catch(e) {
+            reject(new Error('Tavily响应解析失败: ' + e.message));
+          }
+        });
+      });
+      req.on('error', (e) => reject(new Error('Tavily请求失败: ' + e.message)));
+      req.on('timeout', () => { req.destroy(); reject(new Error('Tavily请求超时(30s)')); });
+      req.write(postData);
+      req.end();
+    });
+  }
+  
+  // SearXNG降级搜索
+  async function searxngSearch(query, opts = {}) {
+    const config = loadSearchConfig();
+    const searxngUrl = config.searxngUrl || 'http://localhost:8888';
+    const cacheKey = getCacheKey('searxng', query, opts);
+    const cached = getCachedSearch(cacheKey, config.searchCacheHours);
+    if (cached && !opts.forceRefresh) return cached;
+    
+    const maxResults = Math.min(opts.maxResults || 10, 20);
+    const searchUrl = searxngUrl + '/search?q=' + encodeURIComponent(query) + '&format=json&categories=general&language=en';
+    
+    return new Promise((resolve, reject) => {
+      const u = new URL(searchUrl);
+      const options = {
+        hostname: u.hostname,
+        port: u.port || 80,
+        path: u.pathname + u.search,
+        method: 'GET',
+        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+        timeout: 15000
+      };
+      const req = http.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            const results = (result.results || []).slice(0, maxResults).map(r => ({
+              title: r.title,
+              url: r.url,
+              content: r.content,
+              score: r.score || 0,
+              source: 'searxng'
+            }));
+            recordUsage('searxng', 0, query); // SearXNG免费
+            const output = {
+              provider: 'searxng',
+              query: query,
+              results: results,
+              creditsUsed: 0,
+              fetchedAt: new Date().toISOString()
+            };
+            setCachedSearch(cacheKey, output);
+            resolve(output);
+          } catch(e) {
+            reject(new Error('SearXNG响应解析失败: ' + e.message));
+          }
+        });
+      });
+      req.on('error', (e) => reject(new Error('SearXNG请求失败（可能未启动）: ' + e.message)));
+      req.on('timeout', () => { req.destroy(); reject(new Error('SearXNG请求超时(15s)')); });
+      req.end();
+    });
+  }
+  
+  // 统一搜索接口（Tavily优先，失败降级SearXNG）
+  async function unifiedSearch(query, opts = {}) {
+    const config = loadSearchConfig();
+    const errors = [];
+    // 优先Tavily
+    if (config.tavilyApiKey && opts.provider !== 'searxng') {
+      try {
+        return await tavilySearch(query, opts);
+      } catch(e) {
+        errors.push('Tavily: ' + e.message);
+        log('Tavily搜索失败，降级SearXNG: ' + e.message, 'WARN');
+      }
+    }
+    // 降级SearXNG
+    try {
+      return await searxngSearch(query, opts);
+    } catch(e) {
+      errors.push('SearXNG: ' + e.message);
+      throw new Error('所有搜索提供商均失败:\n' + errors.join('\n'));
+    }
+  }
+  
+  // 公网模式检查：公网访问时禁用搜索和抓取
+  function denyIfPublic(req, res, scope) {
+    if (scope === 'public') {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '公网访问已禁用搜索与抓取功能，请在本机或局域网使用' }));
+      return true;
+    }
+    return false;
+  }
+  
+  // 读取POST body
+  function readBody(req) {
+    return new Promise((resolve, reject) => {
+      let body = '';
+      req.on('data', (chunk) => { body += chunk; if (body.length > 1e6) reject(new Error('请求体过大')); });
+      req.on('end', () => {
+        try { resolve(body ? JSON.parse(body) : {}); } catch(e) { reject(new Error('JSON解析失败: ' + e.message)); }
+      });
+      req.on('error', reject);
+    });
+  }
+  
+  // ============ 搜索API路由 ============
+  
+  // 搜索配置（读取/保存）
+  if (pathname === '/api/search/config' && req.method === 'GET') {
+    const scope = getAccessScope(req);
+    if (denyIfPublic(req, res, scope)) return;
+    const config = loadSearchConfig();
+    // API Key打码返回
+    const maskedKey = config.tavilyApiKey ? config.tavilyApiKey.substring(0, 4) + '...' + config.tavilyApiKey.substring(config.tavilyApiKey.length - 4) : '';
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ tavilyApiKey: maskedKey, hasTavilyKey: !!config.tavilyApiKey, searxngUrl: config.searxngUrl, searchCacheHours: config.searchCacheHours || 24 }));
+    return;
+  }
+  
+  if (pathname === '/api/search/config' && req.method === 'POST') {
+    const scope = getAccessScope(req);
+    if (denyIfPublic(req, res, scope)) return;
+    try {
+      const body = await readBody(req);
+      const config = loadSearchConfig();
+      if (body.tavilyApiKey && body.tavilyApiKey !== '' && !body.tavilyApiKey.includes('...')) {
+        config.tavilyApiKey = body.tavilyApiKey;
+      }
+      if (body.searxngUrl) config.searxngUrl = body.searxngUrl;
+      if (body.searchCacheHours) config.searchCacheHours = parseInt(body.searchCacheHours);
+      saveSearchConfig(config);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: true, message: '配置已保存' }));
+    } catch(e) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  
+  // 统一搜索
+  if (pathname === '/api/search' && req.method === 'POST') {
+    const scope = getAccessScope(req);
+    if (denyIfPublic(req, res, scope)) return;
+    try {
+      const body = await readBody(req);
+      const query = (body.query || '').trim();
+      if (!query) { res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ error: '缺少query参数' })); return; }
+      const result = await unifiedSearch(query, body);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(result));
+      log(`搜索: scope=${scope}, provider=${result.provider}, q="${query}", results=${result.results.length}, credits=${result.creditsUsed}`, 'REQUEST');
+    } catch(e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: e.message }));
+      log(`搜索失败: ${e.message}`, 'ERROR');
+    }
+    return;
+  }
+  
+  // 额度使用统计
+  if (pathname === '/api/search/usage' && req.method === 'GET') {
+    const scope = getAccessScope(req);
+    if (denyIfPublic(req, res, scope)) return;
+    const month = getCurrentMonthKey();
+    const monthly = usageData.monthly[month] || { tavily: 0, searxng: 0, totalQueries: 0 };
+    const freeLimit = 1000; // Tavily免费1000 credits/月
+    const remaining = Math.max(0, freeLimit - (monthly.tavily || 0));
+    const percentUsed = Math.round((monthly.tavily / freeLimit) * 100);
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({
+      month: month,
+      tavilyCreditsUsed: monthly.tavily || 0,
+      tavilyFreeLimit: freeLimit,
+      tavilyRemaining: remaining,
+      tavilyPercentUsed: percentUsed,
+      searxngQueries: monthly.searxng || 0,
+      totalQueries: monthly.totalQueries || 0,
+      lowBalanceWarning: remaining < freeLimit * 0.2,
+      estimatePerCompany: { searchCredits: 3, deepAnalysisCredits: 0, note: '每家客户约消耗3个Tavily credits（3组搜索词×basic搜索），深度分析不消耗搜索额度' },
+      estimatedMonthlyCapacity: Math.floor(freeLimit / 3)
+    }));
+    return;
+  }
+  
+  // 网页抓取
+  if (pathname === '/api/fetch' && req.method === 'POST') {
+    const scope = getAccessScope(req);
+    if (denyIfPublic(req, res, scope)) return;
+    try {
+      const body = await readBody(req);
+      const url = (body.url || '').trim();
+      if (!url) { res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ error: '缺少url参数' })); return; }
+      const result = await fetchUrl(url, body);
+      // 提取纯文本
+      const plainText = extractTextFromHtml(result.body);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        url: result.url,
+        statusCode: result.statusCode,
+        size: result.size,
+        fetchedAt: result.fetchedAt,
+        contentType: result.headers['content-type'] || '',
+        plainText: plainText.substring(0, 10000), // 最多返回1万字
+        plainTextLength: plainText.length,
+        truncated: plainText.length > 10000
+      }));
+      log(`抓取: scope=${scope}, url=${url}, size=${result.size}, status=${result.statusCode}`, 'REQUEST');
+    } catch(e) {
+      const isSSRF = e.message.includes('SSRF');
+      res.writeHead(isSSRF ? 403 : 500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: e.message, ssrfBlocked: isSSRF }));
+      log(`抓取失败: ${e.message}`, isSSRF ? 'WARN' : 'ERROR');
+    }
+    return;
+  }
+  
+  // 清除搜索缓存
+  if (pathname === '/api/search/cache' && req.method === 'DELETE') {
+    const scope = getAccessScope(req);
+    if (denyIfPublic(req, res, scope)) return;
+    searchCache = {};
+    try { fs.writeFileSync(SEARCH_CACHE_FILE, '{}', 'utf-8'); } catch(e) {}
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ success: true, message: '搜索缓存已清除' }));
+    return;
+  }
+  
   // ============ 静态文件 ============
   let filePath;
   if (pathname === '/' || pathname === '') {

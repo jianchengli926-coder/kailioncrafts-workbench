@@ -2581,6 +2581,7 @@ const NAV = [
   {key:'dashboard',icon:'📊',label:'数据看板',title:'数据看板',crumb:'每天先联系谁？'},
   {key:'plans',icon:'🎯',label:'开发任务',title:'AI 开发任务',crumb:'搜索 → 核证据 → 写草稿'},
   {key:'autosearch',icon:'🔍',label:'自动搜客',title:'自动搜客中心',crumb:'地图+海关+社媒 · AI决策人挖掘'},
+  {key:'prospect',icon:'🎯',label:'精准开发',title:'AI精准客户开发',crumb:'画像→搜客→分析→开发信 · 真实联网搜索'},
   {key:'devplans',icon:'📋',label:'开发计划',title:'开发计划中心',crumb:'多计划并行 · AI自动运行'},
   {key:'customers',icon:'👥',label:'客户台账',title:'客户台账',crumb:'39 家线索 · 按优先级分层'},
   {key:'drafts',icon:'✉️',label:'开发信',title:'开发信管理',crumb:'AI 草稿 · 人工发送'},
@@ -3326,7 +3327,7 @@ function getTagCloudHTML(){
 function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
-  const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, devplans:viewDevPlans, planDetail:viewPlanDetail,
+  const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, prospect:viewProspectDev, devplans:viewDevPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
     seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach};
@@ -17747,6 +17748,13 @@ function viewAutoSearch(root){
     avgMatch: as.results.length?Math.round(as.results.reduce((a,r)=>a+(r.match||0),0)/as.results.length):0
   };
   root.innerHTML = `
+    <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:2px solid #f59e0b;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+      <div style="font-size:28px">⚠️</div>
+      <div style="flex:1">
+        <div style="font-weight:800;color:#92400e;font-size:15px;margin-bottom:2px">AI 模拟结果，非真实客户</div>
+        <div style="font-size:12px;color:#78350f;line-height:1.5">本页的"自动搜客"使用预置示例数据演示流程，<b>不会连接真实搜索引擎</b>，返回的公司名称、联系方式均为模拟数据，不可用于实际开发。真实联网搜客请使用左侧导航「<b>精准开发</b>」新功能（Tavily 真实搜索 + 公司深度分析）。</div>
+      </div>
+    </div>
     <!-- V75.3 自然语言智能搜客（参考CRM工作台） -->
     <div class="card card-pad mb16" style="background:linear-gradient(135deg,#faf5ff,#f3e8ff);border:1px solid #ddd6fe">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -20447,6 +20455,764 @@ function decisionMinerView(){
 /* ============================================================
  * V29.0 开发计划中心 - 多计划并行 AI自动运行
  * ============================================================ */
+
+// ============ AI精准客户开发 - 模块A画像设置 + 模块B搜索发现 ============
+let prospectTab = 'profile'; // profile | search | leads
+let prospectProfile = {
+  name: '',
+  categories: [],
+  countries: [],
+  customerTypes: [],
+  companySize: '',
+  salesChannels: [],
+  decisionRoles: [],
+  keywords: '',
+  excludeKeywords: '',
+  excludeCompanies: '',
+  valuePreference: '',
+  notes: ''
+};
+let prospectProfiles = []; // 保存的画像模板
+let prospectSearchResults = [];
+let prospectLeads = []; // 线索池
+let prospectSearchRunning = false;
+let prospectGeneratedQueries = [];
+
+const PROSPECT_CATEGORIES = [
+  {id:'outdoor', name:'户外刀', icon:'🏕️', en:'outdoor knife camping hunting'},
+  {id:'kitchen', name:'厨房刀', icon:'🔪', en:'chef knife kitchen knife set'},
+  {id:'scissors', name:'专业剪刀', icon:'✂️', en:'kitchen scissors poultry shears'},
+  {id:'accessories', name:'厨房配件', icon:'🍳', en:'kitchen utensils cooking tools gadget'}
+];
+
+const PROSPECT_COUNTRIES = [
+  {code:'US', name:'美国', flag:'🇺🇸'}, {code:'DE', name:'德国', flag:'🇩🇪'},
+  {code:'GB', name:'英国', flag:'🇬🇧'}, {code:'FR', name:'法国', flag:'🇫🇷'},
+  {code:'CA', name:'加拿大', flag:'🇨🇦'}, {code:'AU', name:'澳大利亚', flag:'🇦🇺'},
+  {code:'JP', name:'日本', flag:'🇯🇵'}, {code:'NL', name:'荷兰', flag:'🇳🇱'},
+  {code:'SE', name:'瑞典', flag:'🇸🇪'}, {code:'IT', name:'意大利', flag:'🇮🇹'},
+  {code:'ES', name:'西班牙', flag:'🇪🇸'}, {code:'MX', name:'墨西哥', flag:'🇲🇽'},
+  {code:'BR', name:'巴西', flag:'🇧🇷'}, {code:'AE', name:'阿联酋', flag:'🇦🇪'},
+  {code:'KR', name:'韩国', flag:'🇰🇷'}, {code:'SG', name:'新加坡', flag:'🇸🇬'}
+];
+
+const PROSPECT_CUSTOMER_TYPES = [
+  '进口商','批发商','品牌商','亚马逊卖家','独立站卖家','连锁零售',
+  '餐饮供应商','户外用品店','五金工具店','礼品公司','分销商','其他'
+];
+
+const PROSPECT_SALES_CHANNELS = ['Amazon','Shopify/独立站','实体店','批发','B2B平台','其他'];
+
+const PROSPECT_DECISION_ROLES = ['采购经理','买手/Buyer','品类经理','创始人/CEO','运营负责人','供应链经理','产品经理','销售总监'];
+
+const PROSPECT_COMPANY_SIZES = ['1-10人','10-50人','50-200人','200-500人','500+人','未知'];
+
+// 加载保存的画像和线索
+function loadProspectData(){
+  try {
+    const saved = localStorage.getItem('prospectProfiles');
+    if(saved) prospectProfiles = JSON.parse(saved);
+    const leads = localStorage.getItem('prospectLeads');
+    if(leads) prospectLeads = JSON.parse(leads);
+  } catch(e){}
+}
+
+function saveProspectProfiles(){
+  try { localStorage.setItem('prospectProfiles', JSON.stringify(prospectProfiles)); } catch(e){}
+}
+
+function saveProspectLeads(){
+  try { localStorage.setItem('prospectLeads', JSON.stringify(prospectLeads)); } catch(e){}
+}
+
+loadProspectData();
+
+function viewProspectDev(root){
+  root.innerHTML = `
+    <!-- 额度状态栏 -->
+    <div id="prospectUsageBar" style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:12px 18px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:10px;flex-wrap:wrap">
+      <div style="font-weight:700;color:#0369a1;font-size:14px">🎯 AI精准客户开发</div>
+      <div style="flex:1"></div>
+      <div id="prospectUsageInfo" style="font-size:12px;color:#0369a1">加载额度中...</div>
+      <button class="btn btn-sm btn-outline" onclick="refreshProspectUsage()">🔄 刷新</button>
+    </div>
+    
+    <!-- 子标签切换 -->
+    <div class="flex gap8 mb16">
+      ${[['profile','👤 目标画像设置'],['search','🔍 联网搜客'],['leads','📋 线索池 ('+prospectLeads.length+')']].map(([k,l])=>
+        `<button class="btn ${prospectTab===k?'btn-gold':'btn-outline'}" onclick="prospectTab='${k}';renderView()">${l}</button>`
+      ).join('')}
+    </div>
+    
+    ${prospectTab==='profile' ? renderProspectProfile() : ''}
+    ${prospectTab==='search' ? renderProspectSearch() : ''}
+    ${prospectTab==='leads' ? renderProspectLeads() : ''}
+  `;
+  refreshProspectUsage();
+}
+
+function renderProspectProfile(){
+  const p = prospectProfile;
+  return `
+    <div class="card card-pad mb16">
+      <div class="card-title">👤 目标客户画像设置</div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:14px">参考Facebook广告受众筛选逻辑，多维度定义你的理想客户。设置完成后AI将自动生成搜索词。</div>
+      
+      <!-- 画像名称 -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;display:block">📝 画像名称（便于保存复用）</label>
+        <input id="pp_name" class="form-control" placeholder="例如：美国亚马逊厨刀卖家" value="${p.name||''}" style="max-width:400px">
+      </div>
+      
+      <!-- 品类选择 -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;display:block">🏷️ 我的品类（可多选）</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${PROSPECT_CATEGORIES.map(c=>`
+            <label style="display:flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid ${p.categories.includes(c.id)?'#f59e0b':'#e5e7eb'};border-radius:8px;cursor:pointer;background:${p.categories.includes(c.id)?'#fffbeb':'#fff'}">
+              <input type="checkbox" ${p.categories.includes(c.id)?'checked':''} onchange="toggleProspectField('categories','${c.id}')" style="accent-color:#f59e0b">
+              <span>${c.icon} ${c.name}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+      
+      <!-- 国家选择 -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;display:block">🌍 目标国家/地区（可多选）</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${PROSPECT_COUNTRIES.map(c=>`
+            <label style="display:flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid ${p.countries.includes(c.code)?'#3b82f6':'#e5e7eb'};border-radius:6px;cursor:pointer;background:${p.countries.includes(c.code)?'#eff6ff':'#fff'};font-size:12px">
+              <input type="checkbox" ${p.countries.includes(c.code)?'checked':''} onchange="toggleProspectField('countries','${c.code}')" style="accent-color:#3b82f6">
+              <span>${c.flag} ${c.name}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+      
+      <!-- 客户类型 -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;display:block">🏢 客户类型（可多选）</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${PROSPECT_CUSTOMER_TYPES.map(t=>`
+            <label style="display:flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid ${p.customerTypes.includes(t)?'#10b981':'#e5e7eb'};border-radius:6px;cursor:pointer;background:${p.customerTypes.includes(t)?'#ecfdf5':'#fff'};font-size:12px">
+              <input type="checkbox" ${p.customerTypes.includes(t)?'checked':''} onchange="toggleProspectField('customerTypes','${t}')" style="accent-color:#10b981">
+              <span>${t}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px">
+        <!-- 公司规模 -->
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;display:block">📊 公司规模</label>
+          <select id="pp_companySize" class="form-control" onchange="prospectProfile.companySize=this.value">
+            <option value="">不限</option>
+            ${PROSPECT_COMPANY_SIZES.map(s=>`<option value="${s}" ${p.companySize===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <!-- 价值偏好 -->
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;display:block">💎 客户价值偏好</label>
+          <select id="pp_valuePreference" class="form-control" onchange="prospectProfile.valuePreference=this.value">
+            <option value="">不限</option>
+            <option value="OEM/ODM" ${p.valuePreference==='OEM/ODM'?'selected':''}>OEM/ODM 定制</option>
+            <option value="Private Label" ${p.valuePreference==='Private Label'?'selected':''}>Private Label 贴牌</option>
+            <option value="现货采购" ${p.valuePreference==='现货采购'?'selected':''}>现货采购</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- 销售渠道 -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;display:block">🛒 销售渠道（可多选）</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${PROSPECT_SALES_CHANNELS.map(c=>`
+            <label style="display:flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid ${p.salesChannels.includes(c)?'#8b5cf6':'#e5e7eb'};border-radius:6px;cursor:pointer;background:${p.salesChannels.includes(c)?'#f5f3ff':'#fff'};font-size:12px">
+              <input type="checkbox" ${p.salesChannels.includes(c)?'checked':''} onchange="toggleProspectField('salesChannels','${c}')" style="accent-color:#8b5cf6">
+              <span>${c}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+      
+      <!-- 决策人职位 -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;display:block">👤 目标决策人职位（可多选）</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${PROSPECT_DECISION_ROLES.map(r=>`
+            <label style="display:flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid ${p.decisionRoles.includes(r)?'#ef4444':'#e5e7eb'};border-radius:6px;cursor:pointer;background:${p.decisionRoles.includes(r)?'#fef2f2':'#fff'};font-size:12px">
+              <input type="checkbox" ${p.decisionRoles.includes(r)?'checked':''} onchange="toggleProspectField('decisionRoles','${r}')" style="accent-color:#ef4444">
+              <span>${r}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+      
+      <!-- 关键词 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;display:block">🔑 补充关键词（英文，逗号分隔）</label>
+          <textarea id="pp_keywords" rows="2" class="form-control" placeholder="例如：stainless steel, damascus, forged" onchange="prospectProfile.keywords=this.value">${p.keywords||''}</textarea>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;display:block">🚫 排除关键词（英文，逗号分隔）</label>
+          <textarea id="pp_excludeKeywords" rows="2" class="form-control" placeholder="例如：cheap, disposable, plastic" onchange="prospectProfile.excludeKeywords=this.value">${p.excludeKeywords||''}</textarea>
+        </div>
+      </div>
+      
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;display:block">🚫 排除公司/域名（逗号分隔）</label>
+        <input id="pp_excludeCompanies" class="form-control" placeholder="例如：amazon.com, alibaba.com" value="${p.excludeCompanies||''}" onchange="prospectProfile.excludeCompanies=this.value">
+      </div>
+      
+      <!-- 性别/年龄提示 -->
+      <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#92400e">
+        ⚠️ <b>性别/年龄不作为搜索条件</b>：网络搜索无法根据性别/年龄筛选B2B客户。如需记录，可在下方"人工备注"中填写，仅供内部参考。
+      </div>
+      
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;display:block">📝 人工备注</label>
+        <textarea id="pp_notes" rows="2" class="form-control" placeholder="其他备注信息..." onchange="prospectProfile.notes=this.value">${p.notes||''}</textarea>
+      </div>
+      
+      <!-- 操作按钮 -->
+      <div class="flex gap8" style="flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="prospectGenerateQueries()">✨ AI生成搜索词</button>
+        <button class="btn btn-gold" onclick="prospectSaveProfile()">💾 保存画像</button>
+        <button class="btn btn-outline" onclick="prospectLoadSavedProfile()">📂 加载已保存</button>
+        <button class="btn btn-outline" onclick="prospectResetProfile()">🔄 重置</button>
+      </div>
+      
+      <!-- 已保存画像列表 -->
+      ${prospectProfiles.length > 0 ? `
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid #e5e7eb">
+          <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px">📂 已保存画像（${prospectProfiles.length}）</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${prospectProfiles.map((p,i)=>`
+              <span style="padding:6px 10px;background:#f3f4f6;border-radius:6px;font-size:12px;display:flex;align-items:center;gap:6px">
+                ${p.name||'未命名'}
+                <button onclick="prospectApplyProfile(${i})" style="color:#3b82f6;cursor:pointer;background:none;border:none;font-size:11px">加载</button>
+                <button onclick="prospectDeleteProfile(${i})" style="color:#ef4444;cursor:pointer;background:none;border:none;font-size:11px">删除</button>
+              </span>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+    
+    <!-- AI生成的搜索词预览 -->
+    <div id="prospectGeneratedQueriesBox" style="display:none" class="card card-pad mb16">
+      <div class="card-title">🔍 AI生成的搜索词（可编辑后执行）</div>
+      <div id="prospectGeneratedQueriesList"></div>
+      <div class="flex gap8 mt16">
+        <button class="btn btn-primary" onclick="prospectExecuteSearch()">🚀 执行搜索</button>
+        <button class="btn btn-outline" onclick="document.getElementById('prospectGeneratedQueriesBox').style.display='none'">取消</button>
+      </div>
+    </div>
+  `;
+}
+
+function toggleProspectField(field, value){
+  if(!prospectProfile[field]) prospectProfile[field] = [];
+  const idx = prospectProfile[field].indexOf(value);
+  if(idx >= 0) prospectProfile[field].splice(idx, 1);
+  else prospectProfile[field].push(value);
+  renderView();
+}
+
+function prospectSaveProfile(){
+  const name = document.getElementById('pp_name')?.value?.trim();
+  if(!name){ toast('请先填写画像名称','err'); return; }
+  prospectProfile.name = name;
+  const existing = prospectProfiles.findIndex(p=>p.name===name);
+  if(existing >= 0) prospectProfiles[existing] = JSON.parse(JSON.stringify(prospectProfile));
+  else prospectProfiles.push(JSON.parse(JSON.stringify(prospectProfile)));
+  saveProspectProfiles();
+  toast('✅ 画像已保存：' + name);
+  renderView();
+}
+
+function prospectApplyProfile(idx){
+  prospectProfile = JSON.parse(JSON.stringify(prospectProfiles[idx]));
+  toast('✅ 已加载画像：' + prospectProfile.name);
+  renderView();
+}
+
+function prospectDeleteProfile(idx){
+  const name = prospectProfiles[idx].name;
+  prospectProfiles.splice(idx, 1);
+  saveProspectProfiles();
+  toast('已删除画像：' + name);
+  renderView();
+}
+
+function prospectResetProfile(){
+  prospectProfile = {name:'',categories:[],countries:[],customerTypes:[],companySize:'',salesChannels:[],decisionRoles:[],keywords:'',excludeKeywords:'',excludeCompanies:'',valuePreference:'',notes:''};
+  renderView();
+}
+
+function prospectLoadSavedProfile(){
+  if(prospectProfiles.length === 0){ toast('暂无已保存画像','err'); return; }
+  // 显示第一个
+  prospectApplyProfile(0);
+}
+
+// AI生成搜索词
+async function prospectGenerateQueries(){
+  // 收集当前表单值
+  prospectProfile.name = document.getElementById('pp_name')?.value || prospectProfile.name;
+  prospectProfile.keywords = document.getElementById('pp_keywords')?.value || '';
+  prospectProfile.excludeKeywords = document.getElementById('pp_excludeKeywords')?.value || '';
+  prospectProfile.excludeCompanies = document.getElementById('pp_excludeCompanies')?.value || '';
+  prospectProfile.notes = document.getElementById('pp_notes')?.value || '';
+  
+  if(prospectProfile.categories.length === 0){ toast('请至少选择一个品类','err'); return; }
+  if(prospectProfile.countries.length === 0){ toast('请至少选择一个国家','err'); return; }
+  
+  const catNames = prospectProfile.categories.map(id=>PROSPECT_CATEGORIES.find(c=>c.id===id)?.name||id).join(',');
+  const catEn = prospectProfile.categories.map(id=>PROSPECT_CATEGORIES.find(c=>c.id===id)?.en||'').join(' ');
+  const countryNames = prospectProfile.countries.map(code=>PROSPECT_COUNTRIES.find(c=>c.code===code)?.name||code).join(',');
+  const typeNames = prospectProfile.customerTypes.join(',') || '不限';
+  
+  const prompt = `你是一个外贸B2B客户开发专家。请根据以下客户画像，生成5组英文搜索词，用于在Google上搜索潜在客户公司。
+
+客户画像：
+- 产品品类：${catNames}（英文关键词：${catEn}）
+- 目标国家：${countryNames}
+- 客户类型：${typeNames}
+- 公司规模：${prospectProfile.companySize || '不限'}
+- 销售渠道：${prospectProfile.salesChannels.join(',') || '不限'}
+- 补充关键词：${prospectProfile.keywords || '无'}
+- 排除关键词：${prospectProfile.excludeKeywords || '无'}
+
+要求：
+1. 每组搜索词要具体、可执行，能直接在Google搜索
+2. 混合使用：产品词+客户类型+国家、产品词+distributor/importer+国家、品牌词+OEM+private label等
+3. 不要使用太宽泛的词（如"knife"），要加上限定词
+4. 只返回JSON格式，包含queries数组，每个元素是一个搜索词字符串
+5. 不要返回其他解释文字`;
+  
+  const box = document.getElementById('prospectGeneratedQueriesBox');
+  const list = document.getElementById('prospectGeneratedQueriesList');
+  box.style.display = 'block';
+  list.innerHTML = '<div style="text-align:center;padding:20px"><div style="font-size:24px;animation:spin 1s linear infinite">🔄</div><div style="margin-top:8px;color:#6b7280">AI正在生成搜索词...</div></div>';
+  
+  try {
+    const result = await callAI([{role:'user', content:prompt}], {purpose:'生成搜客关键词'});
+    let text = result.content || '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if(jsonMatch){
+      const parsed = JSON.parse(jsonMatch[0]);
+      prospectGeneratedQueries = parsed.queries || [];
+    } else {
+      // 尝试按行提取
+      prospectGeneratedQueries = text.split('\n').filter(l=>l.trim() && l.trim().length > 5 && !l.trim().startsWith('{') && !l.trim().startsWith('}')).map(l=>l.replace(/^[\d\.\-\*\s]+/,'').trim()).slice(0,5);
+    }
+    
+    if(prospectGeneratedQueries.length === 0){
+      // 兜底：基于画像手动生成
+      prospectGeneratedQueries = [
+        `${catEn} distributor ${countryNames.split(',')[0]}`,
+        `${catEn} importer wholesale ${countryNames.split(',')[0]}`,
+        `OEM ${catEn} private label manufacturer ${countryNames.split(',')[0]}`,
+        `${catEn} supplier B2B ${countryNames.split(',')[0]}`,
+        `kitchen knife set brand ${countryNames.split(',')[0]} Amazon seller`
+      ];
+    }
+    
+    list.innerHTML = prospectGeneratedQueries.map((q,i)=>`
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:10px;background:#f9fafb;border-radius:8px">
+        <span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${i+1}</span>
+        <input class="form-control" value="${q.replace(/"/g,'&quot;')}" onchange="prospectGeneratedQueries[${i}]=this.value" style="flex:1;font-size:13px">
+        <button class="btn btn-sm btn-outline" onclick="prospectGeneratedQueries.splice(${i},1);document.getElementById('prospectGeneratedQueriesList').innerHTML=prospectGeneratedQueries.map((q,j)=>'<div style=\\'display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:10px;background:#f9fafb;border-radius:8px\\'><span style=\\'background:#f59e0b;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700\\'>'+(j+1)+'</span><input class=\\'form-control\\' value=\\''+q.replace(/'/g,'&#39;')+'\\' onchange=\\'prospectGeneratedQueries['+j+']=this.value\\' style=\\'flex:1;font-size:13px\\'></div>').join('')" style="color:#ef4444">✕</button>
+      </div>
+    `).join('');
+    
+    toast('✅ 已生成 ' + prospectGeneratedQueries.length + ' 组搜索词，请检查后执行');
+  } catch(e) {
+    list.innerHTML = '<div style="color:#ef4444;padding:10px">生成失败：' + e.message + '</div>';
+  }
+}
+
+// 执行搜索
+async function prospectExecuteSearch(){
+  if(prospectSearchRunning){ toast('搜索正在进行中...'); return; }
+  if(prospectGeneratedQueries.length === 0){ toast('没有搜索词','err'); return; }
+  
+  prospectTab = 'search';
+  prospectSearchRunning = true;
+  prospectSearchResults = [];
+  renderView();
+  
+  const logEl = document.getElementById('prospectSearchLog');
+  const total = prospectGeneratedQueries.length;
+  
+  for(let i=0; i<total; i++){
+    const query = prospectGeneratedQueries[i];
+    if(logEl){
+      logEl.innerHTML += `<div>▶ [${i+1}/${total}] 搜索："${query}"</div>`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    
+    try {
+      const resp = await fetch('/api/search', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({query: query, maxResults: 10, searchDepth: 'basic'})
+      });
+      const data = await resp.json();
+      if(data.error){
+        if(logEl) logEl.innerHTML += `<div style="color:#ef4444">  ❌ 失败：${data.error}</div>`;
+        continue;
+      }
+      
+      const newResults = (data.results || []).map(r=>({
+        ...r,
+        query: query,
+        searchedAt: new Date().toISOString(),
+        provider: data.provider,
+        selected: false,
+        inCustomerDB: checkInCustomerDB(r.url),
+        inBlacklist: false
+      }));
+      
+      // 去重（按域名）
+      for(const r of newResults){
+        try{
+          const domain = new URL(r.url).hostname;
+          if(!prospectSearchResults.find(x=>{try{return new URL(x.url).hostname===domain}catch(e){return false}})){
+            prospectSearchResults.push(r);
+          }
+        }catch(e){}
+      }
+      
+      if(logEl) logEl.innerHTML += `<div style="color:#10b981">  ✅ 找到 ${data.results?.length||0} 条（去重后累计 ${prospectSearchResults.length} 家），消耗 ${data.creditsUsed||0} credits</div>`;
+    } catch(e) {
+      if(logEl) logEl.innerHTML += `<div style="color:#ef4444">  ❌ 错误：${e.message}</div>`;
+    }
+    
+    // 更新进度
+    const pct = Math.round(((i+1)/total)*100);
+    const bar = document.getElementById('prospectSearchProgressBar');
+    const pctEl = document.getElementById('prospectSearchProgressPct');
+    if(bar) bar.style.width = pct + '%';
+    if(pctEl) pctEl.textContent = pct + '%';
+    
+    await new Promise(r=>setTimeout(r, 500)); // 搜索间隔
+  }
+  
+  prospectSearchRunning = false;
+  if(logEl) logEl.innerHTML += `<div style="font-weight:700;color:#0369a1;margin-top:8px">✅ 搜索完成！共找到 ${prospectSearchResults.length} 家候选公司（已去重）</div>`;
+  refreshProspectUsage();
+  renderView();
+}
+
+function checkInCustomerDB(url){
+  try{
+    const domain = new URL(url).hostname;
+    if(S.customers && S.customers.length > 0){
+      return S.customers.some(c=>{
+        if(c.website){ try{ return new URL(c.website).hostname===domain }catch(e){} }
+        return false;
+      });
+    }
+  }catch(e){}
+  return false;
+}
+
+function renderProspectSearch(){
+  return `
+    <div class="card card-pad mb16">
+      <div class="card-title">🔍 联网搜客（真实搜索）</div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:14px">
+        基于目标画像，AI生成多组搜索词，调用Tavily真实搜索引擎（免费1000次/月），失败自动降级SearXNG。
+        <span style="color:#f59e0b">⚠️ 请先在"画像设置"中定义画像并生成搜索词。</span>
+      </div>
+      
+      ${prospectGeneratedQueries.length > 0 ? `
+        <div style="background:#f0f9ff;padding:10px 14px;border-radius:8px;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:6px">当前搜索词（${prospectGeneratedQueries.length}组）</div>
+          <div style="font-size:12px;color:#374151">${prospectGeneratedQueries.map((q,i)=>`<span style="display:inline-block;background:#fff;padding:2px 8px;border-radius:4px;margin:2px;border:1px solid #bae6fd">${i+1}. ${q}</span>`).join('')}</div>
+          <button class="btn btn-sm btn-primary mt8" onclick="prospectExecuteSearch()" ${prospectSearchRunning?'disabled':''}>🚀 ${prospectSearchRunning?'搜索中...':'重新执行搜索'}</button>
+        </div>
+      ` : `
+        <div style="text-align:center;padding:30px;color:#94a3b8">
+          <div style="font-size:36px;margin-bottom:8px">🎯</div>
+          <div>请先到"画像设置"定义目标客户画像，AI生成搜索词后再执行搜索</div>
+          <button class="btn btn-gold mt16" onclick="prospectTab='profile';renderView()">去设置画像 →</button>
+        </div>
+      `}
+      
+      ${prospectSearchRunning ? `
+        <div style="margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span>搜索进度...</span>
+            <span id="prospectSearchProgressPct">0%</span>
+          </div>
+          <div style="height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden">
+            <div id="prospectSearchProgressBar" style="height:100%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);width:0%;transition:width .3s"></div>
+          </div>
+        </div>
+        <div id="prospectSearchLog" style="background:#1e293b;color:#e2e8f0;padding:12px;border-radius:8px;font-size:12px;font-family:monospace;max-height:200px;overflow-y:auto"></div>
+      ` : ''}
+    </div>
+    
+    ${prospectSearchResults.length > 0 ? `
+      <div class="card card-pad">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div class="card-title" style="margin:0">📋 候选公司（${prospectSearchResults.length}家）</div>
+          <div class="flex gap8">
+            <button class="btn btn-sm btn-outline" onclick="prospectSelectAllResults(true)">全选</button>
+            <button class="btn btn-sm btn-outline" onclick="prospectSelectAllResults(false)">全不选</button>
+            <button class="btn btn-sm btn-gold" onclick="prospectAddSelectedToLeads()">➕ 加入线索池</button>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">勾选值得深挖的公司加入线索池，避免一次性对所有公司调用AI造成成本浪费。</div>
+        <div style="max-height:600px;overflow-y:auto">
+          ${prospectSearchResults.map((r,i)=>`
+            <div style="padding:12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;${r.selected?'background:#f0fdf4;border-color:#86efac':''}">
+              <div style="display:flex;align-items:flex-start;gap:10px">
+                <input type="checkbox" ${r.selected?'checked':''} onchange="prospectSearchResults[${i}].selected=this.checked" style="margin-top:4px;accent-color:#10b981">
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="font-weight:700;font-size:14px;color:#1e293b">${r.title||'无标题'}</span>
+                    ${r.inCustomerDB?'<span style="background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:4px;font-size:10px">已在客户库</span>':''}
+                    <span style="background:#f3f4f6;color:#6b7280;padding:1px 6px;border-radius:4px;font-size:10px">${r.provider||''}</span>
+                  </div>
+                  <div style="font-size:12px;color:#3b82f6;margin:4px 0;word-break:break-all"><a href="${r.url}" target="_blank" rel="noopener">${r.url}</a></div>
+                  <div style="font-size:12px;color:#6b7280;line-height:1.5">${(r.content||'').substring(0,200)}${(r.content||'').length>200?'...':''}</div>
+                  <div style="font-size:11px;color:#9ca3af;margin-top:4px">搜索词："${r.query||''}" · ${new Date(r.searchedAt).toLocaleString('zh-CN')}</div>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
+function prospectSelectAllResults(select){
+  prospectSearchResults.forEach(r=>r.selected=select);
+  renderView();
+}
+
+function prospectAddSelectedToLeads(){
+  const selected = prospectSearchResults.filter(r=>r.selected);
+  if(selected.length === 0){ toast('请先勾选要加入线索池的公司','err'); return; }
+  
+  let added = 0;
+  for(const r of selected){
+    // 按域名去重
+    let domain = '';
+    try{ domain = new URL(r.url).hostname; }catch(e){}
+    if(domain && prospectLeads.find(l=>l.domain===domain)) continue;
+    
+    prospectLeads.unshift({
+      id: uid(),
+      name: r.title || domain || '未知公司',
+      url: r.url,
+      domain: domain,
+      source: r.provider || 'tavily',
+      sourceQuery: r.query || '',
+      snippet: r.content || '',
+      searchedAt: r.searchedAt,
+      status: '新线索',
+      priority: 'C',
+      category: prospectProfile.categories.join(',') || '',
+      countries: prospectProfile.countries.join(',') || '',
+      customerType: prospectProfile.customerTypes.join(',') || '',
+      analysis: null,
+      painPoints: [],
+      matchedSellingPoints: [],
+      timeline: [{time:new Date().toISOString(), action:'线索发现', detail:'通过搜索"' + (r.query||'') + '"发现'}]
+    });
+    added++;
+  }
+  
+  saveProspectLeads();
+  toast(`✅ 已添加 ${added} 家公司到线索池`);
+  prospectTab = 'leads';
+  renderView();
+}
+
+function renderProspectLeads(){
+  return `
+    <div class="card card-pad">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="card-title" style="margin:0">📋 线索池（${prospectLeads.length}家）</div>
+        <div class="flex gap8">
+          <button class="btn btn-sm btn-outline" onclick="prospectExportLeads()">📤 导出CSV</button>
+          <button class="btn btn-sm btn-outline" onclick="prospectClearLeads()">🗑️ 清空</button>
+        </div>
+      </div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">线索池中的公司尚未进入客户台账。确认后可转入客户台账，或进行深度分析（阶段2）。</div>
+      
+      ${prospectLeads.length === 0 ? `
+        <div style="text-align:center;padding:40px;color:#94a3b8">
+          <div style="font-size:36px;margin-bottom:8px">📭</div>
+          <div>线索池为空，请先到"联网搜客"搜索并添加候选公司</div>
+        </div>
+      ` : `
+        <div style="max-height:700px;overflow-y:auto">
+          ${prospectLeads.map((l,i)=>`
+            <div style="padding:14px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:10px">
+              <div style="display:flex;align-items:flex-start;gap:10px">
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="font-weight:700;font-size:14px;color:#1e293b">${l.name}</span>
+                    <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px">${l.status||'新线索'}</span>
+                    <span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:4px;font-size:11px">优先级 ${l.priority||'C'}</span>
+                    ${l.analysis?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;font-size:11px">已分析</span>':'<span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:4px;font-size:11px">待分析</span>'}
+                  </div>
+                  <div style="font-size:12px;color:#3b82f6;margin:4px 0;word-break:break-all"><a href="${l.url}" target="_blank" rel="noopener">${l.url}</a></div>
+                  <div style="font-size:12px;color:#6b7280;line-height:1.5">${(l.snippet||'').substring(0,150)}${(l.snippet||'').length>150?'...':''}</div>
+                  <div style="font-size:11px;color:#9ca3af;margin-top:6px;display:flex;gap:12px;flex-wrap:wrap">
+                    <span>来源：${l.source||''}</span>
+                    <span>搜索词："${l.sourceQuery||''}"</span>
+                    <span>发现时间：${new Date(l.searchedAt||Date.now()).toLocaleDateString('zh-CN')}</span>
+                    ${l.category?'<span>品类：'+l.category+'</span>':''}
+                    ${l.countries?'<span>国家：'+l.countries+'</span>':''}
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <button class="btn btn-sm btn-outline" onclick="prospectViewLeadDetail(${i})">📄 详情</button>
+                  <button class="btn btn-sm btn-gold" onclick="prospectConvertToCustomer(${i})">➡️ 转入客户台账</button>
+                  <button class="btn btn-sm btn-outline" style="color:#ef4444" onclick="prospectDeleteLead(${i})">🗑️ 删除</button>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function prospectDeleteLead(idx){
+  const name = prospectLeads[idx].name;
+  prospectLeads.splice(idx, 1);
+  saveProspectLeads();
+  toast('已删除线索：' + name);
+  renderView();
+}
+
+function prospectClearLeads(){
+  if(prospectLeads.length === 0) return;
+  if(!confirm('确定清空线索池？此操作不可撤销。')) return;
+  prospectLeads = [];
+  saveProspectLeads();
+  toast('线索池已清空');
+  renderView();
+}
+
+function prospectConvertToCustomer(idx){
+  const lead = prospectLeads[idx];
+  if(!S.customers) S.customers = [];
+  // 去重
+  if(S.customers.find(c=>c.website===lead.url)){
+    toast('该公司已在客户台账中','err');
+    return;
+  }
+  const newCustomer = {
+    id: uid(),
+    company: lead.name,
+    website: lead.url,
+    source: '精准开发-' + (lead.source||''),
+    type: lead.customerType || '潜在客户',
+    status: '新线索',
+    createdAt: new Date().toISOString(),
+    contact: {name:'', title:'', email:'', phone:'', whatsapp:'', linkedin:''},
+    scores: {total: 50, grade: 'C'},
+    tags: [lead.category||'', lead.countries||''].filter(t=>t),
+    notes: lead.snippet || '',
+    nextFollowUp: null
+  };
+  S.customers.unshift(newCustomer);
+  try{ DB.save('customers', S.customers); }catch(e){}
+  
+  // 从线索池移除
+  prospectLeads.splice(idx, 1);
+  saveProspectLeads();
+  
+  toast('✅ 已转入客户台账：' + lead.name);
+  renderView();
+}
+
+function prospectViewLeadDetail(idx){
+  const lead = prospectLeads[idx];
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;max-width:700px;width:100%;max-height:80vh;overflow-y:auto;padding:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0;font-size:18px">📄 线索详情</h3>
+        <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280">✕</button>
+      </div>
+      <div style="font-size:14px;line-height:1.8">
+        <p><b>公司名称：</b>${lead.name}</p>
+        <p><b>官网：</b><a href="${lead.url}" target="_blank">${lead.url}</a></p>
+        <p><b>来源：</b>${lead.source}（搜索词："${lead.sourceQuery||''}"）</p>
+        <p><b>发现时间：</b>${new Date(lead.searchedAt||Date.now()).toLocaleString('zh-CN')}</p>
+        <p><b>品类：</b>${lead.category||'-'}</p>
+        <p><b>目标国家：</b>${lead.countries||'-'}</p>
+        <p><b>客户类型：</b>${lead.customerType||'-'}</p>
+        <p><b>状态：</b>${lead.status||'新线索'}</p>
+        <div style="margin-top:12px;padding:12px;background:#f9fafb;border-radius:8px">
+          <b>搜索摘要：</b>
+          <div style="font-size:13px;color:#374151;margin-top:6px;white-space:pre-wrap">${lead.snippet||'无'}</div>
+        </div>
+        <div style="margin-top:12px">
+          <b>时间线：</b>
+          ${(lead.timeline||[]).map(t=>`<div style="font-size:12px;color:#6b7280;margin-top:4px">• ${new Date(t.time).toLocaleString('zh-CN')} - ${t.action}：${t.detail||''}</div>`).join('')}
+        </div>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-gold" onclick="prospectConvertToCustomer(${idx});this.closest('div[style*=fixed]').remove()">➡️ 转入客户台账</button>
+        <button class="btn btn-outline" onclick="this.closest('div[style*=fixed]').remove()">关闭</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function prospectExportLeads(){
+  if(prospectLeads.length === 0){ toast('线索池为空','err'); return; }
+  const headers = ['公司名称','官网','域名','来源','搜索词','品类','国家','客户类型','状态','优先级','发现时间','摘要'];
+  const rows = prospectLeads.map(l=>[
+    l.name||'', l.url||'', l.domain||'', l.source||'', l.sourceQuery||'',
+    l.category||'', l.countries||'', l.customerType||'', l.status||'', l.priority||'',
+    new Date(l.searchedAt||Date.now()).toLocaleString('zh-CN'), (l.snippet||'').replace(/[\r\n]/g,' ')
+  ]);
+  const csv = '\uFEFF' + [headers, ...rows].map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '线索池导出_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ 已导出 ' + prospectLeads.length + ' 条线索');
+}
+
+// 额度显示
+async function refreshProspectUsage(){
+  try{
+    const resp = await fetch('/api/search/usage');
+    const data = await resp.json();
+    const el = document.getElementById('prospectUsageInfo');
+    if(el){
+      const warning = data.lowBalanceWarning ? '<span style="color:#ef4444;font-weight:700">⚠️ 额度不足！</span>' : '';
+      el.innerHTML = `Tavily本月：<b>${data.tavilyCreditsUsed}</b>/${data.tavilyFreeLimit} credits（剩余${data.tavilyRemaining}，${data.tavilyPercentUsed}%） ${warning} · 预计可开发 <b>${data.estimatedMonthlyCapacity}</b> 家客户 · 总搜索 <b>${data.totalQueries}</b> 次`;
+    }
+  }catch(e){
+    const el = document.getElementById('prospectUsageInfo');
+    if(el) el.innerHTML = '<span style="color:#ef4444">额度信息获取失败</span>';
+  }
+}
+
 function viewDevPlans(root){
   const plans = S.devPlans || [];
   const running = plans.filter(p=>p.status==='运行中').length;

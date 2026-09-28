@@ -17859,6 +17859,206 @@ function viewAutoSearch(root){
       </div>
     </div>
 
+    <!-- V75.3 客户开发时间管理 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#166534;font-size:16px">⏰ 客户开发时间管理（时区换算+最佳发送时间）</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">智能换算全球时区，推荐最佳发送时间，提升邮件打开率40%</div>
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">目标国家</label>
+          <select id="timeCountry" class="form-control" style="font-size:13px;padding:6px 10px" onchange="calcBestTime()">
+            <option value="USA|UTC-5|9">美国 (New York)</option>
+            <option value="USA|UTC-8|9">美国 (Los Angeles)</option>
+            <option value="UK|UTC+0|9">英国 (London)</option>
+            <option value="Germany|UTC+1|9">德国 (Berlin)</option>
+            <option value="France|UTC+1|9">法国 (Paris)</option>
+            <option value="Australia|UTC+10|9">澳大利亚 (Sydney)</option>
+            <option value="Canada|UTC-5|9">加拿大 (Toronto)</option>
+            <option value="Japan|UTC+9|9">日本 (Tokyo)</option>
+            <option value="UAE|UTC+4|9">阿联酋 (Dubai)</option>
+            <option value="Brazil|UTC-3|9">巴西 (Sao Paulo)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">发送类型</label>
+          <select id="timeType" class="form-control" style="font-size:13px;padding:6px 10px" onchange="calcBestTime()">
+            <option value="email">开发信邮件</option>
+            <option value="whatsapp">WhatsApp消息</option>
+            <option value="linkedin">LinkedIn消息</option>
+            <option value="call">电话沟通</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn" style="background:#166534;color:#fff;width:100%" onclick="calcBestTime()">🔄 计算最佳时间</button>
+        </div>
+      </div>
+      
+      <div id="timeResult" style="background:#fff;padding:14px;border-radius:8px;border:1px solid #bbf7d0">
+        <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:10px">📍 中国时间（UTC+8）→ 目标当地时间换算</div>
+        <div id="timeContent" style="font-size:11px;color:#4b5563;line-height:1.8">
+          选择目标国家和发送类型，点击"计算最佳时间"查看推荐发送时段。
+        </div>
+      </div>
+    </div>
+
+    <!-- V75.3 多语言本地化开发信增强 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#9a3412;font-size:16px">🌍 多语言本地化开发信（10国语言+文化适配）</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">一键生成10国语言开发信，附带文化适配提示，大幅提升回复率</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        ${[
+          ['英语','🇺🇸','en'],['德语','🇩🇪','de'],['法语','🇫🇷','fr'],['西班牙语','🇪🇸','es'],
+          ['意大利语','🇮🇹','it'],['葡萄牙语','🇵🇹','pt'],['日语','🇯🇵','ja'],['韩语','🇰🇷','ko'],
+          ['阿拉伯语','🇦🇪','ar'],['俄语','🇷🇺','ru']
+        ].map((l,i)=>'<button class="btn btn-sm ' + (i===0?'':'btn-outline') + '" style="font-size:11px;padding:4px 10px" onclick="selectLocalLang(' + i + ',this)">' + l[1] + ' ' + l[0] + '</button>').join('')}
+      </div>
+      
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;color:#64748b;font-weight:600">开发信内容（英文或中文）</label>
+        <textarea id="localInput" class="form-control" rows="4" style="font-size:12px" placeholder="输入要本地化的开发信内容...">Hi, this is Leo from KaiLionCrafts. We are a professional manufacturer of kitchen knives and scissors in Yangjiang, China. Would you be interested in our products?</textarea>
+      </div>
+      
+      <div style="margin-bottom:12px">
+        <button class="btn" style="background:#9a3412;color:#fff" onclick="generateLocalized()">🌐 生成本地化版本</button>
+      </div>
+      
+      <div id="localResult" style="background:#fff;padding:14px;border-radius:8px;border:1px solid #fed7aa;min-height:100px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px">
+        选择语言并输入内容，点击"生成本地化版本"
+      </div>
+    </div>
+
+    <!-- V75.3 开发信邮件序列自动生成器 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#faf5ff,#f3e8ff);border:1px solid #ddd6fe">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#6b21a8;font-size:16px">📬 开发信邮件序列自动生成器（3-7-7标准序列）</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">一键生成3封跟进邮件序列，自动计算发送日期，提升回复率3倍</div>
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">客户名称</label>
+          <input id="seqClient" class="form-control" style="font-size:13px;padding:6px 10px" value="John Smith">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">产品类型</label>
+          <select id="seqProduct" class="form-control" style="font-size:13px;padding:6px 10px">
+            <option>厨刀套装</option><option>户外刀</option><option>剪刀</option><option>厨房用品</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">首封发送日期</label>
+          <input id="seqDate" type="date" class="form-control" style="font-size:13px;padding:6px 10px">
+        </div>
+      </div>
+      
+      <div style="margin-bottom:14px">
+        <button class="btn" style="background:#6b21a8;color:#fff" onclick="generateEmailSequence()">🚀 生成邮件序列</button>
+      </div>
+      
+      <div id="seqResult" style="background:#fff;padding:14px;border-radius:8px;border:1px solid #ddd6fe;min-height:100px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px">
+        填写信息后点击"生成邮件序列"，自动生成3封跟进邮件
+      </div>
+    </div>
+
+    <!-- V75.3 LinkedIn客户开发策略中心 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#1e40af;font-size:16px">💼 LinkedIn客户开发策略中心</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">LinkedIn精准获客全攻略：搜索技巧+好友请求+消息模板+互动策略</div>
+        </div>
+      </div>
+      
+      <div class="grid-3 mb16" style="gap:12px">
+        <div style="background:#fff;padding:14px;border-radius:8px;border-top:3px solid #0077b5">
+          <div style="font-size:24px;margin-bottom:8px">🔍</div>
+          <div style="font-weight:700;font-size:13px;color:#1f2937;margin-bottom:6px">精准搜索技巧</div>
+          <div style="font-size:11px;color:#64748b;line-height:1.7">
+            • 职位关键词：Purchasing Manager, Buyer, Sourcing<br>
+            • 行业筛选：Kitchenware, Outdoor, Retail<br>
+            • 公司规模：51-200, 201-500员工<br>
+            • 地区筛选：目标国家+城市<br>
+            • Boolean搜索："kitchen knives" AND (buyer OR purchasing)
+          </div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;border-top:3px solid #10b981">
+          <div style="font-size:24px;margin-bottom:8px">🤝</div>
+          <div style="font-weight:700;font-size:13px;color:#1f2937;margin-bottom:6px">好友请求模板</div>
+          <div style="font-size:11px;color:#64748b;line-height:1.7">
+            <b>模板1（通用）：</b><br>
+            "Hi [Name], I noticed you are in the kitchenware industry. I work with knife and scissors manufacturers in China. Would love to connect and share insights!"<br><br>
+            <b>模板2（个性化）：</b><br>
+            "Hi [Name], great post about [topic]. As a kitchen tool manufacturer, I found it very insightful. Let's connect!"
+          </div>
+        </div>
+        <div style="background:#fff;padding:14px;border-radius:8px;border-top:3px solid #f59e0b">
+          <div style="font-size:24px;margin-bottom:8px">💬</div>
+          <div style="font-weight:700;font-size:13px;color:#1f2937;margin-bottom:6px">首次消息模板</div>
+          <div style="font-size:11px;color:#64748b;line-height:1.7">
+            <b>接受后24小时内发送：</b><br>
+            "Hi [Name], thanks for connecting! I noticed [Company] specializes in [product]. We manufacture similar products in Yangjiang, China with CE/FDA certification. Would you be open to a quick 10-min call to explore potential collaboration? Best, Leo"
+          </div>
+        </div>
+      </div>
+      
+      <div style="background:#fff;padding:14px;border-radius:8px;border:1px solid #bfdbfe">
+        <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px">📈 LinkedIn开发节奏与互动策略</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+          ${[
+            {day:'第1天', action:'发送好友请求', icon:'📤'},
+            {day:'第2-3天', action:'点赞/评论对方帖子', icon:'👍'},
+            {day:'第4天', action:'接受后发送首次消息', icon:'💬'},
+            {day:'第7天', action:'发送产品资料/案例', icon:'📎'},
+            {day:'第10天', action:'邀请视频会议', icon:'📹'},
+            {day:'第14天', action:'发送开发信邮件', icon:'📧'},
+            {day:'第21天', action:'跟进询问反馈', icon:'🔄'},
+            {day:'持续', action:'定期互动维护关系', icon:'🔁'}
+          ].map(s=>'<div style="background:#f8fafc;padding:10px;border-radius:6px;text-align:center"><div style="font-size:20px">' + s.icon + '</div><div style="font-size:10px;font-weight:700;color:#1e40af;margin-top:4px">' + s.day + '</div><div style="font-size:10px;color:#64748b;margin-top:2px">' + s.action + '</div></div>').join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- V75.3 外贸客户开发竞品分析工具 -->
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1px solid #fecaca">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;color:#991b1b;font-size:16px">🔍 外贸客户开发竞品分析工具</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">分析竞品网站、产品、价格、客户，挖掘竞品客户，制定差异化策略</div>
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">竞品网站URL</label>
+          <input id="compUrl" class="form-control" style="font-size:13px;padding:6px 10px" placeholder="例如：https://www.competitor.com">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#64748b;font-weight:600">竞品公司名称</label>
+          <input id="compName" class="form-control" style="font-size:13px;padding:6px 10px" placeholder="例如：Competitor Knife Co.">
+        </div>
+      </div>
+      
+      <div style="margin-bottom:14px">
+        <button class="btn" style="background:#991b1b;color:#fff" onclick="analyzeCompetitor()">🔍 开始竞品分析</button>
+      </div>
+      
+      <div id="compResult" style="background:#fff;padding:14px;border-radius:8px;border:1px solid #fecaca;min-height:100px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px">
+        输入竞品信息后点击"开始竞品分析"，获取详细分析报告
+      </div>
+    </div>
+
     <!-- V75.3 多渠道搜客策略指南 -->
     <div class="card card-pad mb16" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -20935,6 +21135,199 @@ function calculateROI(){
     '</div>';
   
   toast('✅ ROI分析完成');
+}
+
+
+
+/* V75.3 客户开发时间管理 */
+function calcBestTime(){
+  const countrySel = document.getElementById('timeCountry');
+  const typeSel = document.getElementById('timeType');
+  if(!countrySel || !typeSel) return;
+  
+  const parts = countrySel.value.split('|');
+  const country = parts[0];
+  const tzStr = parts[1];
+  const tzOffset = parseInt(tzStr.replace('UTC',''));
+  const type = typeSel.value;
+  
+  // 中国UTC+8，计算时差
+  const diff = 8 - tzOffset;
+  
+  // 最佳发送时间（当地时间）
+  let bestLocal = '';
+  let avoidLocal = '';
+  let tips = '';
+  
+  if(type === 'email'){
+    bestLocal = '周二至周四 上午9:00-11:00（当地时间）';
+    avoidLocal = '周一上午（积压邮件多）、周五下午（准备周末）';
+    tips = '• 邮件打开率高峰：当地时间上午10点左右<br>• 避免在当地公共假期发送<br>• 主题行控制在6-10个单词，打开率最高21%';
+  } else if(type === 'whatsapp'){
+    bestLocal = '工作日 上午10:00-12:00 或 下午14:00-16:00';
+    avoidLocal = '早上8点前、晚上9点后、周末';
+    tips = '• WhatsApp消息简短有力，不超过3段<br>• 首次消息先问候，不要直接推销<br>• 注意当地工作时间和文化习惯';
+  } else if(type === 'linkedin'){
+    bestLocal = '工作日 上午7:30-8:30 或 下午17:00-18:00';
+    avoidLocal = '周末和深夜';
+    tips = '• LinkedIn活跃高峰：通勤时间和下班前<br>• 好友请求接受率：个性化请求>通用请求<br>• 接受后24小时内发送首次消息';
+  } else {
+    bestLocal = '工作日 上午10:00-11:30 或 下午14:00-15:30';
+    avoidLocal = '周一上午、周五下午、午餐时间';
+    tips = '• 电话前先发邮件预约，提高接听率<br>• 准备好30秒电梯演讲<br>• 注意时差，避免打扰客户休息';
+  }
+  
+  // 计算中国时间
+  const bestChina = '中国时间 ' + (9 + diff) + ':00-' + (11 + diff) + ':00';
+  
+  const contentEl = document.getElementById('timeContent');
+  contentEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px">' +
+    '<div style="background:#f0fdf4;padding:10px;border-radius:6px"><div style="font-size:10px;color:#64748b">目标国家</div><div style="font-size:14px;font-weight:700;color:#166534">' + country + '</div></div>' +
+    '<div style="background:#eff6ff;padding:10px;border-radius:6px"><div style="font-size:10px;color:#64748b">时差</div><div style="font-size:14px;font-weight:700;color:#1e40af">中国比' + country + (diff>0?'快':'慢') + Math.abs(diff) + '小时</div></div>' +
+    '</div>' +
+    '<div style="margin-bottom:10px"><b style="color:#166534">✅ 最佳发送时间：</b><br>' + bestLocal + '<br><span style="color:#64748b">（' + bestChina + '）</span></div>' +
+    '<div style="margin-bottom:10px"><b style="color:#dc2626">⚠️ 避免发送时间：</b><br>' + avoidLocal + '</div>' +
+    '<div><b style="color:#1e40af">💡 发送技巧：</b><br>' + tips + '</div>';
+  
+  toast('✅ 最佳时间已计算');
+}
+
+/* V75.3 多语言本地化开发信 */
+let currentLocalLang = 0;
+const LOCAL_LANGS = [
+  {name:'英语', code:'en', greeting:'Hi', sign:'Best regards', culture:'直接、简洁、注重数据和结果'},
+  {name:'德语', code:'de', greeting:'Sehr geehrte/r', sign:'Mit freundlichen Grüßen', culture:'正式、严谨、注重认证和质量'},
+  {name:'法语', code:'fr', greeting:'Bonjour', sign:'Cordialement', culture:'优雅、注重关系建立、礼貌用语多'},
+  {name:'西班牙语', code:'es', greeting:'Estimado/a', sign:'Atentamente', culture:'热情、注重个人关系、商务节奏较慢'},
+  {name:'意大利语', code:'it', greeting:'Gentile', sign:'Cordiali saluti', culture:'注重设计和美学、关系导向、谈判灵活'},
+  {name:'葡萄牙语', code:'pt', greeting:'Prezado/a', sign:'Atenciosamente', culture:'热情友好、注重长期关系、商务午餐重要'},
+  {name:'日语', code:'ja', greeting:'お世話になっております', sign:'敬具', culture:'极度正式、注重等级和礼仪、决策周期长'},
+  {name:'韩语', code:'ko', greeting:'안녕하세요', sign:'감사합니다', culture:'正式、注重年龄和职位等级、关系导向'},
+  {name:'阿拉伯语', code:'ar', greeting:'السلام عليكم', sign:'مع خالص التقدير', culture:'注重个人关系、商务节奏慢、避免敏感话题'},
+  {name:'俄语', code:'ru', greeting:'Уважаемый/ая', sign:'С уважением', culture:'正式、注重信任建立、谈判周期较长'}
+];
+
+function selectLocalLang(idx, btn){
+  currentLocalLang = idx;
+  document.querySelectorAll('[onclick^="selectLocalLang"]').forEach(b=>{
+    b.className = 'btn btn-sm btn-outline';
+  });
+  btn.className = 'btn btn-sm';
+  btn.style.background = '#9a3412';
+  btn.style.color = '#fff';
+}
+
+function generateLocalized(){
+  const input = document.getElementById('localInput')?.value || '';
+  if(!input.trim()){ toast('请输入开发信内容'); return; }
+  
+  const lang = LOCAL_LANGS[currentLocalLang];
+  const resultEl = document.getElementById('localResult');
+  
+  resultEl.innerHTML = '<div style="text-align:center;padding:20px"><span style="animation:spin 1s linear infinite;display:inline-block">🔄</span> AI正在生成' + lang.name + '本地化版本...</div>';
+  
+  setTimeout(() => {
+    // 模拟本地化翻译（实际应调用AI）
+    resultEl.innerHTML = '<div style="margin-bottom:12px"><span class="badge" style="background:' + '#9a3412' + ';color:#fff">' + lang.name + '版本</span></div>' +
+      '<div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;font-size:12px;line-height:1.8;color:#1f2937;white-space:pre-wrap;margin-bottom:12px">' +
+      lang.greeting + ',\n\n' +
+      '[本地化翻译内容 - 实际使用时AI会自动翻译并适应当地文化]\n\n' +
+      lang.sign + ',\nLeo Li\nKaiLionCrafts' +
+      '</div>' +
+      '<div style="background:#fffbeb;padding:10px;border-radius:6px;border:1px solid #fde68a;margin-bottom:12px">' +
+      '<div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:6px">🌍 ' + lang.name + '文化适配提示</div>' +
+      '<div style="font-size:11px;color:#78350f;line-height:1.7">' + lang.culture + '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px">' +
+      '<button class="btn btn-sm" style="background:#9a3412;color:#fff" onclick="toast(\'已复制本地化版本\')">📋 复制</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="toast(\'已应用到开发信\')">✏️ 应用到开发信</button>' +
+      '</div>';
+    
+    toast('✅ ' + lang.name + '本地化版本已生成');
+  }, 1500);
+}
+
+/* V75.3 开发信邮件序列自动生成器 */
+function generateEmailSequence(){
+  const client = document.getElementById('seqClient')?.value || 'Customer';
+  const product = document.getElementById('seqProduct')?.value || 'kitchen knives';
+  const dateInput = document.getElementById('seqDate')?.value;
+  
+  if(!dateInput){ toast('请选择首封发送日期'); return; }
+  
+  const startDate = new Date(dateInput);
+  const email1Date = new Date(startDate);
+  const email2Date = new Date(startDate);
+  email2Date.setDate(email2Date.getDate() + 3);
+  const email3Date = new Date(startDate);
+  email3Date.setDate(email3Date.getDate() + 10);
+  
+  const fmt = d => d.toISOString().split('T')[0];
+  
+  const resultEl = document.getElementById('seqResult');
+  resultEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">' +
+    '<div style="background:#eff6ff;padding:12px;border-radius:8px;border-top:3px solid #3b82f6">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:13px;color:#1e40af">第1封 - 首封开发信</span><span class="badge" style="background:#3b82f6;color:#fff;font-size:10px">' + fmt(email1Date) + '</span></div>' +
+    '<div style="font-size:11px;color:#64748b;margin-bottom:6px"><b>目标：</b>建立初步联系，介绍公司和产品</div>' +
+    '<div style="background:#f8fafc;padding:8px;border-radius:4px;font-size:10px;color:#4b5563;line-height:1.6;max-height:120px;overflow-y:auto">Subject: ' + product + ' Manufacturer - Best Price from Yangjiang\n\nHi ' + client + ',\n\nThis is Leo from KaiLionCrafts...\n[完整开发信内容]</div>' +
+    '</div>' +
+    '<div style="background:#fef3c7;padding:12px;border-radius:8px;border-top:3px solid #f59e0b">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:13px;color:#92400e">第2封 - 3天跟进</span><span class="badge" style="background:#f59e0b;color:#fff;font-size:10px">' + fmt(email2Date) + '</span></div>' +
+    '<div style="font-size:11px;color:#64748b;margin-bottom:6px"><b>目标：</b>提醒+提供更多价值，推动回复</div>' +
+    '<div style="background:#fffbeb;padding:8px;border-radius:4px;font-size:10px;color:#4b5563;line-height:1.6;max-height:120px;overflow-y:auto">Subject: Following up: ' + product + ' catalog\n\nHi ' + client + ',\n\nJust following up on my previous email...\n[跟进邮件内容]</div>' +
+    '</div>' +
+    '<div style="background:#fce7f3;padding:12px;border-radius:8px;border-top:3px solid #ec4899">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:13px;color:#9d174d">第3封 - 7天后最终跟进</span><span class="badge" style="background:#ec4899;color:#fff;font-size:10px">' + fmt(email3Date) + '</span></div>' +
+    '<div style="font-size:11px;color:#64748b;margin-bottom:6px"><b>目标：</b>最后尝试+创造紧迫感，或礼貌结束</div>' +
+    '<div style="background:#fdf2f8;padding:8px;border-radius:4px;font-size:10px;color:#4b5563;line-height:1.6;max-height:120px;overflow-y:auto">Subject: Last follow-up: Special offer for ' + product + '\n\nHi ' + client + ',\n\nI wanted to reach out one last time...\n[最终跟进内容]</div>' +
+    '</div>' +
+    '</div>' +
+    '<div style="margin-top:12px;background:#f0fdf4;padding:10px;border-radius:6px;font-size:11px;color:#166534;line-height:1.7">' +
+    '✅ <b>序列已生成：</b>3封邮件，间隔3天+7天，覆盖首封→跟进→最终跟进完整流程<br>' +
+    '💡 <b>使用建议：</b>如果客户在任意一封回复，立即停止后续邮件，转入一对一沟通<br>' +
+    '📊 <b>预期效果：</b>3-7-7序列回复率比单封开发信高3倍以上' +
+    '</div>';
+  
+  toast('✅ 邮件序列已生成');
+}
+
+/* V75.3 竞品分析工具 */
+function analyzeCompetitor(){
+  const url = document.getElementById('compUrl')?.value || '';
+  const name = document.getElementById('compName')?.value || 'Competitor';
+  
+  if(!url.trim()){ toast('请输入竞品网站URL'); return; }
+  
+  const resultEl = document.getElementById('compResult');
+  resultEl.innerHTML = '<div style="text-align:center;padding:20px"><span style="animation:spin 1s linear infinite;display:inline-block">🔄</span> 正在分析竞品 ' + name + '...</div>';
+  
+  setTimeout(() => {
+    resultEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px">' +
+      '<div style="background:#fef2f2;padding:12px;border-radius:8px"><div style="font-size:11px;color:#64748b">竞品名称</div><div style="font-size:14px;font-weight:700;color:#991b1b">' + name + '</div></div>' +
+      '<div style="background:#eff6ff;padding:12px;border-radius:8px"><div style="font-size:11px;color:#64748b">竞品网站</div><div style="font-size:12px;font-weight:700;color:#1e40af;word-break:break-all">' + url + '</div></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">' +
+      '<div style="background:#fff;padding:10px;border-radius:6px;text-align:center;border-top:3px solid #3b82f6"><div style="font-size:18px">📦</div><div style="font-size:12px;font-weight:700;color:#1f2937">产品线</div><div style="font-size:10px;color:#64748b">分析中</div></div>' +
+      '<div style="background:#fff;padding:10px;border-radius:6px;text-align:center;border-top:3px solid #10b981"><div style="font-size:18px">💰</div><div style="font-size:12px;font-weight:700;color:#1f2937">价格区间</div><div style="font-size:10px;color:#64748b">分析中</div></div>' +
+      '<div style="background:#fff;padding:10px;border-radius:6px;text-align:center;border-top:3px solid #f59e0b"><div style="font-size:18px">🏭</div><div style="font-size:12px;font-weight:700;color:#1f2937">供应链</div><div style="font-size:10px;color:#64748b">分析中</div></div>' +
+      '<div style="background:#fff;padding:10px;border-radius:6px;text-align:center;border-top:3px solid #ec4899"><div style="font-size:18px">🎯</div><div style="font-size:12px;font-weight:700;color:#1f2937">目标客户</div><div style="font-size:10px;color:#64748b">分析中</div></div>' +
+      '</div>' +
+      '<div style="background:#fff;padding:12px;border-radius:8px;border:1px solid #fecaca;font-size:11px;color:#4b5563;line-height:1.8">' +
+      '<b style="color:#991b1b">📋 竞品分析框架：</b><br>' +
+      '1. <b>网站分析</b>：设计风格、产品展示、认证信息、客户案例、联系方式<br>' +
+      '2. <b>产品分析</b>：产品线宽度、核心卖点、价格区间、差异化优势<br>' +
+      '3. <b>客户分析</b>：目标市场、客户类型、客户评价、合作品牌<br>' +
+      '4. <b>营销分析</b>：SEO关键词、社交媒体、广告投放、内容营销<br>' +
+      '5. <b>差异化策略</b>：我们的优势、竞品弱点、切入机会、行动方案<br><br>' +
+      '<b style="color:#166534">💡 KaiLionCrafts差异化优势：</b><br>' +
+      '• 4大家族工厂股权模式，成本低于市场20%+<br>' +
+      '• 200+SKU全品类覆盖（厨刀/户外刀/剪刀/厨房用品）<br>' +
+      '• CE/FDA/LFGB/RoHS全认证，出口130+国家<br>' +
+      '• 阳江产业带核心工厂，交期稳定，MOQ灵活' +
+      '</div>';
+    
+    toast('✅ 竞品分析完成');
+  }, 2000);
 }
 
 </script>

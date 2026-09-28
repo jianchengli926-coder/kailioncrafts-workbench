@@ -21605,7 +21605,7 @@ function checkReminders(){
         '<span style="font-weight:700;font-size:12px;color:#1f2937;width:120px;flex-shrink:0">' + r.customer + '</span>' +
         '<span style="font-size:11px;color:#64748b;flex:1">' + r.action + '</span>' +
         '<span style="font-size:10px;color:#94a3b8;flex-shrink:0">' + r.time + '</span>' +
-        '<button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 8px;flex-shrink:0" onclick="toast(\'已处理：' + r.customer + '\')">✓ 处理</button>' +
+        '<button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 8px;flex-shrink:0" onclick="handleReminder(this)">✓ 处理</button>' +
         '</div>').join('') +
       '<div style="margin-top:10px;background:#f0fdf4;padding:10px;border-radius:6px;font-size:11px;color:#166534">' +
       '✅ 已检查全部客户数据，共发现' + reminders.length + '项待办提醒。建议优先处理高优先级提醒。' +
@@ -21661,6 +21661,18 @@ function runABTest(){
     
     toast('✅ A/B测试分析完成，版本' + winner + '胜出');
   }, 2000);
+}
+
+
+
+/* V75.3 处理提醒 */
+function handleReminder(btn){
+  const row = btn.closest('div[style*="border-left"]');
+  if(row){
+    row.style.opacity = '0.5';
+    row.style.textDecoration = 'line-through';
+  }
+  toast('✅ 已处理该提醒');
 }
 
 </script>

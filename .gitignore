@@ -11,3 +11,9 @@ kb_index_*.json
 *_backup_*.json
 *_backup_*.zip
 localStorage_backup*.json
+
+# 知识库索引缓存
+.kb_hash_cache.json
+
+# 公司核心事实清单（含敏感信息，不进Git）
+公司核心事实清单_待核对.md

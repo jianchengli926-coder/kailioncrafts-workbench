@@ -96,7 +96,7 @@ PORT=8081 node server.js
 - **本地访问**：http://localhost:8080
 - **局域网访问**：http://<你的Mac的IP>:8080
 - **健康检查**：http://localhost:8080/api/health
-- **访问密码**：`441723`
+- **访问密码**：`[已移除-密码不在文档中显示]`
 
 ---
 
@@ -391,7 +391,7 @@ tail -f /tmp/cloudflared.log
 
 ### 访问方式
 - 公网地址：**https://prospect.kailioncrafts.com**
-- 访问密码：**441723**
+- 访问密码：**[已移除-密码不在文档中显示]**
 - 任何人在任何地方只要有网络就能访问
 
 ### 注意事项

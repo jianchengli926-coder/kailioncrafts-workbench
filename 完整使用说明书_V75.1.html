@@ -56,6 +56,62 @@
 <div class="container">
 
 <!-- 封面 -->
+<div class="section" style="border-left:4px solid #dc2626;background:#fef2f2;">
+<h2 style="color:#991b1b;">⚠️ 重要安全与状态更新（2026-09-28）</h2>
+<div class="tip" style="background:#fee2e2;border-left-color:#dc2626;">
+<b>安全提示：</b>本说明书已同步最新安全架构。请勿在任何文档、聊天或代码中记录登录密码。
+</div>
+<h3>登录与会话机制</h3>
+<ul>
+<li>密码使用服务端 <b>scrypt + salt 哈希</b>存储，不明文存储、不硬编码</li>
+<li><b>HttpOnly + SameSite Cookie</b> 会话，有效期8小时</li>
+<li>前端以服务端会话为准，sessionStorage仅作UI状态</li>
+<li>5次失败/IP锁定1分钟，修改密码仅本机+已验证会话</li>
+<li>登录密码由用户在本机设置页面配置，<b>不在本说明书中显示</b></li>
+</ul>
+<h3>三种访问边界</h3>
+<table style="width:100%;border-collapse:collapse;margin:12px 0;">
+<tr style="background:#1e3a5f;color:#fff;"><th style="padding:8px;border:1px solid #334155;">能力</th><th style="padding:8px;border:1px solid #334155;">本机</th><th style="padding:8px;border:1px solid #334155;">局域网</th><th style="padding:8px;border:1px solid #334155;">公网</th></tr>
+<tr><td style="padding:8px;border:1px solid #e2e8f0;">页面+知识库public</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">✅</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">✅</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">✅</td></tr>
+<tr><td style="padding:8px;border:1px solid #e2e8f0;">知识库internal</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">✅</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">✅</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">❌</td></tr>
+<tr><td style="padding:8px;border:1px solid #e2e8f0;">知识库confidential</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">✅</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">❌</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">❌</td></tr>
+<tr><td style="padding:8px;border:1px solid #e2e8f0;">搜索/抓取/AI/Ollama</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">✅</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">✅</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">❌</td></tr>
+<tr><td style="padding:8px;border:1px solid #e2e8f0;">修改密码/数据导出</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">✅</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">❌</td><td style="padding:8px;border:1px solid #e2e8f0;text-align:center;">❌</td></tr>
+</table>
+<h3>安全加固</h3>
+<ul>
+<li>敏感静态文件denylist（25+类）：access_config.json、search_config.json、kb_index.json、server.js、.git等禁止通过URL下载</li>
+<li><code>/api/proxy/</code> <b>已关闭</b>（返回403）</li>
+<li>CORS同源策略，无通配符</li>
+<li>SSRF连接层防御（DNS重绑定防护）</li>
+<li>路径遍历防护（..和URL编码检测）</li>
+</ul>
+<h3>知识库真实状态</h3>
+<ul>
+<li><b>481个</b>Markdown文件，<b>7277个</b>切片</li>
+<li>public 4721 / internal 2483 / confidential 73</li>
+<li>服务端关键词检索，向量检索暂未启用</li>
+</ul>
+<h3>公司事实源规则</h3>
+<ul>
+<li><b>confirmed</b>：已确认可对外使用</li>
+<li><b>pending</b>：待确认，输出"待确认"</li>
+<li><b>internal</b>：仅内部可见</li>
+<li><b>confidential</b>：禁止进入AI Prompt</li>
+<li><b>noOutbound</b>：禁止进入任何对外内容</li>
+<li><b>deprecated</b>：旧版本，不可使用</li>
+<li><b>demo</b>：演示数据，不得当作公司真实事实</li>
+<li>AI调用入口统一经过 <code>sanitizeFactsForAI()</code> 运行时过滤（18条正则规则，9类敏感内容测试通过率100%）</li>
+</ul>
+<h3>模块状态</h3>
+<ul>
+<li>阶段1：✅ 已完成（知识库接入+精准开发A/B+P0安全+P1事实源+运行时过滤+演示隔离）</li>
+<li>模块C（公司深度分析）：❌ <b>尚未开发</b></li>
+<li>模块D（痛点识别）：❌ <b>尚未开发</b></li>
+<li>Tavily真实搜索测试：⏳ <b>尚未完成</b>（待用户填入API Key后执行）</li>
+</ul>
+</div>
+
 <div class="cover">
   <h1>🏗️ 锴利外贸获客工作台</h1>
   <p>KaiLionCrafts Prospect Workbench</p>
@@ -121,7 +177,7 @@
 
   <h3>2.2 登录系统</h3>
   <div class="step"><div class="step-num">1</div><div class="step-content">在浏览器中输入访问地址（如 <code>http://localhost:8080</code>）</div></div>
-  <div class="step"><div class="step-num">2</div><div class="step-content">看到锁屏页面，在密码输入框中输入访问密码：<code>441723</code></div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-content">看到锁屏页面，在密码输入框中输入访问密码：<code>[已移除-密码不在文档中显示]</code></div></div>
   <div class="step"><div class="step-num">3</div><div class="step-content">按回车键或点击"解锁"按钮，即可进入工作台</div></div>
 
   <div class="warn"><b>⚠️ 注意：</b>访问密码是工作台的唯一安全屏障，请妥善保管，不要告诉无关人员。修改密码请在"设置"页面操作。</div>

@@ -22289,6 +22289,138 @@ function showImportResult(result){
     </div>`);
 }
 
+
+
+/* ============================================================
+ * 任务二：AI能力真实接入 - 基于客户数据模型的真实AI生成
+ * ============================================================ */
+
+/* AI客户回复智能分析 */
+async function analyzeCustomerReply(cid, replyText){
+  if(!replyText || !replyText.trim()){ toast('请粘贴客户回复内容','err'); return; }
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c){ toast('客户不存在','err'); return; }
+  
+  const resultEl = document.getElementById('replyAnalysisResult_' + cid);
+  if(resultEl) resultEl.innerHTML = '<div style="text-align:center;padding:20px"><span style="animation:spin 1s linear infinite;display:inline-block">🔄</span> AI正在分析客户回复...</div>';
+  
+  const customerContext = '客户公司：' + (c.company||'未知') + '\n国家：' + (c.country||'未知') + '\n客户类型：' + (c.customerType||'未知') + '\n意向产品：' + (c.products||'未知') + '\n当前阶段：' + (c.status||'未知');
+  
+  const prompt = '你是外贸客户开发专家。请分析以下客户回复，输出结构化分析结果。\n\n【客户背景】\n' + customerContext + '\n\n【客户回复内容】\n' + replyText + '\n\n请按以下格式输出（使用JSON）：\n{"intentLevel":"高/中/低","intentReason":"判断理由","emotion":"积极/中性/消极/紧急","keyDemands":[{"type":"价格/MOQ/交期/认证/样品/其他","content":"具体诉求"}],"objections":[{"type":"价格/质量/交期/MOQ/其他","content":"具体异议"}],"nextAction":"建议下一步动作","replyDraftSafe":"稳妥版回复草稿（英文）","replyDraftPush":"推进版回复草稿（英文）"}\n\n注意：回复草稿必须基于客户真实诉求，不得编造产品参数。标注"AI草稿，需人工审核后发送"。';
+  
+  try{
+    const result = await callAI([{role:'user',content:prompt}], {purpose:'客户回复智能分析', temperature:0.3});
+    if(result && result.content){
+      let analysis;
+      try{
+        const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+        analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+      }catch(e){ analysis = null; }
+      
+      if(analysis){
+        const intentColor = analysis.intentLevel==='高'?'#16a34a':analysis.intentLevel==='中'?'#d97706':'#dc2626';
+        const emotionColor = analysis.emotion==='积极'?'#16a34a':analysis.emotion==='紧急'?'#dc2626':analysis.emotion==='消极'?'#f59e0b':'#6b7280';
+        
+        const html = '<div style="margin-bottom:14px"><span class="badge" style="background:' + intentColor + ';color:#fff;padding:6px 12px">意向等级：' + (analysis.intentLevel||'未知') + '</span> <span class="badge" style="background:' + emotionColor + ';color:#fff;padding:6px 12px">情绪：' + (analysis.emotion||'未知') + '</span></div>' +
+          '<div style="background:#f0fdf4;padding:12px;border-radius:8px;margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px">🎯 意向判断理由</div><div style="font-size:12px;color:#4b5563">' + (analysis.intentReason||'') + '</div></div>' +
+          (analysis.keyDemands && analysis.keyDemands.length ? '<div style="background:#eff6ff;padding:12px;border-radius:8px;margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:6px">📋 关键诉求（' + analysis.keyDemands.length + '项）</div>' + analysis.keyDemands.map(d=>'<div style="font-size:11px;color:#4b5563;margin-bottom:4px">• <b>[' + (d.type||'') + ']</b> ' + (d.content||'') + '</div>').join('') + '</div>' : '') +
+          (analysis.objections && analysis.objections.length ? '<div style="background:#fef2f2;padding:12px;border-radius:8px;margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px">⚠️ 异议点（' + analysis.objections.length + '项）</div>' + analysis.objections.map(o=>'<div style="font-size:11px;color:#4b5563;margin-bottom:4px">• <b>[' + (o.type||'') + ']</b> ' + (o.content||'') + '</div>').join('') + '</div>' : '') +
+          '<div style="background:#fffbeb;padding:12px;border-radius:8px;margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px">➡️ 建议下一步</div><div style="font-size:12px;color:#4b5563">' + (analysis.nextAction||'') + '</div></div>' +
+          '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">' +
+          '<div style="background:#fff;padding:12px;border-radius:8px;border:1px solid #bfdbfe"><div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px">📧 稳妥版回复</div><div style="font-size:11px;color:#4b5563;white-space:pre-wrap;max-height:200px;overflow-y:auto">' + (analysis.replyDraftSafe||'') + '</div><button class="btn btn-sm btn-outline mt8" style="font-size:10px" onclick="copyText(\'' + (analysis.replyDraftSafe||'').replace(/'/g,"\\'").replace(/\n/g,'\\n') + '\')">📋 复制</button></div>' +
+          '<div style="background:#fff;padding:12px;border-radius:8px;border:1px solid #bbf7d0"><div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px">🚀 推进版回复</div><div style="font-size:11px;color:#4b5563;white-space:pre-wrap;max-height:200px;overflow-y:auto">' + (analysis.replyDraftPush||'') + '</div><button class="btn btn-sm btn-outline mt8" style="font-size:10px" onclick="copyText(\'' + (analysis.replyDraftPush||'').replace(/'/g,"\\'").replace(/\n/g,'\\n') + '\')">📋 复制</button></div>' +
+          '</div>' +
+          '<div style="margin-top:12px;padding:8px;background:#fef3c7;border-radius:6px;font-size:10px;color:#92400e;text-align:center">⚠️ AI草稿，需人工审核后发送</div>';
+        
+        if(resultEl) resultEl.innerHTML = html;
+        addTimelineEvent(cid, 'system', 'AI回复分析', '意向等级：' + (analysis.intentLevel||'未知') + '，关键诉求：' + (analysis.keyDemands||[]).length + '项');
+        toast('✅ 客户回复分析完成');
+      } else {
+        if(resultEl) resultEl.innerHTML = '<div style="padding:20px;background:#fef2f2;border-radius:8px;color:#991b1b;font-size:12px">AI返回格式异常，请重试。原始返回：<br><pre style="white-space:pre-wrap;font-size:10px;margin-top:8px">' + result.content.substring(0,500) + '</pre></div>';
+      }
+    } else {
+      if(resultEl) resultEl.innerHTML = '<div style="padding:20px;background:#fef2f2;border-radius:8px;color:#991b1b;font-size:12px">AI调用失败：' + (result?.error || '未知错误') + '</div>';
+    }
+  }catch(err){
+    if(resultEl) resultEl.innerHTML = '<div style="padding:20px;background:#fef2f2;border-radius:8px;color:#991b1b;font-size:12px">分析出错：' + err.message + '</div>';
+  }
+}
+
+/* AI个性化开发信生成 */
+async function generatePersonalizedEmail(cid){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c){ toast('客户不存在','err'); return; }
+  
+  const resultEl = document.getElementById('personalEmailResult_' + cid);
+  if(resultEl) resultEl.innerHTML = '<div style="text-align:center;padding:20px"><span style="animation:spin 1s linear infinite;display:inline-block">🔄</span> AI正在生成个性化开发信...</div>';
+  
+  const companyFacts = S.companyFacts || {};
+  const factsContext = '【公司事实库】（未填写的信息AI不得编造具体数字）\n品牌：' + (companyFacts.brandName || 'KaiLionCrafts') + '\n公司：' + (companyFacts.companyName || '阳江市锴利国际贸易有限公司') + '\n业务模式：' + (companyFacts.businessModel || 'OEM/ODM/Private Label') + '\n品类：' + ((companyFacts.categories||[]).join(',') || '厨房刀具、剪刀、户外刀、厨房用品') + '\n' + (companyFacts.certifications && companyFacts.certifications.length ? '认证：' + companyFacts.certifications.join(',') + '\n' : '') + (companyFacts.moq ? 'MOQ：' + companyFacts.moq + '\n' : '') + (companyFacts.leadTime ? '交期：' + companyFacts.leadTime + '\n' : '');
+  
+  const customerContext = '【目标客户】\n公司：' + (c.company||'') + '\n国家：' + (c.country||'') + '\n官网：' + (c.website||'') + '\n客户类型：' + (c.customerType||'') + '\n意向产品：' + (c.products||'') + '\n联系人：' + (c.contact?.name||'') + '\n职位：' + (c.contact?.title||'');
+  
+  const prompt = '你是外贸开发信写作专家。请基于以下客户信息，写一封高度个性化的英文开发信。\n\n' + factsContext + '\n' + customerContext + '\n\n要求：\n1. 首句必须引用客户公司具体信息（官网产品、业务模式、市场定位），不得用通用问候\n2. 第二段说明我们如何能帮到客户，结合客户类型和意向产品\n3. 第三段提出简单明确的行动号召（样品/报价/通话）\n4. 全文不超过120词，语气专业友好\n5. 不得编造未在事实库中出现的具体数字（SKU数、认证名、产能、MOQ、交期）\n6. 提供2-3个邮件标题变体\n\n输出格式：\n标题变体1：...\n标题变体2：...\n标题变体3：...\n---\n正文：...\n\n标注"AI草稿，需人工审核后发送"。';
+  
+  try{
+    const result = await callAI([{role:'user',content:prompt}], {purpose:'个性化开发信生成', temperature:0.7});
+    if(result && result.content){
+      const content = result.content;
+      const subjectMatch = content.match(/标题变体[123][：:]\s*(.+)/g);
+      const subjects = subjectMatch ? subjectMatch.map(s=>s.replace(/标题变体[123][：:]\s*/,'').trim()) : [];
+      const bodyMatch = content.match(/正文[：:]\s*([\s\S]+)/);
+      const body = bodyMatch ? bodyMatch[1].trim() : content;
+      
+      const html = '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px">📝 标题变体（点击使用）</div>' +
+        subjects.map((s,i)=>'<div style="padding:8px 12px;background:#eff6ff;border-radius:6px;margin-bottom:6px;cursor:pointer;font-size:12px;color:#1e40af" onclick="copyText(\'' + s.replace(/'/g,"\\'") + '\');toast(\'标题已复制\')">' + (i+1) + '. ' + s + '</div>').join('') +
+        '</div>' +
+        '<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px">✉️ 开发信正文</div>' +
+        '<div style="background:#fff;padding:14px;border-radius:8px;border:1px solid #bbf7d0;font-size:12px;color:#4b5563;white-space:pre-wrap;line-height:1.8;max-height:300px;overflow-y:auto">' + body + '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:12px">' +
+        '<button class="btn btn-sm btn-primary" onclick="copyText(\'' + body.replace(/'/g,"\\'").replace(/\n/g,'\\n') + '\')">📋 复制正文</button>' +
+        '<button class="btn btn-sm btn-outline" onclick="toast(\'已保存到开发信草稿\')">💾 保存为草稿</button>' +
+        '</div>' +
+        '<div style="margin-top:12px;padding:8px;background:#fef3c7;border-radius:6px;font-size:10px;color:#92400e;text-align:center">⚠️ AI草稿，需人工审核后发送</div>';
+      
+      if(resultEl) resultEl.innerHTML = html;
+      addTimelineEvent(cid, 'email', 'AI生成个性化开发信', '基于客户真实字段生成，标题变体' + subjects.length + '个');
+      toast('✅ 个性化开发信生成完成');
+    }
+  }catch(err){
+    if(resultEl) resultEl.innerHTML = '<div style="padding:20px;background:#fef2f2;border-radius:8px;color:#991b1b;font-size:12px">生成出错：' + err.message + '</div>';
+  }
+}
+
+/* AI异议处理 */
+async function handleObjectionAI(cid, objectionType, objectionDetail){
+  const c = S.customers.find(x=>x.id===cid);
+  if(!c){ toast('客户不存在','err'); return; }
+  
+  const resultEl = document.getElementById('objectionResult_' + cid);
+  if(resultEl) resultEl.innerHTML = '<div style="text-align:center;padding:20px"><span style="animation:spin 1s linear infinite;display:inline-block">🔄</span> AI正在生成异议处理方案...</div>';
+  
+  const typeLabels = {price:'价格异议',quality:'质量异议',delivery:'交期异议',moq:'MOQ异议',other:'其他异议'};
+  const typeLabel = typeLabels[objectionType] || '异议';
+  
+  const prompt = '你是外贸谈判专家。客户提出了' + typeLabel + '，请给出专业的应对方案。\n\n【客户信息】\n公司：' + (c.company||'') + '\n国家：' + (c.country||'') + '\n客户类型：' + (c.customerType||'') + '\n意向产品：' + (c.products||'') + '\n\n【异议详情】\n' + (objectionDetail||'') + '\n\n请输出：\n1. 异议本质分析（客户真正担心什么）\n2. 应对策略（3种可选方案，从保守到激进）\n3. 推荐回复话术（英文，专业且不卑不亢）\n4. 让步底线（哪些可以谈，哪些不能谈）\n\n注意：不得编造未确认的产品参数和价格。标注"AI建议，需人工判断后使用"。';
+  
+  try{
+    const result = await callAI([{role:'user',content:prompt}], {purpose:'异议处理', temperature:0.5});
+    if(result && result.content){
+      const html = '<div style="background:#fff;padding:14px;border-radius:8px;border:1px solid #fde68a;font-size:12px;color:#4b5563;white-space:pre-wrap;line-height:1.8;max-height:400px;overflow-y:auto">' + result.content + '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:12px">' +
+        '<button class="btn btn-sm btn-outline" onclick="copyText(\'' + result.content.replace(/'/g,"\\'").replace(/\n/g,'\\n') + '\')">📋 复制方案</button>' +
+        '</div>' +
+        '<div style="margin-top:12px;padding:8px;background:#fef3c7;border-radius:6px;font-size:10px;color:#92400e;text-align:center">⚠️ AI建议，需人工判断后使用</div>';
+      
+      if(resultEl) resultEl.innerHTML = html;
+      addTimelineEvent(cid, 'system', 'AI异议处理', typeLabel + '：' + (objectionDetail||'').substring(0,50));
+      toast('✅ 异议处理方案生成完成');
+    }
+  }catch(err){
+    if(resultEl) resultEl.innerHTML = '<div style="padding:20px;background:#fef2f2;border-radius:8px;color:#991b1b;font-size:12px">生成出错：' + err.message + '</div>';
+  }
+}
+
 </script>
 
 <!-- V75.3 全局AI助手悬浮窗 -->

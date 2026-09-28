@@ -112,43 +112,85 @@ function safeKbPath(relativePath) {
   return fullPath;
 }
 
-/* 判断访问来源：local / lan / public */
+/* 判断访问来源：local / lan / public
+ * 安全原则：可由客户端伪造的头（Host、X-Forwarded-For）只能用于降权（判定为公网），
+ * 不得用于提升权限（判定为本机/局域网）。
+ * 可靠依据：socket.remoteAddress（TCP层IP）、CF-Connecting-IP/CF-Ray（Cloudflare添加）。
+ */
 function getAccessScope(req) {
   const cfConnectingIp = req.headers['cf-connecting-ip'];
   const cfRay = req.headers['cf-ray'];
-  const xForwardedFor = req.headers['x-forwarded-for'];
+  const xForwardedFor = req.headers['x-forwarded-for'] || '';
   const host = (req.headers.host || '').toLowerCase();
+  const socketIp = req.socket.remoteAddress || '';
   
-  // Cloudflare Tunnel / Cloudflare CDN 特征
-  if (cfConnectingIp || cfRay || host.includes('prospect.kailioncrafts.com')) {
-    return 'public';
+  const reasons = [];
+  let scope = 'public'; // 默认最严格
+  
+  // === 降权信号（可伪造头，只用于判定为公网）===
+  
+  // Cloudflare特征头（由Cloudflare边缘/cloudflared添加，非客户端可伪造）
+  if (cfConnectingIp || cfRay) {
+    reasons.push('CF头存在(cf-connecting-ip/cf-ray)');
+    scope = 'public';
   }
   
-  // 获取客户端IP
-  let clientIp = req.socket.remoteAddress || '';
+  // Host头包含公网域名（可伪造，用于降权）
+  if (host.includes('prospect.kailioncrafts.com')) {
+    reasons.push('Host头含公网域名');
+    scope = 'public';
+  }
+  
+  // X-Forwarded-For包含公网IP（可伪造，用于降权）
   if (xForwardedFor) {
-    clientIp = xForwardedFor.split(',')[0].trim();
+    const firstXff = xForwardedFor.split(',')[0].trim();
+    const isPrivateXff = firstXff.startsWith('192.168.') || firstXff.startsWith('10.') ||
+      firstXff.startsWith('172.16.') || firstXff.startsWith('172.17.') ||
+      firstXff.startsWith('172.18.') || firstXff.startsWith('172.19.') ||
+      firstXff.startsWith('172.2') || firstXff.startsWith('172.30.') ||
+      firstXff.startsWith('172.31.') || firstXff === '127.0.0.1' || firstXff === '::1';
+    if (!isPrivateXff && firstXff) {
+      reasons.push('X-Forwarded-For含公网IP(' + firstXff + ')');
+      scope = 'public';
+    }
   }
   
-  // 本机
-  if (clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1') {
-    // 但如果Host是公网域名，仍按公网处理
-    if (host.includes('prospect.kailioncrafts.com')) return 'public';
-    return 'local';
+  // === 提升权限信号（仅可靠依据：socket.remoteAddress）===
+  // 只有在没有任何降权信号时，才根据socket IP提升权限
+  
+  if (scope !== 'public') {
+    // 不会走到这里，因为scope默认是public
   }
   
-  // 局域网私网段
-  if (clientIp.startsWith('192.168.') || clientIp.startsWith('10.') || 
-      clientIp.startsWith('172.16.') || clientIp.startsWith('172.17.') ||
-      clientIp.startsWith('172.18.') || clientIp.startsWith('172.19.') ||
-      clientIp.startsWith('172.2') || clientIp.startsWith('172.30.') ||
-      clientIp.startsWith('172.31.') || clientIp.startsWith('::ffff:192.168.') ||
-      clientIp.startsWith('::ffff:10.')) {
-    return 'lan';
+  // 检查socket IP（TCP层，相对可靠）
+  const isLocalSocket = socketIp === '127.0.0.1' || socketIp === '::1' || socketIp === '::ffff:127.0.0.1';
+  const isLanSocket = socketIp.startsWith('192.168.') || socketIp.startsWith('10.') ||
+    socketIp.startsWith('172.16.') || socketIp.startsWith('172.17.') ||
+    socketIp.startsWith('18.') || socketIp.startsWith('172.19.') ||
+    socketIp.startsWith('172.2') || socketIp.startsWith('172.30.') ||
+    socketIp.startsWith('172.31.') || socketIp.startsWith('::ffff:192.168.') ||
+    socketIp.startsWith('::ffff:10.');
+  
+  // 只有在没有降权信号时，才根据socket IP判定
+  if (reasons.length === 0) {
+    if (isLocalSocket) {
+      scope = 'local';
+      reasons.push('socket IP为本机(' + socketIp + ')');
+    } else if (isLanSocket) {
+      scope = 'lan';
+      reasons.push('socket IP为局域网(' + socketIp + ')');
+    } else {
+      reasons.push('socket IP为公网(' + socketIp + ')');
+    }
+  } else {
+    // 有降权信号时，记录socket IP用于调试但不改变判定
+    reasons.push('socket IP=' + socketIp + '（有降权信号，不提升权限）');
   }
   
-  // 判断不确定时按公网处理
-  return 'public';
+  // 调试日志（仅记录判定结果和依据，不记录请求内容）
+  log('[KB Scope] 判定=' + scope + ' | 依据: ' + reasons.join('; '), 'REQUEST');
+  
+  return scope;
 }
 
 /* 根据访问范围过滤切片敏感级别 */
@@ -160,6 +202,11 @@ function filterSlicesByScope(slices, scope) {
   } else {
     return slices.filter(s => s.sensitivity === 'public');
   }
+}
+
+/* 转义正则特殊字符 */
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // ============ 健康检查 ============
@@ -438,62 +485,84 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   
-  // 知识库单个文件内容
+  // 知识库单个文件内容（增强敏感过滤）
   if (pathname === '/api/kb/file') {
     const scope = getAccessScope(req);
     const relativePath = reqUrl.searchParams.get('path');
     
+    // 统一拒绝函数（不泄露文件是否存在）
+    function denyFile(msg) {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: msg || '访问被拒绝' }));
+    }
+    
     if (!relativePath) {
-      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ error: '缺少path参数' }));
+      denyFile('缺少path参数');
+      return;
+    }
+    
+    // 只允许.md后缀
+    if (!relativePath.toLowerCase().endsWith('.md')) {
+      denyFile('仅允许访问.md文件');
+      log(`知识库文件拒绝(非md): ${relativePath}`, 'WARN');
+      return;
+    }
+    
+    // 拒绝99目录
+    if (relativePath.startsWith('99_') || relativePath.includes('/99_')) {
+      denyFile('访问被拒绝');
+      log(`知识库文件拒绝(99目录): ${relativePath}`, 'WARN');
       return;
     }
     
     // 路径穿越防护
     const fullPath = safeKbPath(relativePath);
     if (!fullPath) {
-      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ error: '路径被拒绝（路径穿越防护）', path: relativePath }));
-      log(`知识库文件访问被拒绝(路径穿越): ${relativePath}`, 'WARN');
+      denyFile('访问被拒绝');
+      log(`知识库文件拒绝(路径穿越): ${relativePath}`, 'WARN');
       return;
     }
     
-    // 检查文件是否存在
+    // 检查文件是否存在（不存在也返回403，不泄露存在性）
     if (!fs.existsSync(fullPath)) {
-      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ error: '文件不存在', path: relativePath }));
+      denyFile('访问被拒绝');
       return;
     }
     
-    // 公网访问时检查文件敏感级别
-    if (scope === 'public') {
-      // 读取frontmatter检查sensitivity
-      try {
-        const content = fs.readFileSync(fullPath, 'utf-8');
-        const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-        if (fmMatch) {
-          const sensMatch = fmMatch[1].match(/sensitivity:\s*(\w+)/);
-          if (sensMatch) {
-            const sensitivity = sensMatch[1].toLowerCase();
-            if (sensitivity !== 'public') {
-              res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
-              res.end(JSON.stringify({ error: '公网访问仅允许public级别文件', sensitivity }));
-              log(`知识库文件公网访问被拒绝: ${relativePath} (${sensitivity})`, 'WARN');
-              return;
-            }
+    // 读取文件并检查frontmatter sensitivity
+    let sensitivity = 'confidential'; // 缺失默认confidential
+    let content = '';
+    try {
+      content = fs.readFileSync(fullPath, 'utf-8');
+      const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+      if (fmMatch) {
+        const sensMatch = fmMatch[1].match(/sensitivity:\s*(\w+)/);
+        if (sensMatch) {
+          sensitivity = sensMatch[1].toLowerCase();
+          if (!['public', 'internal', 'confidential'].includes(sensitivity)) {
+            sensitivity = 'confidential';
           }
         }
-      } catch (e) {
-        // 读取失败时按公网严格策略拒绝
-        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ error: '无法验证文件敏感级别，公网访问被拒绝' }));
-        return;
       }
+    } catch (e) {
+      denyFile('访问被拒绝');
+      return;
     }
     
-    // 读取并返回文件内容
+    // 按访问范围过滤
+    if (scope === 'public' && sensitivity !== 'public') {
+      denyFile('访问被拒绝');
+      log(`知识库文件公网拒绝: ${relativePath} (${sensitivity})`, 'WARN');
+      return;
+    }
+    if (scope === 'lan' && sensitivity === 'confidential') {
+      denyFile('访问被拒绝');
+      log(`知识库文件局域网拒绝: ${relativePath} (confidential)`, 'WARN');
+      return;
+    }
+    
+    // 返回文件内容
     try {
-      const content = fs.readFileSync(fullPath, 'utf-8');
       const stats = fs.statSync(fullPath);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
@@ -502,16 +571,139 @@ const server = http.createServer(async (req, res) => {
         size: stats.size,
         lastModified: stats.mtime.toISOString(),
         accessScope: scope,
+        sensitivity,
         content
+      }, null, 2));
+    } catch (e) {
+      denyFile('访问被拒绝');
+    }
+    log(`知识库文件: scope=${scope}, sens=${sensitivity}, ${relativePath}`, 'REQUEST');
+    return;
+  }
+  
+
+  // 知识库服务端检索（前端不再全量拉取索引）
+  if (pathname === '/api/kb/search') {
+    const scope = getAccessScope(req);
+    const q = (reqUrl.searchParams.get('q') || '').trim();
+    const categories = (reqUrl.searchParams.get('categories') || '').split(',').filter(c => c);
+    const topK = Math.min(parseInt(reqUrl.searchParams.get('topK') || '20'), 100);
+    
+    if (!q) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '缺少查询参数q' }));
+      return;
+    }
+    
+    try {
+      if (!fs.existsSync(KB_INDEX_FILE)) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '索引文件不存在' }));
+        return;
+      }
+      const indexData = JSON.parse(fs.readFileSync(KB_INDEX_FILE, 'utf-8'));
+      let slices = indexData.slices || [];
+      
+      // 分类过滤
+      if (categories.length > 0) {
+        slices = slices.filter(s => categories.includes(s.category));
+      }
+      
+      // 敏感级别过滤（根据访问范围）
+      slices = filterSlicesByScope(slices, scope);
+      
+      // 跳过no_outbound切片（对外场景不引用财务数据）
+      // 注意：本机内部分析场景仍可通过/api/kb/index获取
+      
+      // 关键词检索 + 排序
+      const keywords = q.toLowerCase().split(/\s+/).filter(k => k.length > 0);
+      const scored = [];
+      for (const slice of slices) {
+        let score = 0;
+        const titleText = (slice.titleChain || []).join(' ').toLowerCase();
+        const bodyText = (slice.text || '').toLowerCase();
+        const fileName = (slice.fileName || '').toLowerCase();
+        
+        for (const kw of keywords) {
+          // 标题命中权重×5
+          const titleHits = (titleText.match(new RegExp(escapeRegex(kw), 'g')) || []).length;
+          score += titleHits * 5;
+          // 文件名命中权重×3
+          const fileHits = (fileName.match(new RegExp(escapeRegex(kw), 'g')) || []).length;
+          score += fileHits * 3;
+          // 正文命中权重×1
+          const bodyHits = (bodyText.match(new RegExp(escapeRegex(kw), 'g')) || []).length;
+          score += bodyHits * 1;
+        }
+        
+        // authority=high加权×2
+        if (slice.authority === 'high') {
+          score *= 2;
+        }
+        // deprecated降权×0.3
+        if (slice.deprecated) {
+          score *= 0.3;
+        }
+        // no_outbound降权×0.5
+        if (slice.noOutbound) {
+          score *= 0.5;
+        }
+        
+        if (score > 0) {
+          // 提取命中片段（前后各100字）
+          let snippet = '';
+          const firstKw = keywords[0];
+          const idx = bodyText.indexOf(firstKw);
+          if (idx >= 0) {
+            const start = Math.max(0, idx - 100);
+            const end = Math.min(slice.text.length, idx + firstKw.length + 100);
+            snippet = (start > 0 ? '...' : '') + slice.text.substring(start, end) + (end < slice.text.length ? '...' : '');
+          } else {
+            snippet = slice.text.substring(0, 200) + '...';
+          }
+          
+          scored.push({
+            id: slice.id,
+            filePath: slice.filePath,
+            fileName: slice.fileName,
+            category: slice.category,
+            titleChain: slice.titleChain,
+            snippet,
+            sensitivity: slice.sensitivity,
+            authority: slice.authority,
+            deprecated: slice.deprecated,
+            noOutbound: slice.noOutbound,
+            version: slice.version,
+            lastUpdated: slice.lastUpdated,
+            score: Math.round(score * 100) / 100
+          });
+        }
+      }
+      
+      // 按分数降序
+      scored.sort((a, b) => b.score - a.score);
+      
+      // 只返回topK
+      const results = scored.slice(0, topK);
+      
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        query: q,
+        accessScope: scope,
+        totalCandidates: slices.length,
+        totalMatches: scored.length,
+        returned: results.length,
+        topK,
+        results
       }, null, 2));
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: e.message }));
     }
-    log(`知识库文件: scope=${scope}, ${relativePath}`, 'REQUEST');
+    log(`知识库检索: scope=${scope}, q="${q}", matches=${scored ? scored.length : 0}`, 'REQUEST');
     return;
   }
-  
+
   // ============ 静态文件 ============
   let filePath;
   if (pathname === '/' || pathname === '') {

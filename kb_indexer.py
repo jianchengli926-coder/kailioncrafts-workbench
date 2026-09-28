@@ -75,10 +75,10 @@ def parse_frontmatter(content):
     return fm, body
 
 
-def split_by_headings(body, min_chars=300, max_chars=800):
-    """按标题层级切片，每片300-800字"""
+def split_by_headings(body, min_chars=300, max_chars=800, merge_threshold=100):
+    """按标题层级切片，每片300-800字，过短切片(少于100字)与相邻片合并"""
     lines = body.split('\n')
-    slices = []
+    raw_slices = []
     current_title_chain = []
     current_text = []
     current_chars = 0
@@ -87,7 +87,7 @@ def split_by_headings(body, min_chars=300, max_chars=800):
         nonlocal current_text, current_chars
         text = '\n'.join(current_text).strip()
         if text and len(text) > 20:
-            slices.append({
+            raw_slices.append({
                 'title_chain': list(current_title_chain),
                 'text': text,
                 'char_count': len(text)
@@ -97,16 +97,13 @@ def split_by_headings(body, min_chars=300, max_chars=800):
 
     for line in lines:
         stripped = line.strip()
-        # 检测标题
         heading_match = re.match(r'^(#{1,4})\s+(.+)$', stripped)
         if heading_match:
             level = len(heading_match.group(1))
             title = heading_match.group(2).strip()
-            # 更新标题链
             if level <= len(current_title_chain):
                 current_title_chain = current_title_chain[:level - 1]
             current_title_chain.append(title)
-            # 如果当前切片已有足够内容，先刷新
             if current_chars >= min_chars:
                 flush_slice()
             current_text.append(line)
@@ -114,13 +111,34 @@ def split_by_headings(body, min_chars=300, max_chars=800):
         else:
             current_text.append(line)
             current_chars += len(line)
-            # 超过最大长度时强制切片
             if current_chars >= max_chars:
                 flush_slice()
 
-    # 刷新最后一片
     flush_slice()
-    return slices
+
+    # 合并过短切片（少于merge_threshold字）
+    if len(raw_slices) <= 1:
+        return raw_slices
+
+    merged = []
+    i = 0
+    while i < len(raw_slices):
+        current = raw_slices[i]
+        # 如果当前切片过短，尝试与下一片合并
+        if current['char_count'] < merge_threshold and i + 1 < len(raw_slices):
+            next_slice = raw_slices[i + 1]
+            merged_text = current['text'] + '\n\n' + next_slice['text']
+            merged.append({
+                'title_chain': current['title_chain'] if current['title_chain'] else next_slice['title_chain'],
+                'text': merged_text,
+                'char_count': len(merged_text)
+            })
+            i += 2
+        else:
+            merged.append(current)
+            i += 1
+
+    return merged
 
 
 def is_deprecated(content, fm):

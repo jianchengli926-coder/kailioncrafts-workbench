@@ -22421,6 +22421,181 @@ async function handleObjectionAI(cid, objectionType, objectionDetail){
   }
 }
 
+
+
+/* ============================================================
+ * 任务三：开发信质量与送达管理
+ * ============================================================ */
+
+/* 垃圾邮件触发词库 */
+const SPAM_TRIGGER_WORDS = [
+  {word:'free', level:'high', reason:'免费类词汇易触发垃圾邮件过滤'},
+  {word:'100% free', level:'high', reason:'绝对化免费表述'},
+  {word:'act now', level:'high', reason:'紧迫感过度'},
+  {word:'limited time', level:'medium', reason:'限时促销表述'},
+  {word:'urgent', level:'high', reason:'紧急感过度'},
+  {word:'buy now', level:'high', reason:'直接购买指令'},
+  {word:'click here', level:'medium', reason:'通用点击指令'},
+  {word:'order now', level:'high', reason:'直接下单指令'},
+  {word:'discount', level:'medium', reason:'折扣类词汇'},
+  {word:'cheap', level:'high', reason:'低价类词汇'},
+  {word:'lowest price', level:'high', reason:'最低价绝对化表述'},
+  {word:'guarantee', level:'medium', reason:'保证类词汇'},
+  {word:'earn money', level:'high', reason:'赚钱类词汇'},
+  {word:'make money', level:'high', reason:'赚钱类词汇'},
+  {word:'extra income', level:'high', reason:'额外收入类词汇'},
+  {word:'work from home', level:'high', reason:'居家工作类词汇'},
+  {word:'no obligation', level:'medium', reason:'无义务类表述'},
+  {word:'risk free', level:'high', reason:'无风险绝对化表述'},
+  {word:'money back', level:'medium', reason:'退款类表述'},
+  {word:'winner', level:'medium', reason:'中奖类词汇'},
+  {word:'congratulations', level:'medium', reason:'恭喜类词汇'},
+  {word:'you have been selected', level:'high', reason:'被选中类表述'},
+  {word:'amazing', level:'low', reason:'夸张形容词'},
+  {word:'incredible', level:'low', reason:'夸张形容词'},
+  {word:'miracle', level:'high', reason:'奇迹类词汇'},
+  {word:'cure', level:'high', reason:'治愈类词汇'},
+  {word:'lose weight', level:'high', reason:'减肥类词汇'},
+  {word:'viagra', level:'high', reason:'药品类词汇'},
+  {word:'casino', level:'high', reason:'赌博类词汇'},
+  {word:'loan', level:'high', reason:'贷款类词汇'},
+  {word:'credit card', level:'medium', reason:'信用卡类词汇'},
+  {word:'password', level:'high', reason:'密码类词汇'},
+  {word:'verify your account', level:'high', reason:'账户验证类钓鱼表述'},
+  {word:'suspended', level:'high', reason:'账户冻结类表述'},
+  {word:'unsubscribe', level:'low', reason:'退订链接（合规需要但过多会影响）'}
+];
+
+/* 开发信质量检测 */
+function checkEmailQuality(subject, body, customerName=''){
+  const issues = [];
+  const warnings = [];
+  const suggestions = [];
+  let score = 100;
+  
+  // 1. 主题行检测
+  if(!subject || !subject.trim()){
+    issues.push('主题行为空');
+    score -= 20;
+  } else {
+    if(subject.length > 60){ warnings.push('主题行过长（' + subject.length + '字符），建议控制在50字符以内'); score -= 5; }
+    if(subject.length < 10){ warnings.push('主题行过短，缺乏信息量'); score -= 3; }
+    if(subject.includes('!') && (subject.match(/!/g)||[]).length > 1){ warnings.push('主题行感叹号过多，显得不专业'); score -= 5; }
+    if(subject === subject.toUpperCase() && subject.length > 5){ warnings.push('主题行全大写，容易被标记为垃圾邮件'); score -= 10; }
+  }
+  
+  // 2. 正文检测
+  if(!body || !body.trim()){
+    issues.push('正文为空');
+    score -= 30;
+  } else {
+    const wordCount = body.split(/\s+/).filter(w=>w.length>0).length;
+    
+    // 长度检测
+    if(wordCount > 200){ warnings.push('正文过长（' + wordCount + '词），开发信建议控制在80-120词'); score -= 8; }
+    if(wordCount < 30){ warnings.push('正文过短（' + wordCount + '词），信息量不足'); score -= 5; }
+    
+    // 垃圾词检测
+    const bodyLower = body.toLowerCase();
+    const subjectLower = (subject||'').toLowerCase();
+    const foundSpamWords = [];
+    SPAM_TRIGGER_WORDS.forEach(w=>{
+      if(bodyLower.includes(w.word) || subjectLower.includes(w.word)){
+        foundSpamWords.push(w);
+        if(w.level==='high'){ score -= 8; issues.push('高风险垃圾词："' + w.word + '" - ' + w.reason); }
+        else if(w.level==='medium'){ score -= 4; warnings.push('中风险垃圾词："' + w.word + '" - ' + w.reason); }
+        else { score -= 2; suggestions.push('低风险词汇："' + w.word + '" - 建议替换更专业表述'); }
+      }
+    });
+    
+    // 个性化检测
+    const hasPersonalization = customerName && (body.includes(customerName) || body.includes(customerName.split(' ')[0]));
+    if(!hasPersonalization){
+      warnings.push('正文未包含客户名称，个性化程度不足');
+      score -= 10;
+      suggestions.push('在正文中提及客户公司名或联系人姓名，提升个性化');
+    }
+    
+    // CTA检测
+    const hasCTA = /would you|can we|could we|let me|please let|are you interested|would you be open|may i send|can i send/i.test(body);
+    if(!hasCTA){
+      warnings.push('正文缺乏明确的行动号召（CTA）');
+      score -= 10;
+      suggestions.push('在结尾添加明确但不强硬的行动号召，如"Would you be open to..."');
+    }
+    
+    // 称呼检测
+    const hasGreeting = /^(hi|hello|dear)\s/i.test(body.trim());
+    if(!hasGreeting){
+      suggestions.push('建议以"Hi [Name]"或"Dear [Name]"开头');
+    }
+    
+    // 签名检测
+    const hasSignature = /(best|regards|cheers|sincerely)\s*,?\s*$/i.test(body.trim()) || body.includes('Best,') || body.includes('Regards,');
+    if(!hasSignature){
+      suggestions.push('建议添加专业的邮件签名（Best regards, [Name]）');
+    }
+    
+    // 链接检测
+    const urlCount = (body.match(/https?:\/\//g)||[]).length;
+    if(urlCount > 2){ warnings.push('正文中链接过多（' + urlCount + '个），可能触发垃圾邮件过滤'); score -= 5; }
+    
+    // 附件提示
+    if(body.includes('attached') || body.includes('attachment')){
+      suggestions.push('提及附件时确保附件大小合理（<5MB），文件名专业');
+    }
+  }
+  
+  score = Math.max(0, Math.min(100, score));
+  
+  return {
+    score: score,
+    grade: score>=85?'A':score>=70?'B':score>=50?'C':'D',
+    issues: issues,
+    warnings: warnings,
+    suggestions: suggestions,
+    spamWordsFound: SPAM_TRIGGER_WORDS.filter(w=> (body||'').toLowerCase().includes(w.word) || (subject||'').toLowerCase().includes(w.word)),
+    wordCount: (body||'').split(/\s+/).filter(w=>w.length>0).length
+  };
+}
+
+/* 渲染开发信质量检测结果 */
+function renderEmailQualityResult(result, containerId){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  
+  const scoreColor = result.score>=85?'#16a34a':result.score>=70?'#d97706':result.score>=50?'#dc2626':'#991b1b';
+  const gradeColor = result.grade==='A'?'#16a34a':result.grade==='B'?'#d97706':result.grade==='C'?'#dc2626':'#991b1b';
+  
+  let html = '<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">' +
+    '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:' + scoreColor + '">' + result.score + '</div><div style="font-size:10px;color:#64748b">质量评分</div></div>' +
+    '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:' + gradeColor + '">' + result.grade + '</div><div style="font-size:10px;color:#64748b">质量等级</div></div>' +
+    '<div style="flex:1"><div style="font-size:11px;color:#64748b;margin-bottom:4px">字数：' + result.wordCount + ' | 问题：' + result.issues.length + ' | 警告：' + result.warnings.length + ' | 建议：' + result.suggestions.length + '</div>' +
+    '<div style="background:#e5e7eb;border-radius:4px;height:8px;overflow:hidden"><div style="width:' + result.score + '%;background:' + scoreColor + ';height:100%"></div></div></div></div>';
+  
+  if(result.issues.length){
+    html += '<div style="background:#fef2f2;padding:12px;border-radius:8px;margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:8px">❌ 必须修复的问题（' + result.issues.length + '项）</div>' +
+      result.issues.map(i=>'<div style="font-size:11px;color:#991b1b;margin-bottom:4px">• ' + i + '</div>').join('') + '</div>';
+  }
+  
+  if(result.warnings.length){
+    html += '<div style="background:#fffbeb;padding:12px;border-radius:8px;margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px">⚠️ 需要注意的警告（' + result.warnings.length + '项）</div>' +
+      result.warnings.map(w=>'<div style="font-size:11px;color:#92400e;margin-bottom:4px">• ' + w + '</div>').join('') + '</div>';
+  }
+  
+  if(result.suggestions.length){
+    html += '<div style="background:#eff6ff;padding:12px;border-radius:8px;margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px">💡 优化建议（' + result.suggestions.length + '项）</div>' +
+      result.suggestions.map(s=>'<div style="font-size:11px;color:#1e40af;margin-bottom:4px">• ' + s + '</div>').join('') + '</div>';
+  }
+  
+  if(result.spamWordsFound.length){
+    html += '<div style="background:#faf5ff;padding:12px;border-radius:8px"><div style="font-size:12px;font-weight:700;color:#6b21a8;margin-bottom:8px">🔍 检测到的垃圾触发词（' + result.spamWordsFound.length + '个）</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">' + result.spamWordsFound.map(w=>'<span class="badge" style="background:' + (w.level==='high'?'#fecaca':w.level==='medium'?'#fef3c7':'#e0e7ff') + ';color:' + (w.level==='high'?'#991b1b':w.level==='medium'?'#92400e':'#3730a3') + ';font-size:10px;padding:4px 8px">' + w.word + ' (' + w.level + ')</span>').join('') + '</div></div>';
+  }
+  
+  el.innerHTML = html;
+}
+
 </script>
 
 <!-- V75.3 全局AI助手悬浮窗 -->

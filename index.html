@@ -1688,9 +1688,36 @@ function isModelRecentlyFailed(cfgId){
   if(Date.now() - cached.time > FAIL_CACHE_TTL){ modelFailCache.delete(cfgId); return false; }
   return true;
 }
+// V75.5 严格主备模式：本阶段固定 GLM→Ollama三模型，其他在线模型默认关闭
+const AI_STRICT_MODE = true;
+const AI_OLLAMA_PRIORITY = ['qwen2.5:7b', 'deepseek-r1:7b', 'qwen2.5vl:7b'];
+
 function getFallbackChain(opts={}){
   const cfgs = (S.apis||[]).filter(a=>a.enabled && a.caps && (a.caps.assistant||a.caps.lead||a.caps.draft));
   if(!cfgs.length) return [];
+  
+  // V75.5 严格主备模式：只1个GLM + 固定顺序的Ollama三模型（GLM失败直接切Ollama）
+  if(AI_STRICT_MODE){
+    const glmModels = cfgs.filter(a=>a.type==='zhipu');
+    const ollamaModels = cfgs.filter(a=>a.type==='ollama');
+    // 只保留1个GLM：isDefault优先，否则取第一个
+    const defaultGlm = glmModels.find(a=>a.isDefault) || glmModels[0];
+    const sortedGlm = defaultGlm ? [defaultGlm] : [];
+    // Ollama按固定优先级排序
+    const sortedOllama = ollamaModels.sort((a,b)=>{
+      const ai = AI_OLLAMA_PRIORITY.indexOf(a.model);
+      const bi = AI_OLLAMA_PRIORITY.indexOf(b.model);
+      if(ai===-1 && bi===-1) return (a.model||'').localeCompare(b.model||'');
+      if(ai===-1) return 1;
+      if(bi===-1) return -1;
+      return ai - bi;
+    });
+    const chain = sortedGlm.concat(sortedOllama);
+    const seen = new Set();
+    return chain.filter(a=>{ if(seen.has(a.id)) return false; seen.add(a.id); return true; });
+  }
+  
+  // 原有逻辑（非严格模式）
   const purpose = opts.purpose || '';
   const isReasoning = ['score','lead','profile','analysis','reasoning','关键词','画像','评分','分析'].some(k=>purpose.includes(k));
   const online = cfgs.filter(a=>a.type!=='ollama');
@@ -7462,6 +7489,15 @@ document.addEventListener('DOMContentLoaded', function(){
   setTimeout(fetchKBStatus, 500);
   // V75.4 页面初始化时自动检测Ollama本地模型
   setTimeout(()=>{ if(typeof detectOllamaModels==='function'){ detectOllamaModels().then(()=>{ if(typeof renderProviderStatus==='function') renderProviderStatus(); }); } }, 2000);
+  // V75.5 读取服务端AI配置（api_config.json，不返回完整Key）
+  fetch('/api/ai/config').then(r=>r.json()).then(cfg=>{
+    window.AI_SERVER_CONFIG = cfg;
+    if(cfg.glm && cfg.glm.configured){
+      console.log('[AI配置] 服务端GLM已配置，将优先使用api_config.json');
+    }else{
+      console.log('[AI配置] 服务端GLM未配置，使用前端defaultApis');
+    }
+  }).catch(e=>console.log('[AI配置] 读取失败:', e.message));
   try{ migrateData(); }catch(e){ console.error('数据迁移失败:', e); }
   const welcomeShown = localStorage.getItem('kailion_welcome_shown');
   if(!welcomeShown){

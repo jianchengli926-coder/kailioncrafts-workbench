@@ -704,6 +704,42 @@ const server = http.createServer(async (req, res) => {
   // ============ 知识库API（只读） ============
   
   // 访问范围调试接口（仅本机可访问）
+  // AI模型配置接口（读取api_config.json，不返回完整Key）
+  if (pathname === '/api/ai/config') {
+    try {
+      const configPath = require('path').join(ROOT_DIR, 'api_config.json');
+      if (!require('fs').existsSync(configPath)) {
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({configured:false, glm:{configured:false,model:null,endpoint:null}, ollama:{configured:false,baseURL:null}}));
+        return;
+      }
+      const cfg = JSON.parse(require('fs').readFileSync(configPath, 'utf8'));
+      const glm = cfg.glm || {};
+      const ollama = cfg.ollama || {};
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({
+        configured: true,
+        glm: {
+          enabled: glm.enabled !== false,
+          configured: !!(glm.apiKey && glm.apiKey.length > 0),
+          model: glm.model || null,
+          endpoint: glm.endpoint || null,
+          timeout: glm.timeout || 30000
+        },
+        ollama: {
+          enabled: ollama.enabled !== false,
+          baseURL: ollama.baseURL || 'http://localhost:11434/v1'
+        },
+        providerOrder: cfg.providerOrder || ['glm', 'ollama']
+      }));
+      return;
+    } catch(e) {
+      res.writeHead(500, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({configured:false, error:'配置读取失败'}));
+      return;
+    }
+  }
+
   if (pathname === '/api/kb/scope-debug') {
     const scope = getAccessScope(req);
     if (scope !== 'local') {

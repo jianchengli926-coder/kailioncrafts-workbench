@@ -1985,6 +1985,27 @@ const FACT_SANITIZE_RULES = [
   {pattern: /(?:自有|自己的|我们的)\s*(?:工厂|生产线|生产基地)/gi, replacement: 'strategic manufacturing partners'},
   // 中文"家族工厂" → 安全表述
   {pattern: /家族\s*(?:工厂|企业|产业)/gi, replacement: 'strategic manufacturing partners'},
+  // ========== 语义级模糊承诺过滤（V75.6新增：不带数字的不当承诺） ==========
+  // 全认证/认证齐全 → 删除或安全表述
+  {pattern: /(?:全认证|认证齐全|全面认证|完整认证|所有认证|各类认证)\s*(?:产品|工厂|企业|资质|能力)?/gi, replacement: '认证要求可根据具体产品与市场进一步确认'},
+  {pattern: /\b(?:fully certified|all certifications|complete certifications|certifications available|certified products?|wide range of certifications)\b/gi, replacement: 'certification requirements can be confirmed based on specific product and market'},
+  // 成本优势显著/有竞争力的成本（不带数字）→ 删除或安全表述
+  {pattern: /(?:成本优势显著|成本优势明显|极具成本优势|显著的成本优势|成本竞争力强|成本优化已验证|成本可控)/gi, replacement: '可根据项目需求进一步评估供应方案'},
+  {pattern: /\b(?:competitive cost advantage|significant cost advantage|strong cost advantage|cost advantage(?!\s*[:：]?\s*待确认)|lower cost(?!\s*[:：]?\s*待确认)|cost competitive|cost-effective solution)\b/gi, replacement: 'supply options can be further evaluated based on project requirements'},
+  // 出口全球/服务全球 → 删除或安全表述
+  {pattern: /(?:出口全球|远销全球|畅销全球|服务全球|全球供应|全球出口|全球市场覆盖|产品远销)/gi, replacement: '可协助沟通出口与项目需求'},
+  {pattern: /\b(?:global export|export worldwide|worldwide export|serve global markets?|global market coverage|export to global)\b/gi, replacement: 'can assist with export and project requirements'},
+  // 自有工厂/自有生产线（增强，覆盖更多变体）
+  {pattern: /(?:自有|自己的|我们自己的)\s*(?:工厂|生产线|生产基地|制造厂|车间|产线)/gi, replacement: 'strategic manufacturing partners'},
+  {pattern: /\b(?:own production line|own manufacturing line|in-house production|in-house manufacturing|own factory|our own factory)\b/gi, replacement: 'strategic manufacturing partners'},
+  // 保证MOQ/交期/产能 → 待确认
+  {pattern: /(?:保证|确保|承诺)\s*(?:MOQ|起订量|最低订量|交期|交货期|交付|产能|产量|质量)/gi, replacement: '需根据产品规格、订单数量和项目要求确认'},
+  {pattern: /\b(?:guaranteed MOQ|guaranteed lead time|guaranteed capacity|verified capacity|assured delivery)\b/gi, replacement: 'to be confirmed based on product specifications, order quantity and project requirements'},
+  // 真实客户案例/客户成果 → 待确认
+  {pattern: /(?:真实客户案例|成功客户案例|客户成功案例|客户成果展示|标杆客户|知名客户合作)\s*[:：]?[^。.]{0,100}/gi, replacement: '[客户案例: 待确认 - 需提供真实客户授权]'},
+  {pattern: /\b(?:proven client results|verified client success|successful client case|trusted by leading brands)\b/gi, replacement: '[client case: to be confirmed - requires real client authorization]'},
+  // 免费样品（不带数字的中文）→ 待确认
+  {pattern: /(?:免费样品|免费寄样|免费提供样品|免费打样)/gi, replacement: '[样品政策: 待确认]'},
 ];
 
 const FACT_CONSTRAINT_PROMPT = '\n\n【事实约束·强制】未在公司事实库中确认的SKU数、认证、产能、MOQ、交期、客户案例、出口国家数一律输出"待确认"，不得编造具体数字；合作工厂必须表述为strategic manufacturing partners，不得写成KaiLionCrafts自有工厂或自有认证；不得输出成本、底价、利润、价格优势百分比、免费服务承诺；所有AI输出为草稿，需人工审核后发送。';
@@ -2017,6 +2038,68 @@ function sanitizeFactsForAI(messages){
     console.log('[事实过滤] 已过滤 ' + sanitizedCount + ' 处敏感事实');
   }
   return isString ? msgs[0].content : msgs;
+}
+
+// V75.6 最终输出安全检查层：模型返回内容后再过滤一次，处理不带数字的模糊承诺
+const OUTPUT_SANITIZE_RULES = [
+  // 全认证类
+  {pattern: /(?:全认证|认证齐全|全面认证|完整认证|所有认证|各类认证)\s*(?:产品|工厂|企业|资质|能力)?/gi, replacement: '认证要求可根据具体产品与市场进一步确认'},
+  {pattern: /\b(?:fully certified|all certifications|complete certifications|certifications available|certified products?|wide range of certifications)\b/gi, replacement: 'certification requirements can be confirmed based on specific product and market'},
+  // 成本优势类（不带数字）
+  {pattern: /(?:成本优势显著|成本优势明显|极具成本优势|显著的成本优势|成本竞争力强|成本优化已验证|成本可控|具有成本优势)/gi, replacement: '可根据项目需求进一步评估供应方案'},
+  {pattern: /\b(?:competitive cost advantage|significant cost advantage|strong cost advantage|cost advantage|lower cost|cost competitive|cost-effective)\b/gi, replacement: 'supply options can be further evaluated based on project requirements'},
+  // 出口全球类
+  {pattern: /(?:出口全球|远销全球|畅销全球|服务全球|全球供应|全球出口|全球市场覆盖|产品远销|销往全球)/gi, replacement: '可协助沟通出口与项目需求'},
+  {pattern: /\b(?:global export|export worldwide|worldwide export|serve global markets?|global market coverage|export to global|worldwide delivery)\b/gi, replacement: 'can assist with export and project requirements'},
+  // 自有工厂类
+  {pattern: /(?:自有|自己的|我们自己的)\s*(?:工厂|生产线|生产基地|制造厂|车间|产线)/gi, replacement: 'strategic manufacturing partners'},
+  {pattern: /\b(?:own production line|own manufacturing line|in-house production|in-house manufacturing|own factory|our own factory|we own factory)\b/gi, replacement: 'strategic manufacturing partners'},
+  // 保证类
+  {pattern: /(?:保证|确保|承诺)\s*(?:MOQ|起订量|最低订量|交期|交货期|交付|产能|产量|质量)/gi, replacement: '需根据产品规格、订单数量和项目要求确认'},
+  {pattern: /\b(?:guaranteed MOQ|guaranteed lead time|guaranteed capacity|verified capacity|assured delivery)\b/gi, replacement: 'to be confirmed based on product specifications, order quantity and project requirements'},
+  // 客户案例类
+  {pattern: /(?:真实客户案例|成功客户案例|客户成功案例|客户成果展示|标杆客户|知名客户合作)/gi, replacement: '[客户案例: 待确认]'},
+  {pattern: /\b(?:proven client results|verified client success|successful client case|trusted by leading brands)\b/gi, replacement: '[client case: to be confirmed]'},
+  // 免费样品类
+  {pattern: /(?:免费样品|免费寄样|免费提供样品|免费打样)/gi, replacement: '[样品政策: 待确认]'},
+  {pattern: /\bfree samples?\b/gi, replacement: '[sample policy: to be confirmed]'},
+];
+
+function sanitizeOutput(content){
+  if(!content || typeof content !== 'string') return content;
+  let text = content;
+  let count = 0;
+  for(const rule of OUTPUT_SANITIZE_RULES){
+    const before = text;
+    text = text.replace(rule.pattern, rule.replacement);
+    if(text !== before) count++;
+  }
+  if(count > 0){
+    console.log('[输出过滤] 已过滤 ' + count + ' 处语义级不当承诺');
+  }
+  return text;
+}
+
+// V75.6 故障转移模拟开关（仅本机测试用，不修改真实Key/网络配置）
+const AI_TEST_FAILURES = { glm:false, qwen:false, deepseek:false, qwenvl:false };
+function setTestFailure(model, value){
+  if(AI_TEST_FAILURES.hasOwnProperty(model)){
+    AI_TEST_FAILURES[model] = !!value;
+    console.log('[测试模拟] ' + model + ' 失败模拟: ' + (value ? '开启' : '关闭'));
+  }
+}
+function resetTestFailures(){
+  for(const k in AI_TEST_FAILURES) AI_TEST_FAILURES[k] = false;
+  console.log('[测试模拟] 所有失败模拟已重置');
+}
+function shouldSimulateFailure(cfg){
+  if(!cfg || !cfg.model) return false;
+  const m = cfg.model.toLowerCase();
+  if(AI_TEST_FAILURES.glm && cfg.type === 'zhipu') return true;
+  if(AI_TEST_FAILURES.qwen && m.indexOf('qwen2.5:7b') >= 0 && m.indexOf('vl') === -1) return true;
+  if(AI_TEST_FAILURES.deepseek && m.indexOf('deepseek') >= 0) return true;
+  if(AI_TEST_FAILURES.qwenvl && m.indexOf('qwen2.5vl') >= 0) return true;
+  return false;
 }
 
 async function callAI(messages, opts={}){
@@ -2056,6 +2139,14 @@ async function callAI(messages, opts={}){
     // V75.4 GLM主模型重试1次（仅第一个在线模型，且不是预算跳过的情况）
     let retryCount = 0;
     const shouldRetry = (i===0 && cfg.type!=='ollama' && !isModelRecentlyFailed(cfg.id));
+    // V75.6 故障转移模拟检查（仅本机测试用，立即抛出受控错误，不等待超时）
+    if(shouldSimulateFailure(cfg)){
+      const failMsg = 'TEST_FAILURE: 模拟' + cfg.name + '失败（测试模式）';
+      console.log('[测试模拟] ' + failMsg);
+      errors.push(cfg.name + ': 模拟失败（测试模式）');
+      if(cfg.type!=='ollama') markModelFailed(cfg.id, '模拟失败');
+      continue;
+    }
     try{
       const controller = new AbortController();
       // V73 差异化超时：Gemini网络不稳定用15秒快速失败，其他模型用30秒
@@ -2098,6 +2189,12 @@ async function callAI(messages, opts={}){
       const cost = calcApiCost(cfg.model, it, ot);
       logApiCall(cfg.model, opts.purpose||'general', it, ot, cost, 'success');
       if(i>0) console.log('[故障转移] 第'+(i+1)+'个模型成功: '+cfg.name);
+      // V75.6 最终输出安全检查：模型返回内容后再过滤一次，处理不带数字的模糊承诺
+      const originalContent = content;
+      content = sanitizeOutput(content);
+      if(content !== originalContent){
+        console.log('[输出过滤] 模型输出已通过最终安全检查');
+      }
       // V75.4 记录Provider状态
       const providerType = cfg.type==='ollama' ? 'ollama' : (cfg.type==='gemini' ? 'gemini' : 'glm');
       recordProviderStatus(providerType, cfg.model, true, null, Math.round(performance.now()-t0), i);

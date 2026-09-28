@@ -22945,6 +22945,187 @@ function getConsoleErrors(){
   return window._consoleErrors || [];
 }
 
+
+
+/* ============================================================
+ * 任务四：客户搜索与线索来源规范化
+ * ============================================================ */
+
+/* 线索来源类型 */
+const LEAD_SOURCES = [
+  {value:'exhibition', label:'展会', icon:'🎪'},
+  {value:'customs', label:'海关数据', icon:'📦'},
+  {value:'linkedin', label:'LinkedIn', icon:'💼'},
+  {value:'google', label:'Google搜索', icon:'🔍'},
+  {value:'amazon', label:'Amazon卖家', icon:'📱'},
+  {value:'b2b_platform', label:'B2B平台', icon:'🏢'},
+  {value:'website_inquiry', label:'独立站询盘', icon:'🌐'},
+  {value:'referral', label:'客户转介绍', icon:'🤝'},
+  {value:'whatsapp', label:'WhatsApp', icon:'💬'},
+  {value:'other', label:'其他', icon:'📌'}
+];
+
+/* 线索质量评分维度 */
+function scoreLead(lead){
+  let score = 0;
+  const reasons = [];
+  
+  // 公司信息完整度
+  if(lead.company && lead.company.length > 2){ score += 15; reasons.push('公司名称完整 +15'); }
+  if(lead.website){ score += 10; reasons.push('有官网 +10'); }
+  if(lead.country){ score += 5; reasons.push('有国家信息 +5'); }
+  
+  // 联系方式
+  if(lead.email && /@/.test(lead.email)){ score += 20; reasons.push('有有效邮箱 +20'); }
+  if(lead.whatsapp){ score += 10; reasons.push('有WhatsApp +10'); }
+  if(lead.linkedin){ score += 5; reasons.push('有LinkedIn +5'); }
+  
+  // 业务匹配度
+  if(lead.customerType){ score += 10; reasons.push('客户类型明确 +10'); }
+  if(lead.intentCategories && lead.intentCategories.length){ score += 10; reasons.push('意向品类明确 +10'); }
+  
+  // 来源质量
+  const sourceScores = {exhibition:10, customs:8, linkedin:8, google:5, amazon:7, b2b_platform:5, website_inquiry:15, referral:15, whatsapp:8};
+  if(sourceScores[lead.source]){ score += sourceScores[lead.source]; reasons.push('来源质量 +' + sourceScores[lead.source]); }
+  
+  score = Math.min(100, score);
+  const grade = score>=80?'A':score>=60?'B':score>=40?'C':'D';
+  
+  return {score, grade, reasons};
+}
+
+/* 线索去重检测 */
+function findDuplicateLeads(lead, leadsList){
+  const duplicates = [];
+  leadsList.forEach(existing=>{
+    if(existing.id === lead.id) return;
+    let matchScore = 0;
+    
+    // 邮箱完全匹配
+    if(lead.email && existing.email && lead.email.toLowerCase() === existing.email.toLowerCase()){
+      matchScore += 50;
+    }
+    // 公司名相似度
+    if(lead.company && existing.company){
+      const c1 = lead.company.toLowerCase().replace(/[^a-z0-9]/g,'');
+      const c2 = existing.company.toLowerCase().replace(/[^a-z0-9]/g,'');
+      if(c1 === c2) matchScore += 40;
+      else if(c1.includes(c2) || c2.includes(c1)) matchScore += 20;
+    }
+    // 官网匹配
+    if(lead.website && existing.website){
+      const w1 = lead.website.replace(/https?:\/\//,'').replace(/\/$/,'').toLowerCase();
+      const w2 = existing.website.replace(/https?:\/\//,'').replace(/\/$/,'').toLowerCase();
+      if(w1 === w2) matchScore += 30;
+    }
+    
+    if(matchScore >= 40){
+      duplicates.push({lead: existing, matchScore});
+    }
+  });
+  return duplicates.sort((a,b)=>b.matchScore - a.matchScore);
+}
+
+/* 合并两条线索 */
+function mergeLeads(primaryId, secondaryId){
+  const primary = S.customers.find(c=>c.id===primaryId);
+  const secondary = S.customers.find(c=>c.id===secondaryId);
+  if(!primary || !secondary) return null;
+  
+  // 合并字段：主记录优先，空字段从次记录补充
+  const merged = {...primary};
+  const fieldsToMerge = ['contact','email','phone','whatsapp','linkedin','website','country','customerType','products','source','notes'];
+  
+  fieldsToMerge.forEach(field=>{
+    if(!merged[field] && secondary[field]){
+      merged[field] = secondary[field];
+    }
+  });
+  
+  // 合并标签
+  const tags = new Set([...(primary.tags||[]), ...(secondary.tags||[])]);
+  merged.tags = [...tags];
+  
+  // 合并意向品类
+  const categories = new Set([...(primary.intentCategories||[]), ...(secondary.intentCategories||[])]);
+  merged.intentCategories = [...categories];
+  
+  // 合并时间线
+  merged.timeline = [...(primary.timeline||[]), ...(secondary.timeline||[])].sort((a,b)=>new Date(a.time)-new Date(b.time));
+  
+  // 记录合并事件
+  merged.timeline.push({
+    time: new Date().toISOString(),
+    type: 'system',
+    title: '线索合并',
+    content: '与客户 "' + (secondary.company||secondary.id) + '" 合并，保留主记录'
+  });
+  
+  // 删除次记录
+  S.customers = S.customers.filter(c=>c.id !== secondaryId);
+  
+  // 更新主记录
+  const idx = S.customers.findIndex(c=>c.id===primaryId);
+  if(idx >= 0) S.customers[idx] = merged;
+  
+  saveData();
+  return merged;
+}
+
+/* Amazon卖家线索分析模板 */
+function generateAmazonLeadAnalysis(asinOrUrl, productCategory){
+  const categories = {
+    kitchen_knives: {name:'厨房刀具', oemFit:'高', keySellingPoints:['差异化刀柄设计','高端钢材选择','品牌定制包装','套装组合优化'], riskFactors:['亚马逊刀具类目审核严格','需要FDA/LFGB食品接触认证','物流限制较多']},
+    scissors: {name:'专业剪刀', oemFit:'高', keySellingPoints:['工业级锋利度','人体工学手柄','专业用途细分','耐用性提升'], riskFactors:['竞争激烈价格战','需要明确专业定位']},
+    outdoor_knives: {name:'户外刀具', oemFit:'中高', keySellingPoints:['战术设计元素','多功能组合','户外场景定制','EDC便携设计'], riskFactors:['各国进口限制差异大','部分平台禁售','需要明确合规说明']},
+    kitchen_accessories: {name:'厨房配件', oemFit:'高', keySellingPoints:['套装组合销售','材质升级','功能创新','品牌视觉统一'], riskFactors:['品类分散需要聚焦','SKU管理复杂']}
+  };
+  
+  const cat = categories[productCategory] || categories.kitchen_knives;
+  
+  return {
+    asin: asinOrUrl,
+    category: cat.name,
+    oemFitScore: cat.oemFit,
+    analysisSteps: [
+      '1. 查看该ASIN的卖家信息（品牌名、卖家数量、是否有中国卖家）',
+      '2. 分析产品评论中的痛点（质量、包装、功能、价格）',
+      '3. 评估该卖家是否有自有品牌（Private Label）潜力',
+      '4. 查看卖家的其他产品，判断其产品线宽度',
+      '5. 评估OEM/ODM合作的匹配度'
+    ],
+    keySellingPoints: cat.keySellingPoints,
+    riskFactors: cat.riskFactors,
+    outreachAngle: '针对该卖家的产品痛点，提供OEM/ODM定制方案，强调差异化设计和供应链稳定性',
+    emailTemplate: 'Subject: Custom ' + cat.name + ' OEM Solution for Your Brand\n\nHi [Name],\n\nI noticed your ' + cat.name + ' listing on Amazon and see strong potential for your brand.\n\nWe specialize in OEM/ODM ' + cat.name + ' for Amazon sellers, with focus on:\n' + cat.keySellingPoints.map(p=>'- '+p).join('\n') + '\n\nWould you be open to discussing how we can help differentiate your products?\n\nBest regards,\nLeo Li',
+    note: '⚠️ 以上为分析模板，具体卖家信息需要手动核实，不得编造数据'
+  };
+}
+
+/* 线索转化为客户 */
+function convertLeadToCustomer(leadId){
+  const lead = S.customers.find(c=>c.id===leadId);
+  if(!lead) return null;
+  
+  lead.status = '待开发';
+  lead.convertedAt = new Date().toISOString();
+  
+  if(!lead.timeline) lead.timeline = [];
+  lead.timeline.push({
+    time: new Date().toISOString(),
+    type: 'system',
+    title: '线索转化',
+    content: '线索已转化为正式客户，进入待开发阶段'
+  });
+  
+  const score = scoreLead(lead);
+  lead.leadScore = score.score;
+  lead.leadGrade = score.grade;
+  
+  saveData();
+  return lead;
+}
+
 </script>
 
 <!-- V75.3 全局AI助手悬浮窗 -->

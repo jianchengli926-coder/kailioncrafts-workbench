@@ -65,10 +65,31 @@ const KB_ROOT = loadKbRoot();
 const KB_INDEX_FILE = path.join(ROOT_DIR, 'kb_index.json');
 const KB_META_DOCS_FILE = path.join(ROOT_DIR, 'kb_meta_docs.json');
 
+// V77.2 知识库索引进程内缓存（基于文件mtime，不引入Redis/数据库）
+let _kbIndexCache = { data: null, mtime: 0, path: null };
+
 // V77.0 知识库索引格式兼容层：新版v2(chunks) → 旧版(slices)
 function loadKbIndex() {
-  if (!fs.existsSync(KB_INDEX_FILE)) return null;
-  const data = JSON.parse(fs.readFileSync(KB_INDEX_FILE, 'utf-8'));
+  // V77.2: 进程内缓存，文件未变化时复用内存对象
+  try {
+    if (fs.existsSync(KB_INDEX_FILE)) {
+      const stat = fs.statSync(KB_INDEX_FILE);
+      if (_kbIndexCache.data && _kbIndexCache.mtime === stat.mtimeMs && _kbIndexCache.path === KB_INDEX_FILE) {
+        return _kbIndexCache.data;
+      }
+    }
+  } catch(e) { log('索引缓存状态检查失败: ' + e.message, 'WARN'); }
+
+  if (!fs.existsSync(KB_INDEX_FILE)) { _kbIndexCache = { data: null, mtime: 0, path: null }; return null; }
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(KB_INDEX_FILE, 'utf-8'));
+  } catch(e) {
+    // JSON解析失败时fail-closed，不永久缓存失败结果
+    log('kb_index.json解析失败(fail-closed): ' + e.message, 'ERROR');
+    _kbIndexCache = { data: null, mtime: 0, path: null };
+    return null;
+  }
   if (data.schemaVersion === 'v2.0' || (data.chunks && !data.slices)) {
     data.slices = data.chunks.map(c => ({
       ...c,
@@ -104,7 +125,109 @@ function loadKbIndex() {
     data.stats.authority_high = authHighCount;
     data.stats.no_outbound = noOutboundCount;
   }
+  // V77.2: 写入缓存（记录mtime用于失效检测）
+  try {
+    const stat = fs.statSync(KB_INDEX_FILE);
+    _kbIndexCache = { data: data, mtime: stat.mtimeMs, path: KB_INDEX_FILE };
+  } catch(e) { _kbIndexCache = { data: data, mtime: Date.now(), path: KB_INDEX_FILE }; }
   return data;
+}
+
+// V77.2 统一知识库上下文检索层（精准开发/模块C复用，不建立第二套解析逻辑）
+function retrieveKbContext(options) {
+  const { query, purpose = 'internal_ai', provider = 'online_glm', accessScope = 'local', limit = 15, categories = [], factOnly = false, templateOnly = false } = options || {};
+  const result = {
+    query: query || '', purpose: purpose, provider: provider, accessScope: accessScope,
+    totalMatched: 0, facts: [], templates: [], citations: [], excludedCount: 0,
+    policy: { sensitivityAllowed: [], factOnly: factOnly, templateOnly: templateOnly },
+    error: null, kbVersion: '', cacheHit: false
+  };
+  if (!query || !query.trim()) { result.error = 'empty_query'; return result; }
+  // purpose/provider 严格白名单
+  const VALID_PURPOSES = ['browse', 'internal_ai', 'outbound'];
+  const VALID_PROVIDERS = ['none', 'online_glm', 'local_ollama'];
+  if (!VALID_PURPOSES.includes(purpose)) { result.error = 'invalid_purpose'; return result; }
+  if (!VALID_PROVIDERS.includes(provider)) { result.error = 'invalid_provider'; return result; }
+  if (purpose === 'browse' && provider !== 'none') { result.error = 'invalid_combination'; return result; }
+  if ((purpose === 'internal_ai' || purpose === 'outbound') && provider === 'none') { result.error = 'invalid_combination'; return result; }
+  // 加载索引（带缓存）
+  const indexData = loadKbIndex();
+  if (!indexData) { result.error = 'index_unavailable'; return result; }
+  result.kbVersion = indexData.kbVersion || indexData.version || '';
+  let slices = indexData.slices || [];
+  // 分类过滤
+  if (categories && categories.length > 0) {
+    slices = slices.filter(s => categories.includes(s.category) || categories.includes(s.dirCategory) || categories.includes(s.fmCategory));
+  }
+  // 访问范围过滤（99目录非local排除）
+  slices = filterSlicesByScope(slices, accessScope);
+  // purpose/provider 权限过滤
+  let beforeCount = slices.length;
+  if (purpose === 'internal_ai') {
+    if (provider === 'online_glm') {
+      slices = slices.filter(s => s.sensitivity === 'public');
+      result.policy.sensitivityAllowed = ['public'];
+    } else if (provider === 'local_ollama') {
+      slices = slices.filter(s => s.sensitivity === 'public' || s.sensitivity === 'internal');
+      result.policy.sensitivityAllowed = ['public', 'internal'];
+    }
+    slices = slices.filter(s => s.sensitivity !== 'confidential');
+  } else if (purpose === 'outbound') {
+    slices = slices.filter(s => {
+      if (s.sensitivity !== 'public') return false;
+      if (s.pending || s.demo || s.deprecated || s.conflictReview || s.noOutbound) return false;
+      if (s.outboundEligible === false) return false;
+      const st = (s.status || '').toLowerCase();
+      return (st.includes('active') || st.includes('confirmed') || st.includes('正式') || st.includes('公开'));
+    });
+    result.policy.sensitivityAllowed = ['public'];
+  } else {
+    result.policy.sensitivityAllowed = accessScope === 'local' ? ['public','internal','confidential'] : (accessScope === 'lan' ? ['public','internal'] : ['public']);
+  }
+  result.excludedCount = beforeCount - slices.length;
+  // 检索
+  let metaDocs = { metaPatterns: [], boostKeywords: [], metaPenalty: 0.3 };
+  try { if (fs.existsSync(KB_META_DOCS_FILE)) metaDocs = JSON.parse(fs.readFileSync(KB_META_DOCS_FILE, 'utf-8')); } catch(e) {}
+  const searchResults = searchSlicesV2(slices, query, metaDocs);
+  result.totalMatched = searchResults.length;
+  // 按documentId去重
+  const seenDocs = new Map();
+  for (const r of searchResults) {
+    const docId = r.slice.documentId || r.slice.id || r.slice.chunkId;
+    if (!seenDocs.has(docId) || r.score > seenDocs.get(docId).score) seenDocs.set(docId, r);
+  }
+  const deduped = Array.from(seenDocs.values()).sort((a,b) => b.score - a.score);
+  const top = deduped.slice(0, Math.min(limit, 50));
+  // 事实与模板分离
+  for (const r of top) {
+    const s = r.slice;
+    const item = {
+      documentId: s.documentId || s.id || '',
+      chunkId: s.chunkId || s.id || '',
+      title: s.title || '',
+      relativePath: s.relativePath || s.filePath || '',
+      headingPath: s.headingPath || '',
+      dirCategory: s.dirCategory || s.category || '',
+      fmCategory: s.fmCategory || '',
+      sensitivity: s.sensitivity || 'internal',
+      status: s.status || '',
+      authorityLevel: s.authorityLevel || s.authority || 'medium',
+      confidence: s.confidence || 'medium',
+      factEligible: s.factEligible === true,
+      templateEligible: s.templateEligible === true,
+      sourceUrl: s.sourceUrl || '',
+      shortEvidence: (s.text || '').substring(0, 300),
+      score: r.score
+    };
+    // factOnly/templateOnly 过滤
+    if (factOnly && !item.factEligible) continue;
+    if (templateOnly && !item.templateEligible) continue;
+    if (item.factEligible && !item.templateEligible) result.facts.push(item);
+    else if (item.templateEligible && !item.factEligible) result.templates.push(item);
+    else { result.facts.push(item); result.templates.push(item); }
+    result.citations.push({ documentId: item.documentId, title: item.title, relativePath: item.relativePath, headingPath: item.headingPath, sensitivity: item.sensitivity, factEligible: item.factEligible, templateEligible: item.templateEligible, score: item.score });
+  }
+  return result;
 }
 
 // 在线模型API端点（用于健康检查）
@@ -1544,6 +1667,55 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: e.message }));
     }
     log(`知识库检索: scope=${scope}, q="${q}", matches=${scored ? scored.length : 0}`, 'REQUEST');
+    return;
+  }
+
+  // V77.2 统一知识库上下文检索API（精准开发客户画像/模块C复用）
+  if (pathname === '/api/kb/context') {
+    const scope = getAccessScope(req);
+    if (!KB_ROOT) {
+      res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '知识库未配置(fail-closed)，请检查kb_config.json' }));
+      return;
+    }
+    const q = (reqUrl.searchParams.get('q') || '').trim();
+    const purpose = (reqUrl.searchParams.get('purpose') || 'internal_ai').toLowerCase();
+    const providerRaw = reqUrl.searchParams.get('provider');
+    const provider = providerRaw ? providerRaw.toLowerCase() : 'online_glm';
+    const limit = Math.min(parseInt(reqUrl.searchParams.get('limit') || '15'), 50);
+    const categories = (reqUrl.searchParams.get('categories') || '').split(',').filter(c => c);
+    const factOnly = reqUrl.searchParams.get('factOnly') === 'true';
+    const templateOnly = reqUrl.searchParams.get('templateOnly') === 'true';
+    if (!q) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '缺少查询参数q' }));
+      return;
+    }
+    try {
+      const ctx = retrieveKbContext({ query: q, purpose: purpose, provider: provider, accessScope: scope, limit: limit, categories: categories, factOnly: factOnly, templateOnly: templateOnly });
+      if (ctx.error === 'invalid_purpose' || ctx.error === 'invalid_provider' || ctx.error === 'invalid_combination') {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '非法purpose/provider组合: ' + ctx.error, purpose: purpose, provider: provider }));
+        return;
+      }
+      if (ctx.error === 'index_unavailable') {
+        res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '知识库索引不可用(fail-closed)' }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        query: ctx.query, accessScope: scope, purpose: ctx.purpose, provider: ctx.provider,
+        kbVersion: ctx.kbVersion, totalMatched: ctx.totalMatched,
+        facts: ctx.facts, templates: ctx.templates, citations: ctx.citations,
+        excludedCount: ctx.excludedCount, policy: ctx.policy,
+        factCount: ctx.facts.length, templateCount: ctx.templates.length
+      }, null, 2));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '检索失败' })); // 不返回原始堆栈
+    }
+    log(`知识库上下文检索: scope=${scope}, purpose=${purpose}, provider=${provider}, q="${q}", facts=${0}`, 'REQUEST');
     return;
   }
 

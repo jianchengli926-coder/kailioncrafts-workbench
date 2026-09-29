@@ -1893,74 +1893,187 @@ const server = http.createServer(async (req, res) => {
       const emails = html.match(emailRegex) || [];
       info.emails = [...new Set(emails.filter(e => !e.includes('example.com') && !e.includes('domain.com')))];
       
-      // 公开电话（国际格式，严格过滤价格/SKU/年份误判）
-      const phoneRegex = /(?:\+\d{1,3}[-.\s]?)?(?:\(?\d{2,4}\)?[-.\s]?)?\d{3,4}[-.\s]\d{3,4}(?:[-.\s]\d{1,4})?/g;
-      const phones = html.match(phoneRegex) || [];
-      info.phones = [...new Set(phones.filter(p => {
-        const digits = p.replace(/\D/g, '');
-        // 过滤：7-15位数字（国际电话范围），排除纯4位年份、纯价格
+      // V76.2 公开电话（四级证据等级，严格过滤误判）
+      info.phoneDetails = [];
+      const seenPhones = new Set();
+      
+      function isValidPhone(raw) {
+        const digits = raw.replace(/\D/g, '');
         if (digits.length < 7 || digits.length > 15) return false;
-        // 排除常见误判模式
-        if (/^\d{4}$/.test(digits)) return false; // 年份
-        if (/^19\d{2}$/.test(digits)) return false; // 19xx年份
-        if (/^20\d{2}$/.test(digits)) return false; // 20xx年份
-        // 必须包含分隔符或+号（纯连续数字容易是SKU/价格）
-        if (!p.includes('+') && !p.includes('-') && !p.includes(' ') && !p.includes('(') && !p.includes(')')) return false;
+        // 排除年份
+        if (/^(19|20)\d{2}$/.test(digits)) return false;
+        // 排除纯4位
+        if (/^\d{4}$/.test(digits)) return false;
         return true;
-      }))];
+      }
+      
+      function normalizePhone(raw) {
+        return raw.replace(/[\s\-()]/g, '').trim();
+      }
+      
+      function addPhone(raw, confidence, sourceType, context) {
+        if (!raw || !isValidPhone(raw)) return;
+        const normalized = normalizePhone(raw);
+        if (seenPhones.has(normalized)) return;
+        seenPhones.add(normalized);
+        info.phoneDetails.push({
+          raw: raw.trim(),
+          normalized: normalized,
+          confidence: confidence,
+          sourceUrl: url,
+          sourceType: sourceType,
+          context: (context || '').substring(0, 100)
+        });
+      }
+      
+      // 1. tel: 链接（high confidence）
+      const telLinks = html.match(/href=["']tel:([^"']+)["']/gi);
+      if (telLinks) {
+        for (const tl of telLinks) {
+          const num = tl.replace(/href=["']tel:/i, '').replace(/["']/g, '');
+          addPhone(num, 'high', 'tel_link', 'tel:链接');
+        }
+      }
+      
+      // 2. JSON-LD telephone（high confidence）
+      const jsonLdPhone = html.match(/"telephone"\s*:\s*"([^"]+)"/i) || html.match(/"telephone"\s*:\s*\{[^}]*"value"\s*:\s*"([^"]+)"/i);
+      if (jsonLdPhone) {
+        addPhone(jsonLdPhone[1], 'high', 'json_ld', 'JSON-LD telephone字段');
+      }
+      
+      // 3. Contact/Imprint页面带标签的号码（medium/high）
+      const isContactPage = /contact|impressum|imprint|about|company|联系/i.test(url) || /contact|impressum|imprint/i.test(html.substring(0, 5000).toLowerCase());
+      if (isContactPage) {
+        const labeledPhoneRegex = /(?:Phone|Tel|Telephone|Call|Fax|Telefon|电话|联系电话)\s*[:：]\s*([+()\d\-\s.]{7,20})/gi;
+        let labeledMatch;
+        while ((labeledMatch = labeledPhoneRegex.exec(html)) !== null) {
+          addPhone(labeledMatch[1], 'high', 'contact_labeled', labeledMatch[0].substring(0, 50));
+        }
+      }
+      
+      // 4. 普通正文正则（low confidence，严格过滤上下文）
+      const bodyPhoneRegex = /(?:\+\d{1,3}[-.\s]?)?(?:\(?\d{2,4}\)?[-.\s]?)?\d{3,4}[-.\s]\d{3,4}(?:[-.\s]\d{1,4})?/g;
+      const bodyPhones = html.match(bodyPhoneRegex) || [];
+      for (const p of bodyPhones) {
+        // 必须包含分隔符或+号
+        if (!p.includes('+') && !p.includes('-') && !p.includes(' ') && !p.includes('(') && !p.includes(')')) continue;
+        // 检查附近上下文是否有排除词
+        const pIdx = html.indexOf(p);
+        if (pIdx > 0) {
+          const before = html.substring(Math.max(0, pIdx - 60), pIdx).toLowerCase();
+          const after = html.substring(pIdx, Math.min(html.length, pIdx + 60)).toLowerCase();
+          const excludeWords = ['sku', 'model', 'item', 'price', 'usd', 'eur', '£', '$', '€', 'year', 'years', 'warranty', 'guarantee', 'page', 'pages', 'item no', 'product code'];
+          let hasExclude = false;
+          for (const ew of excludeWords) {
+            if (before.includes(ew) || after.includes(ew)) { hasExclude = true; break; }
+          }
+          if (hasExclude) continue;
+        }
+        addPhone(p, 'low', 'body_regex', '正文正则匹配');
+      }
+      
+      // 最终phones数组只保留medium以上置信度
+      info.phones = info.phoneDetails.filter(p => p.confidence !== 'low').map(p => p.raw);
       
       // V76.1 地址提取（简单模式：匹配常见地址格式）
       const addressRegex = /(\d+\s+[A-Za-z0-9\s.,'-]+?(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Square|Sq|Gasse|Straße|Str|Weg|Platz|Ring|Allee|Damm|Ufer|Chaussee|Drove|Close|Gardens|Estate|Industrial|Estate|Park|Way)\.?[^,\n]{0,80})/gi;
       const addresses = html.match(addressRegex) || [];
       info.addresses = [...new Set(addresses.map(a => a.trim().replace(/\s+/g, ' ')).filter(a => a.length > 10 && a.length < 200))].slice(0, 5);
       
-      // V76.1 国家识别（按证据优先级）
-      // 1. JSON-LD中的addressCountry
+      // V76.2 国家识别（严格证据等级，排除配送/货币/语言选择器）
+      info.addresses = info.addresses || [];
+      info.countryAddresses = [];
+      
+      // 提取页面正文（排除header/footer/nav/select选项）
+      const mainContent = html
+        .replace(/<header[\s\S]*?<\/header>/gi, '')
+        .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+        .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+        .replace(/<select[\s\S]*?<\/select>/gi, '')
+        .replace(/<option[\s\S]*?<\/option>/gi, '');
+      const mainText = mainContent.replace(/<[^>]*>/g, ' ');
+      
+      // 1. JSON-LD PostalAddress/addressCountry（high）
+      const jsonLdAddress = html.match(/"address"\s*:\s*\{([^}]+)\}/i);
       const jsonLdCountry = html.match(/"addressCountry"\s*:\s*"([^"]+)"/i) || html.match(/"addressCountry"\s*:\s*\{[^}]*"name"\s*:\s*"([^"]+)"/i);
       if (jsonLdCountry) {
         info.country = jsonLdCountry[1].trim();
         info.countryConfidence = 'high';
         info.countryEvidence = 'JSON-LD addressCountry: ' + info.country;
         info.countryEvidenceUrl = url;
+        info.countryAddresses.push({type: 'json_ld', address: jsonLdAddress ? jsonLdAddress[1].substring(0, 200) : info.country, sourceUrl: url, confidence: 'high'});
       }
-      // 2. 页面中的明确国家名称
-      if (!info.country) {
-        const countryNames = ['United States', 'USA', 'U.S.A.', 'America', 'Germany', 'Deutschland', 'United Kingdom', 'UK', 'U.K.', 'Britain', 'Great Britain', 'England', 'France', 'France', 'Italy', 'Italia', 'Spain', 'España', 'Netherlands', 'Holland', 'Nederland', 'Belgium', 'België', 'Austria', 'Österreich', 'Switzerland', 'Schweiz', 'Suisse', 'Sweden', 'Sverige', 'Norway', 'Norge', 'Denmark', 'Danmark', 'Finland', 'Suomi', 'Poland', 'Polska', 'Czech', 'Czechia', 'Česko', 'Australia', 'Canada', 'Japan', 'China', 'Korea', 'South Korea'];
-        const bodyText = html.replace(/<[^>]*>/g, ' ');
-        for (const cn of countryNames) {
-          const re = new RegExp('\\b' + cn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-          if (re.test(bodyText)) {
-            info.country = cn;
-            info.countryConfidence = 'medium';
-            info.countryEvidence = '页面文本包含: ' + cn;
-            info.countryEvidenceUrl = url;
-            break;
+      
+      // 2. Contact/Imprint页面完整地址（high）
+      const isContactOrImprint = /contact|impressum|imprint|about|company|联系|关于/i.test(url);
+      if (isContactOrImprint && !info.country) {
+        // 匹配完整地址模式（街道+城市+国家）
+        const addressRegex = /(\d+\s+[A-Za-z0-9\s.,'-]+?(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Square|Sq|Gasse|Straße|Str|Weg|Platz|Ring|Allee|Damm|Ufer|Chaussee)\.?[^,\n]{0,120})/gi;
+        const addresses = html.match(addressRegex) || [];
+        for (const addr of addresses) {
+          if (addr.length > 15 && addr.length < 300) {
+            info.countryAddresses.push({type: 'contact_address', address: addr.trim().replace(/\s+/g, ' '), sourceUrl: url, confidence: 'high'});
+            // 从地址中提取国家
+            const countryInAddr = addr.match(/\b(United States|USA|Germany|Deutschland|United Kingdom|UK|France|Italy|Spain|Netherlands|Belgium|Austria|Switzerland|Sweden|Norway|Denmark|Finland|Poland|Czech|Australia|Canada|Japan|China)\b/i);
+            if (countryInAddr && !info.country) {
+              info.country = countryInAddr[1];
+              info.countryConfidence = 'high';
+              info.countryEvidence = 'Contact页面地址包含: ' + countryInAddr[1];
+              info.countryEvidenceUrl = url;
+            }
           }
         }
       }
-      // 3. 电话国家区号（辅助）
-      if (!info.country && info.phones.length > 0) {
-        const phoneCountryMap = {'+1': 'United States/Canada', '+44': 'United Kingdom', '+49': 'Germany', '+33': 'France', '+39': 'Italy', '+34': 'Spain', '+31': 'Netherlands', '+32': 'Belgium', '+43': 'Austria', '+41': 'Switzerland', '+46': 'Sweden', '+47': 'Norway', '+45': 'Denmark', '+358': 'Finland', '+48': 'Poland', '+420': 'Czech Republic', '+61': 'Australia', '+81': 'Japan', '+86': 'China'};
-        for (const phone of info.phones) {
+      
+      // 3. 公司注册号/法律声明（high）
+      const legalRegex = /(?:GmbH|AG|Ltd|LLC|Inc|Corp|Corporation|Limited|S\.A\.|S\.r\.l\.)[^.]{0,100}(?:Register|Registration|HRB|HRB\s*\d+|Court|Amtsgericht)/gi;
+      const legalMatch = html.match(legalRegex);
+      if (legalMatch && !info.country) {
+        const legalText = legalMatch[0];
+        if (/Amtsgericht|HRB|GmbH/i.test(legalText)) {
+          info.country = 'Germany';
+          info.countryConfidence = 'high';
+          info.countryEvidence = '法律声明/注册号: ' + legalText.substring(0, 80);
+          info.countryEvidenceUrl = url;
+        } else if (/Companies House|Ltd|Limited/i.test(legalText)) {
+          info.country = 'United Kingdom';
+          info.countryConfidence = 'high';
+          info.countryEvidence = '法律声明/注册号: ' + legalText.substring(0, 80);
+          info.countryEvidenceUrl = url;
+        }
+      }
+      
+      // 4. 电话国际区号+地址上下文（medium）
+      if (!info.country && info.phoneDetails && info.phoneDetails.length > 0) {
+        const highPhone = info.phoneDetails.find(p => p.confidence === 'high');
+        if (highPhone) {
+          const phoneCountryMap = {'+1': 'United States/Canada', '+44': 'United Kingdom', '+49': 'Germany', '+33': 'France', '+39': 'Italy', '+34': 'Spain', '+31': 'Netherlands', '+32': 'Belgium', '+43': 'Austria', '+41': 'Switzerland', '+46': 'Sweden', '+47': 'Norway', '+45': 'Denmark', '+358': 'Finland', '+48': 'Poland', '+420': 'Czech Republic', '+61': 'Australia', '+81': 'Japan', '+86': 'China'};
           for (const [code, country] of Object.entries(phoneCountryMap)) {
-            if (phone.startsWith(code)) {
+            if (highPhone.normalized.startsWith(code.replace(/\D/g, ''))) {
               info.country = country;
-              info.countryConfidence = 'low';
-              info.countryEvidence = '电话区号 ' + code + ' -> ' + country;
-              info.countryEvidenceUrl = url;
+              info.countryConfidence = 'medium';
+              info.countryEvidence = '高置信度电话区号 ' + code + ' -> ' + country;
+              info.countryEvidenceUrl = highPhone.sourceUrl;
               break;
             }
           }
-          if (info.country) break;
         }
       }
-      // 4. ccTLD（最弱信号，仅辅助）
+      
+      // 5. ccTLD（medium/low，.com不判定）
       if (!info.country) {
         try {
           const hostname = new URL(url).hostname;
-          const tld = hostname.split('.').pop().toLowerCase();
-          const tldCountryMap = {'de': 'Germany', 'uk': 'United Kingdom', 'co.uk': 'United Kingdom', 'fr': 'France', 'it': 'Italy', 'es': 'Spain', 'nl': 'Netherlands', 'be': 'Belgium', 'at': 'Austria', 'ch': 'Switzerland', 'se': 'Sweden', 'no': 'Norway', 'dk': 'Denmark', 'fi': 'Finland', 'pl': 'Poland', 'cz': 'Czech Republic', 'au': 'Australia', 'ca': 'Canada', 'jp': 'Japan', 'us': 'United States'};
-          if (tldCountryMap[tld] && tld !== 'com' && tld !== 'org' && tld !== 'net') {
+          const parts = hostname.split('.');
+          const tld = parts.pop().toLowerCase();
+          const secondTld = parts.length > 1 ? parts.pop().toLowerCase() + '.' + tld : '';
+          const tldCountryMap = {'de': 'Germany', 'uk': 'United Kingdom', 'co.uk': 'United Kingdom', 'fr': 'France', 'it': 'Italy', 'es': 'Spain', 'nl': 'Netherlands', 'be': 'Belgium', 'at': 'Austria', 'ch': 'Switzerland', 'se': 'Sweden', 'no': 'Norway', 'dk': 'Denmark', 'fi': 'Finland', 'pl': 'Poland', 'cz': 'Czech Republic', 'au': 'Australia', 'ca': 'Canada', 'jp': 'Japan'};
+          if (tldCountryMap[secondTld]) {
+            info.country = tldCountryMap[secondTld];
+            info.countryConfidence = 'medium';
+            info.countryEvidence = 'ccTLD .' + secondTld + ' -> ' + info.country;
+            info.countryEvidenceUrl = url;
+          } else if (tldCountryMap[tld] && tld !== 'com' && tld !== 'org' && tld !== 'net') {
             info.country = tldCountryMap[tld];
             info.countryConfidence = 'low';
             info.countryEvidence = 'ccTLD .' + tld + ' -> ' + info.country + ' (弱信号)';
@@ -1969,38 +2082,108 @@ const server = http.createServer(async (req, res) => {
         } catch(e) {}
       }
       
-      // V76.1 客户类型识别（确定性规则）
+      // 6. 页面普通正文出现国家名称（low，仅在主内容区，排除配送/货币/语言选择器）
+      if (!info.country) {
+        const countryNames = ['United States', 'Germany', 'Deutschland', 'United Kingdom', 'France', 'Italy', 'Spain', 'Netherlands', 'Belgium', 'Austria', 'Switzerland', 'Sweden', 'Norway', 'Denmark', 'Finland', 'Poland', 'Australia', 'Canada', 'Japan'];
+        for (const cn of countryNames) {
+          const re = new RegExp('\\b' + cn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+          if (re.test(mainText)) {
+            // 排除"配送至XX国家"、"货币选择"等上下文
+            const cnIdx = mainText.toLowerCase().indexOf(cn.toLowerCase());
+            if (cnIdx > 0) {
+              const before = mainText.substring(Math.max(0, cnIdx - 40), cnIdx).toLowerCase();
+              if (before.includes('ship to') || before.includes('shipping to') || before.includes('deliver to') || before.includes('currency') || before.includes('language')) continue;
+            }
+            info.country = cn;
+            info.countryConfidence = 'low';
+            info.countryEvidence = '页面正文包含: ' + cn + ' (弱信号，需人工确认)';
+            info.countryEvidenceUrl = url;
+            break;
+          }
+        }
+      }
+      
+      // V76.2 三维度分离：businessRoles / commercialSignals / relationshipFit
       const bodyTextLower = html.replace(/<[^>]*>/g, ' ').toLowerCase();
-      const customerTypeRules = [
-        {type: 'wholesaler', patterns: ['wholesale', 'trade account', 'trade customer', 'bulk order', 'b2b', 'reseller'], confidence: 'high'},
-        {type: 'importer', patterns: ['importer', 'import/distribution', 'import and distribution', 'imports'], confidence: 'medium'},
-        {type: 'distributor', patterns: ['distributor', 'dealer network', 'stockist', 'authorized dealer'], confidence: 'high'},
-        {type: 'retailer', patterns: ['shop online', 'buy online', 'retail store', 'our stores', 'visit our store'], confidence: 'medium'},
-        {type: 'brand_owner', patterns: ['our brand', 'brand story', 'own brand', 'founded in', 'established in'], confidence: 'medium'},
-        {type: 'manufacturer', patterns: ['manufacturing', 'our factory', 'made in', 'production facility'], confidence: 'medium'},
-        {type: 'private_label_buyer', patterns: ['private label', 'custom branding', 'custom logo', 'own brand'], confidence: 'high'}
+      info.businessRoles = [];
+      info.commercialSignals = [];
+      info.relationshipFit = 'unknown';
+      
+      // 1. businessRoles（公司角色，需要明确业务证据）
+      const roleRules = [
+        {role: 'wholesaler', patterns: ['wholesale', 'trade account', 'trade customer', 'bulk purchasing', 'b2b wholesale', 'wholesale supplier'], confidence: 'high'},
+        {role: 'distributor', patterns: ['distributor', 'dealer network', 'stockist', 'authorized dealer', 'distribution network'], confidence: 'high'},
+        {role: 'importer', patterns: ['importer', 'import and distribution', 'import/distribution', 'importing'], confidence: 'medium'},
+        {role: 'retailer', patterns: ['shop online', 'buy online', 'retail store', 'our stores', 'visit our store', 'online shop'], confidence: 'medium'},
+        {role: 'brand_owner', patterns: ['our brand', 'brand story', 'brand history', 'trademark', 'registered trademark'], confidence: 'high'},
+        {role: 'manufacturer', patterns: ['manufacturing facility', 'our factory', 'production facility', 'we manufacture', 'factory direct'], confidence: 'high'},
+        {role: 'marketplace_seller', patterns: ['amazon store', 'amazon shop', 'ebay store', 'sell on amazon'], confidence: 'high'}
       ];
-      for (const rule of customerTypeRules) {
+      for (const rule of roleRules) {
         for (const pattern of rule.patterns) {
           if (bodyTextLower.includes(pattern)) {
-            const existing = info.customerTypes.find(ct => ct.type === rule.type);
-            if (!existing) {
-              info.customerTypes.push({
-                type: rule.type,
-                confidence: rule.confidence,
-                evidence: pattern,
-                sourceUrl: url
-              });
+            if (!info.businessRoles.find(r => r.role === rule.role)) {
+              info.businessRoles.push({role: rule.role, confidence: rule.confidence, evidence: pattern, sourceUrl: url});
             }
             break;
           }
         }
       }
-      // mixed判断
-      const confirmedTypes = info.customerTypes.filter(ct => ct.confidence === 'high');
-      if (confirmedTypes.length >= 2) {
-        info.customerTypes.push({type: 'mixed', confidence: 'high', evidence: '同时具有多个高置信度角色: ' + confirmedTypes.map(t=>t.type).join(', '), sourceUrl: url});
+      
+      // 2. commercialSignals（合作信号，不等于采购需求）
+      const signalRules = [
+        {signal: 'wholesale_available', patterns: ['wholesale', 'wholesale prices', 'wholesale inquiry'], confidence: 'medium'},
+        {signal: 'trade_account', patterns: ['trade account', 'trade login', 'trade customer'], confidence: 'high'},
+        {signal: 'dealer_program', patterns: ['dealer program', 'become a dealer', 'dealer application'], confidence: 'high'},
+        {signal: 'distributor_program', patterns: ['distributor program', 'become a distributor', 'distribution partner'], confidence: 'high'},
+        {signal: 'bulk_orders', patterns: ['bulk order', 'bulk orders', 'volume discount', 'large quantity'], confidence: 'medium'},
+        {signal: 'custom_branding', patterns: ['custom branding', 'custom logo', 'branding options'], confidence: 'medium'},
+        {signal: 'oem_offered', patterns: ['oem service', 'oem manufacturing', 'we offer oem', 'oem available'], confidence: 'high'},
+        {signal: 'odm_offered', patterns: ['odm service', 'odm manufacturing', 'we offer odm', 'odm available'], confidence: 'high'},
+        {signal: 'private_label_offered', patterns: ['private label service', 'private label manufacturing', 'we offer private label', 'private label available', 'private label programs'], confidence: 'high'},
+        {signal: 'amazon_store_linked', patterns: [], confidence: 'high'} // 由Amazon链接检测设置
+      ];
+      for (const rule of signalRules) {
+        if (rule.signal === 'amazon_store_linked') continue;
+        for (const pattern of rule.patterns) {
+          if (bodyTextLower.includes(pattern)) {
+            if (!info.commercialSignals.find(s => s.signal === rule.signal)) {
+              info.commercialSignals.push({signal: rule.signal, confidence: rule.confidence, evidence: pattern, sourceUrl: url, note: '对方提供的服务，不等于采购需求'});
+            }
+            break;
+          }
+        }
       }
+      // Amazon链接检测
+      if (info.amazonLinks && info.amazonLinks.length > 0) {
+        info.commercialSignals.push({signal: 'amazon_store_linked', confidence: 'high', evidence: '官网链接到Amazon店铺', sourceUrl: url, note: '可能是Amazon卖家'});
+      }
+      
+      // 3. relationshipFit（关系适配判断）
+      const hasBuyerSignal = info.businessRoles.some(r => ['wholesaler', 'distributor', 'importer', 'retailer', 'marketplace_seller'].includes(r.role) && r.confidence === 'high');
+      const hasBrandSignal = info.businessRoles.some(r => r.role === 'brand_owner' && r.confidence === 'high');
+      const hasManufacturerSignal = info.businessRoles.some(r => r.role === 'manufacturer' && r.confidence === 'high');
+      const offersOEMODM = info.commercialSignals.some(s => ['oem_offered', 'odm_offered', 'private_label_offered'].includes(s.signal) && s.confidence === 'high');
+      
+      if (hasManufacturerSignal && offersOEMODM) {
+        info.relationshipFit = 'competitor_supplier';
+        info.relationshipFitReason = '对方是制造商且对外提供OEM/ODM，可能是竞争供应商而非买家';
+      } else if (hasBuyerSignal && hasBrandSignal) {
+        info.relationshipFit = 'mixed_role';
+        info.relationshipFitReason = '同时具有买家渠道和自有品牌，需进一步确认采购需求';
+      } else if (hasBuyerSignal) {
+        info.relationshipFit = 'buyer_candidate';
+        info.relationshipFitReason = '具有明确的批发/分销/进口/零售业务信号';
+      } else if (hasBrandSignal && !hasBuyerSignal) {
+        info.relationshipFit = 'brand_candidate';
+        info.relationshipFitReason = '品牌商，可能需要OEM/ODM供应商';
+      } else {
+        info.relationshipFit = 'unknown';
+        info.relationshipFitReason = '证据不足，无法判断关系适配';
+      }
+      
+      // 兼容旧字段customerTypes（保留但标记为deprecated）
+      info.customerTypes = info.businessRoles.map(r => ({type: r.role, confidence: r.confidence, evidence: r.evidence, sourceUrl: r.sourceUrl}));
       
       // V76.1 Amazon链接识别
       const amazonLinkRegex = /href=["']([^"']*amazon\.[^"']*)["']/gi;

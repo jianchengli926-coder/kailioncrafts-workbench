@@ -22605,9 +22605,28 @@ function renderCompanyAnalysisContent() {
           <div style="font-size:9px;color:#94a3b8;margin-top:1px">${da.countryEvidence || info.countryEvidence || ''}</div>
         </div>
         <div style="padding:10px 12px;background:#f8fafc;border-radius:6px">
-          <div style="font-size:10px;color:#64748b">客户类型 (确定性识别)</div>
+          <div style="font-size:10px;color:#64748b">公司角色 businessRoles</div>
           <div style="font-size:11px;color:#1e293b;margin-top:2px;line-height:1.5">
-            ${(da.customerTypes || info.customerTypes || []).slice(0,4).map(ct => `<span style="display:inline-block;padding:1px 5px;background:${ct.confidence==='high'?'#dcfce7':'#fef3c7'};color:${ct.confidence==='high'?'#166534':'#92400e'};border-radius:3px;margin:1px;font-size:10px">${ct.type}</span>`).join('') || (da.customerType ? `<span style="padding:1px 5px;background:#f1f5f9;color:#64748b;border-radius:3px">${da.customerType}</span>` : '未确认')}
+            ${(da.businessRoles || info.businessRoles || []).slice(0,5).map(r => `<span style="display:inline-block;padding:1px 5px;background:${r.confidence==='high'?'#dcfce7':'#fef3c7'};color:${r.confidence==='high'?'#166534':'#92400e'};border-radius:3px;margin:1px;font-size:10px">${r.role}</span>`).join('') || '未确认'}
+          </div>
+        </div>
+        <div style="padding:10px 12px;background:#f8fafc;border-radius:6px">
+          <div style="font-size:10px;color:#64748b">关系适配 relationshipFit</div>
+          <div style="font-size:12px;font-weight:600;color:${da.relationshipFit==='buyer_candidate'?'#166534':da.relationshipFit==='competitor_supplier'?'#991b1b':da.relationshipFit==='mixed_role'?'#92400e':'#64748b'};margin-top:2px">
+            ${da.relationshipFit || info.relationshipFit || 'unknown'}
+          </div>
+          <div style="font-size:9px;color:#94a3b8;margin-top:1px">${da.relationshipFitReason || info.relationshipFitReason || ''}</div>
+        </div>
+        <div style="padding:10px 12px;background:#f8fafc;border-radius:6px;grid-column:1/-1">
+          <div style="font-size:10px;color:#64748b">合作信号 commercialSignals（对方提供的服务，不等于采购需求）</div>
+          <div style="font-size:10px;color:#1e293b;margin-top:2px;line-height:1.5">
+            ${(da.commercialSignals || info.commercialSignals || []).slice(0,8).map(s => `<span style="display:inline-block;padding:1px 5px;background:#f0f9ff;color:#0369a1;border-radius:3px;margin:1px;font-size:9px" title="${s.note||''}">${s.signal}</span>`).join('') || '未检测到'}
+          </div>
+        </div>
+        <div style="padding:10px 12px;background:#f8fafc;border-radius:6px">
+          <div style="font-size:10px;color:#64748b">电话（四级证据）</div>
+          <div style="font-size:11px;color:#1e293b;margin-top:2px;word-break:break-all">
+            ${(da.phoneDetails || info.phoneDetails || []).filter(p=>p.confidence!=='low').map(p => `<div>${p.raw} <span style="font-size:9px;color:${p.confidence==='high'?'#166534':'#92400e'}">(${p.confidence}/${p.sourceType})</span></div>`).join('') || (da.phones && da.phones.length ? da.phones.join(', ') : '未找到可信电话')}
           </div>
         </div>
         <div style="padding:10px 12px;background:#f8fafc;border-radius:6px">

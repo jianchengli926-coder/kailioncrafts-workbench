@@ -48,7 +48,10 @@ function loadKbIndex() {
   if (data.schemaVersion === 'v2.0' || (data.chunks && !data.slices)) {
     data.slices = data.chunks.map(c => ({
       ...c, dirCategory: c.category, fmCategory: c.category,
-      authority: c.authorityLevel || 'medium'
+      authority: c.authorityLevel || 'medium',
+      titleChain: c.headingPath ? c.headingPath.split(' > ') : [c.title],
+      filePath: c.relativePath,
+      fileName: c.fileName || (c.relativePath ? c.relativePath.split('/').pop() : '')
     }));
     const stats = data.stats || {};
     data.stats = {

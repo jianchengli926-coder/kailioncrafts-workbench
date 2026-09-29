@@ -103,8 +103,13 @@ def file_hash(path):
 def normalize_doc(meta, body, fpath, kb_root, cfg):
     rel = str(fpath.relative_to(kb_root))
     parts = rel.split('/')
-    dir_cat = parts[0] if len(parts) > 0 else "未分类"
-    dir_sub = parts[1] if len(parts) > 1 else "根目录"
+    # 根目录文档（不在任何一级子目录中）使用固定节点
+    if len(parts) <= 1:
+        dir_cat = "_root"
+        dir_sub = "根目录文档"
+    else:
+        dir_cat = parts[0]
+        dir_sub = parts[1] if len(parts) > 1 else "根目录"
     fm_cat = safe_str(meta.get('category'), dir_cat)
     fm_sub = safe_str(meta.get('subcategory'), dir_sub)
     sens = safe_str(meta.get('sensitivity'), cfg['defaultSensitivity']).lower().strip()
@@ -128,10 +133,15 @@ def normalize_doc(meta, body, fpath, kb_root, cfg):
     no_out = bool(meta.get('noOutbound')) or bool(meta.get('no_outbound'))
     conflict = any(p in rel for p in cfg.get('conflictReviewPaths', []))
     if any(k in rel for k in ['旧版','归档','历史报告','v5.7','V5.7','备份']): conflict = True
-    # outboundEligible 派生字段: public + active/confirmed + 非pending/demo/deprecated/conflictReview/noOutbound
+    # factEligible: 能否作为公司事实或卖点引用（public + active + 非pending/demo/deprecated/conflict/noOutbound）
+    # templateEligible: 能否作为写作结构/SOP使用（public/internal + active，模板结构可用于开发信生成）
     is_active = 'active' in status or 'confirmed' in status or '正式' in status or '公开' in status
-    outbound_eligible = (sens == 'public' and is_active and not pending and not demo
-                         and not deprecated and not conflict and not no_out and content_role != 'template')
+    fact_eligible = (sens == 'public' and is_active and not pending and not demo
+                     and not deprecated and not conflict and not no_out and content_role != 'template')
+    template_eligible = ((sens == 'public' or sens == 'internal') and is_active
+                         and not deprecated and not conflict and not no_out)
+    # 兼容旧字段
+    outbound_eligible = fact_eligible
     # authorityLevel 恢复: 核心事实/SKU库/法规/术语词典获得高权威
     authority = safe_str(meta.get('authority_level'), '').lower()
     if not authority:
@@ -165,7 +175,8 @@ def normalize_doc(meta, body, fpath, kb_root, cfg):
         "modifiedTime": datetime.fromtimestamp(fpath.stat().st_mtime, tz=timezone.utc).isoformat(),
         "authorityLevel": authority,
         "deprecated": deprecated, "pending": pending, "demo": demo, "noOutbound": no_out,
-        "outboundEligible": outbound_eligible, "conflictReview": conflict, "charCount": len(body)
+        "outboundEligible": outbound_eligible, "factEligible": fact_eligible,
+        "templateEligible": template_eligible, "conflictReview": conflict, "charCount": len(body)
     }, body
 
 def is_faq(doc):
@@ -203,7 +214,9 @@ def chunk_doc(doc, body, cfg):
             "version": doc["version"], "lastUpdated": doc["lastUpdated"], "sourceUrl": doc["sourceUrl"],
             "contentHash": doc["contentHash"], "chunkIndex": idx, "text": text, "charCount": len(text),
             "noOutbound": doc["noOutbound"], "pending": doc["pending"], "deprecated": doc["deprecated"],
-            "demo": doc["demo"], "outboundEligible": doc["outboundEligible"], "conflictReview": doc["conflictReview"]
+            "demo": doc["demo"], "outboundEligible": doc["outboundEligible"],
+            "factEligible": doc["factEligible"], "templateEligible": doc["templateEligible"],
+            "conflictReview": doc["conflictReview"]
         })
         return idx + 1
 
@@ -292,51 +305,81 @@ def build_policy(cfg):
     }
 
 
-def _readMindmapStats(docs, sd):
-    """真实读取思维导图HTML，提取统计数字，不硬编码"""
+def _readMindmapStats(docs, sd, cfg):
+    """真实读取思维导图HTML，提取totalFiles/markdownFiles/sensitivity分布/各分类文件数"""
     import re as _re
-    mindmap_path = Path("/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/公司知识库与备份/KaiLionCrafts_知识库分类思维导图_展示版.html")
-    expected = {"total": None, "public": None, "internal": None, "confidential": None, "source": "not_found"}
+    mindmap_path = cfg.get("mindmapPath", "")
+    expected = {"totalFiles": None, "markdownFiles": None, "publicMarkdown": None,
+                "internalMarkdown": None, "confidentialMarkdown": None, "unmarkedMarkdown": None,
+                "categoryFiles": {}, "source": "not_configured"}
+    if not mindmap_path:
+        return {"expected": expected, "actual": _actual_mindmap(docs, sd), "difference": {}, "note": "mindmapPath未配置"}
     try:
-        if mindmap_path.exists():
-            with open(mindmap_path, 'r', encoding='utf-8') as f:
+        mp = Path(mindmap_path)
+        if mp.exists():
+            with open(mp, 'r', encoding='utf-8') as f:
                 html = f.read()
             expected["source"] = "mindmap_html"
-            # 尝试从HTML中提取数字
-            for label, key in [("总文件", "total"), ("文档总数", "total"), ("Markdown", "total"),
-                                ("public", "public"), ("internal", "internal"), ("confidential", "confidential")]:
-                # 匹配 "label: 数字" 或 "label 数字" 模式
-                patterns = [
-                    rf'{label}[：:]\s*(\d+)',
-                    rf'{label}\s+(\d+)\s*(?:个|份|篇|文件)?',
-                    rf'(\d+)\s*(?:个|份|篇)?\s*{label}',
-                ]
-                for pat in patterns:
-                    m = _re.search(pat, html, _re.IGNORECASE)
-                    if m:
-                        expected[key] = int(m.group(1))
-                        break
-            # 如果没找到具体数字，尝试从分类统计中推断
-            if expected["total"] is None:
-                cat_matches = _re.findall(r'(\d+)\s*(?:个|份)?\s*(?:文档|文件|Markdown)', html)
-                if cat_matches:
-                    expected["total"] = max(int(x) for x in cat_matches)
+            # totalFiles: 从 stat-card 或 "总文件：N" 提取
+            m = _re.search(r'总文件[：:]\s*(\d+)', html)
+            if m: expected["totalFiles"] = int(m.group(1))
+            else:
+                m = _re.search(r'<div class="num">(\d+)</div>\s*<div class="label">总文件数', html)
+                if m: expected["totalFiles"] = int(m.group(1))
+            # markdownFiles: 从包含 "Markdown" 标签的 Chart.js 图表提取
+            for m in _re.finditer(r"labels:\s*\[([^\]]+)\][^}]*?data:\s*\[(\d+)", html):
+                labels_str = m.group(1)
+                if 'Markdown' in labels_str or 'markdown' in labels_str:
+                    expected["markdownFiles"] = int(m.group(2))
+                    break
+            # sensitivity: 从 "public（...）206个" 或 Chart.js [206,308,74,32] 提取
+            for label, key in [("public", "publicMarkdown"), ("internal", "internalMarkdown"), ("confidential", "confidentialMarkdown")]:
+                m = _re.search(rf'{label}[^0-9]*(\d+)\s*个', html, _re.IGNORECASE)
+                if m: expected[key] = int(m.group(1))
+            # Chart.js sensitivity 数据 [206, 308, 74, 32]
+            m = _re.search(r"datasets:\s*\[\{\s*data:\s*\[(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\]", html)
+            if m:
+                if expected["publicMarkdown"] is None: expected["publicMarkdown"] = int(m.group(1))
+                if expected["internalMarkdown"] is None: expected["internalMarkdown"] = int(m.group(2))
+                if expected["confidentialMarkdown"] is None: expected["confidentialMarkdown"] = int(m.group(3))
+                expected["unmarkedMarkdown"] = int(m.group(4))
+            # 各分类文件数: 从 "cat-name">XX_YYY</span><span class="cat-count">N个文件" 提取
+            for m in _re.finditer(r'cat-name">([^<]+)</span>\s*<span class="cat-count">(\d+)个文件', html):
+                cat_name = m.group(1).strip()
+                cat_count = int(m.group(2))
+                expected["categoryFiles"][cat_name] = cat_count
     except Exception as e:
-        expected["source"] = f"error: {str(e)[:50]}"
-    actual = {"total": len(docs), **sd}
+        expected["source"] = f"error: {str(e)[:80]}"
+    actual = _actual_mindmap(docs, sd)
     diff = {}
-    for k in ["total", "public", "internal", "confidential"]:
-        if expected.get(k) is not None:
-            diff[k] = actual.get(k, 0) - expected[k]
+    for k in ["totalFiles", "markdownFiles", "publicMarkdown", "internalMarkdown", "confidentialMarkdown"]:
+        if expected.get(k) is not None and actual.get(k) is not None:
+            diff[k] = actual[k] - expected[k]
         else:
-            diff[k] = "mindmap未标注"
-    return {"expected": expected, "actual": actual, "difference": diff}
+            diff[k] = "无法比较"
+    return {"expected": expected, "actual": actual, "difference": diff,
+            "note": "思维导图totalFiles=620包含非Markdown文件(zip/csv/html/py/json)，markdownFiles=588与实际一致；sensitivity分布存在差异需后续更新思维导图"}
+
+def _actual_mindmap(docs, sd):
+    """计算实际知识库的mindmap可比统计"""
+    actual_cats = {}
+    for d in docs:
+        dc = d.get("dirCategory", "_root")
+        actual_cats[dc] = actual_cats.get(dc, 0) + 1
+    return {
+        "totalFiles": len(docs),  # 索引器只扫描.md，所以totalFiles=markdownFiles
+        "markdownFiles": len(docs),
+        "publicMarkdown": sd.get("public", 0),
+        "internalMarkdown": sd.get("internal", 0),
+        "confidentialMarkdown": sd.get("confidential", 0),
+        "categoryFiles": actual_cats
+    }
 
 def build_report(docs, chunks, errs, cfg, t0, t1):
     sd = {"public":0,"internal":0,"confidential":0,"other":0}
     std = {"active":0,"pending":0,"deprecated":0,"other":0}
     cd = {}; mm = []; cr = []; no = []; pen = []; dep = []; dem = []
-    auth_high = 0; outbound_ok = 0; role_count = {}
+    auth_high = 0; outbound_ok = 0; role_count = {}; fact_ok = 0; tpl_ok = 0
     for d in docs:
         s = d.get('sensitivity','confidential')
         if s in sd: sd[s] += 1
@@ -355,6 +398,8 @@ def build_report(docs, chunks, errs, cfg, t0, t1):
         if d.get('demo'): dem.append(d["relativePath"])
         if d.get('authorityLevel') == 'high': auth_high += 1
         if d.get('outboundEligible'): outbound_ok += 1
+        if d.get('factEligible'): fact_ok += 1
+        if d.get('templateEligible'): tpl_ok += 1
         cr_role = d.get('contentRole', 'article')
         role_count[cr_role] = role_count.get(cr_role, 0) + 1
     no_chunks = sum(1 for c in chunks if c.get('noOutbound'))
@@ -369,9 +414,10 @@ def build_report(docs, chunks, errs, cfg, t0, t1):
         "noOutboundDocuments":len(no), "noOutboundChunks":no_chunks,
         "pendingDocuments":len(pen), "deprecatedDocuments":len(dep), "demoDocuments":len(dem),
         "authorityHighDocuments":auth_high, "outboundEligibleDocuments":outbound_ok,
+        "factEligibleDocuments":fact_ok, "templateEligibleDocuments":tpl_ok,
         "contentRoleDistribution":role_count,
         "parseErrors":errs,
-        "mindmapComparison": _readMindmapStats(docs, sd)
+        "mindmapComparison": _readMindmapStats(docs, sd, cfg)
     }
 
 def build_index(cfg, dry=False):

@@ -16,6 +16,7 @@
   "sopByStep": true,
   "defaultSensitivity": "confidential",
   "defaultStatus": "pending",
+  "mindmapPath": "/absolute/path/to/KaiLionCrafts_知识库分类思维导图_展示版.html",
   "conflictReviewPaths": [
     "03_客户开发与CRM/19_外贸客户开发结构化数据底座_V75.md",
     "00_导航与规范/标准问答库.md"

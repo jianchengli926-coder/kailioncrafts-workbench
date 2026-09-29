@@ -39,16 +39,27 @@ const ROOT_DIR = __dirname;
 const OLLAMA_URL = 'http://localhost:11434';
 // V77.0: 从 kb_config.json 读取知识库路径，不再硬编码旧目录
 function loadKbRoot() {
+  // V77.0 Phase 1.2: fail-closed。配置错误时返回null，不静默切回旧知识库。
   try {
     const cfgPath = path.join(ROOT_DIR, 'kb_config.json');
-    if (fs.existsSync(cfgPath)) {
-      const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
-      if (cfg.kbRoot && fs.existsSync(cfg.kbRoot)) {
-        return cfg.kbRoot;
-      }
+    if (!fs.existsSync(cfgPath)) {
+      log('kb_config.json不存在，知识库不可用', 'ERROR');
+      return null;
     }
-  } catch(e) { log('kb_config.json读取失败，使用默认路径: ' + e.message, 'WARN'); }
-  return path.join(ROOT_DIR, '公司知识库备份_v5.7_2026-09-28');
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    if (!cfg.kbRoot) {
+      log('kb_config.json中kbRoot为空，知识库不可用', 'ERROR');
+      return null;
+    }
+    if (!fs.existsSync(cfg.kbRoot)) {
+      log('kbRoot路径不存在: ' + cfg.kbRoot + '，知识库不可用', 'ERROR');
+      return null;
+    }
+    return cfg.kbRoot;
+  } catch(e) {
+    log('kb_config.json读取失败: ' + e.message + '，知识库不可用(fail-closed)', 'ERROR');
+    return null;
+  }
 }
 const KB_ROOT = loadKbRoot();
 const KB_INDEX_FILE = path.join(ROOT_DIR, 'kb_index.json');
@@ -81,9 +92,17 @@ function loadKbIndex() {
       authority_high: 0,
       deprecated: stats.status ? (stats.status.deprecated || 0) : 0, no_outbound: 0
     };
+    // V77.0 Phase 1.2: 从documents实际计算authority_high、no_outbound、by_category(用dirCategory)
+    let authHighCount = 0;
+    let noOutboundCount = 0;
     for (const d of (data.documents || [])) {
-      data.stats.by_category[d.category] = (data.stats.by_category[d.category] || 0) + 1;
+      if (d.authorityLevel === 'high' || d.authority === 'high') authHighCount++;
+      if (d.noOutbound) noOutboundCount++;
+      const dc = d.dirCategory || d.category || '_root';
+      data.stats.by_category[dc] = (data.stats.by_category[dc] || 0) + 1;
     }
+    data.stats.authority_high = authHighCount;
+    data.stats.no_outbound = noOutboundCount;
   }
   return data;
 }
@@ -808,6 +827,17 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/kb/status') {
     const scope = getAccessScope(req);
     try {
+      // V77.0 Phase 1.2: KB_ROOT为null时fail-closed
+      if (!KB_ROOT) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          available: false,
+          error: 'kb_config.json配置错误或kbRoot路径不存在，知识库不可用(fail-closed)',
+          accessScope: scope,
+          kbRootConfigured: false
+        }));
+        return;
+      }
       if (fs.existsSync(KB_INDEX_FILE)) {
         const indexData = loadKbIndex();
         const stats = indexData.stats || {};
@@ -845,6 +875,12 @@ const server = http.createServer(async (req, res) => {
   // 知识库索引（支持分页和分类过滤）
   if (pathname === '/api/kb/index') {
     const scope = getAccessScope(req);
+    // V77.0 Phase 1.2: KB_ROOT为null时fail-closed
+    if (!KB_ROOT) {
+      res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '知识库未配置(fail-closed)，请检查kb_config.json' }));
+      return;
+    }
     const category = reqUrl.searchParams.get('category');
     const page = parseInt(reqUrl.searchParams.get('page') || '0');
     const pageSize = parseInt(reqUrl.searchParams.get('pageSize') || '500');
@@ -896,6 +932,12 @@ const server = http.createServer(async (req, res) => {
   // 知识库单个文件内容（增强敏感过滤）
   if (pathname === '/api/kb/file') {
     const scope = getAccessScope(req);
+    // V77.0 Phase 1.2: KB_ROOT为null时fail-closed
+    if (!KB_ROOT) {
+      res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '知识库未配置(fail-closed)，请检查kb_config.json' }));
+      return;
+    }
     const relativePath = reqUrl.searchParams.get('path');
     
     // 统一拒绝函数（不泄露文件是否存在）
@@ -993,6 +1035,12 @@ const server = http.createServer(async (req, res) => {
   // 知识库服务端检索（前端不再全量拉取索引）
   if (pathname === '/api/kb/search') {
     const scope = getAccessScope(req);
+    // V77.0 Phase 1.2: KB_ROOT为null时fail-closed
+    if (!KB_ROOT) {
+      res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '知识库未配置(fail-closed)，请检查kb_config.json' }));
+      return;
+    }
     const q = (reqUrl.searchParams.get('q') || '').trim();
     const categories = (reqUrl.searchParams.get('categories') || '').split(',').filter(c => c);
     const topK = Math.min(parseInt(reqUrl.searchParams.get('topK') || '20'), 100);
@@ -1020,9 +1068,34 @@ const server = http.createServer(async (req, res) => {
       // 敏感级别过滤（根据访问范围）
       slices = filterSlicesByScope(slices, scope);
 
-      // V77.0 Phase 1.1: purpose/provider 运行时权限过滤
+      // V77.0 Phase 1.2: purpose/provider 严格白名单，非法组合返回400
+      const VALID_PURPOSES = ['browse', 'internal_ai', 'outbound'];
+      const VALID_PROVIDERS = ['none', 'online_glm', 'local_ollama'];
       const purpose = (reqUrl.searchParams.get('purpose') || 'browse').toLowerCase();
-      const provider = (reqUrl.searchParams.get('provider') || 'local').toLowerCase();
+      const providerRaw = reqUrl.searchParams.get('provider');
+      const provider = providerRaw ? providerRaw.toLowerCase() : 'none';
+      // 严格白名单校验
+      if (!VALID_PURPOSES.includes(purpose)) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '非法purpose参数，允许值: browse/internal_ai/outbound', purpose: purpose }));
+        return;
+      }
+      if (!VALID_PROVIDERS.includes(provider)) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '非法provider参数，允许值: none/online_glm/local_ollama', provider: provider }));
+        return;
+      }
+      // 组合校验: browse只允许provider=none; internal_ai/outbound必须明确传online_glm或local_ollama
+      if (purpose === 'browse' && provider !== 'none') {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'browse模式不允许指定provider，请使用provider=none或省略provider' }));
+        return;
+      }
+      if ((purpose === 'internal_ai' || purpose === 'outbound') && (provider === 'none')) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: purpose + '模式必须明确指定provider=online_glm或local_ollama' }));
+        return;
+      }
       let purposeFiltered = 0;
       if (purpose === 'internal_ai') {
         // AI 模型范围: online_glm仅public, local_ollama public+internal, confidential不得发给任何AI

@@ -2304,7 +2304,8 @@ function shouldSimulateFailure(cfg){
 async function callAI(messages, opts={}){
   opts = opts||{};
   // 运行时事实过滤：所有对外AI调用必须经过此层，防止旧工具绕过事实访问层
-  messages = sanitizeFactsForAI(messages);
+  // V77.3.1: 必须传递opts.context，否则externalCompanyResearch等上下文感知模式永远不生效
+  messages = sanitizeFactsForAI(messages, opts.context || 'kaiLionOutbound');
   let chain = getFallbackChain(opts);
   // V77.2.1: providerPolicy=local_only 模式只允许Ollama，失败后不回退在线模型
   if(opts.providerPolicy === 'local_only'){
@@ -23690,7 +23691,10 @@ function renderCompanyAnalysisContent() {
       <!-- V77.3: 公司知识库匹配 -->
       ${da.knowledgeFit ? `<div style="margin-bottom:16px;padding:12px 14px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #93c5fd;border-radius:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="const b=document.getElementById('kbFitBody');b.style.display=b.style.display==='none'?'block':'none'">
-          <div style="font-weight:600;font-size:12px;color:#1e40af">📚 公司知识库匹配 <span style="font-weight:400;font-size:10px;color:#3b82f6">(${da.knowledgeFit.executionMode || 'online_safe'} · ${da.knowledgeFit.provider || 'online_glm'})</span></div>
+          <div style="font-weight:600;font-size:12px;color:#1e40af">📚 公司知识库匹配 <span style="font-weight:400;font-size:10px;color:#3b82f6">(${da.knowledgeFit.executionMode || 'online_safe'} · ${da.knowledgeFit.provider || 'online_glm'})</span>
+            ${da.knowledgeFit.manuallyEdited ? '<span style="margin-left:6px;padding:1px 5px;background:#fef3c7;color:#92400e;border-radius:3px;font-size:9px">✏️ 人工修正</span>' : ''}
+            ${da.knowledgeFit.reviewStatus === 'reviewed' ? '<span style="margin-left:4px;padding:1px 5px;background:#dcfce7;color:#166534;border-radius:3px;font-size:9px">✓ 已审核</span>' : '<span style="margin-left:4px;padding:1px 5px;background:#f1f5f9;color:#64748b;border-radius:3px;font-size:9px">待审核</span>'}
+          </div>
           <div style="font-size:10px;color:#3b82f6">${da.knowledgeFit.status === 'completed' ? '✅ 已匹配' : da.knowledgeFit.status === 'failed' ? '⚠️ 检索失败' : '⏳ 未匹配'} · 展开/收起</div>
         </div>
         <div id="kbFitBody" style="display:block;margin-top:10px">
@@ -23710,6 +23714,7 @@ function renderCompanyAnalysisContent() {
             ${da.knowledgeFit.buyerFit?.reasons?.length ? `<div style="font-size:10px;color:#475569;margin-top:6px;line-height:1.6">💡 ${da.knowledgeFit.buyerFit.reasons.join('；')}</div>` : ''}
             ${da.knowledgeFit.competitionRisk?.reasons?.length ? `<div style="font-size:10px;color:#991b1b;margin-top:4px;line-height:1.6">⚠️ ${da.knowledgeFit.competitionRisk.reasons.join('；')}</div>` : ''}
             ${da.knowledgeFit.knowledgeEvidence?.length ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid #bfdbfe"><div style="font-size:10px;font-weight:600;color:#1e40af;margin-bottom:4px">知识库依据 (${da.knowledgeFit.knowledgeEvidence.length}条)</div>${da.knowledgeFit.knowledgeEvidence.slice(0,3).map(e => `<div style="font-size:10px;color:#475569;padding:3px 0;border-bottom:1px dashed #e0e7ff">• ${e.claim}: ${e.value.substring(0,80)}... <span style="color:#94a3b8">[${e.sensitivity}]</span></div>`).join('')}</div>` : ''}
+            ${da.knowledgeFit.reviewNotes ? `<div style="margin-top:8px;padding:6px 8px;background:#fffbeb;border-radius:4px;border-left:3px solid #f59e0b"><div style="font-size:9px;color:#92400e;font-weight:600">📝 知识库审核备注</div><div style="font-size:10px;color:#78350f;margin-top:2px">${da.knowledgeFit.reviewNotes}</div></div>` : ''}
           ` : `<div style="font-size:11px;color:#92400e;background:#fffbeb;padding:8px 10px;border-radius:6px">⚠️ 知识库暂不可用或未找到已确认依据。涉及KaiLionCrafts能力的内容需人工核实。</div>`}
         </div>
       </div>` : ''}
@@ -23825,6 +23830,15 @@ async function runCompanyAIAnalysis(index) {
   if (contentEl0) contentEl0.innerHTML = renderCompanyAnalysisContent();
 
   const kf = await retrieveKnowledgeForCompanyAnalysis(info, 'online_safe');
+  // V77.3.1: 保护knowledgeFit人工修正 - 重新分析时保留人工修改的buyerFit/competitionRisk
+  const prevKf = r.deepAnalysis.knowledgeFit;
+  if(prevKf && prevKf.manuallyEdited){
+    if(prevKf.buyerFit?.level) kf.buyerFit = { ...(kf.buyerFit||{}), level: prevKf.buyerFit.level, manuallyPreserved: true };
+    if(prevKf.competitionRisk?.level) kf.competitionRisk = { ...(kf.competitionRisk||{}), level: prevKf.competitionRisk.level, manuallyPreserved: true };
+    if(prevKf.reviewNotes) kf.reviewNotes = prevKf.reviewNotes;
+    kf.manuallyEdited = true;
+    kf.reviewStatus = 'reviewed';
+  }
   r.deepAnalysis.knowledgeFit = kf;
   companyAnalysisState.progress = '正在调用 AI 进行深度分析...';
 
@@ -24013,11 +24027,15 @@ function editDeepAnalysis(index) {
   const r = prospectSearchResults[index];
   if (!r || !r.deepAnalysis) return;
   const da = r.deepAnalysis;
+  const kf = da.knowledgeFit || {};
   const currentName = da.companyIdentity?.name || '';
   const currentCountry = da.country || '';
   const currentType = da.customerType || '';
   const currentEmail = (da.publicContacts?.emails || []).join(', ');
   const currentLevel = da.deepAnalysisLevel || '';
+  const currentBuyerFit = kf.buyerFit?.level || '';
+  const currentCompRisk = kf.competitionRisk?.level || '';
+  const currentKfNotes = kf.reviewNotes || '';
   const currentNotes = da.reviewNotes || '';
 
   const name = prompt('公司名称:', currentName);
@@ -24030,7 +24048,14 @@ function editDeepAnalysis(index) {
   if (email === null) return;
   const level = prompt('潜力等级 (高潜力/中潜力/待人工确认/不建议继续):', currentLevel);
   if (level === null) return;
-  const notes = prompt('审核备注:', currentNotes);
+  // V77.3.1: 知识库匹配人工修正
+  const buyerFit = prompt('买家适配 buyerFit (high/medium/low/unknown):', currentBuyerFit);
+  if (buyerFit === null) return;
+  const compRisk = prompt('竞争风险 competitionRisk (high/medium/low/unknown):', currentCompRisk);
+  if (compRisk === null) return;
+  const kfNotes = prompt('知识库匹配审核备注:', currentKfNotes);
+  if (kfNotes === null) return;
+  const notes = prompt('总体审核备注:', currentNotes);
   if (notes === null) return;
 
   da.companyIdentity = da.companyIdentity || {};
@@ -24041,10 +24066,19 @@ function editDeepAnalysis(index) {
   da.publicContacts.emails = email ? email.split(',').map(e=>e.trim()).filter(e=>e) : [];
   da.deepAnalysisLevel = level;
   da.reviewNotes = notes;
+  // V77.3.1: 保存knowledgeFit人工修正
+  if(!da.knowledgeFit) da.knowledgeFit = { version:'v77.3', status:'completed', buyerFit:{}, competitionRisk:{}, reviewStatus:'unreviewed', manuallyEdited:false };
+  da.knowledgeFit.buyerFit = da.knowledgeFit.buyerFit || {};
+  da.knowledgeFit.buyerFit.level = buyerFit;
+  da.knowledgeFit.competitionRisk = da.knowledgeFit.competitionRisk || {};
+  da.knowledgeFit.competitionRisk.level = compRisk;
+  da.knowledgeFit.reviewNotes = kfNotes;
+  da.knowledgeFit.manuallyEdited = true;
+  da.knowledgeFit.reviewStatus = 'reviewed';
   da.manuallyEdited = true;
   da.reviewStatus = 'reviewed';
   saveProspectSearchResults();
-  toast('✅ 人工修正已保存');
+  toast('✅ 人工修正已保存（含知识库匹配）');
   const contentEl = document.getElementById('companyAnalysisContent');
   if (contentEl) contentEl.innerHTML = renderCompanyAnalysisContent();
 }

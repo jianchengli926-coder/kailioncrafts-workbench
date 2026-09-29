@@ -1,0 +1,23 @@
+{
+  "_comment": "知识库配置示例文件。复制为 kb_config.json 并修改实际路径。kb_config.json 已加入 .gitignore。",
+  "kbRoot": "/absolute/path/to/company_knowledge_base",
+  "kbVersion": "v7.0",
+  "schemaVersion": "v2.0",
+  "chunkerVersion": "v2.0",
+  "outputPath": "kb_index.json",
+  "manifestPath": "kb_manifest.json",
+  "treePath": "kb_tree.json",
+  "reportPath": "kb_build_report.json",
+  "maxChunkChars": 1500,
+  "minChunkChars": 100,
+  "faqOneQOneA": true,
+  "emailTemplateOneChunk": true,
+  "tableKeepHeader": true,
+  "sopByStep": true,
+  "defaultSensitivity": "confidential",
+  "defaultStatus": "pending",
+  "conflictReviewPaths": [
+    "03_客户开发与CRM/19_外贸客户开发结构化数据底座_V75.md",
+    "00_导航与规范/标准问答库.md"
+  ]
+}

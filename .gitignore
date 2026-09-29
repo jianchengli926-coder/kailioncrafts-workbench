@@ -15,6 +15,12 @@ localStorage_backup*.json
 # 知识库索引缓存
 .kb_hash_cache.json
 
+# V77.0 完整版知识库运行时配置与产物（含敏感信息，不进Git）
+kb_config.json
+kb_manifest.json
+kb_tree.json
+kb_build_report.json
+
 # 公司核心事实清单（含敏感信息，不进Git）
 公司核心事实清单_待核对.md
 

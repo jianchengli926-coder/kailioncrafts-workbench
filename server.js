@@ -41,6 +41,30 @@ const KB_ROOT = path.join(ROOT_DIR, '公司知识库备份_v5.7_2026-09-28');
 const KB_INDEX_FILE = path.join(ROOT_DIR, 'kb_index.json');
 const KB_META_DOCS_FILE = path.join(ROOT_DIR, 'kb_meta_docs.json');
 
+// V77.0 知识库索引格式兼容层：新版v2(chunks) → 旧版(slices)
+function loadKbIndex() {
+  if (!fs.existsSync(KB_INDEX_FILE)) return null;
+  const data = JSON.parse(fs.readFileSync(KB_INDEX_FILE, 'utf-8'));
+  if (data.schemaVersion === 'v2.0' || (data.chunks && !data.slices)) {
+    data.slices = data.chunks.map(c => ({
+      ...c, dirCategory: c.category, fmCategory: c.category,
+      authority: c.authorityLevel || 'medium'
+    }));
+    const stats = data.stats || {};
+    data.stats = {
+      total_files: stats.documents || data.totalFiles || 0,
+      total_slices: stats.chunks || data.totalChunks || 0,
+      by_sensitivity: stats.sensitivity || {}, by_category: {},
+      authority_high: 0,
+      deprecated: stats.status ? (stats.status.deprecated || 0) : 0, no_outbound: 0
+    };
+    for (const d of (data.documents || [])) {
+      data.stats.by_category[d.category] = (data.stats.by_category[d.category] || 0) + 1;
+    }
+  }
+  return data;
+}
+
 // 在线模型API端点（用于健康检查）
 const ONLINE_APIS = [
   { name: '智谱GLM', url: 'https://open.bigmodel.cn/api/paas/v4/models' },
@@ -355,7 +379,8 @@ const STATIC_DENYLIST = [
   'access_config.json', 'search_config.json', 'search_cache.json', 'search_usage.json',
   'api_config.json',
   '.env', '.git', 'node_modules', '*.log', '*backup*.json', '*backup*.zip',
-  'kb_index.json', 'kb_index_', '公司核心事实清单', '卖点与服务清单',
+  'kb_index.json', 'kb_index_', 'kb_config.json', 'kb_manifest.json', 'kb_tree.json', 'kb_build_report.json',
+  '公司核心事实清单', '卖点与服务清单',
   '公司知识库', '.kb_hash_cache', 'kb_meta_docs.json', 'kb_search_tests.json',
   '外贸客户开发知识库.json',
   'server.js', 'kb_indexer.py', '*.py', '*.sh', '*.command',
@@ -761,7 +786,7 @@ const server = http.createServer(async (req, res) => {
     const scope = getAccessScope(req);
     try {
       if (fs.existsSync(KB_INDEX_FILE)) {
-        const indexData = JSON.parse(fs.readFileSync(KB_INDEX_FILE, 'utf-8'));
+        const indexData = loadKbIndex();
         const stats = indexData.stats || {};
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({
@@ -807,7 +832,7 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: '索引文件不存在' }));
         return;
       }
-      const indexData = JSON.parse(fs.readFileSync(KB_INDEX_FILE, 'utf-8'));
+      const indexData = loadKbIndex();
       let slices = indexData.slices || [];
       
       // 分类过滤
@@ -961,7 +986,7 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: '索引文件不存在' }));
         return;
       }
-      const indexData = JSON.parse(fs.readFileSync(KB_INDEX_FILE, 'utf-8'));
+      const indexData = loadKbIndex();
       let slices = indexData.slices || [];
       
       // 分类过滤

@@ -1718,7 +1718,7 @@ const server = http.createServer(async (req, res) => {
         query: ctx.query, accessScope: scope, purpose: ctx.purpose, provider: ctx.provider,
         kbVersion: ctx.kbVersion, totalMatched: ctx.totalMatched,
         facts: ctx.facts, templates: ctx.templates, citations: ctx.citations,
-        excludedCount: ctx.excludedCount, policy: ctx.policy,
+        excludedCount: ctx.excludedCount, excludedByEligibilityCount: ctx.excludedByEligibilityCount, policy: ctx.policy,
         factCount: ctx.facts.length, templateCount: ctx.templates.length
       }, null, 2));
     } catch (e) {

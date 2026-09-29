@@ -6778,32 +6778,26 @@ function batchKBEmail(){
   if(!ids.length){ toast('请先选择客户'); return; }
   closeModal();
   go('drafts');
-  setTimeout(()=>{
-    let count = 0;
-    ids.forEach(id=>{
+  setTimeout(async()=>{
+    let count = 0, failed = 0;
+    for(const id of ids){
       const c = S.customers.find(x=>x.id===id);
-      if(c){
-        const match = getKBMatchForCustomer(c);
-        const template = (PROSPECT_KB.email_templates||[])[0] || {};
-        const draft = {
-          id: uid(),
-          customerId: id,
-          customerName: c.company,
-          subject: template.subject || 'Re: Partnership Inquiry - ' + c.company,
-          body: `Hi ${c.contact.name || 'there'},\n\nI hope this email finds you well. I came across ${c.company} and was impressed by your business in ${c.country}.\n\n${match.sellingPoints ? match.sellingPoints.substring(0,200) : ''}\n\nWe are KaiLionCrafts, a trusted OEM/ODM partner for kitchen knives, scissors, and outdoor tools from Yangjiang, China. Working with local manufacturing partners, we provide quality products with flexible customization. [SKU count and certifications: 待确认 - please verify before sending]\n\nWould you be interested in receiving our product catalog and latest price list?\n\nBest regards,\nLeo Li\nKaiLionCrafts`,
-          status: '草稿',
-          createdAt: new Date().toISOString(),
-          fromKB: true
-        };
-        S.drafts = S.drafts || [];
-        S.drafts.unshift(draft);
-        count++;
-      }
-    });
-    DB.save('drafts', S.drafts);
-    toast(`✅ 已基于知识库生成 ${count} 封开发信草稿`);
+      if(!c) continue;
+      const result = await generateOutreachEmailDraft(c, {providerPolicy:'online_safe', lang:'en', tone:'professional'});
+      if(result.error){ failed++; continue; }
+      S.drafts = S.drafts || [];
+      S.drafts.unshift({
+        id: uid(), customerId:id, customerName:c.company, country:c.country, language:'英语',
+        subject:result.subject, body:result.body, content:result.body, status:'待审核', createdAt:now(),
+        kbGenerated:true, knowledgeContext:result.knowledgeContext, providerPolicy:'online_safe',
+        reviewStatus:'unreviewed', reviewNotes:'', manuallyEdited:false, aiNotes:['V77.4 统一知识库事实访问层生成']
+      });
+      count++;
+    }
+    persist();
+    toast(count ? `✅ 已生成 ${count} 封待审核开发信${failed ? '；'+failed+' 封未生成' : ''}` : '未生成草稿：请检查本地模型或AI配置');
     renderView();
-  }, 500);
+  }, 200);
 }
 function batchSetFollowUp(){
   const date = document.getElementById('batchFollowDate').value;
@@ -9229,10 +9223,14 @@ function deleteCustomTemplate(idx){
 /* ---------- 开发信编辑器（抽屉） ---------- */
 function editDraftForCustomer(cid){
   const c = S.customers.find(x=>x.id===cid); if(!c) return;
-  const d = S.drafts.find(x=>x.customerId===cid) || {
+  let d = S.drafts.find(x=>x.customerId===cid);
+  if(!d){
+    d = {
     id:uid(), customerId:cid, customerName:c.company, country:c.country, language: c.country==='德国'?'德语':c.country==='日本'?'日语':'英语',
-    subject:'', body:'', aiNotes:[], status:'待检查', createdAt:now(), sentAt:null};
-  openDraftEditor(d.id, true);
+    subject:'', body:'', aiNotes:[], status:'待审核', createdAt:now(), sentAt:null, reviewStatus:'unreviewed', reviewNotes:'', manuallyEdited:false};
+    S.drafts.unshift(d);
+  }
+  openDraftEditor(d.id, false);
 }
 function openDraftEditor(did, isNew){
   let d = S.drafts.find(x=>x.id===did);
@@ -9253,7 +9251,10 @@ function openDraftEditor(did, isNew){
       <div class="form-group"><label>收件人</label><input class="form-control" id="dr_email" value="${c?esc(c.contact.email):''}"></div>
       <div class="form-group"><label>主题</label><input class="form-control" id="dr_subject" value="${esc(d.subject)}"></div>
       <div class="form-group"><label>正文（AI 生成草稿，发送前请人工审核修改）</label>
-        <textarea class="form-control" id="dr_body" style="min-height:260px;font-family:Menlo,monospace;font-size:12.5px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${esc(d.body)}</textarea></div>
+        <textarea class="form-control" id="dr_body" style="min-height:260px;font-family:Menlo,monospace;font-size:12.5px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${esc(d.body || d.content || '')}</textarea></div>
+      <div class="form-group"><label>审核备注</label><textarea class="form-control" id="dr_review_notes" rows="2" placeholder="例如：已核对产品描述；删除未确认认证声明">${esc(d.reviewNotes || '')}</textarea></div>
+      <div style="font-size:11px;margin:-4px 0 12px;color:${d.reviewStatus==='reviewed' ? '#166534' : '#92400e'}">审核状态：${d.reviewStatus==='reviewed' ? '✅ 已人工审核' : '⚠️ 待人工审核'}${d.manuallyEdited ? ' · ✏️ 含人工修正' : ''}</div>
+      <div id="draftKbContextBox" style="display:none"></div>
       <div class="divider"></div>
       <div class="card card-pad mb16" style="background:#f7efdd">
         <b>🕐 最佳发送时间</b>
@@ -9265,6 +9266,7 @@ function openDraftEditor(did, isNew){
       </div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="saveDraft('${d.id}')">💾 保存草稿</button>
+        <button class="btn btn-gold" onclick="markDraftReviewed('${d.id}')">🧑‍⚖️ 标记已审核</button>
         <button class="btn btn-outline" onclick="spamCheck()">🛡 检测进箱率</button>
         <button class="btn btn-success" onclick="markSent('${d.id}')">✅ 标记已人工发送</button>
         <button class="btn btn-outline" onclick="regenDraft('${d.id}')">🔄 AI 重新生成</button>
@@ -9272,36 +9274,74 @@ function openDraftEditor(did, isNew){
       </div>
       <div class="mt16 text-sm text-muted">⚠️ 工作台哲学：AI 只生成草稿，<b>发送动作由你手动完成</b>。这里的"标记已发送"只是记录状态。</div>
     </div>`);
-  setTimeout(()=>{const b=document.getElementById('dr_body'); if(b)b.style.height=b.scrollHeight+'px';},50);
+  setTimeout(()=>{
+    const b=document.getElementById('dr_body'); if(b)b.style.height=b.scrollHeight+'px';
+    renderOutreachKbContext(d.knowledgeContext, 'draftKbContextBox');
+  },50);
 }
 function saveDraft(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
   d.subject = document.getElementById('dr_subject').value;
   d.body = document.getElementById('dr_body').value;
+  d.content = d.body;
+  d.reviewNotes = document.getElementById('dr_review_notes').value.trim();
+  d.manuallyEdited = true;
+  d.reviewStatus = 'unreviewed';
   d.status = '已修改';
   persist(); toast('草稿已保存');
 }
-function markSent(did){
+function markDraftReviewed(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
   d.subject = document.getElementById('dr_subject').value;
   d.body = document.getElementById('dr_body').value;
+  d.content = d.body;
+  d.reviewNotes = document.getElementById('dr_review_notes').value.trim();
+  d.reviewStatus = 'reviewed';
+  d.reviewedAt = now();
+  d.status = '已审核';
+  persist();
+  toast('✅ 已标记人工审核；发送前仍请确认收件人与内容');
+  openDraftEditor(did);
+}
+function markSent(did){
+  const d = S.drafts.find(x=>x.id===did); if(!d) return;
+  if(d.reviewStatus !== 'reviewed'){ toast('请先完成人工审核并标记已审核','err'); return; }
+  d.subject = document.getElementById('dr_subject').value;
+  d.body = document.getElementById('dr_body').value;
+  d.content = d.body;
+  d.reviewNotes = document.getElementById('dr_review_notes').value.trim();
   d.status = '已发送'; d.sentAt = now();
   const c = S.customers.find(x=>x.id===d.customerId);
   if(c){ c.status = '已回复'; c.nextFollowUp = daysLater(3); }
   persist(); toast('已标记发送，跟进序列已启动'); closeDrawer(); renderView();
 }
-function regenDraft(did){
+async function regenDraft(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
-  toast('AI 正在重新生成...');
-  setTimeout(()=>{
-    d.body = d.body + '\n\n[AI 重写补充：] Based on our latest analysis of '+d.customerName+', we would like to emphasize our low MOQ and fast lead time. Reply this email for a revised offer.';
-    d.aiNotes.push('已根据最新社媒动态重写');
-    persist(); openDraftEditor(d.id); toast('已重新生成');
-  },900);
+  const c = S.customers.find(x=>x.id===d.customerId);
+  if(!c){ toast('关联客户不存在','err'); return; }
+  if(d.manuallyEdited || d.reviewStatus === 'reviewed'){
+    if(!confirm('该草稿已有人工修正或审核。重新生成会保留旧版本，但会把新版本设为待审核。确定继续吗？')) return;
+  }
+  toast('正在通过统一知识库事实访问层重新生成...');
+  const result = await generateOutreachEmailDraft(c, {providerPolicy:d.providerPolicy || 'online_safe', lang:d.language==='中文'?'zh':'en', tone:'professional'});
+  if(result.error){ toast('重新生成失败：'+result.error,'err'); return; }
+  d.previousVersions = d.previousVersions || [];
+  d.previousVersions.unshift({subject:d.subject, body:d.body || d.content || '', reviewNotes:d.reviewNotes || '', savedAt:now(), manuallyEdited:!!d.manuallyEdited});
+  d.previousVersions = d.previousVersions.slice(0,5);
+  d.subject = result.subject;
+  d.body = result.body;
+  d.content = result.body;
+  d.knowledgeContext = result.knowledgeContext;
+  d.reviewStatus = 'unreviewed';
+  d.reviewNotes = '重新生成前版本已保留；请重新人工审核。';
+  d.manuallyEdited = false;
+  d.status = '待审核';
+  d.aiNotes = ['V77.4 重新生成：统一知识库事实访问层', '旧版本已保存，事实与模板分离'];
+  persist(); openDraftEditor(d.id); toast('✅ 已重新生成，旧版本已保留，等待人工审核');
 }
 function copyDraft(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
-  const text = 'Subject: '+d.subject+'\n\n'+d.body;
+  const text = 'Subject: '+d.subject+'\n\n'+(d.body || d.content || '');
   navigator.clipboard?.writeText(text).then(()=>toast('已复制到剪贴板')).catch(()=>toast('复制失败，请手动选择','err'));
 }
 
@@ -11281,8 +11321,6 @@ function renderKBMatchCard(cid){
 /* V75.3 基于知识库生成客户专属开发信 */
 async function generateEmailWithKB(cid){
   const c = S.customers.find(x=>x.id===cid); if(!c){toast('客户不存在');return;}
-  const match = getKBMatchForCustomer(c);
-  const kb = PROSPECT_KB;
 
   openModal(`
     <div class="modal-head"><h3>🤖 基于知识库生成开发信</h3><span class="modal-close" onclick="closeModal()">×</span></div>
@@ -11290,9 +11328,8 @@ async function generateEmailWithKB(cid){
       <div class="card card-pad mb12" style="background:#fdfbf7;border:1px solid #e8dcc8">
         <div class="text-xs" style="line-height:1.8">
           <b>客户：</b>${esc(c.company)} (${esc(c.country)})<br>
-          <b>匹配画像：</b><span style="color:#c9a961">${match.persona.name}</span><br>
-          <b>匹配市场：</b><span style="color:#3182ce">${match.market.name}</span><br>
-          <b>推荐模板：</b><span style="color:#38a169">${match.template.subject}</span>
+          <b>事实访问层：</b><span style="color:#1d4ed8">V77.4 Unified Knowledge Context</span><br>
+          <span style="color:#64748b">默认 online_safe，仅允许 public 公司事实；模板只用于结构参考。</span>
         </div>
       </div>
       <div class="form-row">
@@ -11311,6 +11348,13 @@ async function generateEmailWithKB(cid){
             <option value="direct">直接高效</option>
           </select>
         </div>
+        <div>
+          <label class="text-xs text-muted">知识库模式</label>
+          <select id="kbEmailPolicy" class="form-control">
+            <option value="online_safe">online_safe（仅 public）</option>
+            <option value="local_only">local_only（public + internal，本地Ollama）</option>
+          </select>
+        </div>
       </div>
       <div class="mt12">
         <label class="text-xs text-muted">额外要求（可选）</label>
@@ -11320,6 +11364,7 @@ async function generateEmailWithKB(cid){
         <div class="text-xs text-muted mb4"><b>AI生成结果：</b></div>
         <div id="kbEmailOutput" style="background:#f8fafc;padding:12px;border-radius:6px;font-size:12px;white-space:pre-wrap;max-height:350px;overflow-y:auto;border:1px solid #e2e8f0"></div>
       </div>
+      <div id="kbEmailContextBox" style="display:none"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-outline" onclick="closeModal()">取消</button>
@@ -11329,58 +11374,15 @@ async function generateEmailWithKB(cid){
 
 async function doGenerateEmailWithKB(cid){
   const c = S.customers.find(x=>x.id===cid); if(!c){toast('客户不存在');return;}
-  const match = getKBMatchForCustomer(c);
-  const kb = PROSPECT_KB;
   const lang = document.getElementById('kbEmailLang').value;
   const tone = document.getElementById('kbEmailTone').value;
+  const providerPolicy = document.getElementById('kbEmailPolicy').value || 'online_safe';
   const extra = document.getElementById('kbEmailExtra').value.trim();
 
   const btn = document.getElementById('kbEmailGenBtn');
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
 
-  const toneMap = {professional:'专业正式',friendly:'友好亲切',direct:'直接高效'};
-
-  const prompt = `你是${kb.company.brand}的资深外贸业务专家。请为以下客户生成一封${lang==='en'?'英文':'中文'}的个性化开发信。
-
-【客户信息】
-公司：${c.company}
-国家：${c.country}
-类型：${c.customerType||'—'}
-主营：${c.mainProducts||'—'}
-联系人：${c.contact?.name||'—'} (${c.contact?.title||'—'})
-
-【知识库匹配结果】
-客户画像：${match.persona.name}
-画像痛点：${match.persona.pain_points.join('、')}
-切入角度：${match.persona.email_angle}
-目标市场：${match.market.name}
-市场主推：${match.market.key_products.join('、')}
-营销角度：${match.market.marketing_angle}
-推荐模板主题：${match.template.subject}
-模板卖点：${match.template.key_points.join('、')}
-
-【公司知识库】
-公司：${kb.company.name_cn}（${kb.company.brand}）
-定位：${kb.company.slogan_en}
-核心优势：${kb.company.core_advantages.join('；')}
-产品品类：${kb.categories.map(x=>x.name).join('、')} [SKU数量:待确认]
-认证：待确认（合作工厂持有，非公司自有）
-经营哲学：${kb.company.philosophy}
-产业背景（公开数据，非公司自有）：${kb.industry.title}，产量${kb.industry.domestic_output_share}，出口${kb.industry.export_share} [来源:阳江产业公开统计]
-
-${extra?'【额外要求】'+extra:''}
-
-【写作要求】
-1. 语气：${toneMap[tone]||'专业正式'}
-2. 邮件主题和正文都要写
-3. 自然融入公司优势、认证和产业背景，不要生硬堆砌
-4. 针对客户画像痛点给出具体解决方案
-5. 推荐1-2个匹配的产品品类
-6. 结尾要有明确的行动号召（如索要样品、安排通话）
-7. 格式：先写Subject: 然后空一行写正文
-8. 不要加任何解释，直接输出邮件内容`;
-
-  const r = await callAI(prompt, {purpose:'draft'});
+  const r = await generateOutreachEmailDraft(c, {lang, tone, extra, providerPolicy});
   btn.disabled = false; btn.textContent = '🚀 生成开发信';
 
   if(r.error){ toast('生成失败: '+r.error); return; }
@@ -11388,19 +11390,16 @@ ${extra?'【额外要求】'+extra:''}
   const resultDiv = document.getElementById('kbEmailResult');
   const output = document.getElementById('kbEmailOutput');
   resultDiv.style.display = 'block';
-  output.textContent = r.content;
+  output.textContent = 'Subject: ' + (r.subject || '') + '\n\n' + r.body;
+  renderOutreachKbContext(r.knowledgeContext, 'kbEmailContextBox');
 
-  // 自动保存为草稿
-  const lines = r.content.split('\n');
-  let subject = '', body = r.content;
-  if(lines[0].toLowerCase().startsWith('subject:')){
-    subject = lines[0].substring(8).trim();
-    body = lines.slice(1).join('\n').trim();
-  }
+  // 自动保存为待审核草稿，知识库依据与审核元数据随草稿保存。
   if(!S.drafts) S.drafts = [];
   S.drafts.push({
-    id:'draft_'+uid(), customerId:cid, subject, content:body,
-    status:'草稿', createdAt:new Date().toISOString(), kbGenerated:true
+    id:'draft_'+uid(), customerId:cid, customerName:c.company, country:c.country, language:lang==='en'?'英语':'中文',
+    subject:r.subject, body:r.body, content:r.body, status:'待审核', createdAt:new Date().toISOString(), kbGenerated:true,
+    knowledgeContext:r.knowledgeContext, providerPolicy:providerPolicy, reviewStatus:'unreviewed', reviewNotes:'', manuallyEdited:false,
+    aiNotes:['V77.4 统一知识库事实访问层生成', '仅 factEligible 可作为公司事实；templateEligible 仅作结构参考']
   });
   persist();
   toast('✅ 开发信已生成并保存到草稿箱');
@@ -17138,6 +17137,133 @@ function buildKbContextPrompt(kbCtx){
   prompt += '- 合作工厂认证不得写成公司自有认证\n';
   prompt += '- 四大核心产品仅限：Kitchen Knives、Professional Scissors、Outdoor Knives、Kitchen Accessories\n';
   return prompt;
+}
+
+/* V77.4 开发信统一事实访问层：唯一允许进入开发信Prompt的公司事实来源。 */
+async function retrieveKnowledgeForOutreach(customer, providerPolicy){
+  const policy = providerPolicy || 'online_safe';
+  const kbProvider = policy === 'local_only' ? 'local_ollama' : 'online_glm';
+  const ctx = {
+    version: 'v77.4', kbVersion: '', retrievedAt: '', query: '', purpose: 'internal_ai', provider: kbProvider,
+    executionMode: policy, matchedFacts: [], matchedTemplates: [], citations: [], excludedCount: 0,
+    excludedByEligibilityCount: 0, policySummary: {}, status: 'not_started', error: null
+  };
+  try {
+    const parts = [customer?.company, customer?.country, customer?.customerType, customer?.mainProducts, customer?.products]
+      .filter(Boolean).join(' ').substring(0, 300);
+    ctx.query = parts || 'KaiLionCrafts B2B outbound email';
+    ctx.retrievedAt = new Date().toISOString();
+    const url = '/api/kb/context?q=' + encodeURIComponent(ctx.query) + '&purpose=internal_ai&provider=' + kbProvider + '&limit=12';
+    const resp = await fetch(url);
+    if(!resp.ok){ ctx.status = 'failed'; ctx.error = 'http_' + resp.status; return ctx; }
+    const data = await resp.json();
+    if(data.error){ ctx.status = 'failed'; ctx.error = data.error; return ctx; }
+    ctx.kbVersion = data.kbVersion || '';
+    // Defense in depth: enforce sensitivity again on the client, then separate facts/templates by eligibility.
+    const allowedSensitivity = policy === 'local_only' ? ['public', 'internal'] : ['public'];
+    const isAllowed = item => item && allowedSensitivity.includes(item.sensitivity || 'internal');
+    ctx.matchedFacts = (data.facts || []).filter(f => isAllowed(f) && f.factEligible === true).slice(0, 6);
+    ctx.matchedTemplates = (data.templates || []).filter(t => isAllowed(t) && t.templateEligible === true).slice(0, 3);
+    ctx.citations = (data.citations || []).filter(c => isAllowed(c) && (c.factEligible === true || c.templateEligible === true));
+    ctx.excludedCount = data.excludedCount || 0;
+    ctx.excludedByEligibilityCount = data.excludedByEligibilityCount || 0;
+    ctx.policySummary = data.policy || {};
+    ctx.status = 'completed';
+  } catch(e) {
+    ctx.status = 'failed';
+    ctx.error = 'fetch_error';
+  }
+  return ctx;
+}
+
+function buildOutreachKbContextPrompt(kbCtx){
+  if(!kbCtx || kbCtx.status !== 'completed' || !kbCtx.matchedFacts || kbCtx.matchedFacts.length === 0){
+    return '\n\n【KaiLionCrafts Knowledge Base Context】\n未找到可作为公司事实的已确认知识库依据。不得使用公司能力、产品、MOQ、交期、认证、产能、价格、工厂、供应链或案例等具体声明；如客户需要相关信息，请写为“可根据具体需求进一步确认”。';
+  }
+  let prompt = '\n\n【KaiLionCrafts Knowledge Base Context】\n此区块是开发信唯一的KaiLionCrafts公司事实来源。当前模式：' + (kbCtx.executionMode || 'online_safe') + '；provider=' + (kbCtx.provider || 'online_glm') + '。\n';
+  prompt += '【可作为公司事实（factEligible）】\n';
+  kbCtx.matchedFacts.forEach((f, i) => {
+    prompt += (i + 1) + '. ' + f.title + (f.headingPath ? ' (' + f.headingPath + ')' : '') + ': ' + (f.shortEvidence || '').substring(0, 160) + '\n';
+    prompt += '   [来源: ' + f.relativePath + '; sensitivity: ' + f.sensitivity + '; authority: ' + f.authorityLevel + ']\n';
+  });
+  if(kbCtx.matchedTemplates && kbCtx.matchedTemplates.length){
+    prompt += '\n【仅结构参考（templateEligible，不得作为公司事实）】\n';
+    kbCtx.matchedTemplates.forEach((t, i) => {
+      prompt += (i + 1) + '. ' + t.title + ': ' + (t.shortEvidence || '').substring(0, 100) + ' [仅用于措辞/结构，不得转述为公司能力或数据]\n';
+    });
+  }
+  prompt += '\n【开发信事实规则】\n';
+  prompt += '- 只能将 factEligible 条目中的明确内容写成 KaiLionCrafts 事实；templateEligible 绝不能作为事实。\n';
+  prompt += '- 不得声称拥有自有工厂、生产线或合作工厂认证；没有事实依据时不写 MOQ、交期、产能、价格、成本优势、出口国家数、工厂数或客户案例。\n';
+  prompt += '- 如需表述供应链关系，优先使用 “Strategic manufacturing partners” 或 “Local manufacturing network”，且仅在上方事实支持时使用。\n';
+  prompt += '- 四大核心产品仅限 Kitchen Knives、Professional Scissors、Outdoor Knives、Kitchen Accessories；所有输出为待人工审核的草稿。';
+  return prompt;
+}
+
+function buildOutreachEmailPrompt(customer, options, kbCtx){
+  const lang = options?.lang || 'en';
+  const toneMap = {professional:'professional and procurement-oriented', friendly:'warm but professional', direct:'concise and direct'};
+  const customerFacts = [
+    'Company: ' + (customer.company || 'Unknown'),
+    'Country/region: ' + (customer.country || 'Unknown'),
+    'Customer type: ' + (customer.customerType || 'Unknown'),
+    'Main products: ' + (customer.mainProducts || customer.products || 'Unknown'),
+    'Contact: ' + ((customer.contact && customer.contact.name) || 'there') + ((customer.contact && customer.contact.title) ? ' (' + customer.contact.title + ')' : '')
+  ].join('\n');
+  return 'You are preparing a first-contact B2B outbound email draft for KaiLionCrafts.\n\n【Customer information — use only as provided, do not invent customer facts】\n' + customerFacts +
+    buildOutreachKbContextPrompt(kbCtx) +
+    (options?.extra ? '\n\n【Additional request】' + options.extra : '') +
+    '\n\n【Writing requirements】\n' +
+    '1. Write in ' + (lang === 'zh' ? 'Chinese' : 'English') + '; tone: ' + (toneMap[options?.tone] || toneMap.professional) + '.\n' +
+    '2. Return exactly: Subject: <subject>, then a blank line, then the email body.\n' +
+    '3. Keep it concise (English: max 150 words), personalized to the provided customer information, with one low-friction CTA.\n' +
+    '4. Do not invent company or customer facts. Do not state a template as a company fact.\n' +
+    '5. This is a draft for human review; never make guarantees, pricing commitments, certification claims, MOQ, lead-time or sample promises without a factEligible source.';
+}
+
+function parseOutreachEmailResult(content){
+  const raw = String(content || '').trim();
+  const lines = raw.split('\n');
+  const first = lines[0] || '';
+  const subject = /^subject\s*:/i.test(first) ? first.replace(/^subject\s*:/i, '').trim() : '';
+  return { subject: subject, body: subject ? lines.slice(1).join('\n').trim() : raw };
+}
+
+async function generateOutreachEmailDraft(customer, options={}){
+  const policy = options.providerPolicy || 'online_safe';
+  const kbCtx = await retrieveKnowledgeForOutreach(customer, policy);
+  const prompt = buildOutreachEmailPrompt(customer, options, kbCtx);
+  const result = await callAI([{role:'user', content:prompt}], { purpose:'outreach_email', temperature:0.35, providerPolicy:policy, context:'kaiLionOutbound' });
+  if(result.error) return { error:result.error, knowledgeContext:kbCtx, prompt:prompt };
+  if(!result.content) return { error:'未配置可用AI模型；未生成开发信草稿', knowledgeContext:kbCtx, prompt:prompt, mock:!!result.mock };
+  return { ...parseOutreachEmailResult(result.content), raw:result.content, knowledgeContext:kbCtx, model:result.model, latency:result.latency, mock:!!result.mock, prompt:prompt };
+}
+
+function renderOutreachKbContext(kbCtx, containerId){
+  const box = document.getElementById(containerId);
+  if(!box) return;
+  if(!kbCtx){ box.style.display = 'none'; return; }
+  const e = esc;
+  box.style.display = 'block';
+  let html = '<div style="background:linear-gradient(135deg,#eff6ff,#eef2ff);border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin-top:12px">';
+  html += '<div style="font-weight:700;font-size:12px;color:#1e40af">📚 公司知识库依据 <span style="font-weight:400;color:#3b82f6">' + e(kbCtx.executionMode || 'online_safe') + ' · ' + e(kbCtx.provider || '') + '</span></div>';
+  if(kbCtx.status !== 'completed'){
+    html += '<div style="font-size:11px;color:#92400e;margin-top:6px">⚠️ 未获得可用知识库依据；开发信不得补充公司事实。' + (kbCtx.error ? ' (' + e(kbCtx.error) + ')' : '') + '</div>';
+  } else {
+    html += '<div style="font-size:10px;color:#475569;margin:5px 0 8px">仅 factEligible 可作为事实；templateEligible 仅作结构参考。版本: ' + e(kbCtx.kbVersion || 'unknown') + '</div>';
+    const renderItem = (item, type) => '<div style="background:#fff;border-left:3px solid ' + (type === 'fact' ? '#22c55e' : '#f59e0b') + ';border-radius:4px;padding:7px 8px;margin:5px 0;font-size:11px">' +
+      '<b>' + e(item.title || 'Untitled') + '</b> <span style="color:#64748b">' + e(item.headingPath || '') + '</span><br>' +
+      '<span style="color:#475569">' + e((item.shortEvidence || '').substring(0,130)) + '</span><br>' +
+      '<span style="display:inline-block;margin-top:4px;background:#f1f5f9;border-radius:3px;padding:1px 4px">' + (type === 'fact' ? 'factEligible' : 'templateEligible — 仅结构参考') + '</span> ' +
+      '<span style="display:inline-block;background:#f1f5f9;border-radius:3px;padding:1px 4px">sensitivity: ' + e(item.sensitivity || '') + '</span> ' +
+      '<span style="display:inline-block;background:#f1f5f9;border-radius:3px;padding:1px 4px">authority: ' + e(item.authorityLevel || '') + '</span><br>' +
+      '<span style="color:#64748b">引用路径: ' + e(item.relativePath || '') + '</span></div>';
+    if(kbCtx.matchedFacts && kbCtx.matchedFacts.length){ html += '<div style="font-size:11px;color:#166534;font-weight:700;margin-top:8px">✅ 可引用事实</div>' + kbCtx.matchedFacts.map(x=>renderItem(x,'fact')).join(''); }
+    if(kbCtx.matchedTemplates && kbCtx.matchedTemplates.length){ html += '<div style="font-size:11px;color:#92400e;font-weight:700;margin-top:8px">📋 结构参考模板（不可作为事实）</div>' + kbCtx.matchedTemplates.map(x=>renderItem(x,'template')).join(''); }
+    if((!kbCtx.matchedFacts || !kbCtx.matchedFacts.length) && (!kbCtx.matchedTemplates || !kbCtx.matchedTemplates.length)) html += '<div style="font-size:11px;color:#92400e">未检索到符合资格的条目。</div>';
+  }
+  html += '</div>';
+  box.innerHTML = html;
 }
 
 async function generateCustomerProfile(customerInfo, depth, providerPolicy){

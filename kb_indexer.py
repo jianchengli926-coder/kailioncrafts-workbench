@@ -103,23 +103,58 @@ def file_hash(path):
 def normalize_doc(meta, body, fpath, kb_root, cfg):
     rel = str(fpath.relative_to(kb_root))
     parts = rel.split('/')
-    cat = parts[0] if len(parts) > 0 else "未分类"
-    sub = parts[1] if len(parts) > 1 else "根目录"
+    dir_cat = parts[0] if len(parts) > 0 else "未分类"
+    dir_sub = parts[1] if len(parts) > 1 else "根目录"
+    fm_cat = safe_str(meta.get('category'), dir_cat)
+    fm_sub = safe_str(meta.get('subcategory'), dir_sub)
     sens = safe_str(meta.get('sensitivity'), cfg['defaultSensitivity']).lower().strip()
     status = safe_str(meta.get('status'), cfg['defaultStatus']).lower().strip()
     title = safe_str(meta.get('title'), fpath.name.replace('.md',''))
+    doc_type = safe_str(meta.get('type'), 'article').lower()
     deprecated = bool(meta.get('deprecated')) or 'deprecated' in status or 'archived' in status
     pending = 'pending' in status or '待' in status
-    demo = bool(meta.get('demo')) or 'demo' in safe_str(meta.get('type','')).lower() or '示例' in title or '模板' in title
+    # demo: 只有明确 demo:true 或明确演示数据才标记
+    demo = bool(meta.get('demo')) or '演示数据' in title or '示例数据' in title
+    # contentRole: 模板不等于 demo
+    content_role = 'article'
+    if '模板' in title or 'template' in doc_type or '邮件模板' in rel or '开发信模板' in rel:
+        content_role = 'template'
+    elif 'faq' in doc_type or '问答' in title or '常见问题' in title:
+        content_role = 'faq'
+    elif 'sop' in doc_type or '流程' in title or '操作手册' in title:
+        content_role = 'sop'
+    elif 'sku' in rel.lower() or '产品库' in rel:
+        content_role = 'product_data'
     no_out = bool(meta.get('noOutbound')) or bool(meta.get('no_outbound'))
     conflict = any(p in rel for p in cfg.get('conflictReviewPaths', []))
     if any(k in rel for k in ['旧版','归档','历史报告','v5.7','V5.7','备份']): conflict = True
+    # outboundEligible 派生字段: public + active/confirmed + 非pending/demo/deprecated/conflictReview/noOutbound
+    is_active = 'active' in status or 'confirmed' in status or '正式' in status or '公开' in status
+    outbound_eligible = (sens == 'public' and is_active and not pending and not demo
+                         and not deprecated and not conflict and not no_out and content_role != 'template')
+    # authorityLevel 恢复: 核心事实/SKU库/法规/术语词典获得高权威
+    authority = safe_str(meta.get('authority_level'), '').lower()
+    if not authority:
+        if '核心事实' in title or '公司核心事实' in rel:
+            authority = 'high'
+        elif '术语' in title or '术语词典' in rel or '术语规范' in rel:
+            authority = 'high'
+        elif 'SKU正式库' in rel or 'SKU完整参数' in rel or '公开产品确认' in rel:
+            authority = 'high'
+        elif '法规' in title or '合规' in title or '法律' in title or '认证要求' in rel:
+            authority = 'high'
+        elif '官方' in title or '权威' in title or meta.get('source_url'):
+            authority = 'medium'
+        else:
+            authority = 'medium'
     doc_id = hashlib.md5(rel.encode()).hexdigest()[:16]
     return {
         "documentId": doc_id, "relativePath": rel, "fileName": fpath.name, "title": title,
-        "category": safe_str(meta.get('category'), cat), "subcategory": safe_str(meta.get('subcategory'), sub),
+        "dirCategory": dir_cat, "dirSubcategory": dir_sub,
+        "fmCategory": fm_cat, "fmSubcategory": fm_sub,
+        "category": fm_cat, "subcategory": fm_sub,  # 兼容旧字段
         "tags": safe_list(meta.get('tags')), "region": safe_str(meta.get('region')),
-        "type": safe_str(meta.get('type'), 'article'), "sensitivity": sens, "status": status,
+        "type": doc_type, "contentRole": content_role, "sensitivity": sens, "status": status,
         "version": safe_str(meta.get('version')), "confidence": safe_str(meta.get('confidence')),
         "dataSource": safe_str(meta.get('data_source')), "source": safe_str(meta.get('source')),
         "useCase": safe_str(meta.get('use_case')), "summary": safe_str(meta.get('summary')),
@@ -128,9 +163,9 @@ def normalize_doc(meta, body, fpath, kb_root, cfg):
         "fetchDate": safe_str(meta.get('fetch_date')), "expiryHint": safe_str(meta.get('expiry_hint')),
         "contentHash": file_hash(fpath),
         "modifiedTime": datetime.fromtimestamp(fpath.stat().st_mtime, tz=timezone.utc).isoformat(),
-        "authorityLevel": safe_str(meta.get('authority_level')),
+        "authorityLevel": authority,
         "deprecated": deprecated, "pending": pending, "demo": demo, "noOutbound": no_out,
-        "conflictReview": conflict, "charCount": len(body)
+        "outboundEligible": outbound_eligible, "conflictReview": conflict, "charCount": len(body)
     }, body
 
 def is_faq(doc):
@@ -157,13 +192,18 @@ def chunk_doc(doc, body, cfg):
         cid = f"{doc['documentId']}_{idx:04d}"
         chunks.append({
             "chunkId": cid, "documentId": doc["documentId"], "relativePath": doc["relativePath"],
+            "fileName": doc["fileName"],
             "title": doc["title"], "headingPath": " > ".join(hp) if hp else doc["title"],
+            "dirCategory": doc["dirCategory"], "dirSubcategory": doc["dirSubcategory"],
+            "fmCategory": doc["fmCategory"], "fmSubcategory": doc["fmSubcategory"],
             "category": doc["category"], "subcategory": doc["subcategory"], "tags": doc["tags"],
             "region": doc["region"], "sensitivity": doc["sensitivity"], "status": doc["status"],
+            "contentRole": doc["contentRole"],
             "confidence": doc["confidence"], "authorityLevel": doc["authorityLevel"],
             "version": doc["version"], "lastUpdated": doc["lastUpdated"], "sourceUrl": doc["sourceUrl"],
             "contentHash": doc["contentHash"], "chunkIndex": idx, "text": text, "charCount": len(text),
-            "noOutbound": doc["noOutbound"], "pending": doc["pending"], "deprecated": doc["deprecated"], "demo": doc["demo"]
+            "noOutbound": doc["noOutbound"], "pending": doc["pending"], "deprecated": doc["deprecated"],
+            "demo": doc["demo"], "outboundEligible": doc["outboundEligible"], "conflictReview": doc["conflictReview"]
         })
         return idx + 1
 
@@ -211,7 +251,7 @@ def chunk_doc(doc, body, cfg):
 def build_tree(docs):
     tree = {}
     for d in docs:
-        c = d.get('category','未分类'); s = d.get('subcategory','根目录')
+        c = d.get('dirCategory','未分类'); s = d.get('dirSubcategory','根目录')
         if c not in tree:
             tree[c] = {"name":c, "subcategories":{}, "documentCount":0,
                         "sensitivity":{"public":0,"internal":0,"confidential":0},
@@ -251,10 +291,52 @@ def build_policy(cfg):
         }
     }
 
+
+def _readMindmapStats(docs, sd):
+    """真实读取思维导图HTML，提取统计数字，不硬编码"""
+    import re as _re
+    mindmap_path = Path("/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/公司知识库与备份/KaiLionCrafts_知识库分类思维导图_展示版.html")
+    expected = {"total": None, "public": None, "internal": None, "confidential": None, "source": "not_found"}
+    try:
+        if mindmap_path.exists():
+            with open(mindmap_path, 'r', encoding='utf-8') as f:
+                html = f.read()
+            expected["source"] = "mindmap_html"
+            # 尝试从HTML中提取数字
+            for label, key in [("总文件", "total"), ("文档总数", "total"), ("Markdown", "total"),
+                                ("public", "public"), ("internal", "internal"), ("confidential", "confidential")]:
+                # 匹配 "label: 数字" 或 "label 数字" 模式
+                patterns = [
+                    rf'{label}[：:]\s*(\d+)',
+                    rf'{label}\s+(\d+)\s*(?:个|份|篇|文件)?',
+                    rf'(\d+)\s*(?:个|份|篇)?\s*{label}',
+                ]
+                for pat in patterns:
+                    m = _re.search(pat, html, _re.IGNORECASE)
+                    if m:
+                        expected[key] = int(m.group(1))
+                        break
+            # 如果没找到具体数字，尝试从分类统计中推断
+            if expected["total"] is None:
+                cat_matches = _re.findall(r'(\d+)\s*(?:个|份)?\s*(?:文档|文件|Markdown)', html)
+                if cat_matches:
+                    expected["total"] = max(int(x) for x in cat_matches)
+    except Exception as e:
+        expected["source"] = f"error: {str(e)[:50]}"
+    actual = {"total": len(docs), **sd}
+    diff = {}
+    for k in ["total", "public", "internal", "confidential"]:
+        if expected.get(k) is not None:
+            diff[k] = actual.get(k, 0) - expected[k]
+        else:
+            diff[k] = "mindmap未标注"
+    return {"expected": expected, "actual": actual, "difference": diff}
+
 def build_report(docs, chunks, errs, cfg, t0, t1):
     sd = {"public":0,"internal":0,"confidential":0,"other":0}
     std = {"active":0,"pending":0,"deprecated":0,"other":0}
     cd = {}; mm = []; cr = []; no = []; pen = []; dep = []; dem = []
+    auth_high = 0; outbound_ok = 0; role_count = {}
     for d in docs:
         s = d.get('sensitivity','confidential')
         if s in sd: sd[s] += 1
@@ -271,6 +353,10 @@ def build_report(docs, chunks, errs, cfg, t0, t1):
         if d.get('pending'): pen.append(d["relativePath"])
         if d.get('deprecated'): dep.append(d["relativePath"])
         if d.get('demo'): dem.append(d["relativePath"])
+        if d.get('authorityLevel') == 'high': auth_high += 1
+        if d.get('outboundEligible'): outbound_ok += 1
+        cr_role = d.get('contentRole', 'article')
+        role_count[cr_role] = role_count.get(cr_role, 0) + 1
     no_chunks = sum(1 for c in chunks if c.get('noOutbound'))
     return {
         "buildStartTime":t0, "buildEndTime":t1, "buildDurationSeconds":round(t1-t0,2),
@@ -282,10 +368,10 @@ def build_report(docs, chunks, errs, cfg, t0, t1):
         "conflictReviewCount":len(cr), "conflictReviewFiles":cr,
         "noOutboundDocuments":len(no), "noOutboundChunks":no_chunks,
         "pendingDocuments":len(pen), "deprecatedDocuments":len(dep), "demoDocuments":len(dem),
+        "authorityHighDocuments":auth_high, "outboundEligibleDocuments":outbound_ok,
+        "contentRoleDistribution":role_count,
         "parseErrors":errs,
-        "mindmapComparison": {"expected":{"total":588,"public":198,"internal":315,"confidential":75},
-                               "actual":{"total":len(docs), **sd},
-                               "difference":{"total":len(docs)-588, "public":sd["public"]-198, "internal":sd["internal"]-315, "confidential":sd["confidential"]-75}}
+        "mindmapComparison": _readMindmapStats(docs, sd)
     }
 
 def build_index(cfg, dry=False):

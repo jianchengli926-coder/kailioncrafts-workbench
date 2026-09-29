@@ -37,7 +37,20 @@ const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 允许局域网访问
 const ROOT_DIR = __dirname;
 const OLLAMA_URL = 'http://localhost:11434';
-const KB_ROOT = path.join(ROOT_DIR, '公司知识库备份_v5.7_2026-09-28');
+// V77.0: 从 kb_config.json 读取知识库路径，不再硬编码旧目录
+function loadKbRoot() {
+  try {
+    const cfgPath = path.join(ROOT_DIR, 'kb_config.json');
+    if (fs.existsSync(cfgPath)) {
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+      if (cfg.kbRoot && fs.existsSync(cfg.kbRoot)) {
+        return cfg.kbRoot;
+      }
+    }
+  } catch(e) { log('kb_config.json读取失败，使用默认路径: ' + e.message, 'WARN'); }
+  return path.join(ROOT_DIR, '公司知识库备份_v5.7_2026-09-28');
+}
+const KB_ROOT = loadKbRoot();
 const KB_INDEX_FILE = path.join(ROOT_DIR, 'kb_index.json');
 const KB_META_DOCS_FILE = path.join(ROOT_DIR, 'kb_meta_docs.json');
 
@@ -47,11 +60,18 @@ function loadKbIndex() {
   const data = JSON.parse(fs.readFileSync(KB_INDEX_FILE, 'utf-8'));
   if (data.schemaVersion === 'v2.0' || (data.chunks && !data.slices)) {
     data.slices = data.chunks.map(c => ({
-      ...c, dirCategory: c.category, fmCategory: c.category,
+      ...c,
+      dirCategory: c.dirCategory || c.category,
+      dirSubcategory: c.dirSubcategory || c.subcategory,
+      fmCategory: c.fmCategory || c.category,
+      fmSubcategory: c.fmSubcategory || c.subcategory,
       authority: c.authorityLevel || 'medium',
       titleChain: c.headingPath ? c.headingPath.split(' > ') : [c.title],
       filePath: c.relativePath,
-      fileName: c.fileName || (c.relativePath ? c.relativePath.split('/').pop() : '')
+      fileName: c.fileName || (c.relativePath ? c.relativePath.split('/').pop() : ''),
+      outboundEligible: c.outboundEligible || false,
+      contentRole: c.contentRole || 'article',
+      conflictReview: c.conflictReview || false
     }));
     const stats = data.stats || {};
     data.stats = {
@@ -999,9 +1019,44 @@ const server = http.createServer(async (req, res) => {
       
       // 敏感级别过滤（根据访问范围）
       slices = filterSlicesByScope(slices, scope);
-      
-      // 跳过no_outbound切片（对外场景不引用财务数据）
-      // 注意：本机内部分析场景仍可通过/api/kb/index获取
+
+      // V77.0 Phase 1.1: purpose/provider 运行时权限过滤
+      const purpose = (reqUrl.searchParams.get('purpose') || 'browse').toLowerCase();
+      const provider = (reqUrl.searchParams.get('provider') || 'local').toLowerCase();
+      let purposeFiltered = 0;
+      if (purpose === 'internal_ai') {
+        // AI 模型范围: online_glm仅public, local_ollama public+internal, confidential不得发给任何AI
+        if (provider === 'online_glm') {
+          const before = slices.length;
+          slices = slices.filter(s => s.sensitivity === 'public');
+          purposeFiltered = before - slices.length;
+        } else if (provider === 'local_ollama') {
+          const before = slices.length;
+          slices = slices.filter(s => s.sensitivity === 'public' || s.sensitivity === 'internal');
+          purposeFiltered = before - slices.length;
+        }
+        // confidential 始终排除
+        const before2 = slices.length;
+        slices = slices.filter(s => s.sensitivity !== 'confidential');
+        purposeFiltered += before2 - slices.length;
+      } else if (purpose === 'outbound') {
+        // 对外内容: 仅public + active/confirmed + 排除pending/demo/deprecated/conflictReview/noOutbound
+        const before = slices.length;
+        slices = slices.filter(s => {
+          if (s.sensitivity !== 'public') return false;
+          if (s.pending) return false;
+          if (s.demo) return false;
+          if (s.deprecated) return false;
+          if (s.conflictReview) return false;
+          if (s.noOutbound) return false;
+          if (s.outboundEligible === false) return false;
+          const st = (s.status || '').toLowerCase();
+          if (!(st.includes('active') || st.includes('confirmed') || st.includes('正式') || st.includes('公开'))) return false;
+          return true;
+        });
+        purposeFiltered = before - slices.length;
+      }
+      // browse 模式: 不额外过滤，仅供人工浏览
       
       // 加载元文档配置
       let metaDocs = { metaPatterns: [], boostKeywords: [], metaPenalty: 0.3 };
@@ -1063,6 +1118,9 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({
         query: q,
         accessScope: scope,
+        purpose: purpose,
+        provider: provider,
+        purposeFiltered: purposeFiltered,
         totalCandidates: slices.length,
         totalMatches: totalMatches,
         returned: scored.length,

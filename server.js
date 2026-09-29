@@ -841,18 +841,47 @@ const server = http.createServer(async (req, res) => {
       if (fs.existsSync(KB_INDEX_FILE)) {
         const indexData = loadKbIndex();
         const stats = indexData.stats || {};
+        // 按 scope 计算可见文档和切片
+        const allDocs = indexData.documents || [];
+        const allSlices = indexData.slices || indexData.chunks || [];
+        function canSeeDoc(sens) {
+          if (scope === 'public') return sens === 'public';
+          if (scope === 'lan') return sens === 'public' || sens === 'internal';
+          return true;
+        }
+        const visibleDocs = allDocs.filter(d => canSeeDoc(d.sensitivity));
+        const visibleSlices = allSlices.filter(s => canSeeDoc(s.sensitivity));
+        // 按 scope 统计 byCategory
+        const visibleByCategory = {};
+        for (const d of visibleDocs) {
+          const cat = d.dirCategory || d.category || '未分类';
+          if (!visibleByCategory[cat]) visibleByCategory[cat] = 0;
+          visibleByCategory[cat]++;
+        }
+        // 按 scope 统计 bySensitivity
+        const visibleBySensitivity = { public: 0, internal: 0, confidential: 0 };
+        for (const d of visibleDocs) {
+          if (visibleBySensitivity[d.sensitivity] !== undefined) visibleBySensitivity[d.sensitivity]++;
+        }
+        // authorityHigh 按可见文档统计
+        const visibleAuthorityHigh = visibleDocs.filter(d => d.authorityLevel === 'high').length;
+        
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({
           available: true,
           kbVersion: indexData.kbVersion || 'v5.7',
           generatedAt: indexData.generatedAtReadable || indexData.generatedAt,
-          totalFiles: stats.total_files || 0,
-          totalSlices: stats.total_slices || 0,
-          byCategory: stats.by_category || {},
-          bySensitivity: scope === 'public' ? { public: (stats.by_sensitivity || {}).public || 0 } : (stats.by_sensitivity || {}),
-          authorityHigh: stats.authority_high || 0,
-          deprecated: stats.deprecated || 0,
-          noOutbound: stats.no_outbound || 0,
+          totalFiles: visibleDocs.length,
+          totalFilesAll: stats.total_files || 0,
+          totalSlices: visibleSlices.length,
+          totalSlicesAll: stats.total_slices || 0,
+          byCategory: visibleByCategory,
+          byCategoryAll: stats.by_category || {},
+          bySensitivity: visibleBySensitivity,
+          authorityHigh: visibleAuthorityHigh,
+          authorityHighAll: stats.authority_high || 0,
+          deprecated: visibleDocs.filter(d => d.status === 'deprecated').length,
+          noOutbound: visibleDocs.filter(d => d.noOutbound).length,
           accessScope: scope,
           kbRootExists: fs.existsSync(KB_ROOT)
         }, null, 2));
@@ -1069,7 +1098,12 @@ const server = http.createServer(async (req, res) => {
             documentId: d.documentId, title: d.title, relativePath: d.relativePath,
             sensitivity: d.sensitivity, status: d.status, contentRole: d.contentRole || 'article',
             authorityLevel: d.authorityLevel || 'medium', lastUpdated: d.lastUpdated || '',
-            confidence: d.confidence || ''
+            confidence: d.confidence || '',
+            sourceUrl: d.sourceUrl || '',
+            factEligible: d.factEligible !== undefined ? d.factEligible : false,
+            templateEligible: d.templateEligible !== undefined ? d.templateEligible : false,
+            region: d.region || '',
+            tags: d.tags || []
           }))
         };
       }
@@ -1105,7 +1139,12 @@ const server = http.createServer(async (req, res) => {
           documents: cat.documents ? cat.documents.filter(d => canSeeDoc(d.sensitivity)).map(d => ({
             documentId: d.documentId, title: d.title, relativePath: d.relativePath,
             sensitivity: d.sensitivity, status: d.status, contentRole: d.contentRole || 'article',
-            authorityLevel: d.authorityLevel || 'medium', lastUpdated: d.lastUpdated || ''
+            authorityLevel: d.authorityLevel || 'medium', lastUpdated: d.lastUpdated || '',
+            sourceUrl: d.sourceUrl || '',
+            factEligible: d.factEligible !== undefined ? d.factEligible : false,
+            templateEligible: d.templateEligible !== undefined ? d.templateEligible : false,
+            region: d.region || '',
+            tags: d.tags || []
           })) : []
         };
       }
@@ -1179,9 +1218,10 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       
-      // 拒绝99目录
+      // 99_ 目录策略：仅本机(local)可浏览，lan/public 拒绝
       const rp = docMeta.relativePath;
-      if (rp.startsWith('99_') || rp.includes('/99_')) {
+      const is99Dir = rp.startsWith('99_') || rp.includes('/99_');
+      if (is99Dir && scope !== 'local') {
         res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: '访问被拒绝' }));
         return;
@@ -1208,9 +1248,14 @@ const server = http.createServer(async (req, res) => {
       // 统计相关chunk数量
       const chunkCount = (indexData.chunks || []).filter(c => c.documentId === docMeta.documentId).length;
       
-      // 同分类相关文档
+      // 同分类相关文档（按当前访问范围过滤）
+      function canSeeRelatedDoc(sens) {
+        if (scope === 'public') return sens === 'public';
+        if (scope === 'lan') return sens === 'public' || sens === 'internal';
+        return true;
+      }
       const relatedDocs = (indexData.documents || [])
-        .filter(d => d.dirCategory === docMeta.dirCategory && d.documentId !== docMeta.documentId)
+        .filter(d => d.dirCategory === docMeta.dirCategory && d.documentId !== docMeta.documentId && canSeeRelatedDoc(d.sensitivity))
         .slice(0, 10)
         .map(d => ({ documentId: d.documentId, title: d.title, relativePath: d.relativePath, sensitivity: d.sensitivity }));
       
@@ -1370,7 +1415,17 @@ const server = http.createServer(async (req, res) => {
       // 改进版检索（V2）
       const results = searchSlicesV2(slices, q, metaDocs);
       const totalMatches = results.length;
-      const topResults = results.slice(0, topK);
+      // 按 documentId 去重，保留最高分的 chunk
+      const seenDocs = new Map();
+      for (const r of results) {
+        const docId = r.slice.documentId || r.slice.id || r.slice.chunkId;
+        if (!seenDocs.has(docId) || r.score > seenDocs.get(docId).score) {
+          seenDocs.set(docId, r);
+        }
+      }
+      const dedupedResults = Array.from(seenDocs.values()).sort((a,b) => b.score - a.score);
+      const totalUniqueDocs = dedupedResults.length;
+      const topResults = dedupedResults.slice(0, topK);
       
       const scored = topResults.map(r => {
         const slice = r.slice;
@@ -1395,16 +1450,25 @@ const server = http.createServer(async (req, res) => {
         if (!snippet) snippet = slice.text.substring(0, 200) + '...';
         
         return {
-          id: slice.id,
-          filePath: slice.filePath,
+          documentId: slice.documentId || slice.id || slice.chunkId,
+          chunkId: slice.chunkId,
+          title: slice.title || slice.fileName,
+          filePath: slice.filePath || slice.relativePath,
+          relativePath: slice.relativePath || slice.filePath,
           fileName: slice.fileName,
           category: slice.category,
           dirCategory: slice.dirCategory,
           fmCategory: slice.fmCategory,
-          titleChain: slice.titleChain,
+          titleChain: slice.titleChain || slice.headingPath,
           snippet,
           sensitivity: slice.sensitivity,
-          authority: slice.authority,
+          authority: slice.authorityLevel || slice.authority,
+          authorityLevel: slice.authorityLevel,
+          contentRole: slice.contentRole,
+          status: slice.status,
+          factEligible: slice.factEligible,
+          templateEligible: slice.templateEligible,
+          sourceUrl: slice.sourceUrl,
           deprecated: slice.deprecated,
           noOutbound: slice.noOutbound,
           version: slice.version,
@@ -1424,6 +1488,7 @@ const server = http.createServer(async (req, res) => {
         purposeFiltered: purposeFiltered,
         totalCandidates: slices.length,
         totalMatches: totalMatches,
+        totalUniqueDocs: totalUniqueDocs,
         returned: scored.length,
         topK,
         results: scored

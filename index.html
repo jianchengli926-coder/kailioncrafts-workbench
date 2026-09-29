@@ -377,6 +377,41 @@ select.form-control{appearance:none;background-image:url("data:image/svg+xml;utf
   .drawer{width:100vw}
 }
 
+/* V77.1.1 手机端整体布局修复 */
+@media (max-width:768px){
+  .app{overflow-x:hidden}
+  .sidebar{
+    position:fixed;left:0;top:0;bottom:0;z-index:1000;
+    transform:translateX(-100%);transition:transform .25s ease;
+    box-shadow:2px 0 12px rgba(0,0,0,.3);
+  }
+  .app.mobile-nav-open .sidebar{transform:translateX(0)}
+  .app.mobile-nav-open::after{
+    content:'';position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;
+  }
+  .main{width:100%;min-width:0}
+  .topbar{padding:0 12px;gap:8px}
+  .mobile-menu-btn{
+    display:inline-flex !important;align-items:center;justify-content:center;
+    width:36px;height:36px;border:none;background:transparent;cursor:pointer;
+    font-size:20px;color:var(--text);flex-shrink:0;
+  }
+  /* 知识库三栏在手机端 */
+  .kb-browser{flex-direction:column}
+  .kb-browser-tree{
+    width:100%;max-height:200px;border-right:none;border-bottom:1px solid #e2e8f0;
+  }
+  .kb-browser-list{
+    width:100%;min-width:auto;max-height:300px;border-right:none;border-bottom:1px solid #e2e8f0;
+  }
+  .kb-browser-detail{width:100%;min-width:auto}
+  .kb-filter-bar{flex-wrap:wrap}
+  .kb-quick-filters{flex-wrap:wrap}
+}
+@media (min-width:769px){
+  .mobile-menu-btn{display:none !important}
+}
+
 body.dark{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--text-2:#cbd5e1;--text-3:#94a3b8;--gray-bg:#334155}
 body.dark .topbar,body.dark .card{background:var(--card);border-color:var(--border)}
 body.dark .topbar{color:var(--text)}
@@ -11599,11 +11634,17 @@ function kbRenderMarkdown(text) {
   });
   // 行内代码
   md = md.replace(/`([^`]+)`/g, '<code>$1</code>');
-  // 标题
-  md = md.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
-  md = md.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  md = md.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-  md = md.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // 标题（添加锚点 ID）
+  let headingCounter = 0;
+  function addHeadingId(m, level, text) {
+    headingCounter++;
+    const slug = 'kb-h-' + headingCounter + '-' + text.trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-').replace(/^-|-$/g, '').substring(0, 50);
+    return '<h' + level + ' id="' + slug + '">' + text + '</h' + level + '>';
+  }
+  md = md.replace(/^#### (.+)$/gm, function(m, t) { return addHeadingId(m, 4, t); });
+  md = md.replace(/^### (.+)$/gm, function(m, t) { return addHeadingId(m, 3, t); });
+  md = md.replace(/^## (.+)$/gm, function(m, t) { return addHeadingId(m, 2, t); });
+  md = md.replace(/^# (.+)$/gm, function(m, t) { return addHeadingId(m, 1, t); });
   // 粗体和斜体
   md = md.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   md = md.replace(/\*([^*]+)\*/g, '<em>$1</em>');
@@ -11779,6 +11820,21 @@ function kbToggleCat(catName) {
   renderView();
 }
 
+// 快速筛选切换
+function kbToggleQuickFilter(key) {
+  if (kbBrowserState.quickFilter === key) {
+    kbBrowserState.quickFilter = '';
+  } else {
+    kbBrowserState.quickFilter = key;
+    // 快速筛选时清除下拉筛选中的冲突项
+    if (key === 'authority') kbBrowserState.filters.authorityLevel = 'high';
+    if (key === 'public') kbBrowserState.filters.sensitivity = 'public';
+    if (key === 'pending') kbBrowserState.filters.status = 'pending';
+    if (key === 'deprecated') kbBrowserState.filters.status = 'deprecated';
+  }
+  renderView();
+}
+
 // 清除筛选
 function kbClearFilters() {
   kbBrowserState.filters = { sensitivity:'', status:'', contentRole:'', authorityLevel:'', factEligible:'', templateEligible:'' };
@@ -11803,7 +11859,13 @@ function kbCloseDocument() {
 }
 
 function kbScrollToHeadingEl(el) {
-  el.scrollIntoView({behavior:'smooth', block:'start'});
+  const idx = parseInt(el.dataset.headingIdx || '0', 10);
+  const headings = document.querySelectorAll('.kb-detail-body h1, .kb-detail-body h2, .kb-detail-body h3, .kb-detail-body h4');
+  if (headings[idx]) {
+    headings[idx].scrollIntoView({behavior:'smooth', block:'start'});
+  } else {
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+  }
 }
 
 function kbScrollToHeading(pos) {
@@ -11901,7 +11963,6 @@ function viewKBSearch(root){
         for (const [subName, sub] of Object.entries(cat.subcategories)) {
           const subSelected = kbBrowserState.selectedCategory === catName && kbBrowserState.selectedSubcategory === subName;
           html += '<div class="kb-tree-item ' + (subSelected?'selected':'') + '" onclick="kbCatClick(this.dataset.cat,this.dataset.sub)" data-cat="' + esc(catName).replace(/"/g,'&quot;') + '" data-sub="' + esc(subName).replace(/"/g,'&quot;') + '">' + '<span class="cat-name">📄 ' + esc(subName) + '<span class="cat-count">' + sub.documentCount + '</span></span></div>';
-          html += '<span class="cat-name">📄 ' + esc(subName) + '<span class="cat-count">' + sub.documentCount + '</span></span></div>';
         }
         html += '</div>';
       }
@@ -12014,7 +12075,7 @@ function viewKBSearch(root){
     if (headings.length > 0) {
       html += '<div class="kb-detail-toc"><div class="kb-detail-toc-title">📑 章节导航（' + headings.length + '）</div>';
       for (const h of headings) {
-        html += '<a class="toc-h' + h.level + '" onclick="kbScrollToHeadingEl(this)">' + esc(h.text) + '</a>';
+        html += '<a class="toc-h' + h.level + '" onclick="kbScrollToHeadingEl(this)" data-heading-idx="' + hIdx + '">' + esc(h.text) + '</a>';
       }
       html += '</div>';
     }

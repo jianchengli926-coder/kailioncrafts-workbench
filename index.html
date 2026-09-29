@@ -2305,7 +2305,14 @@ async function callAI(messages, opts={}){
   opts = opts||{};
   // 运行时事实过滤：所有对外AI调用必须经过此层，防止旧工具绕过事实访问层
   messages = sanitizeFactsForAI(messages);
-  const chain = getFallbackChain(opts);
+  let chain = getFallbackChain(opts);
+  // V77.2.1: providerPolicy=local_only 模式只允许Ollama，失败后不回退在线模型
+  if(opts.providerPolicy === 'local_only'){
+    chain = chain.filter(cfg => cfg.type === 'ollama');
+    if(!chain.length){
+      return {content:null, error:'local_only模式：无可用本地Ollama模型，不得回退在线模型', model:null, latency:0};
+    }
+  }
   if(!chain.length){ logApiCall('模拟模式',opts.purpose||'general',0,0,0,'mock'); return {content:null, usage:{}, error:null, mock:true, model:'模拟模式'}; }
   if(opts.modelConfigId){
     const specific = chain.find(a=>a.id===opts.modelConfigId);
@@ -17065,28 +17072,31 @@ const PROFILE_PROMPT = `你是资深外贸客户背调专家。请根据以下�
 请确保分析基于客户信息合理推断，不确定的地方标注"需进一步验证"。报告要实用、可执行，不要泛泛而谈。`;
 
 /* 生成客户画像 */
-/* V77.2 精准开发客户画像 - 知识库上下文检索 */
-async function retrieveKnowledgeForProfile(customerInfo){
-  const ctx = { version: 'v77.2', kbVersion: '', retrievedAt: '', query: '', purpose: 'internal_ai', provider: 'online_ollama', matchedFacts: [], matchedTemplates: [], matchedProductLines: [], matchedCustomerTypes: [], citations: [], excludedCount: 0, policySummary: {}, fallbackUsed: false, status: 'not_started', error: null };
+/* V77.2.1 精准开发客户画像 - 知识库上下文检索（Provider与权限绑定） */
+async function retrieveKnowledgeForProfile(customerInfo, providerPolicy){
+  // V77.2.1: 默认 online_safe 模式，只检索 public（可安全发送给在线GLM和本地Ollama）
+  const policy = providerPolicy || 'online_safe';
+  const kbProvider = policy === 'local_only' ? 'local_ollama' : 'online_glm';
+  const ctx = { version: 'v77.2.1', kbVersion: '', retrievedAt: '', query: '', purpose: 'internal_ai', provider: kbProvider, executionMode: policy, matchedFacts: [], matchedTemplates: [], matchedProductLines: [], matchedCustomerTypes: [], citations: [], excludedCount: 0, policySummary: {}, fallbackUsed: false, status: 'not_started', error: null };
   try {
-    // 构建检索查询：从客户信息中提取产品、客户类型、国家关键词
     const query = customerInfo.substring(0, 200);
     ctx.query = query;
     ctx.retrievedAt = new Date().toISOString();
-    // 调用统一知识库检索层（internal_ai + local_ollama = public + internal，禁止confidential）
-    const url = '/api/kb/context?q=' + encodeURIComponent(query) + '&purpose=internal_ai&provider=local_ollama&limit=12';
+    // V77.2.1: online_safe=online_glm(仅public), local_only=local_ollama(public+internal)
+    const url = '/api/kb/context?q=' + encodeURIComponent(query) + '&purpose=internal_ai&provider=' + kbProvider + '&limit=12';
     const resp = await fetch(url);
     if (!resp.ok) { ctx.status = 'failed'; ctx.error = 'http_' + resp.status; return ctx; }
     const data = await resp.json();
     if (data.error) { ctx.status = 'failed'; ctx.error = data.error; return ctx; }
     ctx.kbVersion = data.kbVersion || '';
-    ctx.matchedFacts = (data.facts || []).slice(0, 8);
-    ctx.matchedTemplates = (data.templates || []).slice(0, 4);
+    // V77.2.1: 严格分离事实和模板
+    ctx.matchedFacts = (data.facts || []).filter(f => f.factEligible === true).slice(0, 8);
+    ctx.matchedTemplates = (data.templates || []).filter(t => t.templateEligible === true).slice(0, 4);
     ctx.citations = data.citations || [];
     ctx.excludedCount = data.excludedCount || 0;
     ctx.policySummary = data.policy || {};
     ctx.status = 'completed';
-    // 识别匹配的产品线（四大核心产品）
+    // 识别匹配的产品线（四大核心产品，不含Personal Care）
     const allText = (ctx.matchedFacts.map(f => f.title + ' ' + f.headingPath).join(' ') + ' ' + query).toLowerCase();
     const productLines = ['Kitchen Knives', 'Professional Scissors', 'Outdoor Knives', 'Kitchen Accessories'];
     for (const pl of productLines) {
@@ -17100,12 +17110,13 @@ async function retrieveKnowledgeForProfile(customerInfo){
   return ctx;
 }
 
-/* V77.2 构建知识库上下文Prompt区块（事实与模板分离，不混淆两家公司事实） */
+/* V77.2.1 构建知识库上下文Prompt区块（事实与模板严格分离，安全提示） */
 function buildKbContextPrompt(kbCtx){
+  // V77.2.1: 知识库不可用或无factEligible内容时，只注入安全提示，不回退PROSPECT_KB
   if (!kbCtx || kbCtx.status !== 'completed' || kbCtx.matchedFacts.length === 0) {
-    return '\n\n【KaiLionCrafts Knowledge Base Context】\n未找到已确认的知识库依据。涉及公司能力、产品、认证、MOQ、交期等内容必须标记为"待确认"，不得编造。';
+    return '\n\n【KaiLionCrafts Knowledge Base Context】\n未找到已确认的公司知识库依据。涉及公司能力、产品、MOQ、交期、认证、产能、价格、工厂、供应链和案例的内容必须标记为"待确认"，不得编造。不得声称拥有自有工厂，优先使用"Strategic manufacturing partners"、"Local manufacturing network"。';
   }
-  let prompt = '\n\n【KaiLionCrafts Knowledge Base Context】\n以下内容来自KaiLionCrafts公司知识库，仅用于评估客户匹配度。factEligible内容可作为公司事实；templateEligible内容仅用于结构参考，不得作为事实。\n\n';
+  let prompt = '\n\n【KaiLionCrafts Knowledge Base Context】\n以下内容来自KaiLionCrafts公司知识库（' + (kbCtx.executionMode || 'online_safe') + '模式，provider=' + kbCtx.provider + '）。factEligible内容可作为公司事实；templateEligible内容仅用于结构参考，不得作为事实。\n\n';
   prompt += '【已确认公司事实（factEligible）】\n';
   for (let i = 0; i < Math.min(kbCtx.matchedFacts.length, 6); i++) {
     const f = kbCtx.matchedFacts[i];
@@ -17115,51 +17126,44 @@ function buildKbContextPrompt(kbCtx){
     prompt += '\n【结构参考模板（templateEligible，不得作为事实）】\n';
     for (let i = 0; i < Math.min(kbCtx.matchedTemplates.length, 3); i++) {
       const t = kbCtx.matchedTemplates[i];
-      prompt += `${i+1}. ${t.title}: ${t.shortEvidence.substring(0, 100)} [模板结构参考]\n`;
+      prompt += `${i+1}. ${t.title}: ${t.shortEvidence.substring(0, 100)} [模板结构参考，不得解释为公司事实]\n`;
     }
   }
   prompt += '\n【知识库使用规则】\n';
-  prompt += '- 不得声称KaiLionCrafts拥有所有工厂或生产线，优先使用"Strategic manufacturing partners"、"Local manufacturing network"、"Integrated supply chain collaboration"\n';
-  prompt += '- 不得使用未确认的MOQ、交期、产能、认证、成本优势、出口国家数量\n';
+  prompt += '- 不得声称KaiLionCrafts拥有所有工厂或生产线，优先使用"Strategic manufacturing partners"、"Local manufacturing network"、"Integrated supply chain collaboration"、"Yangjiang-based manufacturing resources"\n';
+  prompt += '- 不得使用未确认的MOQ、交期、产能、认证、成本优势、出口国家数量、工厂数量\n';
   prompt += '- 没有知识库依据的内容标记为"待确认"或unknown\n';
   prompt += '- 不得编造采购量、预算、营业额、员工数量或合作意愿\n';
   prompt += '- 合作工厂认证不得写成公司自有认证\n';
+  prompt += '- 四大核心产品仅限：Kitchen Knives、Professional Scissors、Outdoor Knives、Kitchen Accessories\n';
   return prompt;
 }
 
-async function generateCustomerProfile(customerInfo, depth){
+async function generateCustomerProfile(customerInfo, depth, providerPolicy){
   if(!customerInfo || !customerInfo.trim()) return {content:null, error:'请输入客户信息'};
   const depthCfg = PROFILE_DEPTHS.find(d=>d.id===depth) || PROFILE_DEPTHS[1];
-  // V77.2 检索公司知识库上下文（internal_ai + local_ollama，禁止confidential）
-  const kbCtx = await retrieveKnowledgeForProfile(customerInfo);
-  // V75.3 注入知识库上下文（保留旧版作为fallback，但优先使用V77.2知识库检索结果）
-  const kb = PROSPECT_KB;
-  const kbSuffix = `\n\n【我们的公司背景（基础信息）】
-公司：${kb.company.name_cn}（${kb.company.brand}）
-定位：${kb.company.slogan_en}
-核心优势：${kb.company.core_advantages.join('；')}
-产品品类：${kb.categories.map(x=>x.name).join('、')} [SKU数量:待确认]
-目标市场：${kb.markets.map(x=>x.name).join('、')}
-认证：待确认（合作工厂持有，非公司自有）
-产业背景（公开数据，非公司自有）：${kb.industry.city}是中国刀剪之都，产量占全国${kb.industry.national_output_share} [来源:阳江产业公开统计]
-
-请在分析客户时，结合我们的公司背景，评估该客户与我们的匹配度，并在"开发建议"部分推荐适合的产品品类和切入角度。`;
-  let prompt = PROFILE_PROMPT.replace('{customerInfo}', customerInfo) + kbSuffix;
+  // V77.2.1: 检索公司知识库上下文（默认online_safe=仅public，不冒internal泄露给在线模型的风险）
+  const policy = providerPolicy || 'online_safe';
+  const kbCtx = await retrieveKnowledgeForProfile(customerInfo, policy);
+  // V77.2.1: 移除旧版PROSPECT_KB和getToolKBContext()注入，不再作为事实来源
+  let prompt = PROFILE_PROMPT.replace('{customerInfo}', customerInfo);
   if(depth === 'quick'){
     prompt += '\n\n【注意】这是快速分析，请只输出前3个部分，每个部分简洁明了，总字数控制在500字以内。';
   } else if(depth === 'standard'){
     prompt += '\n\n【注意】这是标准分析，请输出前6个部分，每个部分适度展开，总字数控制在1200字以内。';
   }
-  // V77.2 注入知识库检索结果（事实与模板分离）
-  prompt = '你是'+PROSPECT_KB.company.brand+'的客户画像分析师。\n'+getToolKBContext()+'\n\n'+prompt + buildKbContextPrompt(kbCtx);
-  const result = await callAI([{role:'user',content:prompt}], {purpose:'customer_profile', temperature:0.3});
+  // V77.2.1: 系统角色 + 知识库上下文（唯一事实来源）
+  prompt = '你是KaiLionCrafts的客户画像分析师。\n\n' + prompt + buildKbContextPrompt(kbCtx);
+  // V77.2.1: callAI传入providerPolicy，local_only模式只允许Ollama
+  const callOpts = { purpose: 'customer_profile', temperature: 0.3, providerPolicy: policy };
+  const result = await callAI([{role:'user',content:prompt}], callOpts);
   if(result.error) return {content:null, error:result.error, knowledgeContext: kbCtx};
-  // 保存历史
+  // 保存历史（含knowledgeContext和executionMode）
   if(!S.profileHistory) S.profileHistory = [];
-  S.profileHistory.unshift({id:uid(),customerInfo:customerInfo,depth:depth,depthLabel:depthCfg.label,content:result.content,t:Date.now(),model:result.model,latency:result.latency,knowledgeContext: kbCtx});
+  S.profileHistory.unshift({id:uid(),customerInfo:customerInfo,depth:depth,depthLabel:depthCfg.label,content:result.content,t:Date.now(),model:result.model,latency:result.latency,knowledgeContext: kbCtx, executionMode: policy});
   if(S.profileHistory.length>30) S.profileHistory = S.profileHistory.slice(0,30);
   DB.save('profileHistory', S.profileHistory);
-  return {content:result.content, model:result.model, latency:result.latency, depthLabel:depthCfg.label, knowledgeContext: kbCtx};
+  return {content:result.content, model:result.model, latency:result.latency, depthLabel:depthCfg.label, knowledgeContext: kbCtx, executionMode: policy};
 }
 
 /* 复制画像报告 */
@@ -17216,21 +17220,24 @@ function renderProfileKbContext(kbCtx, containerId){
   if(!box) return;
   if(!kbCtx || kbCtx.status === 'not_started'){ box.style.display = 'none'; return; }
   box.style.display = 'block';
+  // V77.2.1: 所有用户可控内容必须经过esc()转义，打开文档使用data-*属性+事件委托
+  const e = esc;
   let html = '<div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;margin-top:14px">';
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="const b=document.getElementById(\''+containerId+'_body\');b.style.display=b.style.display===\'none\'?\'block\':\'none\'">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" data-kb-toggle="'+e(containerId)+'">';
   html += '<div style="font-size:13px;font-weight:700;color:#166534">📚 公司知识库依据</div>';
   const statusText = kbCtx.status === 'completed' ? '✅ 已检索' : (kbCtx.status === 'failed' ? '⚠️ 检索失败' : '⏳ 检索中');
-  html += '<div style="font-size:11px;color:#15803d">' + statusText + ' · 展开/收起</div></div>';
-  html += '<div id="'+containerId+'_body" style="display:block;margin-top:10px">';
+  html += '<div style="font-size:11px;color:#15803d">' + e(statusText) + ' · 展开/收起</div></div>';
+  html += '<div id="'+e(containerId)+'_body" style="display:block;margin-top:10px">';
   if(kbCtx.status === 'completed'){
     html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:11px">';
-    html += '<span style="background:#fff;padding:4px 8px;border-radius:4px">版本: ' + (kbCtx.kbVersion || 'v7.0') + '</span>';
+    html += '<span style="background:#fff;padding:4px 8px;border-radius:4px">版本: ' + e(kbCtx.kbVersion || 'v7.0') + '</span>';
     html += '<span style="background:#fff;padding:4px 8px;border-radius:4px">事实: ' + (kbCtx.matchedFacts ? kbCtx.matchedFacts.length : 0) + '</span>';
     html += '<span style="background:#fff;padding:4px 8px;border-radius:4px">模板: ' + (kbCtx.matchedTemplates ? kbCtx.matchedTemplates.length : 0) + '</span>';
-    html += '<span style="background:#fff;padding:4px 8px;border-radius:4px">purpose: ' + kbCtx.purpose + '</span>';
-    html += '<span style="background:#fff;padding:4px 8px;border-radius:4px">provider: ' + kbCtx.provider + '</span>';
+    html += '<span style="background:#fff;padding:4px 8px;border-radius:4px">purpose: ' + e(kbCtx.purpose) + '</span>';
+    html += '<span style="background:#fff;padding:4px 8px;border-radius:4px">provider: ' + e(kbCtx.provider) + '</span>';
+    html += '<span style="background:#fff;padding:4px 8px;border-radius:4px">模式: ' + e(kbCtx.executionMode || 'online_safe') + '</span>';
     if(kbCtx.matchedProductLines && kbCtx.matchedProductLines.length > 0){
-      html += '<span style="background:#fef3c7;padding:4px 8px;border-radius:4px">匹配产品: ' + kbCtx.matchedProductLines.join(', ') + '</span>';
+      html += '<span style="background:#fef3c7;padding:4px 8px;border-radius:4px">匹配产品: ' + e(kbCtx.matchedProductLines.join(', ')) + '</span>';
     }
     html += '</div>';
     if(kbCtx.matchedFacts && kbCtx.matchedFacts.length > 0){
@@ -17240,14 +17247,15 @@ function renderProfileKbContext(kbCtx, containerId){
         const f = kbCtx.matchedFacts[i];
         const sensColor = f.sensitivity === 'public' ? '#16a34a' : (f.sensitivity === 'internal' ? '#2563eb' : '#dc2626');
         html += '<div style="background:#fff;padding:8px 10px;border-radius:6px;margin-bottom:6px;border-left:3px solid #22c55e">';
-        html += '<div style="font-size:12px;font-weight:600;color:#1f2937">' + (f.title || '').substring(0,60) + '</div>';
-        if(f.headingPath) html += '<div style="font-size:10px;color:#6b7280;margin:2px 0">' + f.headingPath + '</div>';
-        html += '<div style="font-size:11px;color:#4b5563;margin-top:4px;line-height:1.5">' + (f.shortEvidence || '').substring(0,120) + '...</div>';
-        html += '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">';
+        html += '<div style="font-size:12px;font-weight:600;color:#1f2937">' + e((f.title || '').substring(0,60)) + '</div>';
+        if(f.headingPath) html += '<div style="font-size:10px;color:#6b7280;margin:2px 0">' + e(f.headingPath) + '</div>';
+        html += '<div style="font-size:11px;color:#4b5563;margin-top:4px;line-height:1.5">' + e((f.shortEvidence || '').substring(0,120)) + '...</div>';
+        html += '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">';
         html += '<span style="font-size:10px;background:#f0fdf4;color:#166534;padding:2px 6px;border-radius:3px">factEligible</span>';
-        html += '<span style="font-size:10px;background:#f1f5f9;color:'+sensColor+';padding:2px 6px;border-radius:3px">'+f.sensitivity+'</span>';
-        html += '<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:3px">'+f.authorityLevel+'</span>';
-        html += '<button style="font-size:10px;background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:3px;border:none;cursor:pointer" onclick="openKbDocFromPath(\''+(f.relativePath||'').replace(/'/g,"\\'")+'\')">📖 打开文档</button>';
+        html += '<span style="font-size:10px;background:#f1f5f9;color:'+sensColor+';padding:2px 6px;border-radius:3px">'+e(f.sensitivity)+'</span>';
+        html += '<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:3px">'+e(f.authorityLevel)+'</span>';
+        // V77.2.1: 使用data-*属性存储路径，通过事件委托打开，避免onclick注入
+        html += '<button style="font-size:10px;background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:3px;border:none;cursor:pointer" data-kb-open-doc="'+e(f.relativePath || '')+'">📖 打开文档</button>';
         html += '</div></div>';
       }
       html += '</div>';
@@ -17257,7 +17265,7 @@ function renderProfileKbContext(kbCtx, containerId){
       for(let i=0;i<Math.min(kbCtx.matchedTemplates.length,2);i++){
         const t = kbCtx.matchedTemplates[i];
         html += '<div style="background:#fffbeb;padding:6px 10px;border-radius:6px;margin-bottom:4px;border-left:3px solid #f59e0b;font-size:11px;color:#78350f">';
-        html += (t.title || '').substring(0,50) + ' <span style="color:#92400e">[模板结构参考]</span>';
+        html += e((t.title || '').substring(0,50)) + ' <span style="color:#92400e">[模板结构参考]</span>';
         html += '</div>';
       }
     }
@@ -17266,6 +17274,16 @@ function renderProfileKbContext(kbCtx, containerId){
   }
   html += '</div></div>';
   box.innerHTML = html;
+  // V77.2.1: 事件委托处理展开/收起和打开文档
+  box.querySelectorAll('[data-kb-toggle]').forEach(el => {
+    el.onclick = function(){
+      const body = document.getElementById(this.getAttribute('data-kb-toggle') + '_body');
+      if(body) body.style.display = body.style.display === 'none' ? 'block' : 'none';
+    };
+  });
+  box.querySelectorAll('[data-kb-open-doc]').forEach(el => {
+    el.onclick = function(){ openKbDocFromPath(this.getAttribute('data-kb-open-doc')); };
+  });
 }
 
 /* V77.2 从路径打开知识库文档（复用现有知识库详情功能） */

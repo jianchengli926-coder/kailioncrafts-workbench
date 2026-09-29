@@ -453,6 +453,118 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
   50% { opacity: 0.3; }
 }
 
+/* ===== V77.1 公司知识库浏览 UI ===== */
+.kb-browser { display:flex; flex-direction:column; height:calc(100vh - 140px); min-height:600px; }
+.kb-browser-header { padding:12px 16px; background:linear-gradient(135deg,#1a365d,#2c5282); color:#fff; border-radius:8px; margin-bottom:12px; }
+.kb-browser-header h2 { margin:0 0 4px 0; font-size:18px; }
+.kb-browser-header p { margin:0; font-size:12px; opacity:0.85; }
+.kb-browser-stats { display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; }
+.kb-browser-stat { font-size:11px; opacity:0.9; }
+.kb-browser-stat b { font-size:14px; margin-right:2px; }
+.kb-browser-tabs { display:flex; gap:4px; margin-bottom:12px; }
+.kb-browser-tab { padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px; background:#edf2f7; color:#4a5568; border:none; }
+.kb-browser-tab.active { background:#2c5282; color:#fff; }
+.kb-browser-tab.legacy { background:#fef5e7; color:#975a16; }
+.kb-browser-main { display:flex; gap:0; flex:1; overflow:hidden; border:1px solid #e2e8f0; border-radius:8px; background:#fff; }
+.kb-browser-tree { width:240px; min-width:240px; border-right:1px solid #e2e8f0; overflow-y:auto; background:#f7fafc; }
+.kb-browser-list { width:340px; min-width:340px; border-right:1px solid #e2e8f0; overflow-y:auto; background:#fff; }
+.kb-browser-detail { flex:1; overflow-y:auto; padding:16px 20px; }
+.kb-tree-item { padding:6px 10px; cursor:pointer; font-size:12px; border-left:3px solid transparent; transition:all 0.15s; }
+.kb-tree-item:hover { background:#e2e8f0; }
+.kb-tree-item.selected { background:#bee3f8; border-left-color:#3182ce; font-weight:600; }
+.kb-tree-item .cat-name { display:flex; align-items:center; gap:4px; }
+.kb-tree-item .cat-count { margin-left:auto; font-size:10px; color:#718096; background:#fff; padding:1px 6px; border-radius:8px; }
+.kb-tree-sub { padding-left:16px; }
+.kb-tree-sub .kb-tree-item { font-size:11px; padding:4px 8px; }
+.kb-tree-toggle { display:inline-block; width:14px; text-align:center; color:#a0aec0; font-size:10px; }
+.kb-list-item { padding:10px 12px; border-bottom:1px solid #f0f4f8; cursor:pointer; transition:background 0.15s; }
+.kb-list-item:hover { background:#f7fafc; }
+.kb-list-item.selected { background:#ebf8ff; border-left:3px solid #3182ce; }
+.kb-list-title { font-size:13px; font-weight:600; color:#2d3748; margin-bottom:4px; line-height:1.4; }
+.kb-list-meta { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+.kb-tag { display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:500; }
+.kb-tag.public { background:#c6f6d5; color:#22543d; }
+.kb-tag.internal { background:#bee3f8; color:#2a4365; }
+.kb-tag.confidential { background:#fed7d7; color:#742a2a; }
+.kb-tag.status-active { background:#e6fffa; color:#234e52; }
+.kb-tag.status-pending { background:#fefcbf; color:#744210; }
+.kb-tag.status-deprecated { background:#e2e8f0; color:#4a5568; }
+.kb-tag.authority-high { background:#fef5e7; color:#7c2d12; }
+.kb-tag.role-article { background:#e9d8fd; color:#44337a; }
+.kb-tag.role-sop { background:#c6f6d5; color:#22543d; }
+.kb-tag.role-faq { background:#bee3f8; color:#2a4365; }
+.kb-tag.role-template { background:#fefcbf; color:#744210; }
+.kb-tag.role-product_data { background:#fed7d7; color:#742a2a; }
+.kb-detail-header { border-bottom:2px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px; }
+.kb-detail-title { font-size:20px; font-weight:700; color:#1a202c; margin:0 0 8px 0; line-height:1.4; }
+.kb-detail-path { font-size:11px; color:#718096; font-family:monospace; margin-bottom:8px; word-break:break-all; }
+.kb-detail-meta { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+.kb-detail-meta-row { display:flex; gap:12px; font-size:11px; color:#718096; flex-wrap:wrap; }
+.kb-detail-meta-row span b { color:#4a5568; }
+.kb-detail-body { font-size:14px; line-height:1.8; color:#2d3748; }
+.kb-detail-body h1 { font-size:22px; margin:24px 0 12px; padding-bottom:8px; border-bottom:1px solid #e2e8f0; }
+.kb-detail-body h2 { font-size:18px; margin:20px 0 10px; color:#1a365d; }
+.kb-detail-body h3 { font-size:16px; margin:16px 0 8px; color:#2c5282; }
+.kb-detail-body h4 { font-size:14px; margin:12px 0 6px; color:#4a5568; }
+.kb-detail-body p { margin:8px 0; }
+.kb-detail-body code { background:#f0f4f8; padding:1px 5px; border-radius:3px; font-size:12px; font-family:monospace; color:#c53030; }
+.kb-detail-body pre { background:#1a202c; color:#e2e8f0; padding:12px; border-radius:6px; overflow-x:auto; margin:12px 0; }
+.kb-detail-body pre code { background:none; color:#e2e8f0; padding:0; }
+.kb-detail-body table { border-collapse:collapse; width:100%; margin:12px 0; font-size:12px; display:block; overflow-x:auto; }
+.kb-detail-body th, .kb-detail-body td { border:1px solid #e2e8f0; padding:6px 10px; text-align:left; }
+.kb-detail-body th { background:#f7fafc; font-weight:600; }
+.kb-detail-body blockquote { border-left:4px solid #4299e1; background:#ebf8ff; padding:8px 14px; margin:12px 0; border-radius:0 4px 4px 0; }
+.kb-detail-body ul, .kb-detail-body ol { margin:8px 0; padding-left:24px; }
+.kb-detail-body li { margin:4px 0; }
+.kb-detail-body hr { border:none; border-top:1px solid #e2e8f0; margin:20px 0; }
+.kb-detail-body a { color:#3182ce; text-decoration:none; }
+.kb-detail-toc { position:sticky; top:0; background:#f7fafc; padding:10px 12px; border-radius:6px; margin-bottom:16px; max-height:200px; overflow-y:auto; }
+.kb-detail-toc-title { font-size:11px; font-weight:600; color:#4a5568; margin-bottom:6px; }
+.kb-detail-toc a { display:block; font-size:11px; color:#718096; padding:2px 0; text-decoration:none; cursor:pointer; }
+.kb-detail-toc a:hover { color:#3182ce; }
+.kb-detail-toc .toc-h1 { padding-left:0; }
+.kb-detail-toc .toc-h2 { padding-left:10px; }
+.kb-detail-toc .toc-h3 { padding-left:20px; }
+.kb-detail-toc .toc-h4 { padding-left:30px; }
+.kb-detail-related { margin-top:24px; padding-top:16px; border-top:1px solid #e2e8f0; }
+.kb-detail-related h4 { font-size:13px; color:#4a5568; margin:0 0 8px 0; }
+.kb-detail-related-item { font-size:12px; padding:4px 0; cursor:pointer; color:#3182ce; }
+.kb-detail-related-item:hover { text-decoration:underline; }
+.kb-warning { padding:8px 12px; border-radius:6px; margin:8px 0; font-size:12px; }
+.kb-warning.pending { background:#fefcbf; color:#744210; border-left:3px solid #d69e2e; }
+.kb-warning.deprecated { background:#e2e8f0; color:#4a5568; border-left:3px solid #718096; }
+.kb-warning.conflict { background:#fed7d7; color:#742a2a; border-left:3px solid #e53e3e; }
+.kb-warning.fact { background:#fef5e7; color:#7c2d12; border-left:3px solid #dd6b20; }
+.kb-warning.template { background:#e6fffa; color:#234e52; border-left:3px solid #38b2ac; }
+.kb-search-bar { padding:10px 12px; border-bottom:1px solid #e2e8f0; background:#f7fafc; }
+.kb-search-bar input { width:100%; padding:6px 10px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; }
+.kb-filter-bar { padding:8px 12px; border-bottom:1px solid #e2e8f0; background:#fff; display:flex; flex-wrap:wrap; gap:4px; }
+.kb-filter-select { font-size:11px; padding:3px 6px; border:1px solid #e2e8f0; border-radius:4px; background:#fff; max-width:120px; }
+.kb-quick-filter { font-size:10px; padding:3px 8px; border-radius:10px; cursor:pointer; background:#edf2f7; color:#4a5568; border:none; }
+.kb-quick-filter.active { background:#3182ce; color:#fff; }
+.kb-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#a0aec0; font-size:13px; }
+.kb-empty .icon { font-size:36px; margin-bottom:8px; }
+.kb-loading { display:flex; align-items:center; justify-content:center; height:100%; color:#718096; font-size:13px; }
+.kb-loading .spinner { width:20px; height:20px; border:2px solid #e2e8f0; border-top-color:#3182ce; border-radius:50%; animation:spin 0.8s linear infinite; margin-right:8px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.kb-mindmap-notice { padding:8px 12px; background:#fef5e7; color:#7c2d12; font-size:11px; border-radius:6px; margin:8px 12px; }
+/* 响应式 */
+@media (max-width:1024px) {
+  .kb-browser-tree { width:200px; min-width:200px; }
+  .kb-browser-list { width:280px; min-width:280px; }
+}
+@media (max-width:768px) {
+  .kb-browser { height:auto; min-height:auto; }
+  .kb-browser-main { flex-direction:column; overflow:visible; }
+  .kb-browser-tree { width:100%; min-width:auto; max-height:300px; border-right:none; border-bottom:1px solid #e2e8f0; }
+  .kb-browser-list { width:100%; min-width:auto; max-height:400px; border-right:none; border-bottom:1px solid #e2e8f0; }
+  .kb-browser-detail { width:100%; }
+}
+.kb-mobile-toggle { display:none; }
+@media (max-width:768px) {
+  .kb-mobile-toggle { display:inline-block; }
+}
+
 /* ===== 知识库状态徽章 ===== */
 .kb-status-badge{display:flex;align-items:center;gap:6px;padding:5px 12px;background:linear-gradient(135deg,#f0f7ff,#e8f0fe);border:1px solid #c5d9f0;border-radius:999px;cursor:pointer;transition:all .2s;font-size:12px;white-space:nowrap}
 .kb-status-badge:hover{background:linear-gradient(135deg,#e0efff,#d0e4fd);border-color:#a8c8f0;transform:translateY(-1px)}
@@ -574,7 +686,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
         </div>
         <div class="search-box">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a96a8" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-          <input placeholder="搜索客户 / 公司 / 邮箱…" onkeydown="if(event.key==='Enter')globalSearch(this.value)">
+          <input placeholder="搜索客户 / 公司 / 邮箱…" onkeydown="if(event.key===\'Enter\')globalSearch(this.value)">
         </div>
         <button class="icon-btn" onclick="toggleTheme()" title="切换深浅主题">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
@@ -5679,7 +5791,7 @@ function npStep1(){
   <div class="form-group"><label>产品关键词（回车添加）</label>
     <div class="tag-input-wrap" onclick="this.querySelector('input').focus()">
       ${np.keywords.map((k,i)=>`<span class="chip">${esc(k)}<span class="x" onclick="np.keywords.splice(${i},1);renderNewPlan()">×</span></span>`).join('')}
-      <input id="npKw" placeholder="输入关键词后回车，如 kitchen scissors" onkeydown="if(event.key==='Enter'){event.preventDefault();const v=this.value.trim();if(v){np.keywords.push(v);this.value='';renderNewPlan();}}">
+      <input id="npKw" placeholder="输入关键词后回车，如 kitchen scissors" onkeydown="if(event.key===\'Enter\'){event.preventDefault();const v=this.value.trim();if(v){np.keywords.push(v);this.value='';renderNewPlan();}}">
     </div>
     <div class="form-hint">英文关键词效果更佳，AI 会自动组合成搜索 query</div></div>`;
 }
@@ -11439,88 +11551,498 @@ async function kbViewOriginal(filePath){
 }
 
 /* 渲染公司知识库检索面板 */
+// V77.1 知识库浏览器状态
+let kbBrowserState = {
+  tree: null,
+  treeLoading: false,
+  selectedCategory: '',
+  selectedSubcategory: '',
+  selectedDocumentId: '',
+  document: null,
+  documentLoading: false,
+  searchQuery: '',
+  searchResults: [],
+  searchLoading: false,
+  filters: { sensitivity:'', status:'', contentRole:'', authorityLevel:'', factEligible:'', templateEligible:'' },
+  quickFilter: '',
+  expandedCats: {},
+  status: null,
+  scope: 'local',
+  viewMode: 'browser' // browser | search
+}
+
+// V77.1 安全事件处理（避免引号嵌套）
+function kbCatClick(catName, subName) {
+  kbSelectCategory(catName || '', subName || '');
+}
+function kbCatToggle(catName) {
+  kbToggleCat(catName);
+}
+function kbDocClick(docId) {
+  kbLoadDocument(docId);
+}
+function kbRelatedDocClick(docId) {
+  kbLoadDocument(docId);
+}
+;
+
+// 安全 Markdown 渲染（不执行 HTML/script/iframe）
+function kbRenderMarkdown(text) {
+  if (!text) return '';
+  // 先移除 YAML frontmatter
+  let md = text.replace(/^---\n[\s\S]*?\n---\n?/, '');
+  // HTML 转义
+  md = esc(md);
+  // 代码块
+  md = md.replace(/```([\s\S]*?)```/g, function(m, code) {
+    return '<pre><code>' + code.replace(/^\w*\n/, '').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code></pre>';
+  });
+  // 行内代码
+  md = md.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // 标题
+  md = md.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  md = md.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  md = md.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  md = md.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // 粗体和斜体
+  md = md.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  md = md.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  // 引用块
+  md = md.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+  // 水平线
+  md = md.replace(/^---+$/gm, '<hr>');
+  // 表格（简单处理）
+  md = md.replace(/^\|(.+)\|$/gm, function(m, row) {
+    const cells = row.split('|').map(c => c.trim());
+    if (cells.every(c => /^[-:]+$/.test(c))) return ''; // 分隔行
+    return '<tr>' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>';
+  });
+  // 把连续的 <tr> 包裹成 table
+  md = md.replace(/((?:<tr>[\s\S]*?<\/tr>\n?)+)/g, '<table>$1</table>');
+  // 无序列表
+  md = md.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+  md = md.replace(/((?:<li>.+<\/li>\n?)+)/g, '<ul>$1</ul>');
+  // 有序列表
+  md = md.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  // 段落（空行分隔）
+  md = md.replace(/\n\n/g, '</p><p>');
+  md = '<p>' + md + '</p>';
+  // 清理空段落
+  md = md.replace(/<p><\/p>/g, '');
+  md = md.replace(/<p><h/g, '<h');
+  md = md.replace(/<\/h[1-4]><\/p>/g, function(m) { return m.replace('</p>',''); });
+  return md;
+}
+
+// 加载分类树
+async function kbLoadTree() {
+  if (kbBrowserState.treeLoading) return;
+  kbBrowserState.treeLoading = true;
+  try {
+    const resp = await fetch('/api/kb/tree');
+    const data = await resp.json();
+    kbBrowserState.tree = data.tree || {};
+    kbBrowserState.scope = data.accessScope || 'local';
+  } catch(e) {
+    console.error('加载分类树失败:', e);
+  }
+  kbBrowserState.treeLoading = false;
+}
+
+// 加载文档详情
+async function kbLoadDocument(docId) {
+  kbBrowserState.documentLoading = true;
+  kbBrowserState.selectedDocumentId = docId;
+  try {
+    const resp = await fetch('/api/kb/document?id=' + encodeURIComponent(docId));
+    if (resp.status === 403) {
+      kbBrowserState.document = { error: '访问被拒绝', documentId: docId };
+    } else if (resp.ok) {
+      kbBrowserState.document = await resp.json();
+    } else {
+      kbBrowserState.document = { error: '加载失败', documentId: docId };
+    }
+  } catch(e) {
+    kbBrowserState.document = { error: e.message, documentId: docId };
+  }
+  kbBrowserState.documentLoading = false;
+  renderView();
+}
+
+// 获取当前分类下的文档列表
+function kbGetDocumentList() {
+  if (!kbBrowserState.tree) return [];
+  let docs = [];
+  
+  if (kbBrowserState.searchQuery && kbBrowserState.searchResults.length > 0) {
+    return kbBrowserState.searchResults;
+  }
+  
+  if (kbBrowserState.selectedCategory) {
+    const cat = kbBrowserState.tree[kbBrowserState.selectedCategory];
+    if (!cat) return [];
+    if (kbBrowserState.selectedSubcategory) {
+      const sub = cat.subcategories && cat.subcategories[kbBrowserState.selectedSubcategory];
+      if (sub) docs = sub.documents || [];
+    } else {
+      // 收集该分类下所有子分类的文档
+      if (cat.documents) docs = docs.concat(cat.documents);
+      if (cat.subcategories) {
+        for (const sub of Object.values(cat.subcategories)) {
+          if (sub.documents) docs = docs.concat(sub.documents);
+        }
+      }
+    }
+  } else {
+    // 全部文档
+    for (const cat of Object.values(kbBrowserState.tree)) {
+      if (cat.documents) docs = docs.concat(cat.documents);
+      if (cat.subcategories) {
+        for (const sub of Object.values(cat.subcategories)) {
+          if (sub.documents) docs = docs.concat(sub.documents);
+        }
+      }
+    }
+  }
+  
+  // 应用筛选
+  const f = kbBrowserState.filters;
+  if (f.sensitivity) docs = docs.filter(d => d.sensitivity === f.sensitivity);
+  if (f.status) docs = docs.filter(d => d.status === f.status);
+  if (f.contentRole) docs = docs.filter(d => d.contentRole === f.contentRole);
+  if (f.authorityLevel) docs = docs.filter(d => d.authorityLevel === f.authorityLevel);
+  
+  // 快速筛选
+  if (kbBrowserState.quickFilter === 'authority') docs = docs.filter(d => d.authorityLevel === 'high');
+  if (kbBrowserState.quickFilter === 'public') docs = docs.filter(d => d.sensitivity === 'public');
+  if (kbBrowserState.quickFilter === 'pending') docs = docs.filter(d => d.status === 'pending');
+  if (kbBrowserState.quickFilter === 'deprecated') docs = docs.filter(d => d.status === 'deprecated');
+  if (kbBrowserState.quickFilter === 'sop') docs = docs.filter(d => d.contentRole === 'sop' || d.contentRole === 'template');
+  if (kbBrowserState.quickFilter === 'source') docs = docs.filter(d => d.sourceUrl);
+  if (kbBrowserState.quickFilter === 'fact') docs = docs.filter(d => d.factEligible);
+  if (kbBrowserState.quickFilter === 'template') docs = docs.filter(d => d.templateEligible);
+  
+  return docs;
+}
+
+// 搜索文档
+async function kbSearchDocs(query) {
+  kbBrowserState.searchQuery = query;
+  if (!query.trim()) {
+    kbBrowserState.searchResults = [];
+    kbBrowserState.viewMode = 'browser';
+    renderView();
+    return;
+  }
+  kbBrowserState.searchLoading = true;
+  kbBrowserState.viewMode = 'search';
+  try {
+    const resp = await fetch('/api/kb/search?q=' + encodeURIComponent(query) + '&purpose=browse&provider=none&topK=30');
+    const data = await resp.json();
+    kbBrowserState.searchResults = (data.results || []).map(r => ({
+      documentId: r.documentId || r.id,
+      title: r.title || r.fileName,
+      relativePath: r.filePath || r.relativePath,
+      sensitivity: r.sensitivity || 'public',
+      status: r.status || 'active',
+      contentRole: r.contentRole || 'article',
+      authorityLevel: r.authority || r.authorityLevel || 'medium',
+      lastUpdated: r.lastUpdated || '',
+      snippet: r.snippet || '',
+      score: r.score || 0,
+      category: r.category || r.dirCategory || ''
+    }));
+  } catch(e) {
+    console.error('搜索失败:', e);
+    kbBrowserState.searchResults = [];
+  }
+  kbBrowserState.searchLoading = false;
+  renderView();
+}
+
+// 选择分类
+function kbSelectCategory(catName, subName) {
+  kbBrowserState.selectedCategory = catName;
+  kbBrowserState.selectedSubcategory = subName || '';
+  kbBrowserState.selectedDocumentId = '';
+  kbBrowserState.document = null;
+  kbBrowserState.searchQuery = '';
+  kbBrowserState.searchResults = [];
+  kbBrowserState.viewMode = 'browser';
+  if (catName) kbBrowserState.expandedCats[catName] = true;
+  renderView();
+}
+
+// 切换分类展开
+function kbToggleCat(catName) {
+  kbBrowserState.expandedCats[catName] = !kbBrowserState.expandedCats[catName];
+  renderView();
+}
+
+// 清除筛选
+function kbClearFilters() {
+  kbBrowserState.filters = { sensitivity:'', status:'', contentRole:'', authorityLevel:'', factEligible:'', templateEligible:'' };
+  kbBrowserState.quickFilter = '';
+  renderView();
+}
+
+// 复制路径
+function kbCopyPath(path) {
+  navigator.clipboard.writeText(path).then(() => toast('已复制: ' + path)).catch(() => toast('复制失败'));
+}
+
+// 滚动到章节
+
+// 滚动到章节元素
+
+// 关闭文档详情
+function kbCloseDocument() {
+  kbBrowserState.document = null;
+  kbBrowserState.selectedDocumentId = '';
+  renderView();
+}
+
+function kbScrollToHeadingEl(el) {
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function kbScrollToHeading(pos) {
+  const body = document.querySelector('.kb-detail-body');
+  if (body) {
+    const children = body.children;
+    // 简单滚动到对应位置
+    body.scrollTop = pos / 10;
+  }
+}
+
+// V77.1 公司知识库浏览 UI（三栏布局）
 function viewKBSearch(root){
-  const isPublic = kbSearchState.scope === 'public';
-  const status = kbSearchState.status || {};
+  const status = kbBrowserState.status || {};
+  const scope = kbBrowserState.scope;
+  const scopeText = scope==='local'?'本机（全部）':scope==='lan'?'局域网（public+internal）':'公网（仅public）';
   
-  let html = `
-  <div class="kb-search-hero">
-    <h2>📚 公司知识库检索</h2>
-    <p>基于 ${status.totalFiles||'—'} 个文件、${status.totalSlices||'—'} 条切片的智能检索 · 访问范围：${kbSearchState.scope==='local'?'本机（全部）':kbSearchState.scope==='lan'?'局域网（public+internal）':'公网（仅public）'}</p>
-    <div class="kb-search-input-wrap">
-      <input id="kbSearchInput" placeholder="搜索：德国 厨房刀具 进口商、价格异议 应对、OEM 定制 包装…" value="${esc(kbSearchState.query)}" onkeydown="if(event.key==='Enter')searchKB(this.value)">
-      <button onclick="searchKB(document.getElementById('kbSearchInput').value)">🔍 搜索</button>
-    </div>
-    <div class="kb-stats-row">
-      <span class="kb-stat-item"><b>${status.totalFiles||'—'}</b>文件</span>
-      <span class="kb-stat-item"><b>${status.totalSlices||'—'}</b>切片</span>
-      <span class="kb-stat-item"><b>${status.authorityHigh||'—'}</b>权威文档</span>
-      ${!isPublic?`<span class="kb-stat-item"><b>${(status.bySensitivity&&status.bySensitivity.confidential)||'—'}</b>机密（仅本机）</span>`:''}
-      <span class="kb-stat-item">最后同步：${status.lastSync||'—'}</span>
-    </div>
-  </div>`;
-  
-  // 分类过滤
-  const cats = ['全部','00_导航与规范','01_公司与品牌','02_产品知识库','03_客户开发与CRM','04_国家地区开发指南','05_独立站与SEO','06_海外仓与订单物流','07_营销与社媒','08_AI工作流与工具','09_行业知识与培训','10_项目路演与政府材料','11_订单与财务'];
-  html += `<div class="kb-filter-bar">
-    <select onchange="kbSearchState.category=this.value==='全部'?'':this.value;if(kbSearchState.query)searchKB(kbSearchState.query)">
-      ${cats.map(c=>`<option ${kbSearchState.category===(c==='全部'?'':c)?'selected':''}>${c}</option>`).join('')}
-    </select>
-    <span style="font-size:12px;color:#718096">选择分类后需重新搜索</span>
-  </div>`;
-  
-  // 加载中
-  if(kbSearchState.loading){
-    html += `<div class="kb-loading"><div class="spinner"></div><div>正在检索知识库…</div></div>`;
-    root.innerHTML = html;
-    return;
+  // 异步加载分类树和状态
+  if (!kbBrowserState.tree && !kbBrowserState.treeLoading) {
+    kbLoadTree();
+    fetch('/api/kb/status').then(r=>r.json()).then(d=>{ kbBrowserState.status=d; renderView(); }).catch(()=>{});
   }
   
-  // 无结果
-  if(!kbSearchState.query){
-    html += `<div class="kb-empty"><div class="icon">🔍</div><div style="font-size:15px;margin-bottom:8px">输入关键词开始检索公司知识库</div><div style="font-size:13px;color:#a0aec0">支持中文、英文、多词组合（空格分隔）</div></div>`;
-    root.innerHTML = html;
-    return;
+  let html = '<div class="kb-browser">';
+  
+  // 顶部标签
+  html += '<div class="kb-browser-tabs">';
+  html += '<button class="kb-browser-tab active" onclick="kbSearchState._showLegacy=false;renderView()">📚 公司知识库</button>';
+  html += '<button class="kb-browser-tab" onclick="kbSearchState._showLegacy=true;renderView()">📝 业务笔记</button>';
+  html += '<button class="kb-browser-tab legacy" onclick="prospectKB=true;renderView()">📊 旧版外贸开发知识库</button>';
+  html += '</div>';
+  
+  // 头部信息
+  html += '<div class="kb-browser-header">';
+  html += '<h2>📚 KaiLionCrafts 公司知识库</h2>';
+  html += '<p>完整版知识库浏览 · 访问范围：' + scopeText + ' · 基于 V77.0 新版索引</p>';
+  html += '<div class="kb-browser-stats">';
+  html += '<span class="kb-browser-stat"><b>' + (status.totalFiles||'588') + '</b>文档</span>';
+  html += '<span class="kb-browser-stat"><b>' + (status.totalSlices||'9156') + '</b>切片</span>';
+  html += '<span class="kb-browser-stat"><b>' + (status.authorityHigh||'31') + '</b>权威文档</span>';
+  if (scope !== 'public') html += '<span class="kb-browser-stat"><b>' + ((status.bySensitivity&&status.bySensitivity.confidential)||'75') + '</b>机密（仅本机）</span>';
+  html += '<span class="kb-browser-stat">最后同步：' + (status.lastSync||status.generatedAt||'2026-09-28') + '</span>';
+  html += '</div></div>';
+  
+  // 思维导图差异提示
+  html += '<div class="kb-mindmap-notice">⚠️ 分类思维导图为历史展示版，当前实际 Markdown 为 588 个；敏感等级以实时索引为准。思维导图 sensitivity 分布（206/308/74）与实际（198/315/75）存在差异，待确认后更新。</div>';
+  
+  // 三栏主体
+  html += '<div class="kb-browser-main">';
+  
+  // === 左栏：分类树 ===
+  html += '<div class="kb-browser-tree">';
+  html += '<div class="kb-search-bar"><input placeholder="搜索知识库..." value="' + esc(kbBrowserState.searchQuery) + '" onkeydown="if(event.key===\'Enter\')kbSearchDocs(this.value)"></div>';
+  
+  // 快速筛选
+  html += '<div class="kb-filter-bar">';
+  const quickFilters = [
+    {key:'authority', label:'⭐权威'},
+    {key:'public', label:'🌐公开'},
+    {key:'pending', label:'⏳待确认'},
+    {key:'deprecated', label:'📦已归档'},
+    {key:'sop', label:'📋SOP/模板'},
+    {key:'source', label:'🔗有来源'},
+    {key:'fact', label:'✓可引用'},
+    {key:'template', label:'✎可模板'}
+  ];
+  for (const qf of quickFilters) {
+    html += '<button class="kb-quick-filter ' + (kbBrowserState.quickFilter===qf.key?'active':'') + '" onclick="kbToggleQuickFilter(\'' + qf.key + '\')">' + qf.label + '</button>';
   }
+  html += '</div>';
   
-  if(kbSearchState.results.length===0){
-    html += `<div class="kb-empty"><div class="icon">📭</div><div style="font-size:15px;margin-bottom:8px">未找到相关结果</div><div style="font-size:13px;color:#a0aec0">尝试更换关键词或减少限制条件</div></div>`;
-    root.innerHTML = html;
-    return;
+  // "全部" 选项
+  html += '<div class="kb-tree-item ' + (!kbBrowserState.selectedCategory?'selected':'') + '" onclick="kbSelectCategory(\'\')">';
+  html += '<span class="cat-name">📁 全部文档 <span class="cat-count">' + (kbBrowserState.tree?Object.values(kbBrowserState.tree).reduce((s,c)=>s+c.documentCount,0):'—') + '</span></span></div>';
+  
+  // 分类树
+  if (kbBrowserState.treeLoading) {
+    html += '<div class="kb-loading"><div class="spinner"></div>加载分类树...</div>';
+  } else if (kbBrowserState.tree) {
+    for (const [catName, cat] of Object.entries(kbBrowserState.tree)) {
+      const displayName = catName === '_root' ? '根目录文档' : catName;
+      const isExpanded = kbBrowserState.expandedCats[catName] || kbBrowserState.selectedCategory === catName;
+      const isSelected = kbBrowserState.selectedCategory === catName && !kbBrowserState.selectedSubcategory;
+      
+      html += '<div class="kb-tree-item ' + (isSelected?'selected':'') + '" onclick="kbCatClick(this.dataset.cat)" data-cat="' + esc(catName).replace(/"/g,'&quot;') + '">';
+      html += '<span class="cat-name">';
+      html += '<span class="kb-tree-toggle" onclick="event.stopPropagation();kbCatToggle(this.dataset.cat)" data-cat="' + esc(catName).replace(/"/g,'&quot;') + '">' + (isExpanded?'▼':'▶') + '</span>';
+      html += '📂 ' + esc(displayName);
+      html += '<span class="cat-count">' + cat.documentCount + '</span>';
+      html += '</span></div>';
+      
+      // 子分类
+      if (isExpanded && cat.subcategories) {
+        html += '<div class="kb-tree-sub">';
+        for (const [subName, sub] of Object.entries(cat.subcategories)) {
+          const subSelected = kbBrowserState.selectedCategory === catName && kbBrowserState.selectedSubcategory === subName;
+          html += '<div class="kb-tree-item ' + (subSelected?'selected':'') + '" onclick="kbCatClick(this.dataset.cat,this.dataset.sub)" data-cat="' + esc(catName).replace(/"/g,'&quot;') + '" data-sub="' + esc(subName).replace(/"/g,'&quot;') + '">' + '<span class="cat-name">📄 ' + esc(subName) + '<span class="cat-count">' + sub.documentCount + '</span></span></div>';
+          html += '<span class="cat-name">📄 ' + esc(subName) + '<span class="cat-count">' + sub.documentCount + '</span></span></div>';
+        }
+        html += '</div>';
+      }
+    }
   }
+  html += '</div>';
   
-  // 结果列表
-  html += `<div style="font-size:13px;color:#718096;margin-bottom:12px">找到 ${kbSearchState.results.length} 条相关结果（按相关度排序）</div>`;
+  // === 中栏：文档列表 ===
+  html += '<div class="kb-browser-list">';
   
-  for(const r of kbSearchState.results){
-    const titleText = (r.titleChain||[]).join(' > ') || r.fileName;
-    const expanded = kbSearchState.expanded[r.id];
-    const fb = kbSearchState.feedback[r.id];
+  // 筛选栏
+  html += '<div class="kb-filter-bar">';
+  html += '<select class="kb-filter-select" onchange="kbBrowserState.filters.sensitivity=this.value;renderView()">';
+  html += '<option value="">全部等级</option>';
+  html += '<option value="public" ' + (kbBrowserState.filters.sensitivity==='public'?'selected':'') + '>public</option>';
+  html += '<option value="internal" ' + (kbBrowserState.filters.sensitivity==='internal'?'selected':'') + '>internal</option>';
+  html += '<option value="confidential" ' + (kbBrowserState.filters.sensitivity==='confidential'?'selected':'') + '>confidential</option>';
+  html += '</select>';
+  html += '<select class="kb-filter-select" onchange="kbBrowserState.filters.status=this.value;renderView()">';
+  html += '<option value="">全部状态</option>';
+  html += '<option value="active" ' + (kbBrowserState.filters.status==='active'?'selected':'') + '>active</option>';
+  html += '<option value="pending" ' + (kbBrowserState.filters.status==='pending'?'selected':'') + '>pending</option>';
+  html += '<option value="deprecated" ' + (kbBrowserState.filters.status==='deprecated'?'selected':'') + '>deprecated</option>';
+  html += '</select>';
+  html += '<select class="kb-filter-select" onchange="kbBrowserState.filters.contentRole=this.value;renderView()">';
+  html += '<option value="">全部类型</option>';
+  html += '<option value="article" ' + (kbBrowserState.filters.contentRole==='article'?'selected':'') + '>文章</option>';
+  html += '<option value="sop" ' + (kbBrowserState.filters.contentRole==='sop'?'selected':'') + '>SOP</option>';
+  html += '<option value="faq" ' + (kbBrowserState.filters.contentRole==='faq'?'selected':'') + '>FAQ</option>';
+  html += '<option value="template" ' + (kbBrowserState.filters.contentRole==='template'?'selected':'') + '>模板</option>';
+  html += '<option value="product_data" ' + (kbBrowserState.filters.contentRole==='product_data'?'selected':'') + '>产品数据</option>';
+  html += '</select>';
+  html += '<button class="kb-quick-filter" onclick="kbClearFilters()">清除筛选</button>';
+  html += '</div>';
+  
+  const docs = kbGetDocumentList();
+  const listTitle = kbBrowserState.searchQuery ? ('搜索 "' + esc(kbBrowserState.searchQuery) + '" - ' + docs.length + ' 条结果') : (kbBrowserState.selectedCategory ? (esc(kbBrowserState.selectedCategory === '_root' ? '根目录文档' : kbBrowserState.selectedCategory) + (kbBrowserState.selectedSubcategory ? ' / ' + esc(kbBrowserState.selectedSubcategory) : '')) : '全部文档') + ' - ' + docs.length + ' 篇';
+  
+  html += '<div style="padding:8px 12px;font-size:11px;color:#718096;background:#f7fafc;border-bottom:1px solid #e2e8f0">' + listTitle + '</div>';
+  
+  if (kbBrowserState.searchLoading) {
+    html += '<div class="kb-loading"><div class="spinner"></div>搜索中...</div>';
+  } else if (docs.length === 0) {
+    html += '<div class="kb-empty"><div class="icon">📭</div><div>暂无文档</div></div>';
+  } else {
+    for (const doc of docs) {
+      const isSelected = kbBrowserState.selectedDocumentId === doc.documentId;
+      html += '<div class="kb-list-item ' + (isSelected?'selected':'') + '" onclick="kbDocClick(this.dataset.doc)" data-doc="' + doc.documentId + '">';
+      html += '<div class="kb-list-title">' + esc(doc.title || doc.fileName || '未命名') + '</div>';
+      html += '<div class="kb-list-meta">';
+      html += '<span class="kb-tag ' + (doc.sensitivity||'public') + '">' + (doc.sensitivity||'public') + '</span>';
+      html += '<span class="kb-tag status-' + (doc.status||'active') + '">' + (doc.status||'active') + '</span>';
+      if (doc.authorityLevel === 'high') html += '<span class="kb-tag authority-high">⭐权威</span>';
+      if (doc.contentRole && doc.contentRole !== 'article') html += '<span class="kb-tag role-' + doc.contentRole + '">' + doc.contentRole + '</span>';
+      if (doc.score) html += '<span style="font-size:10px;color:#a0aec0;margin-left:auto">相关度 ' + doc.score + '</span>';
+      html += '</div>';
+      if (doc.snippet) html += '<div style="font-size:11px;color:#718096;margin-top:4px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">' + esc(doc.snippet.substring(0,120)) + '...</div>';
+      html += '<div style="font-size:10px;color:#a0aec0;margin-top:4px;font-family:monospace;word-break:break-all">' + esc(doc.relativePath || '') + '</div>';
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+  
+  // === 右栏：文档详情 ===
+  html += '<div class="kb-browser-detail">';
+  
+  if (kbBrowserState.documentLoading) {
+    html += '<div class="kb-loading"><div class="spinner"></div>加载文档...</div>';
+  } else if (!kbBrowserState.document) {
+    html += '<div class="kb-empty"><div class="icon">📖</div><div>选择左侧文档查看详情</div><div style="font-size:11px;margin-top:8px">支持 Markdown 安全渲染 · 章节导航 · 相关文档</div></div>';
+  } else if (kbBrowserState.document.error) {
+    html += '<div class="kb-empty"><div class="icon">⚠️</div><div>' + esc(kbBrowserState.document.error) + '</div></div>';
+  } else {
+    const doc = kbBrowserState.document.document || kbBrowserState.document;
+    const content = kbBrowserState.document.content || '';
+    const headings = kbBrowserState.document.headings || [];
+    const related = kbBrowserState.document.relatedDocuments || [];
     
-    html += `<div class="kb-result-card">
-      <div class="kb-result-header">
-        <div class="kb-result-title">${kbHighlight(esc(titleText), r.matchedTerms)}</div>
-        <div style="flex-shrink:0">
-          ${r.authority==='high'?'<span class="kb-tag kb-tag-authority">⭐ 权威</span>':''}
-          <span class="kb-tag kb-tag-score">${r.score}</span>
-        </div>
-      </div>
-      <div class="kb-result-meta">
-        <span class="kb-tag kb-tag-category">${esc(r.category||r.dirCategory||'—')}</span>
-        ${!isPublic?`<span class="kb-tag kb-tag-sensitivity ${r.sensitivity||''}">${r.sensitivity||'public'}</span>`:''}
-        ${r.allOriginalHit?'<span class="kb-tag" style="background:#c6f6d5;color:#22543d">✓ 全词匹配</span>':''}
-      </div>
-      <div class="kb-result-snippet">${kbHighlight(esc(r.snippet||''), r.matchedTerms)}</div>
-      <div class="kb-result-source">📄 ${esc(r.filePath)} · 更新于 ${r.lastUpdated||'—'}</div>
-      <div class="kb-result-actions">
-        <button class="kb-view-original" onclick="kbViewOriginal('${esc(r.filePath)}')">查看原文</button>
-        <button class="kb-expand-btn" onclick="kbToggleExpand('${r.id}')">${expanded?'收起':'展开'}</button>
-        <span style="margin-left:auto;font-size:11px;color:#a0aec0">反馈：</span>
-        <button class="kb-feedback-btn ${fb==='useful'?'active-useful':''}" onclick="kbFeedback('${r.id}','useful')">👍 有用</button>
-        <button class="kb-feedback-btn ${fb==='useless'?'active-useless':''}" onclick="kbFeedback('${r.id}','useless')">👎 无用</button>
-      </div>
-    </div>`;
+    // 头部
+    html += '<div class="kb-detail-header">';
+    html += '<div class="kb-detail-title">' + esc(doc.title || '未命名') + '</div>';
+    html += '<div class="kb-detail-path">📄 ' + esc(doc.relativePath || '') + ' <button class="kb-quick-filter" style="font-size:9px;padding:1px 6px" onclick="kbCopyPath(this.dataset.path)" data-path="' + esc(doc.relativePath||'').replace(/"/g,'&quot;') + '">复制路径</button></div>';
+    html += '<div class="kb-detail-meta">';
+    html += '<span class="kb-tag ' + (doc.sensitivity||'public') + '">' + (doc.sensitivity||'public') + '</span>';
+    html += '<span class="kb-tag status-' + (doc.status||'active') + '">' + (doc.status||'active') + '</span>';
+    if (doc.authorityLevel === 'high') html += '<span class="kb-tag authority-high">⭐ 权威资料</span>';
+    if (doc.contentRole) html += '<span class="kb-tag role-' + doc.contentRole + '">' + doc.contentRole + '</span>';
+    if (doc.conflictReview) html += '<span class="kb-tag" style="background:#fed7d7;color:#742a2a">⚠️ 冲突审核</span>';
+    html += '</div>';
+    html += '<div class="kb-detail-meta-row">';
+    if (doc.version) html += '<span><b>版本:</b> ' + esc(doc.version) + '</span>';
+    if (doc.lastUpdated) html += '<span><b>更新:</b> ' + esc(doc.lastUpdated) + '</span>';
+    if (doc.confidence) html += '<span><b>置信度:</b> ' + esc(doc.confidence) + '</span>';
+    if (doc.dataSource) html += '<span><b>来源:</b> ' + esc(doc.dataSource) + '</span>';
+    if (doc.region) html += '<span><b>地区:</b> ' + esc(doc.region) + '</span>';
+    if (doc.tags && doc.tags.length) html += '<span><b>标签:</b> ' + esc(doc.tags.join(', ')) + '</span>';
+    html += '<span><b>切片数:</b> ' + (kbBrowserState.document.chunkCount || 0) + '</span>';
+    html += '</div>';
+    
+    // 警告提示
+    if (doc.pending) html += '<div class="kb-warning pending">⏳ 此文档状态为 pending，部分信息待确认，不可直接作为对外事实。</div>';
+    if (doc.deprecated) html += '<div class="kb-warning deprecated">📦 此文档已废弃，仅供历史参考。</div>';
+    if (doc.conflictReview) html += '<div class="kb-warning conflict">⚠️ 此文档存在版本冲突，需人工审核后才能作为权威事实源。</div>';
+    if (doc.factEligible === false) html += '<div class="kb-warning fact">📌 此文档不可直接作为对外事实引用，其中具体数字和参数需单独确认。</div>';
+    if (doc.templateEligible) html += '<div class="kb-warning template">📋 此文档可作为写作结构/SOP模板使用，但其中事实仍需审核。</div>';
+    
+    html += '</div>';
+    
+    // 章节导航
+    if (headings.length > 0) {
+      html += '<div class="kb-detail-toc"><div class="kb-detail-toc-title">📑 章节导航（' + headings.length + '）</div>';
+      for (const h of headings) {
+        html += '<a class="toc-h' + h.level + '" onclick="kbScrollToHeadingEl(this)">' + esc(h.text) + '</a>';
+      }
+      html += '</div>';
+    }
+    
+    // 正文（安全 Markdown 渲染）
+    html += '<div class="kb-detail-body">' + kbRenderMarkdown(content) + '</div>';
+    
+    // 相关文档
+    if (related.length > 0) {
+      html += '<div class="kb-detail-related"><h4>🔗 同分类相关文档（' + related.length + '）</h4>';
+      for (const r of related) {
+        html += '<div class="kb-detail-related-item" onclick="kbRelatedDocClick(this.dataset.doc)" data-doc="' + r.documentId + '">';
+        html += '<span class="kb-tag ' + (r.sensitivity||'public') + '" style="margin-right:6px">' + (r.sensitivity||'public') + '</span>';
+        html += esc(r.title) + '</div>';
+      }
+      html += '</div>';
+    }
+    
+    // 底部操作
+    html += '<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;display:flex;gap:8px">';
+    html += '<button class="btn btn-outline btn-sm" onclick="kbCloseDocument()">← 返回列表</button>';
+    html += '<button class="btn btn-outline btn-sm" onclick="kbCopyPath(this.dataset.path)" data-path="' + esc(doc.relativePath||'').replace(/"/g,'&quot;') + '">📋 复制相对路径</button>';
+    html += '</div>';
   }
+  
+  html += '</div>'; // end detail
+  html += '</div>'; // end main
+  html += '</div>'; // end browser
   
   root.innerHTML = html;
 }
@@ -22070,7 +22592,7 @@ function renderTavilyConfigCard(){
         <div style="display:flex;gap:8px;align-items:center">
           <input type="password" id="tavilyKeyInput" placeholder="粘贴 Tavily API Key（tvly- 开头）" 
             style="flex:1;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;font-family:monospace"
-            onkeydown="if(event.key==='Enter')tavilySaveKey()">
+            onkeydown="if(event.key===\'Enter\')tavilySaveKey()">
           <button class="btn btn-sm btn-outline" onclick="tavilyToggleKeyInput()">${tavilyKeyInputVisible?'🙈':'👁️'}</button>
         </div>
         <div style="display:flex;gap:8px;margin-top:8px">
@@ -22744,9 +23266,9 @@ function renderCompanyAnalysisContent() {
     `;
   }
   
-  return '<div>加载中...</div>';  }
-  
   return '<div>加载中...</div>';
+  
+
 }
 
 async function executeCompanyFetch(url, index) {
@@ -26893,7 +27415,7 @@ if(document.readyState === 'loading'){
         <button onclick="aiQuickAsk('翻译')" style="font-size:11px;padding:4px 10px;background:#f0f4f8;border:1px solid #e2e8f0;border-radius:12px;cursor:pointer;color:#4a5568">🌐 翻译</button>
       </div>
       <div style="display:flex;gap:8px">
-        <input id="aiChatInput" type="text" placeholder="输入您的问题..." onkeydown="if(event.key==='Enter')sendAIChat()" style="flex:1;padding:10px 14px;border:1px solid #e2e8f0;border-radius:20px;font-size:13px;outline:none">
+        <input id="aiChatInput" type="text" placeholder="输入您的问题..." onkeydown="if(event.key===\'Enter\')sendAIChat()" style="flex:1;padding:10px 14px;border:1px solid #e2e8f0;border-radius:20px;font-size:13px;outline:none">
         <button onclick="sendAIChat()" style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;cursor:pointer;font-size:16px">➤</button>
       </div>
     </div>

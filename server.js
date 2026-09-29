@@ -1032,6 +1032,234 @@ const server = http.createServer(async (req, res) => {
   }
   
 
+  // V77.1 知识库分类树（按访问范围过滤）
+  if (pathname === '/api/kb/tree') {
+    const scope = getAccessScope(req);
+    if (!KB_ROOT) {
+      res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '知识库未配置(fail-closed)' }));
+      return;
+    }
+    try {
+      const treeFile = path.join(ROOT_DIR, 'kb_tree.json');
+      if (!fs.existsSync(treeFile)) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '分类树不存在' }));
+        return;
+      }
+      const rawTree = JSON.parse(fs.readFileSync(treeFile, 'utf-8'));
+      
+      // 按scope过滤文档可见性
+      function canSeeDoc(sens) {
+        if (scope === 'public') return sens === 'public';
+        if (scope === 'lan') return sens === 'public' || sens === 'internal';
+        return true; // local
+      }
+      
+      function filterSubcategory(sub) {
+        if (!sub || !sub.documents) return { ...sub, documents: [], documentCount: 0, sensitivity: {public:0,internal:0,confidential:0} };
+        const visibleDocs = sub.documents.filter(d => canSeeDoc(d.sensitivity));
+        const sensCount = {public:0, internal:0, confidential:0};
+        visibleDocs.forEach(d => { if(sensCount[d.sensitivity]!==undefined) sensCount[d.sensitivity]++; });
+        return {
+          name: sub.name,
+          documentCount: visibleDocs.length,
+          sensitivity: sensCount,
+          documents: visibleDocs.map(d => ({
+            documentId: d.documentId, title: d.title, relativePath: d.relativePath,
+            sensitivity: d.sensitivity, status: d.status, contentRole: d.contentRole || 'article',
+            authorityLevel: d.authorityLevel || 'medium', lastUpdated: d.lastUpdated || '',
+            confidence: d.confidence || ''
+          }))
+        };
+      }
+      
+      function filterCategory(cat) {
+        if (!cat) return null;
+        const visibleSubs = {};
+        let totalDocs = 0;
+        const sensTotal = {public:0, internal:0, confidential:0};
+        const statusTotal = {active:0, pending:0, deprecated:0};
+        
+        if (cat.subcategories) {
+          for (const [subName, sub] of Object.entries(cat.subcategories)) {
+            const filtered = filterSubcategory(sub);
+            visibleSubs[subName] = filtered;
+            totalDocs += filtered.documentCount;
+            for (const k of ['public','internal','confidential']) sensTotal[k] += filtered.sensitivity[k] || 0;
+          }
+        }
+        // 一级分类下直接挂的文档
+        if (cat.documents) {
+          const visible = cat.documents.filter(d => canSeeDoc(d.sensitivity));
+          totalDocs += visible.length;
+          visible.forEach(d => { if(sensTotal[d.sensitivity]!==undefined) sensTotal[d.sensitivity]++; });
+        }
+        
+        return {
+          name: cat.name,
+          documentCount: totalDocs,
+          sensitivity: sensTotal,
+          status: cat.status || statusTotal,
+          subcategories: visibleSubs,
+          documents: cat.documents ? cat.documents.filter(d => canSeeDoc(d.sensitivity)).map(d => ({
+            documentId: d.documentId, title: d.title, relativePath: d.relativePath,
+            sensitivity: d.sensitivity, status: d.status, contentRole: d.contentRole || 'article',
+            authorityLevel: d.authorityLevel || 'medium', lastUpdated: d.lastUpdated || ''
+          })) : []
+        };
+      }
+      
+      const filteredTree = {};
+      for (const [catName, cat] of Object.entries(rawTree)) {
+        const filtered = filterCategory(cat);
+        if (filtered && filtered.documentCount > 0) {
+          filteredTree[catName] = filtered;
+        }
+      }
+      
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        accessScope: scope,
+        categoryCount: Object.keys(filteredTree).length,
+        totalVisibleDocuments: Object.values(filteredTree).reduce((s,c) => s + c.documentCount, 0),
+        tree: filteredTree
+      }, null, 2));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    log(`知识库分类树: scope=${scope}`, 'REQUEST');
+    return;
+  }
+  
+  // V77.1 知识库文档详情
+  if (pathname === '/api/kb/document') {
+    const scope = getAccessScope(req);
+    if (!KB_ROOT) {
+      res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '知识库未配置(fail-closed)' }));
+      return;
+    }
+    const documentId = reqUrl.searchParams.get('id');
+    const relativePath = reqUrl.searchParams.get('path');
+    
+    if (!documentId && !relativePath) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: '缺少id或path参数' }));
+      return;
+    }
+    
+    try {
+      // 从索引中查找文档metadata
+      const indexData = loadKbIndex();
+      let docMeta = null;
+      if (documentId) {
+        docMeta = (indexData.documents || []).find(d => d.documentId === documentId);
+      } else if (relativePath) {
+        docMeta = (indexData.documents || []).find(d => d.relativePath === relativePath);
+      }
+      
+      if (!docMeta) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '文档不存在' }));
+        return;
+      }
+      
+      // 按scope过滤
+      const sens = docMeta.sensitivity || 'confidential';
+      if (scope === 'public' && sens !== 'public') {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '访问被拒绝' }));
+        return;
+      }
+      if (scope === 'lan' && sens === 'confidential') {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '访问被拒绝' }));
+        return;
+      }
+      
+      // 拒绝99目录
+      const rp = docMeta.relativePath;
+      if (rp.startsWith('99_') || rp.includes('/99_')) {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '访问被拒绝' }));
+        return;
+      }
+      
+      // 路径安全检查
+      const fullPath = safeKbPath(rp);
+      if (!fullPath || !fs.existsSync(fullPath)) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: '文档不存在' }));
+        return;
+      }
+      
+      const content = fs.readFileSync(fullPath, 'utf-8');
+      
+      // 提取headings
+      const headings = [];
+      const headingRegex = /^(#{1,4})\s+(.+)$/gm;
+      let hm;
+      while ((hm = headingRegex.exec(content)) !== null) {
+        headings.push({ level: hm[1].length, text: hm[2].trim(), position: hm.index });
+      }
+      
+      // 统计相关chunk数量
+      const chunkCount = (indexData.chunks || []).filter(c => c.documentId === docMeta.documentId).length;
+      
+      // 同分类相关文档
+      const relatedDocs = (indexData.documents || [])
+        .filter(d => d.dirCategory === docMeta.dirCategory && d.documentId !== docMeta.documentId)
+        .slice(0, 10)
+        .map(d => ({ documentId: d.documentId, title: d.title, relativePath: d.relativePath, sensitivity: d.sensitivity }));
+      
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        document: {
+          documentId: docMeta.documentId,
+          title: docMeta.title,
+          relativePath: docMeta.relativePath,
+          fileName: docMeta.fileName,
+          dirCategory: docMeta.dirCategory,
+          dirSubcategory: docMeta.dirSubcategory,
+          sensitivity: docMeta.sensitivity,
+          status: docMeta.status,
+          contentRole: docMeta.contentRole,
+          authorityLevel: docMeta.authorityLevel,
+          confidence: docMeta.confidence,
+          version: docMeta.version,
+          lastUpdated: docMeta.lastUpdated,
+          dataSource: docMeta.dataSource,
+          source: docMeta.source,
+          useCase: docMeta.useCase,
+          region: docMeta.region,
+          tags: docMeta.tags,
+          sourceUrl: docMeta.sourceUrl,
+          sourceName: docMeta.sourceName,
+          factEligible: docMeta.factEligible,
+          templateEligible: docMeta.templateEligible,
+          conflictReview: docMeta.conflictReview,
+          pending: docMeta.pending,
+          deprecated: docMeta.deprecated,
+          demo: docMeta.demo,
+          noOutbound: docMeta.noOutbound,
+          charCount: docMeta.charCount
+        },
+        content: content,
+        headings: headings,
+        chunkCount: chunkCount,
+        relatedDocuments: relatedDocs,
+        accessScope: scope
+      }, null, 2));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    log(`知识库文档详情: scope=${scope}, id=${documentId || 'N/A'}, path=${relativePath || 'N/A'}`, 'REQUEST');
+    return;
+  }
+  
   // 知识库服务端检索（前端不再全量拉取索引）
   if (pathname === '/api/kb/search') {
     const scope = getAccessScope(req);

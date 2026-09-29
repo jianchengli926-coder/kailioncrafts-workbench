@@ -1,14 +1,14 @@
 /**
  * 锴利外贸获客工作台 - 本地服务器
  * 把Mac作为本地服务器运行工作台
- * 
+ *
  * 功能：
  * 1. 静态文件服务（index.html, logo.png等）
  * 2. API代理（解决浏览器CORS限制）
  * 3. Ollama本地模型健康检查
  * 4. 在线模型可用性检测
  * 5. 自动故障转移状态监控
- * 
+ *
  * 使用方法：node server.js
  * 访问地址：http://localhost:8080
  */
@@ -250,13 +250,20 @@ function getAccessScope(req) {
 }
 
 /* 根据访问范围过滤切片敏感级别 */
+function is99DirPath(relativePath) {
+  if (!relativePath) return false;
+  return relativePath.startsWith('99_') || relativePath.includes('/99_');
+}
+
 function filterSlicesByScope(slices, scope) {
+  // V77.1.2: 99目录仅 local 可见
+  const filter99 = (s) => scope === 'local' || !is99DirPath(s.relativePath);
   if (scope === 'local') {
-    return slices; // 本机可访问所有级别
+    return slices.filter(filter99); // 本机可访问所有级别
   } else if (scope === 'lan') {
-    return slices.filter(s => s.sensitivity === 'public' || s.sensitivity === 'internal');
+    return slices.filter(s => (s.sensitivity === 'public' || s.sensitivity === 'internal') && filter99(s));
   } else {
-    return slices.filter(s => s.sensitivity === 'public');
+    return slices.filter(s => s.sensitivity === 'public' && filter99(s));
   }
 }
 
@@ -285,10 +292,10 @@ function searchSlicesV2(slices, q, metaDocs) {
   const tokens = tokenizeQuery(q);
   const originalTerms = tokens.filter(t => t.type !== 'cn-bigram').map(t => t.term);
   const queryContainsMetaKeyword = metaDocs.boostKeywords.some(kw => q.toLowerCase().includes(kw.toLowerCase()));
-  
+
   const scored = [];
   const fileResultCount = {};
-  
+
   for (const slice of slices) {
     let score = 0;
     const matchedTerms = [];
@@ -296,9 +303,9 @@ function searchSlicesV2(slices, q, metaDocs) {
     const bodyText = (slice.text || '').toLowerCase();
     const fileName = (slice.fileName || '').toLowerCase();
     const filePath = (slice.filePath || '').toLowerCase();
-    
+
     let allOriginalHit = true;
-    
+
     for (const token of tokens) {
       const kw = token.term;
       let hits = 0;
@@ -308,7 +315,7 @@ function searchSlicesV2(slices, q, metaDocs) {
       if (hits === 0 && token.type !== 'cn-bigram') allOriginalHit = false;
       score += hits * token.weight;
     }
-    
+
     if (score === 0) continue;
     if (allOriginalHit && originalTerms.length > 1) score *= 2.5;
     // 单匹配降权：只匹配了1个原词且非AND的，降权50%
@@ -317,19 +324,19 @@ function searchSlicesV2(slices, q, metaDocs) {
     if (slice.authority === 'high') score *= 1.5;
     if (slice.deprecated) score *= 0.3;
     if (slice.noOutbound) score *= 0.5;
-    
+
     const isMeta = metaDocs.metaPatterns.some(p =>
       slice.filePath.includes(p) || slice.fileName.includes(p) || titleText.includes(p)
     );
     if (isMeta && !queryContainsMetaKeyword) score *= metaDocs.metaPenalty;
-    
+
     const fp = slice.filePath;
     fileResultCount[fp] = (fileResultCount[fp] || 0) + 1;
     if (fileResultCount[fp] > 2) continue;
-    
+
     scored.push({ slice, score: Math.round(score * 100) / 100, matchedTerms, allOriginalHit });
   }
-  
+
   scored.sort((a, b) => b.score - a.score);
   return scored.filter(r => r.score >= 3);
 }
@@ -388,7 +395,7 @@ function proxyRequest(req, res, targetUrl) {
   const parsedUrl = new URL(targetUrl);
   const isHttps = parsedUrl.protocol === 'https:';
   const httpModule = isHttps ? https : http;
-  
+
   const options = {
     hostname: parsedUrl.hostname,
     port: parsedUrl.port || (isHttps ? 443 : 80),
@@ -399,19 +406,19 @@ function proxyRequest(req, res, targetUrl) {
   delete options.headers.host;
   delete options.headers.origin;
   delete options.headers.referer;
-  
+
   const proxyReq = httpModule.request(options, (proxyRes) => {
     res.writeHead(proxyRes.statusCode, {
       ...proxyRes.headers
     });
     proxyRes.pipe(res);
   });
-  
+
   proxyReq.on('error', (err) => {
     res.writeHead(502, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: '代理请求失败', detail: err.message }));
   });
-  
+
   req.pipe(proxyReq);
 }
 
@@ -471,19 +478,19 @@ function serveStaticFile(req, res, filePath) {
       });
       return;
     }
-    
+
     const ext = path.extname(filePath).toLowerCase();
     const contentType = getMimeType(filePath);
-    
+
     // 缓存策略：HTML不缓存，静态资源缓存1小时
     const cacheControl = ext === '.html' ? 'no-cache' : 'public, max-age=3600';
-    
+
     res.writeHead(200, {
       'Content-Type': contentType,
       'Content-Length': stats.size,
       'Cache-Control': cacheControl
     });
-    
+
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
     stream.on('error', () => {
@@ -497,23 +504,23 @@ function serveStaticFile(req, res, filePath) {
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
   const pathname = decodeURIComponent(reqUrl.pathname);
-  
+
   // CORS预检（同源策略，不使用通配符）
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
     return;
   }
-  
+
   // ============ API路由 ============
-  
+
   // 健康检查API
   if (pathname === '/api/health') {
     const ollama = await checkOllama();
     const onlineChecks = await Promise.all(
       ONLINE_APIS.map(api => checkOnlineAPI(api.name, api.url))
     );
-    
+
     const health = {
       status: 'ok',
       timestamp: new Date().toISOString(),
@@ -530,13 +537,13 @@ const server = http.createServer(async (req, res) => {
         strategy: '在线模型优先 → 全部失败时自动切换到本地Ollama模型'
       }
     };
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(health, null, 2));
     log(`健康检查: Ollama=${ollama.running ? '运行中' : '未运行'}, 在线=${onlineChecks.filter(a=>a.available).length}/${onlineChecks.length}`, 'SUCCESS');
     return;
   }
-  
+
   // Ollama代理API（公网禁用）
   if (pathname.startsWith('/api/ollama/')) {
     const scope = getAccessScope(req);
@@ -551,30 +558,30 @@ const server = http.createServer(async (req, res) => {
     proxyRequest(req, res, targetUrl);
     return;
   }
-  
+
   // 在线模型API代理已关闭（SSRF风险，无明确当前用途）
   if (pathname.startsWith('/api/proxy/')) {
     res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ error: '代理接口已禁用', reason: 'SSRF安全风险，无明确当前用途' }));
     return;
   }
-  
+
   // ============ 访问密码API（scrypt哈希+HttpOnly会话+失败限制+公网权限） ============
-  
+
   const ACCESS_CONFIG_FILE = path.join(ROOT_DIR, 'access_config.json');
   const SESSION_COOKIE_NAME = 'kl_session';
   const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8小时
   const MAX_FAILED_ATTEMPTS = 5;
   const FAIL_LOCKOUT_MS = 60 * 1000; // 1分钟
-  
+
   // 内存会话存储（不写磁盘）
   const activeSessions = new Map();
   const failedAttempts = new Map(); // ip -> {count, firstFailTime}
-  
+
   function hashPassword(password, salt) {
     return crypto.scryptSync(password, salt, 64).toString('hex');
   }
-  
+
   function verifyPassword(password, config) {
     if (config.passwordHash && config.salt) {
       const hash = hashPassword(password, Buffer.from(config.salt, 'hex'));
@@ -596,7 +603,7 @@ const server = http.createServer(async (req, res) => {
     }
     return false;
   }
-  
+
   function loadAccessConfig() {
     try {
       if (fs.existsSync(ACCESS_CONFIG_FILE)) {
@@ -617,15 +624,15 @@ const server = http.createServer(async (req, res) => {
     console.log('\n🔐 首次运行临时密码（请立即修改）: ' + randomPassword + '\n');
     return config;
   }
-  
+
   function saveAccessConfig(config) {
     try { fs.writeFileSync(ACCESS_CONFIG_FILE, JSON.stringify(config, null, 2)); return true; } catch(e) { return false; }
   }
-  
+
   function getClientIp(req) {
     return req.socket.remoteAddress || 'unknown';
   }
-  
+
   function isRateLimited(ip) {
     const record = failedAttempts.get(ip);
     if (!record) return false;
@@ -635,20 +642,20 @@ const server = http.createServer(async (req, res) => {
     }
     return false;
   }
-  
+
   function recordFailedAttempt(ip) {
     const record = failedAttempts.get(ip) || { count: 0, firstFailTime: Date.now() };
     record.count++;
     failedAttempts.set(ip, record);
   }
-  
+
   function createSession(res) {
     const token = crypto.randomBytes(32).toString('hex');
     activeSessions.set(token, { createdAt: Date.now(), expiresAt: Date.now() + SESSION_TTL_MS });
     res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_MS / 1000}`);
     return token;
   }
-  
+
   function validateSession(req) {
     const cookies = req.headers.cookie || '';
     const match = cookies.match(new RegExp(SESSION_COOKIE_NAME + '=([^;]+)'));
@@ -662,11 +669,11 @@ const server = http.createServer(async (req, res) => {
     }
     return true;
   }
-  
+
   function destroySession(res) {
     res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`);
   }
-  
+
   // 访问密码状态（公开，不泄露密码）
   if (pathname === '/api/access/status' && req.method === 'GET') {
     const config = loadAccessConfig();
@@ -681,7 +688,7 @@ const server = http.createServer(async (req, res) => {
     }));
     return;
   }
-  
+
   // 验证密码（登录）
   if (pathname === '/api/access/verify' && req.method === 'POST') {
     const ip = getClientIp(req);
@@ -712,7 +719,7 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
-  
+
   // 登出
   if (pathname === '/api/access/logout' && req.method === 'POST') {
     destroySession(res);
@@ -720,7 +727,7 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ success: true }));
     return;
   }
-  
+
   // 修改密码（仅本机+已验证会话可调用）
   if (pathname === '/api/access/password' && req.method === 'POST') {
     const scope = getAccessScope(req);
@@ -767,9 +774,9 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
-  
+
   // ============ 知识库API（只读） ============
-  
+
   // 访问范围调试接口（仅本机可访问）
   // AI模型配置接口（读取api_config.json，不返回完整Key）
   if (pathname === '/api/ai/config') {
@@ -822,7 +829,7 @@ const server = http.createServer(async (req, res) => {
     }));
     return;
   }
-  
+
   // 知识库状态
   if (pathname === '/api/kb/status') {
     const scope = getAccessScope(req);
@@ -844,13 +851,19 @@ const server = http.createServer(async (req, res) => {
         // 按 scope 计算可见文档和切片
         const allDocs = indexData.documents || [];
         const allSlices = indexData.slices || indexData.chunks || [];
-        function canSeeDoc(sens) {
-          if (scope === 'public') return sens === 'public';
-          if (scope === 'lan') return sens === 'public' || sens === 'internal';
+        function is99Dir(relativePath) {
+          if (!relativePath) return false;
+          return relativePath.startsWith('99_') || relativePath.includes('/99_');
+        }
+        function canSeeDoc(doc) {
+          const sens = doc.sensitivity;
+          if (scope === 'public') { if (sens !== 'public') return false; }
+          if (scope === 'lan') { if (sens !== 'public' && sens !== 'internal') return false; }
+          if (scope !== 'local' && is99Dir(doc.relativePath)) return false;
           return true;
         }
-        const visibleDocs = allDocs.filter(d => canSeeDoc(d.sensitivity));
-        const visibleSlices = allSlices.filter(s => canSeeDoc(s.sensitivity));
+        const visibleDocs = allDocs.filter(d => canSeeDoc(d));
+        const visibleSlices = allSlices.filter(s => canSeeDoc(s));
         // 按 scope 统计 byCategory
         const visibleByCategory = {};
         for (const d of visibleDocs) {
@@ -865,26 +878,30 @@ const server = http.createServer(async (req, res) => {
         }
         // authorityHigh 按可见文档统计
         const visibleAuthorityHigh = visibleDocs.filter(d => d.authorityLevel === 'high').length;
-        
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({
+
+        // V77.1.2: public/LAN 不返回 *All 全库统计字段，避免泄露被过滤知识库总量
+        const statusResp = {
           available: true,
           kbVersion: indexData.kbVersion || 'v5.7',
           generatedAt: indexData.generatedAtReadable || indexData.generatedAt,
           totalFiles: visibleDocs.length,
-          totalFilesAll: stats.total_files || 0,
           totalSlices: visibleSlices.length,
-          totalSlicesAll: stats.total_slices || 0,
           byCategory: visibleByCategory,
-          byCategoryAll: stats.by_category || {},
           bySensitivity: visibleBySensitivity,
           authorityHigh: visibleAuthorityHigh,
-          authorityHighAll: stats.authority_high || 0,
-          deprecated: visibleDocs.filter(d => d.status === 'deprecated').length,
+          deprecated: visibleDocs.filter(d => d.status === 'deprecated' || d.deprecated === true).length,
           noOutbound: visibleDocs.filter(d => d.noOutbound).length,
           accessScope: scope,
           kbRootExists: fs.existsSync(KB_ROOT)
-        }, null, 2));
+        };
+        if (scope === 'local') {
+          statusResp.totalFilesAll = stats.total_files || 0;
+          statusResp.totalSlicesAll = stats.total_slices || 0;
+          statusResp.byCategoryAll = stats.by_category || {};
+          statusResp.authorityHighAll = stats.authority_high || 0;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(statusResp, null, 2));
       } else {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({
@@ -900,7 +917,7 @@ const server = http.createServer(async (req, res) => {
     log(`知识库状态: scope=${scope}`, 'REQUEST');
     return;
   }
-  
+
   // 知识库索引（支持分页和分类过滤）
   if (pathname === '/api/kb/index') {
     const scope = getAccessScope(req);
@@ -913,7 +930,7 @@ const server = http.createServer(async (req, res) => {
     const category = reqUrl.searchParams.get('category');
     const page = parseInt(reqUrl.searchParams.get('page') || '0');
     const pageSize = parseInt(reqUrl.searchParams.get('pageSize') || '500');
-    
+
     try {
       if (!fs.existsSync(KB_INDEX_FILE)) {
         res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -922,22 +939,22 @@ const server = http.createServer(async (req, res) => {
       }
       const indexData = loadKbIndex();
       let slices = indexData.slices || [];
-      
+
       // 分类过滤
       if (category) {
         slices = slices.filter(s => s.category === category);
       }
-      
+
       // 敏感级别过滤（根据访问范围）
       const beforeFilter = slices.length;
       slices = filterSlicesByScope(slices, scope);
       const afterFilter = slices.length;
-      
+
       // 分页
       const total = slices.length;
       const start = page * pageSize;
       const paged = slices.slice(start, start + pageSize);
-      
+
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         kbVersion: indexData.kbVersion,
@@ -957,7 +974,7 @@ const server = http.createServer(async (req, res) => {
     log(`知识库索引: scope=${scope}, category=${category || 'all'}, page=${page}`, 'REQUEST');
     return;
   }
-  
+
   // 知识库单个文件内容（增强敏感过滤）
   if (pathname === '/api/kb/file') {
     const scope = getAccessScope(req);
@@ -968,32 +985,32 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const relativePath = reqUrl.searchParams.get('path');
-    
+
     // 统一拒绝函数（不泄露文件是否存在）
     function denyFile(msg) {
       res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: msg || '访问被拒绝' }));
     }
-    
+
     if (!relativePath) {
       denyFile('缺少path参数');
       return;
     }
-    
+
     // 只允许.md后缀
     if (!relativePath.toLowerCase().endsWith('.md')) {
       denyFile('仅允许访问.md文件');
       log(`知识库文件拒绝(非md): ${relativePath}`, 'WARN');
       return;
     }
-    
+
     // 拒绝99目录
     if (relativePath.startsWith('99_') || relativePath.includes('/99_')) {
       denyFile('访问被拒绝');
       log(`知识库文件拒绝(99目录): ${relativePath}`, 'WARN');
       return;
     }
-    
+
     // 路径穿越防护
     const fullPath = safeKbPath(relativePath);
     if (!fullPath) {
@@ -1001,13 +1018,13 @@ const server = http.createServer(async (req, res) => {
       log(`知识库文件拒绝(路径穿越): ${relativePath}`, 'WARN');
       return;
     }
-    
+
     // 检查文件是否存在（不存在也返回403，不泄露存在性）
     if (!fs.existsSync(fullPath)) {
       denyFile('访问被拒绝');
       return;
     }
-    
+
     // 读取文件并检查frontmatter sensitivity
     let sensitivity = 'confidential'; // 缺失默认confidential
     let content = '';
@@ -1027,7 +1044,7 @@ const server = http.createServer(async (req, res) => {
       denyFile('访问被拒绝');
       return;
     }
-    
+
     // 按访问范围过滤
     if (scope === 'public' && sensitivity !== 'public') {
       denyFile('访问被拒绝');
@@ -1039,7 +1056,7 @@ const server = http.createServer(async (req, res) => {
       log(`知识库文件局域网拒绝: ${relativePath} (confidential)`, 'WARN');
       return;
     }
-    
+
     // 返回文件内容
     try {
       const stats = fs.statSync(fullPath);
@@ -1059,7 +1076,7 @@ const server = http.createServer(async (req, res) => {
     log(`知识库文件: scope=${scope}, sens=${sensitivity}, ${relativePath}`, 'REQUEST');
     return;
   }
-  
+
 
   // V77.1 知识库分类树（按访问范围过滤）
   if (pathname === '/api/kb/tree') {
@@ -1077,44 +1094,80 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const rawTree = JSON.parse(fs.readFileSync(treeFile, 'utf-8'));
-      
-      // 按scope过滤文档可见性
-      function canSeeDoc(sens) {
-        if (scope === 'public') return sens === 'public';
-        if (scope === 'lan') return sens === 'public' || sens === 'internal';
-        return true; // local
+
+      // V77.1.2: 加载完整索引，建立 documentId -> 完整 metadata Map
+      const indexFile = path.join(ROOT_DIR, 'kb_index.json');
+      let docMetaMap = {};
+      if (fs.existsSync(indexFile)) {
+        const fullIndex = JSON.parse(fs.readFileSync(indexFile, 'utf-8'));
+        if (Array.isArray(fullIndex.documents)) {
+          for (const d of fullIndex.documents) {
+            if (d.documentId) docMetaMap[d.documentId] = d;
+          }
+        }
       }
-      
+
+      // 合并完整元数据
+      function mergeDocMeta(d) {
+        const full = docMetaMap[d.documentId] || {};
+        return {
+          documentId: d.documentId,
+          title: full.title || d.title || '',
+          relativePath: full.relativePath || d.relativePath || '',
+          sensitivity: full.sensitivity || d.sensitivity || 'public',
+          status: full.status || d.status || 'active',
+          pending: full.pending === true || (full.status && String(full.status).includes('pending')),
+          deprecated: full.deprecated === true || full.status === 'deprecated' || full.status === 'archived',
+          conflictReview: full.conflictReview === true,
+          contentRole: full.contentRole || d.contentRole || 'article',
+          authorityLevel: full.authorityLevel || d.authorityLevel || 'medium',
+          sourceUrl: full.sourceUrl || d.sourceUrl || '',
+          factEligible: full.factEligible === true,
+          templateEligible: full.templateEligible === true,
+          region: full.region || d.region || '',
+          tags: full.tags || d.tags || [],
+          lastUpdated: full.lastUpdated || d.lastUpdated || '',
+          confidence: full.confidence || d.confidence || ''
+        };
+      }
+
+      // V77.1.2: 99目录仅 local 可见
+      function is99Dir(relativePath) {
+        if (!relativePath) return false;
+        return relativePath.startsWith('99_') || relativePath.includes('/99_');
+      }
+
+      // 按scope过滤文档可见性
+      function canSeeDoc(doc) {
+        const sens = doc.sensitivity;
+        if (scope === 'public') { if (sens !== 'public') return false; }
+        if (scope === 'lan') { if (sens !== 'public' && sens !== 'internal') return false; }
+        // local: 全部可见
+        // 99目录仅 local 可见
+        if (scope !== 'local' && is99Dir(doc.relativePath)) return false;
+        return true;
+      }
+
       function filterSubcategory(sub) {
         if (!sub || !sub.documents) return { ...sub, documents: [], documentCount: 0, sensitivity: {public:0,internal:0,confidential:0} };
-        const visibleDocs = sub.documents.filter(d => canSeeDoc(d.sensitivity));
+        const visibleDocs = sub.documents.filter(d => canSeeDoc(mergeDocMeta(d)));
         const sensCount = {public:0, internal:0, confidential:0};
         visibleDocs.forEach(d => { if(sensCount[d.sensitivity]!==undefined) sensCount[d.sensitivity]++; });
         return {
           name: sub.name,
           documentCount: visibleDocs.length,
           sensitivity: sensCount,
-          documents: visibleDocs.map(d => ({
-            documentId: d.documentId, title: d.title, relativePath: d.relativePath,
-            sensitivity: d.sensitivity, status: d.status, contentRole: d.contentRole || 'article',
-            authorityLevel: d.authorityLevel || 'medium', lastUpdated: d.lastUpdated || '',
-            confidence: d.confidence || '',
-            sourceUrl: d.sourceUrl || '',
-            factEligible: d.factEligible !== undefined ? d.factEligible : false,
-            templateEligible: d.templateEligible !== undefined ? d.templateEligible : false,
-            region: d.region || '',
-            tags: d.tags || []
-          }))
+          documents: visibleDocs.map(d => mergeDocMeta(d))
         };
       }
-      
+
       function filterCategory(cat) {
         if (!cat) return null;
         const visibleSubs = {};
         let totalDocs = 0;
         const sensTotal = {public:0, internal:0, confidential:0};
         const statusTotal = {active:0, pending:0, deprecated:0};
-        
+
         if (cat.subcategories) {
           for (const [subName, sub] of Object.entries(cat.subcategories)) {
             const filtered = filterSubcategory(sub);
@@ -1125,30 +1178,21 @@ const server = http.createServer(async (req, res) => {
         }
         // 一级分类下直接挂的文档
         if (cat.documents) {
-          const visible = cat.documents.filter(d => canSeeDoc(d.sensitivity));
+          const visible = cat.documents.filter(d => canSeeDoc(mergeDocMeta(d)));
           totalDocs += visible.length;
           visible.forEach(d => { if(sensTotal[d.sensitivity]!==undefined) sensTotal[d.sensitivity]++; });
         }
-        
+
         return {
           name: cat.name,
           documentCount: totalDocs,
           sensitivity: sensTotal,
           status: cat.status || statusTotal,
           subcategories: visibleSubs,
-          documents: cat.documents ? cat.documents.filter(d => canSeeDoc(d.sensitivity)).map(d => ({
-            documentId: d.documentId, title: d.title, relativePath: d.relativePath,
-            sensitivity: d.sensitivity, status: d.status, contentRole: d.contentRole || 'article',
-            authorityLevel: d.authorityLevel || 'medium', lastUpdated: d.lastUpdated || '',
-            sourceUrl: d.sourceUrl || '',
-            factEligible: d.factEligible !== undefined ? d.factEligible : false,
-            templateEligible: d.templateEligible !== undefined ? d.templateEligible : false,
-            region: d.region || '',
-            tags: d.tags || []
-          })) : []
+          documents: cat.documents ? cat.documents.filter(d => canSeeDoc(mergeDocMeta(d))).map(d => mergeDocMeta(d)) : []
         };
       }
-      
+
       const filteredTree = {};
       for (const [catName, cat] of Object.entries(rawTree)) {
         const filtered = filterCategory(cat);
@@ -1156,7 +1200,7 @@ const server = http.createServer(async (req, res) => {
           filteredTree[catName] = filtered;
         }
       }
-      
+
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         accessScope: scope,
@@ -1171,7 +1215,7 @@ const server = http.createServer(async (req, res) => {
     log(`知识库分类树: scope=${scope}`, 'REQUEST');
     return;
   }
-  
+
   // V77.1 知识库文档详情
   if (pathname === '/api/kb/document') {
     const scope = getAccessScope(req);
@@ -1182,13 +1226,13 @@ const server = http.createServer(async (req, res) => {
     }
     const documentId = reqUrl.searchParams.get('id');
     const relativePath = reqUrl.searchParams.get('path');
-    
+
     if (!documentId && !relativePath) {
       res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: '缺少id或path参数' }));
       return;
     }
-    
+
     try {
       // 从索引中查找文档metadata
       const indexData = loadKbIndex();
@@ -1198,13 +1242,13 @@ const server = http.createServer(async (req, res) => {
       } else if (relativePath) {
         docMeta = (indexData.documents || []).find(d => d.relativePath === relativePath);
       }
-      
+
       if (!docMeta) {
         res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: '文档不存在' }));
         return;
       }
-      
+
       // 按scope过滤
       const sens = docMeta.sensitivity || 'confidential';
       if (scope === 'public' && sens !== 'public') {
@@ -1217,7 +1261,7 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: '访问被拒绝' }));
         return;
       }
-      
+
       // 99_ 目录策略：仅本机(local)可浏览，lan/public 拒绝
       const rp = docMeta.relativePath;
       const is99Dir = rp.startsWith('99_') || rp.includes('/99_');
@@ -1226,7 +1270,7 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: '访问被拒绝' }));
         return;
       }
-      
+
       // 路径安全检查
       const fullPath = safeKbPath(rp);
       if (!fullPath || !fs.existsSync(fullPath)) {
@@ -1234,9 +1278,9 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: '文档不存在' }));
         return;
       }
-      
+
       const content = fs.readFileSync(fullPath, 'utf-8');
-      
+
       // 提取headings
       const headings = [];
       const headingRegex = /^(#{1,4})\s+(.+)$/gm;
@@ -1244,21 +1288,23 @@ const server = http.createServer(async (req, res) => {
       while ((hm = headingRegex.exec(content)) !== null) {
         headings.push({ level: hm[1].length, text: hm[2].trim(), position: hm.index });
       }
-      
+
       // 统计相关chunk数量
       const chunkCount = (indexData.chunks || []).filter(c => c.documentId === docMeta.documentId).length;
-      
-      // 同分类相关文档（按当前访问范围过滤）
-      function canSeeRelatedDoc(sens) {
-        if (scope === 'public') return sens === 'public';
-        if (scope === 'lan') return sens === 'public' || sens === 'internal';
+
+      // 同分类相关文档（按当前访问范围过滤，V77.1.2: 99目录仅local可见）
+      function canSeeRelatedDoc(doc) {
+        const sens = doc.sensitivity;
+        if (scope === 'public') { if (sens !== 'public') return false; }
+        if (scope === 'lan') { if (sens !== 'public' && sens !== 'internal') return false; }
+        if (scope !== 'local' && is99DirPath(doc.relativePath)) return false;
         return true;
       }
       const relatedDocs = (indexData.documents || [])
-        .filter(d => d.dirCategory === docMeta.dirCategory && d.documentId !== docMeta.documentId && canSeeRelatedDoc(d.sensitivity))
+        .filter(d => d.dirCategory === docMeta.dirCategory && d.documentId !== docMeta.documentId && canSeeRelatedDoc(d))
         .slice(0, 10)
         .map(d => ({ documentId: d.documentId, title: d.title, relativePath: d.relativePath, sensitivity: d.sensitivity }));
-      
+
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         document: {
@@ -1304,7 +1350,7 @@ const server = http.createServer(async (req, res) => {
     log(`知识库文档详情: scope=${scope}, id=${documentId || 'N/A'}, path=${relativePath || 'N/A'}`, 'REQUEST');
     return;
   }
-  
+
   // 知识库服务端检索（前端不再全量拉取索引）
   if (pathname === '/api/kb/search') {
     const scope = getAccessScope(req);
@@ -1317,13 +1363,13 @@ const server = http.createServer(async (req, res) => {
     const q = (reqUrl.searchParams.get('q') || '').trim();
     const categories = (reqUrl.searchParams.get('categories') || '').split(',').filter(c => c);
     const topK = Math.min(parseInt(reqUrl.searchParams.get('topK') || '20'), 100);
-    
+
     if (!q) {
       res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: '缺少查询参数q' }));
       return;
     }
-    
+
     try {
       if (!fs.existsSync(KB_INDEX_FILE)) {
         res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1332,12 +1378,12 @@ const server = http.createServer(async (req, res) => {
       }
       const indexData = loadKbIndex();
       let slices = indexData.slices || [];
-      
+
       // 分类过滤
       if (categories.length > 0) {
         slices = slices.filter(s => categories.includes(s.category) || categories.includes(s.dirCategory) || categories.includes(s.fmCategory));
       }
-      
+
       // 敏感级别过滤（根据访问范围）
       slices = filterSlicesByScope(slices, scope);
 
@@ -1403,7 +1449,7 @@ const server = http.createServer(async (req, res) => {
         purposeFiltered = before - slices.length;
       }
       // browse 模式: 不额外过滤，仅供人工浏览
-      
+
       // 加载元文档配置
       let metaDocs = { metaPatterns: [], boostKeywords: [], metaPenalty: 0.3 };
       try {
@@ -1411,7 +1457,7 @@ const server = http.createServer(async (req, res) => {
           metaDocs = JSON.parse(fs.readFileSync(KB_META_DOCS_FILE, 'utf-8'));
         }
       } catch(e) { log('元文档配置读取失败: ' + e.message, 'ERROR'); }
-      
+
       // 改进版检索（V2）
       const results = searchSlicesV2(slices, q, metaDocs);
       const totalMatches = results.length;
@@ -1426,7 +1472,7 @@ const server = http.createServer(async (req, res) => {
       const dedupedResults = Array.from(seenDocs.values()).sort((a,b) => b.score - a.score);
       const totalUniqueDocs = dedupedResults.length;
       const topResults = dedupedResults.slice(0, topK);
-      
+
       const scored = topResults.map(r => {
         const slice = r.slice;
         let snippet = '';
@@ -1448,7 +1494,7 @@ const server = http.createServer(async (req, res) => {
           snippet = (start > 0 ? '...' : '') + slice.text.substring(start, end) + (end < slice.text.length ? '...' : '');
         }
         if (!snippet) snippet = slice.text.substring(0, 200) + '...';
-        
+
         return {
           documentId: slice.documentId || slice.id || slice.chunkId,
           chunkId: slice.chunkId,
@@ -1478,7 +1524,7 @@ const server = http.createServer(async (req, res) => {
           allOriginalHit: r.allOriginalHit
         };
       });
-      
+
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         query: q,
@@ -1503,10 +1549,10 @@ const server = http.createServer(async (req, res) => {
 
 
   // ============ AI精准客户开发 - 搜索与抓取API ============
-  
+
   // 搜索配置文件（用户自行填入Tavily API Key，不硬编码）
   const SEARCH_CONFIG_FILE = path.join(ROOT_DIR, 'search_config.json');
-  
+
   function loadSearchConfig() {
     try {
       if (fs.existsSync(SEARCH_CONFIG_FILE)) {
@@ -1515,14 +1561,14 @@ const server = http.createServer(async (req, res) => {
     } catch(e) { log('搜索配置读取失败: ' + e.message, 'WARN'); }
     return { tavilyApiKey: '', searxngUrl: 'http://localhost:8888', searchCacheHours: 24 };
   }
-  
+
   function saveSearchConfig(config) {
     try {
       fs.writeFileSync(SEARCH_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
       return true;
     } catch(e) { return false; }
   }
-  
+
   // 搜索缓存（24小时）
   const SEARCH_CACHE_FILE = path.join(ROOT_DIR, 'search_cache.json');
   let searchCache = {};
@@ -1531,11 +1577,11 @@ const server = http.createServer(async (req, res) => {
       searchCache = JSON.parse(fs.readFileSync(SEARCH_CACHE_FILE, 'utf-8'));
     }
   } catch(e) { searchCache = {}; }
-  
+
   function getCacheKey(provider, query, params) {
     return provider + ':' + query + ':' + JSON.stringify(params || {});
   }
-  
+
   function getCachedSearch(key, cacheHours) {
     const entry = searchCache[key];
     if (!entry) return null;
@@ -1546,7 +1592,7 @@ const server = http.createServer(async (req, res) => {
     }
     return { ...entry.data, cached: true, cacheAgeHours: Math.round(age * 10) / 10 };
   }
-  
+
   function setCachedSearch(key, data) {
     searchCache[key] = { timestamp: Date.now(), data };
     // 限制缓存大小，只保留最近500条
@@ -1557,7 +1603,7 @@ const server = http.createServer(async (req, res) => {
     }
     try { fs.writeFileSync(SEARCH_CACHE_FILE, JSON.stringify(searchCache), 'utf-8'); } catch(e) {}
   }
-  
+
   // 额度使用统计
   const USAGE_FILE = path.join(ROOT_DIR, 'search_usage.json');
   let usageData = { monthly: {} };
@@ -1566,12 +1612,12 @@ const server = http.createServer(async (req, res) => {
       usageData = JSON.parse(fs.readFileSync(USAGE_FILE, 'utf-8'));
     }
   } catch(e) { usageData = { monthly: {} }; }
-  
+
   function getCurrentMonthKey() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   }
-  
+
   function recordUsage(provider, credits, query) {
     const month = getCurrentMonthKey();
     if (!usageData.monthly[month]) usageData.monthly[month] = { tavily: 0, searxng: 0, totalQueries: 0, lastQuery: '' };
@@ -1580,9 +1626,9 @@ const server = http.createServer(async (req, res) => {
     usageData.monthly[month].lastQuery = query.substring(0, 100);
     try { fs.writeFileSync(USAGE_FILE, JSON.stringify(usageData, null, 2), 'utf-8'); } catch(e) {}
   }
-  
+
   // ============ SSRF防护（升级版：连接层IP校验 + DNS重绑定防御） ============
-  
+
   // 检查IP是否为内网/保留地址（支持IPv4和IPv6）
   function isPrivateIP(ip) {
     if (!ip) return true;
@@ -1607,7 +1653,7 @@ const server = http.createServer(async (req, res) => {
     if (v6 === '::') return true; // 未指定地址
     return false;
   }
-  
+
   // 将十进制/十六进制数字转换为IPv4点分格式（用于检测绕过）
   function normalizeNumericIP(hostname) {
     // 纯十进制数字，如 2130706433 = 127.0.0.1
@@ -1626,7 +1672,7 @@ const server = http.createServer(async (req, res) => {
     }
     return null;
   }
-  
+
   // 自定义DNS lookup：在连接层校验解析后的IP，防御DNS重绑定
   // 注意：Node.js v22+ 的 http.request 会传递 all:true，此时 dns.lookup 返回数组
   function safeLookup(hostname, options, callback) {
@@ -1650,7 +1696,7 @@ const server = http.createServer(async (req, res) => {
       }
     });
   }
-  
+
   // URL安全检查（字符串层面预检查，连接层还有safeLookup二次校验）
   function isUrlSafe(urlStr) {
     try {
@@ -1680,14 +1726,14 @@ const server = http.createServer(async (req, res) => {
       return false;
     }
   }
-  
+
   // 网页抓取（升级版：连接层SSRF校验 + 最多3次重定向 + 2MB响应上限 + 递归重定向校验）
   function fetchUrl(urlStr, opts = {}) {
     const maxRedirects = opts.maxRedirects !== undefined ? opts.maxRedirects : 3;
     const timeout = opts.timeout || 15000;
     const maxSize = opts.maxSize || 2 * 1024 * 1024; // 最大2MB
     const visited = opts._visited || [];
-    
+
     return new Promise((resolve, reject) => {
       // 字符串层面预检查
       if (!isUrlSafe(urlStr)) {
@@ -1700,11 +1746,11 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       visited.push(urlStr);
-      
+
       const u = new URL(urlStr);
       const isHttps = u.protocol === 'https:';
       const client = isHttps ? https : http;
-      
+
       const options = {
         hostname: u.hostname,
         port: u.port || (isHttps ? 443 : 80),
@@ -1719,7 +1765,7 @@ const server = http.createServer(async (req, res) => {
         timeout: timeout,
         lookup: safeLookup  // 连接层二次校验：DNS解析后检查IP
       };
-      
+
       const req = client.request(options, (res) => {
         // 处理重定向（递归，每次都经过isUrlSafe和safeLookup双重校验）
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
@@ -1748,7 +1794,7 @@ const server = http.createServer(async (req, res) => {
             .then(resolve).catch(reject);
           return;
         }
-        
+
         let data = '';
         let size = 0;
         res.on('data', (chunk) => {
@@ -1773,13 +1819,13 @@ const server = http.createServer(async (req, res) => {
           });
         });
       });
-      
+
       req.on('error', (e) => reject(e));
       req.on('timeout', () => { req.destroy(); reject(new Error('请求超时(' + timeout + 'ms)')); });
       req.end();
     });
   }
-  
+
   // 从HTML中提取纯文本
   function extractTextFromHtml(html) {
     if (!html) return '';
@@ -1797,7 +1843,7 @@ const server = http.createServer(async (req, res) => {
     text = text.replace(/\s+/g, ' ').trim();
     return text;
   }
-  
+
   // Tavily搜索
   async function tavilySearch(query, opts = {}) {
     const config = loadSearchConfig();
@@ -1807,12 +1853,12 @@ const server = http.createServer(async (req, res) => {
     const cacheKey = getCacheKey('tavily', query, opts);
     const cached = getCachedSearch(cacheKey, config.searchCacheHours);
     if (cached && !opts.forceRefresh) return cached;
-    
+
     const searchDepth = opts.searchDepth || 'basic'; // basic=1 credit, advanced=2 credits
     const maxResults = Math.min(opts.maxResults || 10, 20);
     const includeDomains = opts.includeDomains || [];
     const excludeDomains = opts.excludeDomains || [];
-    
+
     const postData = JSON.stringify({
       api_key: config.tavilyApiKey,
       query: query,
@@ -1823,7 +1869,7 @@ const server = http.createServer(async (req, res) => {
       include_answer: false,
       include_raw_content: false
     });
-    
+
     return new Promise((resolve, reject) => {
       const options = {
         hostname: 'api.tavily.com',
@@ -1836,7 +1882,7 @@ const server = http.createServer(async (req, res) => {
         },
         timeout: 30000
       };
-      
+
       const req = https.request(options, (res) => {
         let data = '';
         res.on('data', (chunk) => data += chunk);
@@ -1876,7 +1922,7 @@ const server = http.createServer(async (req, res) => {
       req.end();
     });
   }
-  
+
 
   // Tavily官方用量查询（接入官方API，返回真实已用/剩余额度）
   function tavilyGetUsage() {
@@ -1929,7 +1975,7 @@ const server = http.createServer(async (req, res) => {
       req.end();
     });
   }
-  
+
   // SearXNG降级搜索
   async function searxngSearch(query, opts = {}) {
     const config = loadSearchConfig();
@@ -1937,10 +1983,10 @@ const server = http.createServer(async (req, res) => {
     const cacheKey = getCacheKey('searxng', query, opts);
     const cached = getCachedSearch(cacheKey, config.searchCacheHours);
     if (cached && !opts.forceRefresh) return cached;
-    
+
     const maxResults = Math.min(opts.maxResults || 10, 20);
     const searchUrl = searxngUrl + '/search?q=' + encodeURIComponent(query) + '&format=json&categories=general&language=en';
-    
+
     return new Promise((resolve, reject) => {
       const u = new URL(searchUrl);
       const options = {
@@ -1984,7 +2030,7 @@ const server = http.createServer(async (req, res) => {
       req.end();
     });
   }
-  
+
   // 统一搜索接口（Tavily优先，失败降级SearXNG）
   async function unifiedSearch(query, opts = {}) {
     const config = loadSearchConfig();
@@ -2006,7 +2052,7 @@ const server = http.createServer(async (req, res) => {
       throw new Error('所有搜索提供商均失败:\n' + errors.join('\n'));
     }
   }
-  
+
   // 公网模式检查：公网访问时禁用搜索和抓取
   function denyIfPublic(req, res, scope) {
     if (scope === 'public') {
@@ -2016,7 +2062,7 @@ const server = http.createServer(async (req, res) => {
     }
     return false;
   }
-  
+
   // 读取POST body
   function readBody(req) {
     return new Promise((resolve, reject) => {
@@ -2028,9 +2074,9 @@ const server = http.createServer(async (req, res) => {
       req.on('error', reject);
     });
   }
-  
+
   // ============ 搜索API路由 ============
-  
+
   // 搜索配置（读取/保存）
   // 公网权限控制：搜索/抓取/配置接口公网禁用
   const isSearchOrFetchApi = pathname.startsWith('/api/search') || pathname === '/api/fetch';
@@ -2042,7 +2088,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
   }
-  
+
   if (pathname === '/api/search/config' && req.method === 'GET') {
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
@@ -2071,7 +2117,7 @@ const server = http.createServer(async (req, res) => {
     }));
     return;
   }
-  
+
   if (pathname === '/api/search/config' && req.method === 'POST') {
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
@@ -2105,7 +2151,7 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
-  
+
   // V75.8 Tavily连接测试（不消耗搜索额度，调用usage接口验证Key有效性）
   if (pathname === '/api/search/test' && req.method === 'POST') {
     const scope = getAccessScope(req);
@@ -2154,7 +2200,7 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
-  
+
   // 统一搜索
   if (pathname === '/api/search' && req.method === 'POST') {
     const scope = getAccessScope(req);
@@ -2174,14 +2220,14 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
-  
+
   // 额度使用统计（接入Tavily官方用量，本地计数作补充）
   if (pathname === '/api/search/usage' && req.method === 'GET') {
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     const month = getCurrentMonthKey();
     const monthly = usageData.monthly[month] || { tavily: 0, searxng: 0, totalQueries: 0, failedQueries: 0, cacheHits: 0 };
-    
+
     // 尝试获取Tavily官方用量
     let officialUsage = null;
     try {
@@ -2192,7 +2238,7 @@ const server = http.createServer(async (req, res) => {
     } catch(e) {
       officialUsage = { available: false, reason: e.message };
     }
-    
+
     // 以官方数据为准，本地计数作补充
     let creditsUsed, creditsLimit, creditsRemaining, dataSource;
     if (officialUsage && officialUsage.available) {
@@ -2206,9 +2252,9 @@ const server = http.createServer(async (req, res) => {
       creditsRemaining = Math.max(0, creditsLimit - creditsUsed);
       dataSource = 'local';
     }
-    
+
     const percentUsed = creditsLimit > 0 ? Math.round((creditsUsed / creditsLimit) * 100) : 0;
-    
+
     // 本地计数与官方数据差异检测（超过10%时提示）
     let discrepancyWarning = null;
     if (officialUsage && officialUsage.available && monthly.tavily > 0) {
@@ -2218,14 +2264,14 @@ const server = http.createServer(async (req, res) => {
         discrepancyWarning = '本地计数(' + monthly.tavily + ')与官方数据(' + officialUsage.creditsUsed + ')差异' + diffPct.toFixed(1) + '%，以官方数据为准';
       }
     }
-    
+
     // 分别估算可发现候选公司数和可深度分析数
     const searchCreditsPerCompany = 3; // 每家客户约3组搜索词
     const discoverableCompanies = Math.floor(creditsRemaining / searchCreditsPerCompany);
     // 深度分析消耗：阶段2完成后按实际消耗更新，当前预估每家约2 credits（抓取+提取不消耗Tavily，AI分析用模型不消耗搜索额度）
     const deepAnalysisCreditsPerCompany = 0; // 深度分析主要消耗模型token，不消耗Tavily搜索额度
     const deepAnalyzableCompanies = deepAnalysisCreditsPerCompany > 0 ? Math.floor(creditsRemaining / deepAnalysisCreditsPerCompany) : null;
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({
       month: month,
@@ -2255,7 +2301,7 @@ const server = http.createServer(async (req, res) => {
     }));
     return;
   }
-  
+
   // 网页抓取
   if (pathname === '/api/fetch' && req.method === 'POST') {
     const scope = getAccessScope(req);
@@ -2287,9 +2333,9 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
-  
+
   // ============ V76.0 模块C：公司官网深度分析抓取接口 ============
-  
+
   // 从HTML中确定性提取公司信息
   function extractCompanyInfo(html, url) {
     const info = {
@@ -2322,33 +2368,33 @@ const server = http.createServer(async (req, res) => {
       // V76.1 新增：Amazon链接
       amazonLinks: []
     };
-    
+
     try {
       // 页面标题
       const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
       if (titleMatch) info.title = titleMatch[1].trim().replace(/\s+/g, ' ');
-      
+
       // Meta Description
       const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i) || html.match(/<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["']/i);
       if (descMatch) info.metaDescription = descMatch[1].trim();
-      
+
       // Meta Keywords
       const kwMatch = html.match(/<meta[^>]+name=["']keywords["'][^>]+content=["']([^"']*)["']/i);
       if (kwMatch) info.metaKeywords = kwMatch[1].trim();
-      
+
       // 页面语言
       const langMatch = html.match(/<html[^>]+lang=["']([^"']*)["']/i);
       if (langMatch) info.language = langMatch[1].trim();
-      
+
       // 公开邮箱（去重）
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
       const emails = html.match(emailRegex) || [];
       info.emails = [...new Set(emails.filter(e => !e.includes('example.com') && !e.includes('domain.com')))];
-      
+
       // V76.2 公开电话（四级证据等级，严格过滤误判）
       info.phoneDetails = [];
       const seenPhones = new Set();
-      
+
       function isValidPhone(raw) {
         const digits = raw.replace(/\D/g, '');
         if (digits.length < 7 || digits.length > 15) return false;
@@ -2358,11 +2404,11 @@ const server = http.createServer(async (req, res) => {
         if (/^\d{4}$/.test(digits)) return false;
         return true;
       }
-      
+
       function normalizePhone(raw) {
         return raw.replace(/[\s\-()]/g, '').trim();
       }
-      
+
       function addPhone(raw, confidence, sourceType, context) {
         if (!raw || !isValidPhone(raw)) return;
         const normalized = normalizePhone(raw);
@@ -2377,7 +2423,7 @@ const server = http.createServer(async (req, res) => {
           context: (context || '').substring(0, 100)
         });
       }
-      
+
       // 1. tel: 链接（high confidence）
       const telLinks = html.match(/href=["']tel:([^"']+)["']/gi);
       if (telLinks) {
@@ -2386,13 +2432,13 @@ const server = http.createServer(async (req, res) => {
           addPhone(num, 'high', 'tel_link', 'tel:链接');
         }
       }
-      
+
       // 2. JSON-LD telephone（high confidence）
       const jsonLdPhone = html.match(/"telephone"\s*:\s*"([^"]+)"/i) || html.match(/"telephone"\s*:\s*\{[^}]*"value"\s*:\s*"([^"]+)"/i);
       if (jsonLdPhone) {
         addPhone(jsonLdPhone[1], 'high', 'json_ld', 'JSON-LD telephone字段');
       }
-      
+
       // 3. Contact/Imprint页面带标签的号码（medium/high）
       const isContactPage = /contact|impressum|imprint|about|company|联系/i.test(url) || /contact|impressum|imprint/i.test(html.substring(0, 5000).toLowerCase());
       if (isContactPage) {
@@ -2402,7 +2448,7 @@ const server = http.createServer(async (req, res) => {
           addPhone(labeledMatch[1], 'high', 'contact_labeled', labeledMatch[0].substring(0, 50));
         }
       }
-      
+
       // 4. 普通正文正则（low confidence，严格过滤上下文）
       const bodyPhoneRegex = /(?:\+\d{1,3}[-.\s]?)?(?:\(?\d{2,4}\)?[-.\s]?)?\d{3,4}[-.\s]\d{3,4}(?:[-.\s]\d{1,4})?/g;
       const bodyPhones = html.match(bodyPhoneRegex) || [];
@@ -2423,19 +2469,19 @@ const server = http.createServer(async (req, res) => {
         }
         addPhone(p, 'low', 'body_regex', '正文正则匹配');
       }
-      
+
       // 最终phones数组只保留medium以上置信度
       info.phones = info.phoneDetails.filter(p => p.confidence !== 'low').map(p => p.raw);
-      
+
       // V76.1 地址提取（简单模式：匹配常见地址格式）
       const addressRegex = /(\d+\s+[A-Za-z0-9\s.,'-]+?(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Square|Sq|Gasse|Straße|Str|Weg|Platz|Ring|Allee|Damm|Ufer|Chaussee|Drove|Close|Gardens|Estate|Industrial|Estate|Park|Way)\.?[^,\n]{0,80})/gi;
       const addresses = html.match(addressRegex) || [];
       info.addresses = [...new Set(addresses.map(a => a.trim().replace(/\s+/g, ' ')).filter(a => a.length > 10 && a.length < 200))].slice(0, 5);
-      
+
       // V76.2 国家识别（严格证据等级，排除配送/货币/语言选择器）
       info.addresses = info.addresses || [];
       info.countryAddresses = [];
-      
+
       // 提取页面正文（排除header/footer/nav/select选项）
       const mainContent = html
         .replace(/<header[\s\S]*?<\/header>/gi, '')
@@ -2444,7 +2490,7 @@ const server = http.createServer(async (req, res) => {
         .replace(/<select[\s\S]*?<\/select>/gi, '')
         .replace(/<option[\s\S]*?<\/option>/gi, '');
       const mainText = mainContent.replace(/<[^>]*>/g, ' ');
-      
+
       // 1. JSON-LD PostalAddress/addressCountry（high）
       const jsonLdAddress = html.match(/"address"\s*:\s*\{([^}]+)\}/i);
       const jsonLdCountry = html.match(/"addressCountry"\s*:\s*"([^"]+)"/i) || html.match(/"addressCountry"\s*:\s*\{[^}]*"name"\s*:\s*"([^"]+)"/i);
@@ -2455,7 +2501,7 @@ const server = http.createServer(async (req, res) => {
         info.countryEvidenceUrl = url;
         info.countryAddresses.push({type: 'json_ld', address: jsonLdAddress ? jsonLdAddress[1].substring(0, 200) : info.country, sourceUrl: url, confidence: 'high'});
       }
-      
+
       // 2. Contact/Imprint页面完整地址（high）
       const isContactOrImprint = /contact|impressum|imprint|about|company|联系|关于/i.test(url);
       if (isContactOrImprint && !info.country) {
@@ -2476,7 +2522,7 @@ const server = http.createServer(async (req, res) => {
           }
         }
       }
-      
+
       // 3. 公司注册号/法律声明（high）
       const legalRegex = /(?:GmbH|AG|Ltd|LLC|Inc|Corp|Corporation|Limited|S\.A\.|S\.r\.l\.)[^.]{0,100}(?:Register|Registration|HRB|HRB\s*\d+|Court|Amtsgericht)/gi;
       const legalMatch = html.match(legalRegex);
@@ -2494,7 +2540,7 @@ const server = http.createServer(async (req, res) => {
           info.countryEvidenceUrl = url;
         }
       }
-      
+
       // 4. 电话国际区号+地址上下文（medium）
       if (!info.country && info.phoneDetails && info.phoneDetails.length > 0) {
         const highPhone = info.phoneDetails.find(p => p.confidence === 'high');
@@ -2511,7 +2557,7 @@ const server = http.createServer(async (req, res) => {
           }
         }
       }
-      
+
       // 5. ccTLD（medium/low，.com不判定）
       if (!info.country) {
         try {
@@ -2533,7 +2579,7 @@ const server = http.createServer(async (req, res) => {
           }
         } catch(e) {}
       }
-      
+
       // 6. 页面普通正文出现国家名称（low，仅在主内容区，排除配送/货币/语言选择器）
       if (!info.country) {
         const countryNames = ['United States', 'Germany', 'Deutschland', 'United Kingdom', 'France', 'Italy', 'Spain', 'Netherlands', 'Belgium', 'Austria', 'Switzerland', 'Sweden', 'Norway', 'Denmark', 'Finland', 'Poland', 'Australia', 'Canada', 'Japan'];
@@ -2554,13 +2600,13 @@ const server = http.createServer(async (req, res) => {
           }
         }
       }
-      
+
       // V76.2 三维度分离：businessRoles / commercialSignals / relationshipFit
       const bodyTextLower = html.replace(/<[^>]*>/g, ' ').toLowerCase();
       info.businessRoles = [];
       info.commercialSignals = [];
       info.relationshipFit = 'unknown';
-      
+
       // 1. businessRoles（公司角色，需要明确业务证据）
       const roleRules = [
         {role: 'wholesaler', patterns: ['wholesale', 'trade account', 'trade customer', 'bulk purchasing', 'b2b wholesale', 'wholesale supplier'], confidence: 'high'},
@@ -2581,7 +2627,7 @@ const server = http.createServer(async (req, res) => {
           }
         }
       }
-      
+
       // 2. commercialSignals（合作信号，不等于采购需求）
       const signalRules = [
         {signal: 'wholesale_available', patterns: ['wholesale', 'wholesale prices', 'wholesale inquiry'], confidence: 'medium'},
@@ -2610,13 +2656,13 @@ const server = http.createServer(async (req, res) => {
       if (info.amazonLinks && info.amazonLinks.length > 0) {
         info.commercialSignals.push({signal: 'amazon_store_linked', confidence: 'high', evidence: '官网链接到Amazon店铺', sourceUrl: url, note: '可能是Amazon卖家'});
       }
-      
+
       // 3. relationshipFit（关系适配判断）
       const hasBuyerSignal = info.businessRoles.some(r => ['wholesaler', 'distributor', 'importer', 'retailer', 'marketplace_seller'].includes(r.role) && r.confidence === 'high');
       const hasBrandSignal = info.businessRoles.some(r => r.role === 'brand_owner' && r.confidence === 'high');
       const hasManufacturerSignal = info.businessRoles.some(r => r.role === 'manufacturer' && r.confidence === 'high');
       const offersOEMODM = info.commercialSignals.some(s => ['oem_offered', 'odm_offered', 'private_label_offered'].includes(s.signal) && s.confidence === 'high');
-      
+
       if (hasManufacturerSignal && offersOEMODM) {
         info.relationshipFit = 'competitor_supplier';
         info.relationshipFitReason = '对方是制造商且对外提供OEM/ODM，可能是竞争供应商而非买家';
@@ -2633,10 +2679,10 @@ const server = http.createServer(async (req, res) => {
         info.relationshipFit = 'unknown';
         info.relationshipFitReason = '证据不足，无法判断关系适配';
       }
-      
+
       // 兼容旧字段customerTypes（保留但标记为deprecated）
       info.customerTypes = info.businessRoles.map(r => ({type: r.role, confidence: r.confidence, evidence: r.evidence, sourceUrl: r.sourceUrl}));
-      
+
       // V76.1 Amazon链接识别
       const amazonLinkRegex = /href=["']([^"']*amazon\.[^"']*)["']/gi;
       let amazonMatch;
@@ -2645,7 +2691,7 @@ const server = http.createServer(async (req, res) => {
           info.amazonLinks.push(amazonMatch[1]);
         }
       }
-      
+
       // 提取所有链接
       const linkRegex = /<a[^>]+href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
       let linkMatch;
@@ -2656,7 +2702,7 @@ const server = http.createServer(async (req, res) => {
           info.allLinks.push({ href, text });
           const lowerHref = href.toLowerCase();
           const lowerText = text.toLowerCase();
-          
+
           // 识别关键页面
           if (lowerHref.includes('contact') || lowerText.includes('contact') || lowerText.includes('联系')) {
             if (!info.contactUrl) info.contactUrl = href;
@@ -2677,7 +2723,7 @@ const server = http.createServer(async (req, res) => {
           if (lowerHref.includes('private-label') || lowerHref.includes('private label') || lowerHref.includes('oem') || lowerHref.includes('odm') || lowerText.includes('private label') || lowerText.includes('贴牌') || lowerText.includes('定制')) {
             if (text && text.length < 50) info.privateLabelSignals.push(text);
           }
-          
+
           // 社交媒体链接
           const socialDomains = ['facebook.com', 'instagram.com', 'linkedin.com', 'twitter.com', 'x.com', 'youtube.com', 'tiktok.com', 'pinterest.com'];
           for (const sd of socialDomains) {
@@ -2688,7 +2734,7 @@ const server = http.createServer(async (req, res) => {
           }
         }
       }
-      
+
       // 正文中的Wholesale/B2B信号
       const bodyText = html.replace(/<[^>]*>/g, ' ').toLowerCase();
       const wholesaleKeywords = ['wholesale', 'distributor', 'b2b', 'bulk order', 'reseller', 'dealer', '批发', '经销', '代理'];
@@ -2697,7 +2743,7 @@ const server = http.createServer(async (req, res) => {
           info.wholesaleSignals.push(kw);
         }
       }
-      
+
       // Private Label/OEM信号
       const plKeywords = ['private label', 'oem', 'odm', 'custom branding', 'own brand', '贴牌', '定制', '代工'];
       for (const kw of plKeywords) {
@@ -2705,7 +2751,7 @@ const server = http.createServer(async (req, res) => {
           info.privateLabelSignals.push(kw);
         }
       }
-      
+
       // 公司名称（从title或og:site_name提取）
       const ogSiteName = html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']*)["']/i);
       if (ogSiteName) {
@@ -2715,19 +2761,19 @@ const server = http.createServer(async (req, res) => {
         const namePart = info.title.split(/[|\-–—]/)[0].trim();
         if (namePart && namePart.length < 60) info.companyName = namePart;
       }
-      
+
     } catch(e) {
       console.error('提取公司信息失败:', e.message);
     }
-    
+
     // 限制数组长度
     info.productCategories = info.productCategories.slice(0, 20);
     info.allLinks = info.allLinks.slice(0, 50);
     info.socialLinks = [...new Map(info.socialLinks.map(s => [s.url, s])).values()];
-    
+
     return info;
   }
-  
+
   // V76.1 robots.txt解析函数
   function parseRobotsTxt(text) {
     const rules = { allow: [], disallow: [], crawlDelay: null, sitemap: [] };
@@ -2749,7 +2795,7 @@ const server = http.createServer(async (req, res) => {
     }
     return rules;
   }
-  
+
   // V76.1 检查路径是否被robots.txt允许
   function isPathAllowedByRobots(path, rules) {
     if (!rules || rules.disallow.length === 0) return true;
@@ -2760,7 +2806,7 @@ const server = http.createServer(async (req, res) => {
     }
     return true;
   }
-  
+
   // V76.1 抓取状态分类辅助函数
   function classifyFetchStatus(statusCode, error) {
     if (error) {
@@ -2777,7 +2823,7 @@ const server = http.createServer(async (req, res) => {
     if (statusCode >= 500) return 'server_error';
     return 'other';
   }
-  
+
   // 模块C：批量抓取公司官网并提取信息
   if (pathname === '/api/company/fetch' && req.method === 'POST') {
     const scope = getAccessScope(req);
@@ -2786,16 +2832,16 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const baseUrl = (body.url || '').trim();
       if (!baseUrl) { res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ error: '缺少url参数' })); return; }
-      
+
       // SSRF预检查
       if (!isUrlSafe(baseUrl)) {
         res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: 'SSRF防护：禁止访问内网或本地地址' }));
         return;
       }
-      
+
       const baseDomain = new URL(baseUrl).hostname.replace(/^www\./, '');
-      
+
       // V76.1 robots.txt显式检查
       const robotsUrl = new URL('/robots.txt', baseUrl).href;
       let robotsStatus = 'unavailable';
@@ -2820,20 +2866,20 @@ const server = http.createServer(async (req, res) => {
         robotsStatus = 'error';
         log(`robots.txt请求失败: ${e.message}`, 'WARN');
       }
-      
+
       // 确定要抓取的页面（最多5个）
       const pagesToFetch = [{ url: baseUrl, type: 'homepage', label: '首页' }];
-      
+
       // 先抓取首页，从中发现About/Contact/Products/Wholesale页面
       log(`模块C抓取: scope=${scope}, url=${baseUrl}, robots=${robotsStatus}`, 'REQUEST');
-      
+
       const fetchedPages = [];
       const failedPages = [];
       const skippedPages = [];
       const blockedPages = [];
       let attemptedPages = 0;
       let homepageInfo = null;
-      
+
       try {
         attemptedPages++;
         // V76.1 检查robots.txt是否允许首页
@@ -2841,12 +2887,12 @@ const server = http.createServer(async (req, res) => {
         if (robotsRules && !isPathAllowedByRobots('/', robotsRules)) {
           homeRobotsAllowed = false;
         }
-        
+
         if (!homeRobotsAllowed) {
           blockedPages.push({ url: baseUrl, type: 'homepage', label: '首页', status: 'robots_blocked', error: 'robots.txt禁止抓取' });
           throw new Error('robots.txt禁止抓取首页');
         }
-        
+
         const homeResult = await fetchUrl(baseUrl, { timeout: 15000, maxSize: 2*1024*1024 });
         const homeStatus = classifyFetchStatus(homeResult.statusCode, null);
         homepageInfo = extractCompanyInfo(homeResult.body, baseUrl);
@@ -2867,14 +2913,14 @@ const server = http.createServer(async (req, res) => {
         } else {
           failedPages.push(homePageEntry);
         }
-        
+
         // 从首页发现的链接中选择要抓取的页面
         const discoveredPages = [];
         if (homepageInfo.aboutUrl) discoveredPages.push({ url: resolveUrl(baseUrl, homepageInfo.aboutUrl), type: 'about', label: '关于我们' });
         if (homepageInfo.contactUrl) discoveredPages.push({ url: resolveUrl(baseUrl, homepageInfo.contactUrl), type: 'contact', label: '联系我们' });
         if (homepageInfo.productsUrl) discoveredPages.push({ url: resolveUrl(baseUrl, homepageInfo.productsUrl), type: 'products', label: '产品' });
         if (homepageInfo.wholesaleUrl) discoveredPages.push({ url: resolveUrl(baseUrl, homepageInfo.wholesaleUrl), type: 'wholesale', label: '批发/B2B' });
-        
+
         // 抓取发现的页面（同一域名，使用crawlDelay间隔）
         for (const page of discoveredPages.slice(0, 4)) {
           attemptedPages++;
@@ -2929,7 +2975,7 @@ const server = http.createServer(async (req, res) => {
       } catch(e) {
         failedPages.push({ url: baseUrl, type: 'homepage', label: '首页', error: e.message });
       }
-      
+
       // 合并所有页面的提取信息
       const mergedInfo = {
         title: homepageInfo?.title || '',
@@ -2953,7 +2999,7 @@ const server = http.createServer(async (req, res) => {
         evidence: [],
         amazonLinks: []
       };
-      
+
       for (const page of fetchedPages) {
         // 跳过非success状态页面的信息提取
         if (page.status !== 'success') continue;
@@ -2967,7 +3013,7 @@ const server = http.createServer(async (req, res) => {
         if (info.privateLabelSignals) mergedInfo.privateLabelSignals.push(...info.privateLabelSignals);
         if (info.amazonLinks) mergedInfo.amazonLinks.push(...info.amazonLinks);
         if (page.type) mergedInfo.keyPages[page.type] = { url: page.url, statusCode: page.statusCode, status: page.status, label: page.label };
-        
+
         // V76.1 国家识别：取最高置信度
         if (info.country && info.countryConfidence) {
           const confidenceOrder = { high: 3, medium: 2, low: 1, unknown: 0 };
@@ -2980,7 +3026,7 @@ const server = http.createServer(async (req, res) => {
             mergedInfo.countryEvidenceUrl = info.countryEvidenceUrl;
           }
         }
-        
+
         // V76.1 客户类型合并（去重）
         if (info.customerTypes) {
           for (const ct of info.customerTypes) {
@@ -2998,7 +3044,7 @@ const server = http.createServer(async (req, res) => {
             }
           }
         }
-        
+
         // V76.1 证据生成（确定性提取）
         const pageUrl = page.url;
         const sourceType = page.label || page.type || '页面';
@@ -3037,7 +3083,7 @@ const server = http.createServer(async (req, res) => {
           mergedInfo.evidence.push({ claim: 'Amazon官方链接', value: info.amazonLinks[0], sourceUrl: pageUrl, sourceType, shortEvidence: '页面链接到Amazon', confidence: 'high', extractionMethod: 'deterministic', verifiedAt: new Date().toISOString() });
         }
       }
-      
+
       // 去重
       mergedInfo.emails = [...new Set(mergedInfo.emails)];
       mergedInfo.phones = [...new Set(mergedInfo.phones)];
@@ -3054,7 +3100,7 @@ const server = http.createServer(async (req, res) => {
         seenTypes.add(ct.type);
         return true;
       });
-      
+
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         success: true,
@@ -3077,7 +3123,7 @@ const server = http.createServer(async (req, res) => {
         extractedInfo: mergedInfo,
         analyzedAt: new Date().toISOString()
       }));
-      
+
       log(`模块C抓取完成: ${baseDomain}, 尝试${attemptedPages}页, 成功${fetchedPages.length}页, 失败${failedPages.length}页, 跳过${skippedPages.length}页, 阻止${blockedPages.length}页`, 'REQUEST');
     } catch(e) {
       const isSSRF = e.message.includes('SSRF');
@@ -3087,12 +3133,12 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
-  
+
   // URL解析辅助函数
   function resolveUrl(base, relative) {
     try { return new URL(relative, base).href; } catch(e) { return relative; }
   }
-  
+
   // 清除搜索缓存
   if (pathname === '/api/search/cache' && req.method === 'DELETE') {
     const scope = getAccessScope(req);
@@ -3103,7 +3149,7 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ success: true, message: '搜索缓存已清除' }));
     return;
   }
-  
+
   // ============ 静态文件 ============
   let filePath;
   if (pathname === '/' || pathname === '') {
@@ -3118,14 +3164,14 @@ const server = http.createServer(async (req, res) => {
     const safePath = path.normalize(pathname).replace(/^(\.\.[\/\\])+/, '');
     filePath = path.join(ROOT_DIR, safePath);
   }
-  
+
   // 安全检查：确保文件在ROOT_DIR内
   if (!filePath.startsWith(ROOT_DIR)) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('403 Forbidden');
     return;
   }
-  
+
   log(`${req.method} ${pathname}`, 'REQUEST');
   serveStaticFile(req, res, filePath);
 });
@@ -3139,13 +3185,13 @@ server.listen(PORT, HOST, async () => {
   console.log('║                                                              ║');
   console.log('╚══════════════════════════════════════════════════════════╝');
   console.log('');
-  
+
   log(`本地访问: http://localhost:${PORT}`, 'SUCCESS');
   log(`局域网访问: http://<你的IP>:${PORT}`, 'INFO');
   log(`工作台文件: ${ROOT_DIR}`, 'INFO');
   log(`Ollama服务: ${OLLAMA_URL}`, 'INFO');
   console.log('');
-  
+
   // 启动时检查Ollama状态
   const ollama = await checkOllama();
   if (ollama.running) {
@@ -3153,7 +3199,7 @@ server.listen(PORT, HOST, async () => {
   } else {
     log(`Ollama未运行！本地模型将不可用。请运行: ollama serve`, 'WARN');
   }
-  
+
   console.log('');
   log('按 Ctrl+C 停止服务器', 'INFO');
   console.log('');

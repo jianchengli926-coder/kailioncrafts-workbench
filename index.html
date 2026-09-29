@@ -386,9 +386,8 @@ select.form-control{appearance:none;background-image:url("data:image/svg+xml;utf
     box-shadow:2px 0 12px rgba(0,0,0,.3);
   }
   .app.mobile-nav-open .sidebar{transform:translateX(0)}
-  .app.mobile-nav-open::after{
-    content:'';position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;
-  }
+  .mobile-nav-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;}
+  .app.mobile-nav-open .mobile-nav-backdrop{display:block;}
   .main{width:100%;min-width:0}
   .topbar{padding:0 12px;gap:8px}
   .mobile-menu-btn{
@@ -691,6 +690,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
 
 <!-- APP_ROOT -->
 <div class="app" id="app">
+  <div class="mobile-nav-backdrop" onclick="closeMobileNav()"></div>
   <!-- ===== 侧边栏 ===== -->
   <aside class="sidebar">
     <div class="brand">
@@ -707,6 +707,9 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
   <!-- ===== 主区 ===== -->
   <div class="main">
     <header class="topbar">
+      <button class="mobile-menu-btn" onclick="toggleMobileNav()" title="菜单" aria-label="打开导航菜单">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
       <button class="icon-btn collapse-btn" onclick="toggleSidebar()" title="折叠侧栏">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
       </button>
@@ -3357,6 +3360,7 @@ function renderNav(){
 function toggleSidebar(){ document.getElementById('app').classList.toggle('collapsed'); }
 
 function go(view, params){
+  closeMobileNav(); // V77.1.2: 导航后自动关闭手机菜单
   currentView = view; routeParams = params||{};
   const meta = NAV.find(n=>n.key===view);
   document.getElementById('pageTitle').textContent = meta?meta.title:'';
@@ -11754,14 +11758,15 @@ function kbGetDocumentList() {
   if (f.authorityLevel) docs = docs.filter(d => d.authorityLevel === f.authorityLevel);
   
   // 快速筛选
+  // V77.1.2: 快速筛选使用真实元数据字段
   if (kbBrowserState.quickFilter === 'authority') docs = docs.filter(d => d.authorityLevel === 'high');
   if (kbBrowserState.quickFilter === 'public') docs = docs.filter(d => d.sensitivity === 'public');
-  if (kbBrowserState.quickFilter === 'pending') docs = docs.filter(d => d.status === 'pending');
-  if (kbBrowserState.quickFilter === 'deprecated') docs = docs.filter(d => d.status === 'deprecated');
+  if (kbBrowserState.quickFilter === 'pending') docs = docs.filter(d => d.pending === true || (d.status && String(d.status).includes('pending')));
+  if (kbBrowserState.quickFilter === 'deprecated') docs = docs.filter(d => d.deprecated === true || d.status === 'deprecated' || d.status === 'archived');
   if (kbBrowserState.quickFilter === 'sop') docs = docs.filter(d => d.contentRole === 'sop' || d.contentRole === 'template');
-  if (kbBrowserState.quickFilter === 'source') docs = docs.filter(d => d.sourceUrl);
-  if (kbBrowserState.quickFilter === 'fact') docs = docs.filter(d => d.factEligible);
-  if (kbBrowserState.quickFilter === 'template') docs = docs.filter(d => d.templateEligible);
+  if (kbBrowserState.quickFilter === 'source') docs = docs.filter(d => d.sourceUrl && String(d.sourceUrl).length > 0);
+  if (kbBrowserState.quickFilter === 'fact') docs = docs.filter(d => d.factEligible === true);
+  if (kbBrowserState.quickFilter === 'template') docs = docs.filter(d => d.templateEligible === true);
   
   return docs;
 }
@@ -11821,16 +11826,38 @@ function kbToggleCat(catName) {
 }
 
 // 快速筛选切换
+// V77.1.2: 手机端导航菜单控制
+function openMobileNav() {
+  document.querySelector('.app').classList.add('mobile-nav-open');
+  document.body.style.overflow = 'hidden';
+}
+function closeMobileNav() {
+  document.querySelector('.app').classList.remove('mobile-nav-open');
+  document.body.style.overflow = '';
+}
+function toggleMobileNav() {
+  const app = document.querySelector('.app');
+  if (app.classList.contains('mobile-nav-open')) {
+    closeMobileNav();
+  } else {
+    openMobileNav();
+  }
+}
+// ESC 关闭手机导航
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeMobileNav();
+});
+// 视口从手机切换到桌面时关闭导航
+window.addEventListener('resize', function() {
+  if (window.innerWidth > 768) closeMobileNav();
+});
+
 function kbToggleQuickFilter(key) {
+  // V77.1.2: quickFilter 完全独立于下拉 filters，不留下粘滞状态
   if (kbBrowserState.quickFilter === key) {
     kbBrowserState.quickFilter = '';
   } else {
     kbBrowserState.quickFilter = key;
-    // 快速筛选时清除下拉筛选中的冲突项
-    if (key === 'authority') kbBrowserState.filters.authorityLevel = 'high';
-    if (key === 'public') kbBrowserState.filters.sensitivity = 'public';
-    if (key === 'pending') kbBrowserState.filters.status = 'pending';
-    if (key === 'deprecated') kbBrowserState.filters.status = 'deprecated';
   }
   renderView();
 }
@@ -12074,9 +12101,9 @@ function viewKBSearch(root){
     // 章节导航
     if (headings.length > 0) {
       html += '<div class="kb-detail-toc"><div class="kb-detail-toc-title">📑 章节导航（' + headings.length + '）</div>';
-      for (const h of headings) {
+      headings.forEach((h, hIdx) => {
         html += '<a class="toc-h' + h.level + '" onclick="kbScrollToHeadingEl(this)" data-heading-idx="' + hIdx + '">' + esc(h.text) + '</a>';
-      }
+      });
       html += '</div>';
     }
     

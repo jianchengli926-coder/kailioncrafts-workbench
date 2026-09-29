@@ -17640,6 +17640,114 @@ function markOutreachArchiveStatus(archiveId, status){
   renderView();
 }
 
+/* V78.1: 恢复开发 — 根据草稿/发送历史计算合理阶段 */
+function restoreOutreachArchive(archiveId){
+  const archive = getOutreachArchiveById(archiveId);
+  if(!archive) return;
+  const cDrafts = (S.drafts||[]).filter(d => d.customerId === archive.customerId);
+  let newStage = 'not_started';
+  if(cDrafts.some(d => d.status === '已发送' || d.sentAt)) newStage = 'sent';
+  else if(cDrafts.some(d => d.reviewStatus === 'reviewed')) newStage = 'reviewed_ready';
+  else if(cDrafts.length > 0) newStage = 'draft_pending';
+  archive.outreachStage = newStage;
+  archive.doNotContact = false;
+  archive.lastUpdatedAt = now();
+  // 同步恢复客户状态
+  const c = (S.customers||[]).find(x => x.id === archive.customerId);
+  if(c){ c.doNotContact = false; c.blacklisted = false; if(c.status === '暂不跟进' || c.status === '暂停') c.status = '活跃'; }
+  persist();
+  toast('已恢复开发：' + (OUTREACH_STAGES[newStage]?OUTREACH_STAGES[newStage].label:newStage));
+  closeModal();
+  renderView();
+}
+
+/* V78.1: 从档案详情生成首封开发信 — 必须先通过前置检查 */
+async function generateFirstOutreachEmail(customerId){
+  let c = (S.customers||[]).find(x => x.id === customerId);
+  // V78.1: 如果 S.customers 中找不到（演示数据id变化），从archive构建最小客户对象
+  if(!c){
+    const archive = getOutreachArchiveByCustomerId(customerId);
+    if(archive){
+      c = { id:customerId, company:archive.customerName, country:archive.country, website:archive.website, contact:{name:archive.contactName, email:(archive.emails||[])[0]||''}, status:'活跃', products:archive.mainProducts?archive.mainProducts.split(','):[] };
+    }
+  }
+  if(!c){ toast('客户不存在','err'); return; }
+  // 前置检查：重复/历史/不再联系
+  const check = checkOutreachBeforeGenerate(customerId);
+  if(!check.allowed){
+    if(check.archive){
+      const archive = check.archive;
+      openModal(`
+      <div class="modal-head"><h3>⚠️ 该客户已有开发历史</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+      <div class="modal-body">
+        <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;color:#92400e">${esc(check.reason)}</div>
+        <div style="font-size:12px;line-height:1.8;margin-bottom:12px">
+          <b>客户：</b>${esc(archive.customerName)} (${esc(archive.country||'')})<br>
+          <b>当前阶段：</b>${esc(OUTREACH_STAGES[archive.outreachStage]?OUTREACH_STAGES[archive.outreachStage].label:archive.outreachStage)}<br>
+          <b>开发信数量：</b>${(archive.linkedDraftIds||[]).length} 封
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="closeModal();openOutreachKBArchive('${archive.archiveId}')">📂 查看客户档案</button>
+          <button class="btn btn-outline" onclick="closeModal();editDraftForCustomer('${customerId}')">✉️ 写后续跟进信</button>
+        </div>
+      </div>`);
+      return;
+    } else {
+      toast(check.reason, 'err');
+      return;
+    }
+  }
+  // 通过检查，使用默认参数生成首封开发信（复用 V77.4 统一入口）
+  closeModal();
+  toast('正在生成首封开发信...');
+  const r = await generateOutreachEmailDraft(c, {lang:'en', tone:'professional', providerPolicy:'online_safe'});
+  if(r.error){ toast('生成失败: '+r.error, 'err'); return; }
+  // 保存为待审核草稿
+  if(!S.drafts) S.drafts = [];
+  S.drafts.push({
+    id:'draft_'+uid(), customerId:customerId, customerName:c.company, country:c.country, language:'英语',
+    subject:r.subject, body:r.body, content:r.body, status:'待审核', createdAt:new Date().toISOString(), kbGenerated:true,
+    knowledgeContext:r.knowledgeContext, providerPolicy:'online_safe', reviewStatus:'unreviewed', reviewNotes:'', manuallyEdited:false,
+    aiNotes:['V78.1 档案首封开发信入口生成', 'V77.4 统一知识库事实访问层']
+  });
+  persist();
+  // 同步到档案
+  try { syncCustomerToOutreachKB(customerId); } catch(e){}
+  toast('首封开发信已生成（待审核）');
+  // 打开编辑器
+  const newDraft = S.drafts[S.drafts.length-1];
+  if(newDraft) openDraftEditor(newDraft.id, true);
+}
+
+/* V78.1: 重新生成首封草稿 — 保留旧草稿和历史，新草稿进入待审核 */
+async function regenFirstOutreachDraft(customerId){
+  let c = (S.customers||[]).find(x => x.id === customerId);
+  if(!c){
+    const archive = getOutreachArchiveByCustomerId(customerId);
+    if(archive){
+      c = { id:customerId, company:archive.customerName, country:archive.country, website:archive.website, contact:{name:archive.contactName, email:(archive.emails||[])[0]||''}, status:'活跃', products:archive.mainProducts?archive.mainProducts.split(','):[] };
+    }
+  }
+  if(!c){ toast('客户不存在','err'); return; }
+  toast('正在重新生成首封草稿（保留旧版本）...');
+  const r = await generateOutreachEmailDraft(c, {lang:'en', tone:'professional', providerPolicy:'online_safe'});
+  if(r.error){ toast('生成失败: '+r.error, 'err'); return; }
+  // 保留旧草稿，新增草稿
+  if(!S.drafts) S.drafts = [];
+  S.drafts.push({
+    id:'draft_'+uid(), customerId:customerId, customerName:c.company, country:c.country, language:'英语',
+    subject:r.subject, body:r.body, content:r.body, status:'待审核', createdAt:new Date().toISOString(), kbGenerated:true,
+    knowledgeContext:r.knowledgeContext, providerPolicy:'online_safe', reviewStatus:'unreviewed', reviewNotes:'重新生成首封草稿', manuallyEdited:false,
+    aiNotes:['V78.1 重新生成首封草稿', '旧草稿已保留在历史中', 'V77.4 统一知识库事实访问层']
+  });
+  persist();
+  try { syncCustomerToOutreachKB(customerId); } catch(e){}
+  toast('首封草稿已重新生成（待审核，旧版本已保留）');
+  const newDraft = S.drafts[S.drafts.length-1];
+  if(newDraft) openDraftEditor(newDraft.id, true);
+}
+
 /* ── V78.0 客户开发知识库工作台 UI ── */
 let okbSearch = '';
 let okbFilterStage = '';
@@ -17647,7 +17755,12 @@ let okbFilterDuplicate = '';
 let okbFilterHasEmail = '';
 
 function viewOutreachKB(root){
-  const archives = S.outreachKnowledgeBase || [];
+  let archives = S.outreachKnowledgeBase || [];
+  // V78.1: 如果档案为空但有客户数据，自动执行安全同步初始化（幂等，不删除已有数据）
+  if(archives.length === 0 && (S.customers||[]).length > 0){
+    try { syncAllToOutreachKB(); } catch(e){ console.warn('outreachKB auto-sync failed:', e); }
+    archives = S.outreachKnowledgeBase || [];
+  }
   const needSync = archives.length === 0 || (S.customers||[]).some(c => !archives.find(a => a.customerId === c.id));
 
   root.innerHTML = `
@@ -17845,20 +17958,30 @@ function openOutreachKBArchive(archiveId){
         <span style="color:#94a3b8;font-size:10px">${esc(t.relativePath||'')}</span>
       </div>`).join('')}
     </div>`;
-  }
-
-  let dupHtml = '';
-  if(a.duplicateStatus !== 'unique' && a.duplicateOf){
-    const dupArchive = getOutreachArchiveById(a.duplicateOf);
-    dupHtml = `<div style="background:${a.duplicateStatus==='duplicate'?'#fef2f2':'#fffbeb'};border:1px solid ${a.duplicateStatus==='duplicate'?'#fecaca':'#fde68a'};border-radius:8px;padding:10px 12px;margin:10px 0;font-size:12px">
-      ⚠️ ${a.duplicateStatus==='duplicate'?'高置信重复':'疑似重复'}：${esc(a.duplicateReason||'')}
-      ${dupArchive?`<br>关联客户：<b>${esc(dupArchive.customerName)}</b> (${esc(dupArchive.country||'')})`:''}
-      <div style="margin-top:6px;display:flex;gap:6px">
-        <button class="btn btn-outline btn-sm" style="font-size:11px" onclick="confirmOutreachUnique('${a.archiveId}')">确认非重复</button>
-        ${dupArchive?`<button class="btn btn-outline btn-sm" style="font-size:11px" onclick="openOutreachKBArchive('${a.duplicateOf}')">查看关联档案</button>`:''}
-      </div>
+  } else {
+    // V78.1: 旧草稿或无 knowledgeContext 时明确显示，不伪造引用
+    const hasAnyKb = (a.developmentHistory||[]).some(h => h.knowledgeSummary && h.knowledgeSummary.factCount > 0);
+    kbContextHtml = `<div style="margin-top:12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:10px 12px;font-size:11.5px;color:#64748b">
+      📚 知识库依据：${hasAnyKb ? '历史草稿含知识库引用摘要，详见上方时间线。' : '暂无知识库依据（旧草稿或未通过 V77.4 统一事实访问层生成）。'}
     </div>`;
   }
+
+  // V78.1: 始终显示去重信息区域
+  let dupHtml = '';
+  const dupLabel = a.duplicateStatus === 'duplicate' ? '高置信重复'
+    : a.duplicateStatus === 'suspected' ? '疑似重复' : '唯一';
+  const dupColor = a.duplicateStatus === 'duplicate' ? '#dc2626'
+    : a.duplicateStatus === 'suspected' ? '#d97706' : '#16a34a';
+  const dupArchive = a.duplicateOf ? getOutreachArchiveById(a.duplicateOf) : null;
+  dupHtml = `<div style="background:${a.duplicateStatus==='unique'?'#f0fdf4':a.duplicateStatus==='duplicate'?'#fef2f2':'#fffbeb'};border:1px solid ${a.duplicateStatus==='unique'?'#bbf7d0':a.duplicateStatus==='duplicate'?'#fecaca':'#fde68a'};border-radius:8px;padding:10px 12px;margin:10px 0;font-size:12px">
+    🔁 去重状态：<b style="color:${dupColor}">${esc(dupLabel)}</b>
+    ${a.duplicateReason ? ` · ${esc(a.duplicateReason)}` : ''}
+    ${dupArchive ? `<br>关联客户：<b>${esc(dupArchive.customerName)}</b> (${esc(dupArchive.country||'')})` : ''}
+    ${a.duplicateStatus !== 'unique' ? `<div style="margin-top:6px;display:flex;gap:6px">
+      <button class="btn btn-outline btn-sm" style="font-size:11px" onclick="confirmOutreachUnique('${a.archiveId}')">确认非重复</button>
+      ${dupArchive?`<button class="btn btn-outline btn-sm" style="font-size:11px" onclick="openOutreachKBArchive('${a.duplicateOf}')">查看关联档案</button>`:''}
+    </div>` : ''}
+  </div>`;
 
   openModal(`
   <div class="modal-head"><h3>🗂️ ${esc(a.customerName||'客户档案')}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
@@ -17899,10 +18022,15 @@ function openOutreachKBArchive(archiveId){
     ${a.notes?`<div style="margin-top:12px;background:#fffbeb;border-radius:8px;padding:10px 12px;font-size:12px"><b>📝 备注：</b>${esc(a.notes)}</div>`:''}
     <div class="divider"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${customer?`<button class="btn btn-primary" onclick="closeModal();editDraftForCustomer('${a.customerId}')">✉️ 写开发信/跟进信</button>`:''}
-      ${a.outreachStage!=='paused'?`<button class="btn btn-outline" onclick="markOutreachArchiveStatus('${a.archiveId}','paused');closeModal()">⏸️ 标记暂不跟进</button>`:''}
-      ${a.outreachStage!=='do_not_contact'?`<button class="btn btn-outline" style="color:#dc2626;border-color:#fecaca" onclick="if(confirm('确定标记为不再联系？该客户将被阻止生成新开发信。')){markOutreachArchiveStatus('${a.archiveId}','do_not_contact');closeModal()}">🚫 标记不再联系</button>`:''}
-      ${customer?`<button class="btn btn-outline" onclick="closeModal();go('customers')">👥 打开客户台账</button>`:''}
+      ${drafts.length === 0
+        ? `<button class="btn btn-primary" onclick="generateFirstOutreachEmail('${a.customerId}')">✉️ 生成首封开发信</button>`
+        : `<button class="btn btn-primary" onclick="closeModal();editDraftForCustomer('${a.customerId}')">✉️ 写跟进信</button>`
+      }
+      ${drafts.length > 0 ? `<button class="btn btn-outline" style="font-size:12px" onclick="if(confirm('重新生成首封开发信将保留旧草稿和历史，新草稿进入待审核状态。确定继续？')){closeModal();regenFirstOutreachDraft('${a.customerId}')}">🔄 重新生成首封草稿</button>` : ''}
+      ${(a.outreachStage === 'paused' || a.outreachStage === 'do_not_contact') ? `<button class="btn btn-outline" style="color:#16a34a;border-color:#bbf7d0" onclick="restoreOutreachArchive('${a.archiveId}')">▶️ 恢复开发</button>` : ''}
+      ${a.outreachStage!=='paused' && a.outreachStage!=='do_not_contact' ? `<button class="btn btn-outline" onclick="markOutreachArchiveStatus('${a.archiveId}','paused');closeModal()">⏸️ 标记暂不跟进</button>` : ''}
+      ${a.outreachStage!=='do_not_contact' ? `<button class="btn btn-outline" style="color:#dc2626;border-color:#fecaca" onclick="if(confirm('确定标记为不再联系？该客户将被阻止生成新开发信。')){markOutreachArchiveStatus('${a.archiveId}','do_not_contact');closeModal()}">🚫 标记不再联系</button>` : ''}
+      <button class="btn btn-outline" onclick="closeModal();go('customers')">👥 打开客户台账</button>
     </div>
   </div>`);
 }

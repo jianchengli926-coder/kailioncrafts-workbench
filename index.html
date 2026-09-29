@@ -22581,11 +22581,12 @@ function renderCompanyAnalysisContent() {
     const scoreBg = da.deepAnalysisLevel === '高潜力' ? '#dcfce7' : da.deepAnalysisLevel === '中潜力' ? '#fef3c7' : da.deepAnalysisLevel === '不建议继续' ? '#fee2e2' : '#f1f5f9';
     
     return `
-      <div style="margin-bottom:16px;padding:12px 16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-weight:600;color:#166534">✓ 抓取完成 · ${da.status === 'completed' ? 'AI分析完成' : da.status === 'partial' ? 'AI分析(partial)' : '待AI分析'}</div>
-          <div style="font-size:12px;color:#15803d;margin-top:2px">成功 ${fetched.length} 页，失败 ${failed.length} 页</div>
-        </div>
+      <div style="margin-bottom:16px;padding:12px 16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:600;color:#166534">✓ 抓取完成 · ${da.status === 'completed' ? 'AI分析完成' : da.status === 'partial' ? 'AI分析(partial)' : '待AI分析'}</div>
+            <div style="font-size:11px;color:#15803d;margin-top:2px">尝试 ${da.attemptedPages || state.result?.attemptedPages || fetched.length + failed.length + (da.skippedPages||[]).length + (da.blockedPages||[]).length} 页 · 成功 ${fetched.length} · 失败 ${failed.length} · 跳过 ${(da.skippedPages||[]).length} · 阻止 ${(da.blockedPages||[]).length}</div>
+          </div>
         ${da.deepAnalysisScore ? `<div style="text-align:right">
           <div style="font-size:24px;font-weight:700;color:${scoreColor}">${da.deepAnalysisScore}</div>
           <div style="font-size:11px;padding:2px 8px;background:${scoreBg};color:${scoreColor};border-radius:4px">${da.deepAnalysisLevel}</div>
@@ -22599,8 +22600,15 @@ function renderCompanyAnalysisContent() {
           <div style="font-weight:600;color:#1e293b;font-size:13px">${da.companyIdentity?.name || info.companyName || '未找到'}</div>
         </div>
         <div style="padding:10px 12px;background:#f8fafc;border-radius:6px">
-          <div style="font-size:10px;color:#64748b">国家 / 客户类型</div>
-          <div style="font-weight:600;color:#1e293b;font-size:13px">${da.country || '未确认'} / ${da.customerType || '未确认'}</div>
+          <div style="font-size:10px;color:#64748b">国家 <span style="padding:1px 4px;background:${da.countryConfidence==='high'?'#dcfce7':da.countryConfidence==='medium'?'#fef3c7':'#f1f5f9'};color:${da.countryConfidence==='high'?'#166534':da.countryConfidence==='medium'?'#92400e':'#64748b'};border-radius:3px">${da.countryConfidence || 'unknown'}</span></div>
+          <div style="font-weight:600;color:#1e293b;font-size:13px">${da.country || info.country || '未确认'}</div>
+          <div style="font-size:9px;color:#94a3b8;margin-top:1px">${da.countryEvidence || info.countryEvidence || ''}</div>
+        </div>
+        <div style="padding:10px 12px;background:#f8fafc;border-radius:6px">
+          <div style="font-size:10px;color:#64748b">客户类型 (确定性识别)</div>
+          <div style="font-size:11px;color:#1e293b;margin-top:2px;line-height:1.5">
+            ${(da.customerTypes || info.customerTypes || []).slice(0,4).map(ct => `<span style="display:inline-block;padding:1px 5px;background:${ct.confidence==='high'?'#dcfce7':'#fef3c7'};color:${ct.confidence==='high'?'#166534':'#92400e'};border-radius:3px;margin:1px;font-size:10px">${ct.type}</span>`).join('') || (da.customerType ? `<span style="padding:1px 5px;background:#f1f5f9;color:#64748b;border-radius:3px">${da.customerType}</span>` : '未确认')}
+          </div>
         </div>
         <div style="padding:10px 12px;background:#f8fafc;border-radius:6px">
           <div style="font-size:10px;color:#64748b">公开邮箱</div>
@@ -22611,6 +22619,14 @@ function renderCompanyAnalysisContent() {
           <div style="font-weight:600;color:#1e293b;font-size:12px">${da.amazonPresence || 'unverified'} / ${da.confidence || 'low'}</div>
         </div>
       </div>
+      
+      <!-- V76.1 robots.txt状态 -->
+      ${(da.robots || state.result?.robots) ? `
+      <div style="margin-bottom:12px;padding:8px 12px;background:#f8fafc;border-radius:6px;display:flex;gap:16px;font-size:11px">
+        <span><strong>robots:</strong> ${(da.robots || state.result.robots).status}</span>
+        <span><strong>crawlDelay:</strong> ${(da.robots || state.result.robots).crawlDelay}ms</span>
+        <span><strong>disallow:</strong> ${(da.robots || state.result.robots).disallowCount}条</span>
+      </div>` : ''}
       
       <!-- 评分明细 -->
       ${da.scoreBreakdown ? `
@@ -22647,7 +22663,7 @@ function renderCompanyAnalysisContent() {
       <!-- 证据列表 -->
       ${(da.evidence||[]).length > 0 ? `
       <div style="margin-bottom:16px">
-        <div style="font-weight:600;font-size:12px;color:#1e293b;margin-bottom:6px">🔗 证据列表 (${da.evidence.length}条)</div>
+        <div style="font-weight:600;font-size:12px;color:#1e293b;margin-bottom:6px">🔗 证据列表 (${da.evidence.length}条) · 覆盖率 ${Math.min(100, Math.round((da.evidence.length / 19) * 100))}%</div>
         <div style="max-height:200px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px">
           ${da.evidence.map((e,i) => `
             <div style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:11px">

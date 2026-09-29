@@ -1857,7 +1857,18 @@ const server = http.createServer(async (req, res) => {
       aboutUrl: '',
       productsUrl: '',
       wholesaleUrl: '',
-      allLinks: []
+      allLinks: [],
+      // V76.1 新增：国家识别
+      country: '',
+      countryConfidence: 'unknown',
+      countryEvidence: '',
+      countryEvidenceUrl: '',
+      // V76.1 新增：客户类型识别
+      customerTypes: [],
+      // V76.1 新增：证据
+      evidence: [],
+      // V76.1 新增：Amazon链接
+      amazonLinks: []
     };
     
     try {
@@ -1897,6 +1908,108 @@ const server = http.createServer(async (req, res) => {
         if (!p.includes('+') && !p.includes('-') && !p.includes(' ') && !p.includes('(') && !p.includes(')')) return false;
         return true;
       }))];
+      
+      // V76.1 地址提取（简单模式：匹配常见地址格式）
+      const addressRegex = /(\d+\s+[A-Za-z0-9\s.,'-]+?(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Square|Sq|Gasse|Straße|Str|Weg|Platz|Ring|Allee|Damm|Ufer|Chaussee|Drove|Close|Gardens|Estate|Industrial|Estate|Park|Way)\.?[^,\n]{0,80})/gi;
+      const addresses = html.match(addressRegex) || [];
+      info.addresses = [...new Set(addresses.map(a => a.trim().replace(/\s+/g, ' ')).filter(a => a.length > 10 && a.length < 200))].slice(0, 5);
+      
+      // V76.1 国家识别（按证据优先级）
+      // 1. JSON-LD中的addressCountry
+      const jsonLdCountry = html.match(/"addressCountry"\s*:\s*"([^"]+)"/i) || html.match(/"addressCountry"\s*:\s*\{[^}]*"name"\s*:\s*"([^"]+)"/i);
+      if (jsonLdCountry) {
+        info.country = jsonLdCountry[1].trim();
+        info.countryConfidence = 'high';
+        info.countryEvidence = 'JSON-LD addressCountry: ' + info.country;
+        info.countryEvidenceUrl = url;
+      }
+      // 2. 页面中的明确国家名称
+      if (!info.country) {
+        const countryNames = ['United States', 'USA', 'U.S.A.', 'America', 'Germany', 'Deutschland', 'United Kingdom', 'UK', 'U.K.', 'Britain', 'Great Britain', 'England', 'France', 'France', 'Italy', 'Italia', 'Spain', 'España', 'Netherlands', 'Holland', 'Nederland', 'Belgium', 'België', 'Austria', 'Österreich', 'Switzerland', 'Schweiz', 'Suisse', 'Sweden', 'Sverige', 'Norway', 'Norge', 'Denmark', 'Danmark', 'Finland', 'Suomi', 'Poland', 'Polska', 'Czech', 'Czechia', 'Česko', 'Australia', 'Canada', 'Japan', 'China', 'Korea', 'South Korea'];
+        const bodyText = html.replace(/<[^>]*>/g, ' ');
+        for (const cn of countryNames) {
+          const re = new RegExp('\\b' + cn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+          if (re.test(bodyText)) {
+            info.country = cn;
+            info.countryConfidence = 'medium';
+            info.countryEvidence = '页面文本包含: ' + cn;
+            info.countryEvidenceUrl = url;
+            break;
+          }
+        }
+      }
+      // 3. 电话国家区号（辅助）
+      if (!info.country && info.phones.length > 0) {
+        const phoneCountryMap = {'+1': 'United States/Canada', '+44': 'United Kingdom', '+49': 'Germany', '+33': 'France', '+39': 'Italy', '+34': 'Spain', '+31': 'Netherlands', '+32': 'Belgium', '+43': 'Austria', '+41': 'Switzerland', '+46': 'Sweden', '+47': 'Norway', '+45': 'Denmark', '+358': 'Finland', '+48': 'Poland', '+420': 'Czech Republic', '+61': 'Australia', '+81': 'Japan', '+86': 'China'};
+        for (const phone of info.phones) {
+          for (const [code, country] of Object.entries(phoneCountryMap)) {
+            if (phone.startsWith(code)) {
+              info.country = country;
+              info.countryConfidence = 'low';
+              info.countryEvidence = '电话区号 ' + code + ' -> ' + country;
+              info.countryEvidenceUrl = url;
+              break;
+            }
+          }
+          if (info.country) break;
+        }
+      }
+      // 4. ccTLD（最弱信号，仅辅助）
+      if (!info.country) {
+        try {
+          const hostname = new URL(url).hostname;
+          const tld = hostname.split('.').pop().toLowerCase();
+          const tldCountryMap = {'de': 'Germany', 'uk': 'United Kingdom', 'co.uk': 'United Kingdom', 'fr': 'France', 'it': 'Italy', 'es': 'Spain', 'nl': 'Netherlands', 'be': 'Belgium', 'at': 'Austria', 'ch': 'Switzerland', 'se': 'Sweden', 'no': 'Norway', 'dk': 'Denmark', 'fi': 'Finland', 'pl': 'Poland', 'cz': 'Czech Republic', 'au': 'Australia', 'ca': 'Canada', 'jp': 'Japan', 'us': 'United States'};
+          if (tldCountryMap[tld] && tld !== 'com' && tld !== 'org' && tld !== 'net') {
+            info.country = tldCountryMap[tld];
+            info.countryConfidence = 'low';
+            info.countryEvidence = 'ccTLD .' + tld + ' -> ' + info.country + ' (弱信号)';
+            info.countryEvidenceUrl = url;
+          }
+        } catch(e) {}
+      }
+      
+      // V76.1 客户类型识别（确定性规则）
+      const bodyTextLower = html.replace(/<[^>]*>/g, ' ').toLowerCase();
+      const customerTypeRules = [
+        {type: 'wholesaler', patterns: ['wholesale', 'trade account', 'trade customer', 'bulk order', 'b2b', 'reseller'], confidence: 'high'},
+        {type: 'importer', patterns: ['importer', 'import/distribution', 'import and distribution', 'imports'], confidence: 'medium'},
+        {type: 'distributor', patterns: ['distributor', 'dealer network', 'stockist', 'authorized dealer'], confidence: 'high'},
+        {type: 'retailer', patterns: ['shop online', 'buy online', 'retail store', 'our stores', 'visit our store'], confidence: 'medium'},
+        {type: 'brand_owner', patterns: ['our brand', 'brand story', 'own brand', 'founded in', 'established in'], confidence: 'medium'},
+        {type: 'manufacturer', patterns: ['manufacturing', 'our factory', 'made in', 'production facility'], confidence: 'medium'},
+        {type: 'private_label_buyer', patterns: ['private label', 'custom branding', 'custom logo', 'own brand'], confidence: 'high'}
+      ];
+      for (const rule of customerTypeRules) {
+        for (const pattern of rule.patterns) {
+          if (bodyTextLower.includes(pattern)) {
+            const existing = info.customerTypes.find(ct => ct.type === rule.type);
+            if (!existing) {
+              info.customerTypes.push({
+                type: rule.type,
+                confidence: rule.confidence,
+                evidence: pattern,
+                sourceUrl: url
+              });
+            }
+            break;
+          }
+        }
+      }
+      // mixed判断
+      const confirmedTypes = info.customerTypes.filter(ct => ct.confidence === 'high');
+      if (confirmedTypes.length >= 2) {
+        info.customerTypes.push({type: 'mixed', confidence: 'high', evidence: '同时具有多个高置信度角色: ' + confirmedTypes.map(t=>t.type).join(', '), sourceUrl: url});
+      }
+      
+      // V76.1 Amazon链接识别
+      const amazonLinkRegex = /href=["']([^"']*amazon\.[^"']*)["']/gi;
+      let amazonMatch;
+      while ((amazonMatch = amazonLinkRegex.exec(html)) !== null) {
+        if (!info.amazonLinks.includes(amazonMatch[1])) {
+          info.amazonLinks.push(amazonMatch[1]);
+        }
+      }
       
       // 提取所有链接
       const linkRegex = /<a[^>]+href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
@@ -1980,6 +2093,56 @@ const server = http.createServer(async (req, res) => {
     return info;
   }
   
+  // V76.1 robots.txt解析函数
+  function parseRobotsTxt(text) {
+    const rules = { allow: [], disallow: [], crawlDelay: null, sitemap: [] };
+    if (!text) return rules;
+    let currentAgent = '*';
+    const lines = text.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const colonIdx = trimmed.indexOf(':');
+      if (colonIdx === -1) continue;
+      const key = trimmed.substring(0, colonIdx).trim().toLowerCase();
+      const value = trimmed.substring(colonIdx + 1).trim();
+      if (key === 'user-agent') currentAgent = value;
+      else if (key === 'allow' && (currentAgent === '*' || currentAgent === 'KaiLionCraftsBot')) rules.allow.push(value);
+      else if (key === 'disallow' && (currentAgent === '*' || currentAgent === 'KaiLionCraftsBot')) rules.disallow.push(value);
+      else if (key === 'crawl-delay') rules.crawlDelay = parseInt(value) || null;
+      else if (key === 'sitemap') rules.sitemap.push(value);
+    }
+    return rules;
+  }
+  
+  // V76.1 检查路径是否被robots.txt允许
+  function isPathAllowedByRobots(path, rules) {
+    if (!rules || rules.disallow.length === 0) return true;
+    for (const disallowed of rules.disallow) {
+      if (!disallowed) continue;
+      if (disallowed === '/' ) return false;
+      if (path.startsWith(disallowed)) return false;
+    }
+    return true;
+  }
+  
+  // V76.1 抓取状态分类辅助函数
+  function classifyFetchStatus(statusCode, error) {
+    if (error) {
+      if (error.includes('timeout') || error.includes('Timeout')) return 'timeout';
+      if (error.includes('size') || error.includes('too large')) return 'size_limit';
+      if (error.includes('跨域名')) return 'cross_domain_skipped';
+      if (error.includes('SSRF')) return 'ssrf_blocked';
+      if (error.includes('robots')) return 'robots_blocked';
+      return 'failed';
+    }
+    if (statusCode >= 200 && statusCode < 300) return 'success';
+    if (statusCode === 404) return 'not_found';
+    if (statusCode === 403 || statusCode === 429) return 'blocked';
+    if (statusCode >= 500) return 'server_error';
+    return 'other';
+  }
+  
   // 模块C：批量抓取公司官网并提取信息
   if (pathname === '/api/company/fetch' && req.method === 'POST') {
     const scope = getAccessScope(req);
@@ -1998,28 +2161,77 @@ const server = http.createServer(async (req, res) => {
       
       const baseDomain = new URL(baseUrl).hostname.replace(/^www\./, '');
       
+      // V76.1 robots.txt显式检查
+      const robotsUrl = new URL('/robots.txt', baseUrl).href;
+      let robotsStatus = 'unavailable';
+      let robotsRules = null;
+      let robotsFetchedAt = null;
+      let crawlDelay = 1000; // 默认1秒
+      try {
+        if (isUrlSafe(robotsUrl)) {
+          const robotsResult = await fetchUrl(robotsUrl, { timeout: 10000, maxSize: 512*1024 });
+          robotsFetchedAt = new Date().toISOString();
+          if (robotsResult.statusCode === 200) {
+            robotsStatus = 'available';
+            robotsRules = parseRobotsTxt(robotsResult.body);
+            if (robotsRules.crawlDelay) crawlDelay = Math.max(1000, robotsRules.crawlDelay * 1000);
+          } else if (robotsResult.statusCode === 404) {
+            robotsStatus = 'unavailable';
+          } else {
+            robotsStatus = 'error';
+          }
+        }
+      } catch(e) {
+        robotsStatus = 'error';
+        log(`robots.txt请求失败: ${e.message}`, 'WARN');
+      }
+      
       // 确定要抓取的页面（最多5个）
       const pagesToFetch = [{ url: baseUrl, type: 'homepage', label: '首页' }];
       
       // 先抓取首页，从中发现About/Contact/Products/Wholesale页面
-      log(`模块C抓取: scope=${scope}, url=${baseUrl}`, 'REQUEST');
+      log(`模块C抓取: scope=${scope}, url=${baseUrl}, robots=${robotsStatus}`, 'REQUEST');
       
       const fetchedPages = [];
       const failedPages = [];
+      const skippedPages = [];
+      const blockedPages = [];
+      let attemptedPages = 0;
       let homepageInfo = null;
       
       try {
+        attemptedPages++;
+        // V76.1 检查robots.txt是否允许首页
+        let homeRobotsAllowed = true;
+        if (robotsRules && !isPathAllowedByRobots('/', robotsRules)) {
+          homeRobotsAllowed = false;
+        }
+        
+        if (!homeRobotsAllowed) {
+          blockedPages.push({ url: baseUrl, type: 'homepage', label: '首页', status: 'robots_blocked', error: 'robots.txt禁止抓取' });
+          throw new Error('robots.txt禁止抓取首页');
+        }
+        
         const homeResult = await fetchUrl(baseUrl, { timeout: 15000, maxSize: 2*1024*1024 });
+        const homeStatus = classifyFetchStatus(homeResult.statusCode, null);
         homepageInfo = extractCompanyInfo(homeResult.body, baseUrl);
-        fetchedPages.push({
+        const homePageEntry = {
           url: homeResult.finalUrl || baseUrl,
           type: 'homepage',
           label: '首页',
           statusCode: homeResult.statusCode,
+          status: homeStatus,
           size: homeResult.size,
           fetchedAt: homeResult.fetchedAt,
           info: homepageInfo
-        });
+        };
+        if (homeStatus === 'success') {
+          fetchedPages.push(homePageEntry);
+        } else if (homeStatus === 'blocked' || homeStatus === 'robots_blocked') {
+          blockedPages.push(homePageEntry);
+        } else {
+          failedPages.push(homePageEntry);
+        }
         
         // 从首页发现的链接中选择要抓取的页面
         const discoveredPages = [];
@@ -2028,29 +2240,55 @@ const server = http.createServer(async (req, res) => {
         if (homepageInfo.productsUrl) discoveredPages.push({ url: resolveUrl(baseUrl, homepageInfo.productsUrl), type: 'products', label: '产品' });
         if (homepageInfo.wholesaleUrl) discoveredPages.push({ url: resolveUrl(baseUrl, homepageInfo.wholesaleUrl), type: 'wholesale', label: '批发/B2B' });
         
-        // 抓取发现的页面（同一域名，间隔1秒）
+        // 抓取发现的页面（同一域名，使用crawlDelay间隔）
         for (const page of discoveredPages.slice(0, 4)) {
+          attemptedPages++;
           try {
             // 确保同一根域名
             const pageDomain = new URL(page.url).hostname.replace(/^www\./, '');
             if (pageDomain !== baseDomain && !pageDomain.endsWith('.' + baseDomain) && !baseDomain.endsWith('.' + pageDomain)) {
-              failedPages.push({ url: page.url, type: page.type, label: page.label, error: '跨域名，跳过' });
+              skippedPages.push({ url: page.url, type: page.type, label: page.label, status: 'cross_domain_skipped', error: '跨域名，跳过' });
               continue;
             }
-            await new Promise(r => setTimeout(r, 1000)); // 请求间隔1秒
+            // V76.1 robots.txt路径检查
+            if (robotsRules) {
+              try {
+                const pagePath = new URL(page.url).pathname;
+                if (!isPathAllowedByRobots(pagePath, robotsRules)) {
+                  blockedPages.push({ url: page.url, type: page.type, label: page.label, status: 'robots_blocked', error: 'robots.txt禁止抓取: ' + pagePath });
+                  continue;
+                }
+              } catch(e) {}
+            }
+            await new Promise(r => setTimeout(r, crawlDelay)); // 使用robots.txt的crawl-delay
             const result = await fetchUrl(page.url, { timeout: 15000, maxSize: 2*1024*1024 });
+            const pageStatus = classifyFetchStatus(result.statusCode, null);
             const pageInfo = extractCompanyInfo(result.body, page.url);
-            fetchedPages.push({
+            const pageEntry = {
               url: result.finalUrl || page.url,
               type: page.type,
               label: page.label,
               statusCode: result.statusCode,
+              status: pageStatus,
               size: result.size,
               fetchedAt: result.fetchedAt,
               info: pageInfo
-            });
+            };
+            if (pageStatus === 'success') {
+              fetchedPages.push(pageEntry);
+            } else if (pageStatus === 'blocked' || pageStatus === 'robots_blocked') {
+              blockedPages.push(pageEntry);
+            } else if (pageStatus === 'not_found') {
+              failedPages.push(pageEntry);
+            } else {
+              failedPages.push(pageEntry);
+            }
           } catch(e) {
-            failedPages.push({ url: page.url, type: page.type, label: page.label, error: e.message });
+            const errStatus = classifyFetchStatus(null, e.message);
+            const errEntry = { url: page.url, type: page.type, label: page.label, status: errStatus, error: e.message };
+            if (errStatus === 'cross_domain_skipped') skippedPages.push(errEntry);
+            else if (errStatus === 'robots_blocked' || errStatus === 'ssrf_blocked') blockedPages.push(errEntry);
+            else failedPages.push(errEntry);
           }
         }
       } catch(e) {
@@ -2065,45 +2303,147 @@ const server = http.createServer(async (req, res) => {
         companyName: homepageInfo?.companyName || '',
         emails: [],
         phones: [],
+        addresses: [],
         socialLinks: [],
         productCategories: [],
         wholesaleSignals: [],
         privateLabelSignals: [],
-        keyPages: {}
+        keyPages: {},
+        // V76.1 新增
+        country: '',
+        countryConfidence: 'unknown',
+        countryEvidence: '',
+        countryEvidenceUrl: '',
+        customerTypes: [],
+        evidence: [],
+        amazonLinks: []
       };
       
       for (const page of fetchedPages) {
-        // 跳过404/500等错误页面的信息提取
-        if (page.statusCode >= 400) continue;
+        // 跳过非success状态页面的信息提取
+        if (page.status !== 'success') continue;
         const info = page.info;
         if (info.emails) mergedInfo.emails.push(...info.emails);
         if (info.phones) mergedInfo.phones.push(...info.phones);
+        if (info.addresses) mergedInfo.addresses.push(...info.addresses);
         if (info.socialLinks) mergedInfo.socialLinks.push(...info.socialLinks);
         if (info.productCategories) mergedInfo.productCategories.push(...info.productCategories);
         if (info.wholesaleSignals) mergedInfo.wholesaleSignals.push(...info.wholesaleSignals);
         if (info.privateLabelSignals) mergedInfo.privateLabelSignals.push(...info.privateLabelSignals);
-        if (page.type) mergedInfo.keyPages[page.type] = { url: page.url, statusCode: page.statusCode, label: page.label };
+        if (info.amazonLinks) mergedInfo.amazonLinks.push(...info.amazonLinks);
+        if (page.type) mergedInfo.keyPages[page.type] = { url: page.url, statusCode: page.statusCode, status: page.status, label: page.label };
+        
+        // V76.1 国家识别：取最高置信度
+        if (info.country && info.countryConfidence) {
+          const confidenceOrder = { high: 3, medium: 2, low: 1, unknown: 0 };
+          const currentConf = confidenceOrder[mergedInfo.countryConfidence] || 0;
+          const newConf = confidenceOrder[info.countryConfidence] || 0;
+          if (newConf > currentConf || !mergedInfo.country) {
+            mergedInfo.country = info.country;
+            mergedInfo.countryConfidence = info.countryConfidence;
+            mergedInfo.countryEvidence = info.countryEvidence;
+            mergedInfo.countryEvidenceUrl = info.countryEvidenceUrl;
+          }
+        }
+        
+        // V76.1 客户类型合并（去重）
+        if (info.customerTypes) {
+          for (const ct of info.customerTypes) {
+            const existing = mergedInfo.customerTypes.find(c => c.type === ct.type);
+            if (!existing) {
+              mergedInfo.customerTypes.push(ct);
+            } else {
+              // 取更高置信度
+              const confOrder = { high: 3, medium: 2, low: 1 };
+              if ((confOrder[ct.confidence] || 0) > (confOrder[existing.confidence] || 0)) {
+                existing.confidence = ct.confidence;
+                existing.evidence = ct.evidence;
+                existing.sourceUrl = ct.sourceUrl;
+              }
+            }
+          }
+        }
+        
+        // V76.1 证据生成（确定性提取）
+        const pageUrl = page.url;
+        const sourceType = page.label || page.type || '页面';
+        if (info.companyName && !mergedInfo.evidence.find(e => e.claim === '公司名称')) {
+          mergedInfo.evidence.push({ claim: '公司名称', value: info.companyName, sourceUrl: pageUrl, sourceType, shortEvidence: '页面标题/og:site_name', confidence: 'high', extractionMethod: 'deterministic', verifiedAt: new Date().toISOString() });
+        }
+        if (info.emails?.length > 0 && !mergedInfo.evidence.find(e => e.claim === '公开邮箱')) {
+          mergedInfo.evidence.push({ claim: '公开邮箱', value: info.emails.join(', '), sourceUrl: pageUrl, sourceType, shortEvidence: '页面正则提取', confidence: 'high', extractionMethod: 'deterministic', verifiedAt: new Date().toISOString() });
+        }
+        if (info.phones?.length > 0 && !mergedInfo.evidence.find(e => e.claim === '公开电话')) {
+          mergedInfo.evidence.push({ claim: '公开电话', value: info.phones.join(', '), sourceUrl: pageUrl, sourceType, shortEvidence: '页面正则提取', confidence: 'medium', extractionMethod: 'deterministic', verifiedAt: new Date().toISOString() });
+        }
+        if (info.language && !mergedInfo.evidence.find(e => e.claim === '网站语言')) {
+          mergedInfo.evidence.push({ claim: '网站语言', value: info.language, sourceUrl: pageUrl, sourceType, shortEvidence: 'html lang属性', confidence: 'high', extractionMethod: 'deterministic', verifiedAt: new Date().toISOString() });
+        }
+        if (info.productCategories?.length > 0 && !mergedInfo.evidence.find(e => e.claim === '产品分类')) {
+          mergedInfo.evidence.push({ claim: '产品分类', value: info.productCategories.slice(0,5).join(', '), sourceUrl: pageUrl, sourceType, shortEvidence: '导航/产品页链接', confidence: 'medium', extractionMethod: 'deterministic', verifiedAt: new Date().toISOString() });
+        }
+        if (info.wholesaleSignals?.length > 0 && !mergedInfo.evidence.find(e => e.claim === 'Wholesale/B2B信号')) {
+          mergedInfo.evidence.push({ claim: 'Wholesale/B2B信号', value: info.wholesaleSignals.slice(0,3).join(', '), sourceUrl: pageUrl, sourceType, shortEvidence: '页面关键词匹配', confidence: 'medium', extractionMethod: 'deterministic', verifiedAt: new Date().toISOString() });
+        }
+        if (info.privateLabelSignals?.length > 0 && !mergedInfo.evidence.find(e => e.claim === 'OEM/Private Label信号')) {
+          mergedInfo.evidence.push({ claim: 'OEM/Private Label信号', value: info.privateLabelSignals.slice(0,3).join(', '), sourceUrl: pageUrl, sourceType, shortEvidence: '页面关键词匹配', confidence: 'medium', extractionMethod: 'deterministic', verifiedAt: new Date().toISOString() });
+        }
+        if (info.country && !mergedInfo.evidence.find(e => e.claim === '国家')) {
+          mergedInfo.evidence.push({ claim: '国家', value: info.country, sourceUrl: info.countryEvidenceUrl || pageUrl, sourceType, shortEvidence: info.countryEvidence, confidence: info.countryConfidence, extractionMethod: 'deterministic', verifiedAt: new Date().toISOString() });
+        }
+        if (info.customerTypes?.length > 0) {
+          for (const ct of info.customerTypes) {
+            if (!mergedInfo.evidence.find(e => e.claim === '客户类型:' + ct.type)) {
+              mergedInfo.evidence.push({ claim: '客户类型:' + ct.type, value: ct.type, sourceUrl: ct.sourceUrl || pageUrl, sourceType, shortEvidence: ct.evidence, confidence: ct.confidence, extractionMethod: 'deterministic', verifiedAt: new Date().toISOString() });
+            }
+          }
+        }
+        if (info.amazonLinks?.length > 0 && !mergedInfo.evidence.find(e => e.claim === 'Amazon官方链接')) {
+          mergedInfo.evidence.push({ claim: 'Amazon官方链接', value: info.amazonLinks[0], sourceUrl: pageUrl, sourceType, shortEvidence: '页面链接到Amazon', confidence: 'high', extractionMethod: 'deterministic', verifiedAt: new Date().toISOString() });
+        }
       }
       
       // 去重
       mergedInfo.emails = [...new Set(mergedInfo.emails)];
       mergedInfo.phones = [...new Set(mergedInfo.phones)];
+      mergedInfo.addresses = [...new Set(mergedInfo.addresses)];
       mergedInfo.socialLinks = [...new Map(mergedInfo.socialLinks.map(s => [s.url, s])).values()];
       mergedInfo.productCategories = [...new Set(mergedInfo.productCategories)].slice(0, 30);
       mergedInfo.wholesaleSignals = [...new Set(mergedInfo.wholesaleSignals)].slice(0, 20);
       mergedInfo.privateLabelSignals = [...new Set(mergedInfo.privateLabelSignals)].slice(0, 20);
+      mergedInfo.amazonLinks = [...new Set(mergedInfo.amazonLinks)];
+      // 客户类型去重
+      const seenTypes = new Set();
+      mergedInfo.customerTypes = mergedInfo.customerTypes.filter(ct => {
+        if (seenTypes.has(ct.type)) return false;
+        seenTypes.add(ct.type);
+        return true;
+      });
       
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         success: true,
         rootDomain: baseDomain,
+        // V76.1 抓取统计（数字相互一致）
+        attemptedPages: attemptedPages,
         fetchedPages: fetchedPages,
         failedPages: failedPages,
+        skippedPages: skippedPages,
+        blockedPages: blockedPages,
+        // V76.1 robots.txt信息
+        robots: {
+          status: robotsStatus,
+          url: robotsUrl,
+          fetchedAt: robotsFetchedAt,
+          crawlDelay: crawlDelay,
+          disallowCount: robotsRules?.disallow?.length || 0,
+          allowCount: robotsRules?.allow?.length || 0
+        },
         extractedInfo: mergedInfo,
         analyzedAt: new Date().toISOString()
       }));
       
-      log(`模块C抓取完成: ${baseDomain}, 成功${fetchedPages.length}页, 失败${failedPages.length}页`, 'REQUEST');
+      log(`模块C抓取完成: ${baseDomain}, 尝试${attemptedPages}页, 成功${fetchedPages.length}页, 失败${failedPages.length}页, 跳过${skippedPages.length}页, 阻止${blockedPages.length}页`, 'REQUEST');
     } catch(e) {
       const isSSRF = e.message.includes('SSRF');
       res.writeHead(isSSRF ? 403 : 500, { 'Content-Type': 'application/json; charset=utf-8' });

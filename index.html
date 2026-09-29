@@ -894,7 +894,7 @@ window.onunhandledrejection = function(event){
 console.log('%c✅ 全局错误处理已启用', 'color:#0f7b3f;font-weight:bold');
 
 /* ---------- 全局状态 ---------- */
-let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[] };
+let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[], outreachKnowledgeBase:[] };
 function loadState(){
   S.customers = DB.load('customers') || [];
   S.plans = DB.load('plans') || [];
@@ -1057,6 +1057,7 @@ function getTimelineEvents(cid, limit=50){
   S.modelSpeedTest = DB.load('modelSpeedTest') || null;
   S.contentHistory = DB.load('contentHistory') || null;
   S.communications = DB.load('communications') || null;
+  S.outreachKnowledgeBase = DB.load('outreachKnowledgeBase') || [];
   S.orders = DB.load('orders') || [];
   S.followupTasks = DB.load('followupTasks') || [];
   S.opportunities = DB.load('opportunities') || [];
@@ -1121,6 +1122,7 @@ function persist(){
   DB.save('autoSearch',S.autoSearch); DB.save('activityLog',S.activityLog); DB.save('socialMonitor',S.socialMonitor);
   DB.save('mailQueue',S.mailQueue); DB.save('mailLogs',S.mailLogs); DB.save('smtpConfig',S.smtpConfig);
   DB.save('devPlans',S.devPlans); DB.save('apiLogs',S.apiLogs); DB.save('pipeline2',S.pipeline2);
+  DB.save('outreachKnowledgeBase',S.outreachKnowledgeBase);
 }
 
 /* V74.6 导出客户数据为CSV */
@@ -3324,6 +3326,7 @@ const NAV = [
   {key:'devplans',icon:'📋',label:'开发计划',title:'开发计划中心',crumb:'多计划并行 · AI自动运行'},
   {key:'customers',icon:'👥',label:'客户台账',title:'客户台账',crumb:'39 家线索 · 按优先级分层'},
   {key:'drafts',icon:'✉️',label:'开发信',title:'开发信管理',crumb:'AI 草稿 · 人工发送'},
+  {key:'outreachKB',icon:'🗂️',label:'客户开发知识库',title:'客户开发知识库',crumb:'Outreach Knowledge Base · 搜索去重 · 历史归档'},
   {group:'沟通与跟进'},
   {key:'inbox',icon:'📥',label:'AI 收件箱',title:'AI 收件箱',crumb:'客户回复 · AI 提炼重点'},
   {key:'schedule',icon:'📅',label:'跟进日程',title:'跟进日程',crumb:'今天/明天/本周要联系谁'},
@@ -4074,7 +4077,7 @@ function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, prospect:viewProspectDev, devplans:viewDevPlans, planDetail:viewPlanDetail,
-    customers:viewCustomers, drafts:viewDrafts, inbox:viewInbox, schedule:viewSchedule,
+    customers:viewCustomers, drafts:viewDrafts, outreachKB:viewOutreachKB, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
     seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach};
   (map[currentView]||viewDashboard)(c);
@@ -6779,10 +6782,13 @@ function batchKBEmail(){
   closeModal();
   go('drafts');
   setTimeout(async()=>{
-    let count = 0, failed = 0;
+    let count = 0, failed = 0, skipped = 0;
     for(const id of ids){
       const c = S.customers.find(x=>x.id===id);
       if(!c) continue;
+      // V78.0: 批量生成前检查历史/不再联系
+      const check = checkOutreachBeforeGenerate(id);
+      if(!check.allowed){ skipped++; continue; }
       const result = await generateOutreachEmailDraft(c, {providerPolicy:'online_safe', lang:'en', tone:'professional'});
       if(result.error){ failed++; continue; }
       S.drafts = S.drafts || [];
@@ -6792,10 +6798,12 @@ function batchKBEmail(){
         kbGenerated:true, knowledgeContext:result.knowledgeContext, providerPolicy:'online_safe',
         reviewStatus:'unreviewed', reviewNotes:'', manuallyEdited:false, aiNotes:['V77.4 统一知识库事实访问层生成']
       });
+      syncCustomerToOutreachKB(id);
       count++;
     }
     persist();
-    toast(count ? `✅ 已生成 ${count} 封待审核开发信${failed ? '；'+failed+' 封未生成' : ''}` : '未生成草稿：请检查本地模型或AI配置');
+    const skipMsg = skipped ? `；跳过 ${skipped} 位已有历史或不再联系的客户` : '';
+    toast(count ? `✅ 已生成 ${count} 封待审核开发信${failed ? '；'+failed+' 封未生成' : ''}${skipMsg}` : '未生成草稿：请检查本地模型或AI配置'+skipMsg);
     renderView();
   }, 200);
 }
@@ -9288,7 +9296,7 @@ function saveDraft(did){
   d.manuallyEdited = true;
   d.reviewStatus = 'unreviewed';
   d.status = '已修改';
-  persist(); toast('草稿已保存');
+  persist(); syncCustomerToOutreachKB(d.customerId); toast('草稿已保存');
 }
 function markDraftReviewed(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
@@ -9299,7 +9307,7 @@ function markDraftReviewed(did){
   d.reviewStatus = 'reviewed';
   d.reviewedAt = now();
   d.status = '已审核';
-  persist();
+  persist(); syncCustomerToOutreachKB(d.customerId);
   toast('✅ 已标记人工审核；发送前仍请确认收件人与内容');
   openDraftEditor(did);
 }
@@ -9313,7 +9321,7 @@ function markSent(did){
   d.status = '已发送'; d.sentAt = now();
   const c = S.customers.find(x=>x.id===d.customerId);
   if(c){ c.status = '已回复'; c.nextFollowUp = daysLater(3); }
-  persist(); toast('已标记发送，跟进序列已启动'); closeDrawer(); renderView();
+  persist(); syncCustomerToOutreachKB(d.customerId); toast('已标记发送，跟进序列已启动'); closeDrawer(); renderView();
 }
 async function regenDraft(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
@@ -9337,7 +9345,7 @@ async function regenDraft(did){
   d.manuallyEdited = false;
   d.status = '待审核';
   d.aiNotes = ['V77.4 重新生成：统一知识库事实访问层', '旧版本已保存，事实与模板分离'];
-  persist(); openDraftEditor(d.id); toast('✅ 已重新生成，旧版本已保留，等待人工审核');
+  persist(); syncCustomerToOutreachKB(d.customerId); openDraftEditor(d.id); toast('✅ 已重新生成，旧版本已保留，等待人工审核');
 }
 function copyDraft(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
@@ -11379,6 +11387,38 @@ async function doGenerateEmailWithKB(cid){
   const providerPolicy = document.getElementById('kbEmailPolicy').value || 'online_safe';
   const extra = document.getElementById('kbEmailExtra').value.trim();
 
+  // V78.0: 生成首封开发信前检查重复/历史/不再联系
+  const check = checkOutreachBeforeGenerate(cid);
+  if(!check.allowed){
+    if(check.archive){
+      const archive = check.archive;
+      openModal(`
+      <div class="modal-head"><h3>⚠️ 该客户已有开发历史</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+      <div class="modal-body">
+        <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;color:#92400e">
+          ${esc(check.reason)}
+        </div>
+        <div style="font-size:12px;line-height:1.8;margin-bottom:12px">
+          <b>客户：</b>${esc(archive.customerName)} (${esc(archive.country||'')})<br>
+          <b>当前阶段：</b>${esc(OUTREACH_STAGES[archive.outreachStage]?OUTREACH_STAGES[archive.outreachStage].label:archive.outreachStage)}<br>
+          <b>开发信数量：</b>${(archive.linkedDraftIds||[]).length} 封<br>
+          <b>沟通记录：</b>${(archive.linkedCommunicationIds||[]).length} 条<br>
+          ${archive.lastOutreachAt?'<b>最近开发：</b>'+esc(new Date(archive.lastOutreachAt).toLocaleDateString())+'<br>':''}
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="closeModal();openOutreachKBArchive('${archive.archiveId}')">📂 查看客户档案</button>
+          <button class="btn btn-outline" onclick="closeModal();editDraftForCustomer('${cid}')">✉️ 写后续跟进信</button>
+          <button class="btn btn-outline" style="color:#dc2626" onclick="if(confirm('确定仍要重新生成首封开发信？这可能造成重复开发。')){closeModal();_doGenerateEmailWithKBForce('${cid}','${lang}','${tone}','${providerPolicy}',${extra?JSON.stringify(extra):'null'})}">🔄 仍然重新生成</button>
+        </div>
+      </div>`);
+      return;
+    } else {
+      toast(check.reason, 'err');
+      return;
+    }
+  }
+
   const btn = document.getElementById('kbEmailGenBtn');
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
 
@@ -11402,7 +11442,27 @@ async function doGenerateEmailWithKB(cid){
     aiNotes:['V77.4 统一知识库事实访问层生成', '仅 factEligible 可作为公司事实；templateEligible 仅作结构参考']
   });
   persist();
+  // V78.0: 同步更新客户开发知识库档案
+  syncCustomerToOutreachKB(cid);
   toast('✅ 开发信已生成并保存到草稿箱');
+}
+
+/* V78.0: 用户确认后强制重新生成首封开发信（绕过历史检查） */
+async function _doGenerateEmailWithKBForce(cid, lang, tone, providerPolicy, extra){
+  const c = S.customers.find(x=>x.id===cid); if(!c){toast('客户不存在');return;}
+  const r = await generateOutreachEmailDraft(c, {lang, tone, extra: extra||'', providerPolicy});
+  if(r.error){ toast('生成失败: '+r.error); return; }
+  if(!S.drafts) S.drafts = [];
+  S.drafts.push({
+    id:'draft_'+uid(), customerId:cid, customerName:c.company, country:c.country, language:lang==='en'?'英语':'中文',
+    subject:r.subject, body:r.body, content:r.body, status:'待审核', createdAt:new Date().toISOString(), kbGenerated:true,
+    knowledgeContext:r.knowledgeContext, providerPolicy:providerPolicy, reviewStatus:'unreviewed', reviewNotes:'用户确认后强制重新生成', manuallyEdited:false,
+    aiNotes:['V78.0 强制重新生成（用户确认绕过历史检查）']
+  });
+  persist();
+  syncCustomerToOutreachKB(cid);
+  toast('✅ 已重新生成并保存到草稿箱');
+  go('drafts');
 }
 
 
@@ -17217,8 +17277,9 @@ function buildOutreachEmailPrompt(customer, options, kbCtx){
     '1. Write in ' + (lang === 'zh' ? 'Chinese' : 'English') + '; tone: ' + (toneMap[options?.tone] || toneMap.professional) + '.\n' +
     '2. Return exactly: Subject: <subject>, then a blank line, then the email body.\n' +
     '3. Keep it concise (English: max 150 words), personalized to the provided customer information, with one low-friction CTA.\n' +
-    '4. Do not invent company or customer facts. Do not state a template as a company fact.\n' +
-    '5. This is a draft for human review; never make guarantees, pricing commitments, certification claims, MOQ, lead-time or sample promises without a factEligible source.';
+    '4. Do not invent company or customer facts. Do not state a template as a company fact. If customer website, contact or product details are missing, write conservatively and do not claim to have reviewed their site.\n' +
+    '5. This is a draft for human review; never make guarantees, pricing commitments, certification claims, MOQ, lead-time or sample promises without a factEligible source.\n' +
+    '6. Include the KaiLionCrafts official website https://kailioncrafts.com/ in the signature or CTA area. If no real contact name or email is available, the draft must be marked as needing contact info; do not fabricate a contact person.';
 }
 
 function parseOutreachEmailResult(content){
@@ -17264,6 +17325,599 @@ function renderOutreachKbContext(kbCtx, containerId){
   }
   html += '</div>';
   box.innerHTML = html;
+}
+
+/* ============================================================
+ * V78.0 客户开发知识库工作台 (Outreach Knowledge Base)
+ * 复用 S.customers / S.drafts / S.communications，不复制客户主数据
+ * ============================================================ */
+const OUTREACH_STAGES = {
+  not_started:    { label:'未开发',       color:'#94a3b8' },
+  draft_pending:  { label:'草稿待审核',   color:'#d97706' },
+  reviewed_ready: { label:'已审核待发送', color:'#2563eb' },
+  sent:           { label:'已发送',       color:'#16a34a' },
+  replied:        { label:'已回复',       color:'#7c3aed' },
+  paused:         { label:'暂不跟进',     color:'#64748b' },
+  do_not_contact: { label:'不再联系',     color:'#dc2626' }
+};
+
+/* 域名标准化：去协议、www、路径、参数、锚点、小写 */
+function normalizeDomain(url){
+  if(!url || typeof url !== 'string') return '';
+  let d = url.trim().toLowerCase();
+  d = d.replace(/^https?:\/\//, '').replace(/^\/\//, '');
+  d = d.split('/')[0].split('?')[0].split('#')[0];
+  d = d.replace(/^www\./, '');
+  return d.replace(/\/+$/, '');
+}
+
+/* 公司名标准化：去标点、空格、常见后缀，小写 */
+function normalizeCompanyName(name){
+  if(!name || typeof name !== 'string') return '';
+  return name.toLowerCase()
+    .replace(/[.,'&()\-]/g, ' ')
+    .replace(/\b(co|corp|corporation|inc|ltd|limited|llc|gmbh|sarl|bv|pte|pty|kg|ag|sa|sl|spol|sro|oo|tovar|che|joint|stock|company)\b/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function getEmailDomain(email){
+  if(!email || typeof email !== 'string' || !email.includes('@')) return '';
+  return email.split('@')[1].toLowerCase().trim();
+}
+
+/* 按 customerId 查找档案 */
+function getOutreachArchiveByCustomerId(cid){
+  return (S.outreachKnowledgeBase||[]).find(a => a.customerId === cid);
+}
+function getOutreachArchiveById(aid){
+  return (S.outreachKnowledgeBase||[]).find(a => a.archiveId === aid);
+}
+
+/* 计算客户当前开发阶段 */
+function getOutreachStage(customer, drafts){
+  if(!customer) return 'not_started';
+  if(customer.doNotContact || customer.blacklisted || customer.unsubscribe) return 'do_not_contact';
+  if(customer.status === '暂不跟进' || customer.status === '暂停') return 'paused';
+  const cDrafts = (drafts||[]).filter(d => d.customerId === customer.id);
+  if(customer.status === '已回复' || cDrafts.some(d => d.status === '已回复')) return 'replied';
+  if(cDrafts.some(d => d.status === '已发送' || d.sentAt)) return 'sent';
+  if(cDrafts.some(d => d.reviewStatus === 'reviewed')) return 'reviewed_ready';
+  if(cDrafts.length > 0) return 'draft_pending';
+  return 'not_started';
+}
+
+/* 构建开发历史时间线 */
+function buildDevelopmentHistory(customer, drafts, communications){
+  const history = [];
+  const cDrafts = (drafts||[]).filter(d => d.customerId === customer.id);
+  for(const d of cDrafts){
+    const kbSummary = d.knowledgeContext ? {
+      executionMode: d.knowledgeContext.executionMode || '',
+      provider: d.knowledgeContext.provider || '',
+      factCount: (d.knowledgeContext.matchedFacts||[]).length,
+      templateCount: (d.knowledgeContext.matchedTemplates||[]).length,
+      citations: (d.knowledgeContext.citations||[]).slice(0,5).map(c => ({
+        relativePath: c.relativePath || '', sensitivity: c.sensitivity || '', authorityLevel: c.authorityLevel || ''
+      }))
+    } : null;
+    history.push({
+      type: 'draft',
+      draftId: d.id,
+      createdAt: d.createdAt || now(),
+      subject: d.subject || '(无主题)',
+      bodySnippet: (d.body || d.content || '').substring(0, 200),
+      status: d.status || '草稿',
+      reviewStatus: d.reviewStatus || 'unreviewed',
+      manuallyEdited: !!d.manuallyEdited,
+      sent: d.status === '已发送' || !!d.sentAt,
+      sentAt: d.sentAt || null,
+      providerPolicy: d.providerPolicy || '',
+      knowledgeSummary: kbSummary,
+      previousVersions: (d.previousVersions||[]).map(v => ({
+        subject: v.subject || '', savedAt: v.savedAt || '', manuallyEdited: !!v.manuallyEdited
+      }))
+    });
+  }
+  const cComms = (communications||[]).filter(c => c.customerId === customer.id);
+  for(const comm of cComms){
+    history.push({
+      type: 'communication',
+      commId: comm.id,
+      createdAt: comm.createdAt ? new Date(comm.createdAt).toISOString() : now(),
+      commType: comm.type || '',
+      content: (comm.content || '').substring(0, 200),
+      contactPerson: comm.contactPerson || ''
+    });
+  }
+  history.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return history;
+}
+
+/* 去重检测：返回 { status, duplicateOf, reason, candidates } */
+function detectOutreachDuplicates(archive, allArchives){
+  const result = { status: 'unique', duplicateOf: null, reason: '', candidates: [] };
+  if(!archive) return result;
+  const others = (allArchives||[]).filter(a => a.archiveId !== archive.archiveId);
+
+  // 1. customerId 相同（理论上不会发生，因为同步是幂等的）
+  const sameCid = others.find(a => a.customerId === archive.customerId);
+  if(sameCid){ return { status:'duplicate', duplicateOf:sameCid.archiveId, reason:'customerId 相同', candidates:[sameCid.archiveId] }; }
+
+  // 2. 标准化域名相同：高置信重复
+  if(archive.normalizedDomain){
+    const sameDomain = others.filter(a => a.normalizedDomain && a.normalizedDomain === archive.normalizedDomain);
+    if(sameDomain.length > 0){
+      return { status:'duplicate', duplicateOf:sameDomain[0].archiveId, reason:'独立站域名相同 ('+archive.normalizedDomain+')', candidates:sameDomain.map(a=>a.archiveId) };
+    }
+  }
+
+  // 3. 邮箱域名 + 标准化公司名相同：高置信重复
+  const archiveEmailDomains = (archive.emails||[]).map(getEmailDomain).filter(Boolean);
+  if(archiveEmailDomains.length > 0 && archive.normalizedCustomerName){
+    const sameEmailAndName = others.filter(a => {
+      const aEmailDomains = (a.emails||[]).map(getEmailDomain).filter(Boolean);
+      return a.normalizedCustomerName === archive.normalizedCustomerName &&
+             aEmailDomains.some(d => archiveEmailDomains.includes(d));
+    });
+    if(sameEmailAndName.length > 0){
+      return { status:'duplicate', duplicateOf:sameEmailAndName[0].archiveId, reason:'邮箱域名+公司名相同', candidates:sameEmailAndName.map(a=>a.archiveId) };
+    }
+  }
+
+  // 4. 标准化公司名 + 国家相同：疑似重复
+  if(archive.normalizedCustomerName && archive.country){
+    const sameNameCountry = others.filter(a =>
+      a.normalizedCustomerName === archive.normalizedCustomerName && a.country === archive.country
+    );
+    if(sameNameCountry.length > 0){
+      result.status = 'suspected';
+      result.duplicateOf = sameNameCountry[0].archiveId;
+      result.reason = '公司名+国家相同，需人工确认';
+      result.candidates = sameNameCountry.map(a=>a.archiveId);
+      return result;
+    }
+  }
+
+  return result;
+}
+
+/* 单客户同步到知识库档案（幂等） */
+function syncCustomerToOutreachKB(customerId){
+  const customer = (S.customers||[]).find(c => c.id === customerId);
+  if(!customer) return null;
+  const drafts = S.drafts || [];
+  const communications = S.communications || [];
+  const contact = customer.contact || {};
+
+  const emails = [];
+  if(contact.email) emails.push(contact.email);
+  const phones = [];
+  if(contact.phone) phones.push(contact.phone);
+  if(contact.whatsapp) phones.push(contact.whatsapp);
+  const socialLinks = [];
+  if(contact.linkedin) socialLinks.push({type:'linkedin', url:contact.linkedin});
+
+  const stage = getOutreachStage(customer, drafts);
+  const history = buildDevelopmentHistory(customer, drafts, communications);
+  const cDrafts = drafts.filter(d => d.customerId === customerId);
+  const latestDraft = cDrafts.sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))[0];
+
+  const archiveData = {
+    customerId: customer.id,
+    customerName: customer.company || '',
+    normalizedCustomerName: normalizeCompanyName(customer.company),
+    website: customer.website || '',
+    normalizedDomain: normalizeDomain(customer.website),
+    country: customer.country || '',
+    customerType: customer.customerType || '',
+    mainProducts: customer.products || customer.mainProducts || '',
+    contactName: contact.name || '',
+    contactTitle: contact.title || '',
+    emails: emails,
+    phones: phones,
+    socialLinks: socialLinks,
+    source: customer.source || customer.leadSource || '',
+    customerStatus: customer.status || '',
+    outreachStage: stage,
+    lastOutreachAt: latestDraft ? (latestDraft.createdAt || latestDraft.sentAt || '') : '',
+    lastContactAt: customer.lastComm ? new Date(customer.lastComm).toISOString() : (customer.lastInteraction || ''),
+    doNotContact: !!(customer.doNotContact || customer.blacklisted || customer.unsubscribe),
+    notes: customer.notes || '',
+    linkedDraftIds: cDrafts.map(d => d.id),
+    linkedCommunicationIds: communications.filter(c => c.customerId === customerId).map(c => c.id),
+    developmentHistory: history,
+    currentKnowledgeContext: latestDraft ? (latestDraft.knowledgeContext || null) : null,
+    deepAnalysisSummary: customer.deepAnalysis ? {
+      status: customer.deepAnalysis.status || '',
+      relationshipFit: customer.deepAnalysis.relationshipFit || '',
+      countryConfidence: customer.deepAnalysis.countryConfidence || '',
+      businessRoles: (customer.deepAnalysis.businessRoles||[]).map(r=>r.role),
+      fetchedPages: customer.deepAnalysis.fetchedPages || []
+    } : null,
+    lastUpdatedAt: now()
+  };
+
+  let archive = getOutreachArchiveByCustomerId(customerId);
+  if(archive){
+    // 更新已有档案，保留 archiveId / firstArchivedAt / duplicateStatus 人工确认
+    Object.assign(archive, archiveData, {
+      archiveId: archive.archiveId,
+      firstArchivedAt: archive.firstArchivedAt,
+      duplicateStatus: archive.duplicateStatus || 'unique',
+      duplicateOf: archive.duplicateOf || null,
+      duplicateReason: archive.duplicateReason || '',
+      manuallyMerged: !!archive.manuallyMerged
+    });
+  } else {
+    archive = Object.assign({
+      archiveId: 'okb_' + uid(),
+      firstArchivedAt: now(),
+      duplicateStatus: 'unique',
+      duplicateOf: null,
+      duplicateReason: ''
+    }, archiveData);
+    if(!S.outreachKnowledgeBase) S.outreachKnowledgeBase = [];
+    S.outreachKnowledgeBase.push(archive);
+  }
+
+  // 自动检测重复（仅当未被人工确认过）
+  if(!archive.manuallyMerged){
+    const dup = detectOutreachDuplicates(archive, S.outreachKnowledgeBase);
+    archive.duplicateStatus = dup.status;
+    archive.duplicateOf = dup.duplicateOf;
+    archive.duplicateReason = dup.reason;
+  }
+
+  return archive;
+}
+
+/* 全量同步 */
+function syncAllToOutreachKB(){
+  if(!S.outreachKnowledgeBase) S.outreachKnowledgeBase = [];
+  let created = 0, updated = 0;
+  const beforeIds = new Set(S.outreachKnowledgeBase.map(a => a.archiveId));
+  for(const customer of (S.customers||[])){
+    const existed = getOutreachArchiveByCustomerId(customer.id);
+    syncCustomerToOutreachKB(customer.id);
+    if(existed) updated++; else created++;
+  }
+  // 二次扫描重复（因为新增后可能产生新的疑似重复）
+  for(const archive of S.outreachKnowledgeBase){
+    if(!archive.manuallyMerged){
+      const dup = detectOutreachDuplicates(archive, S.outreachKnowledgeBase);
+      archive.duplicateStatus = dup.status;
+      archive.duplicateOf = dup.duplicateOf;
+      archive.duplicateReason = dup.reason;
+    }
+  }
+  persist();
+  return { created, updated, total: S.outreachKnowledgeBase.length };
+}
+
+/* 生成首封开发信前的重复/历史检查 */
+function checkOutreachBeforeGenerate(customerId){
+  const customer = (S.customers||[]).find(c => c.id === customerId);
+  if(!customer) return { allowed:true, reason:'客户不存在' };
+  const archive = getOutreachArchiveByCustomerId(customerId);
+
+  if(customer.doNotContact || customer.blacklisted || customer.unsubscribe){
+    return { allowed:false, reason:'该客户已标记为不再联系/黑名单', archive: archive };
+  }
+
+  if(archive){
+    const cDrafts = (S.drafts||[]).filter(d => d.customerId === customerId);
+    const hasActive = cDrafts.some(d =>
+      d.reviewStatus === 'unreviewed' || d.reviewStatus === 'reviewed' ||
+      d.status === '已发送' || d.sentAt || customer.status === '已回复'
+    );
+    if(hasActive){
+      return { allowed:false, reason:'该客户已有开发历史（草稿/已审核/已发送/已回复）', archive: archive, hasDrafts:true };
+    }
+    if(archive.duplicateStatus === 'duplicate'){
+      return { allowed:false, reason:'检测到高置信重复客户', archive: archive, duplicate:true };
+    }
+  }
+  return { allowed:true, archive: archive };
+}
+
+/* 标记档案状态 */
+function markOutreachArchiveStatus(archiveId, status){
+  const archive = getOutreachArchiveById(archiveId);
+  if(!archive) return;
+  archive.outreachStage = status;
+  archive.lastUpdatedAt = now();
+  if(status === 'do_not_contact'){
+    archive.doNotContact = true;
+    const c = (S.customers||[]).find(x => x.id === archive.customerId);
+    if(c){ c.doNotContact = true; c.blacklisted = true; }
+  }
+  if(status === 'paused'){
+    const c = (S.customers||[]).find(x => x.id === archive.customerId);
+    if(c) c.status = '暂不跟进';
+  }
+  persist();
+  toast('已更新状态：' + (OUTREACH_STAGES[status]?OUTREACH_STAGES[status].label:status));
+  renderView();
+}
+
+/* ── V78.0 客户开发知识库工作台 UI ── */
+let okbSearch = '';
+let okbFilterStage = '';
+let okbFilterDuplicate = '';
+let okbFilterHasEmail = '';
+
+function viewOutreachKB(root){
+  const archives = S.outreachKnowledgeBase || [];
+  const needSync = archives.length === 0 || (S.customers||[]).some(c => !archives.find(a => a.customerId === c.id));
+
+  root.innerHTML = `
+  <div style="max-width:1200px;margin:0 auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div>
+        <h2 style="margin:0 0 4px;font-size:20px">🗂️ 客户开发知识库</h2>
+        <div style="font-size:12px;color:#64748b">Outreach Knowledge Base · 搜索去重 · 历史归档 · 避免重复开发</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="syncAllOutreachKB()">🔄 同步/初始化档案</button>
+        <button class="btn btn-outline" onclick="okbResetFilters()">🔁 重置筛选</button>
+      </div>
+    </div>
+    ${needSync ? `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400e">
+      ⚠️ 检测到 ${(S.customers||[]).length} 位客户中 ${archives.length} 位已归档。点击上方"同步/初始化档案"从现有客户、开发信和沟通记录自动构建知识库。
+    </div>` : ''}
+    <div id="okbStats"></div>
+    <div id="okbFilters" style="margin:16px 0"></div>
+    <div id="okbList"></div>
+  </div>`;
+
+  renderOutreachKBStats();
+  renderOutreachKBFilters();
+  renderOutreachKBList();
+}
+
+function renderOutreachKBStats(){
+  const archives = S.outreachKnowledgeBase || [];
+  const count = stage => archives.filter(a => a.outreachStage === stage).length;
+  const stats = [
+    { label:'已归档客户', value: archives.length, color:'#1e40af', icon:'📦' },
+    { label:'未开发', value: count('not_started'), color:'#64748b', icon:'⚪' },
+    { label:'草稿待审核', value: count('draft_pending'), color:'#d97706', icon:'📝' },
+    { label:'已审核待发送', value: count('reviewed_ready'), color:'#2563eb', icon:'✅' },
+    { label:'已发送', value: count('sent'), color:'#16a34a', icon:'📤' },
+    { label:'已回复', value: count('replied'), color:'#7c3aed', icon:'💬' },
+    { label:'暂不跟进', value: count('paused'), color:'#64748b', icon:'⏸️' },
+    { label:'不再联系', value: count('do_not_contact'), color:'#dc2626', icon:'🚫' },
+    { label:'疑似重复', value: archives.filter(a => a.duplicateStatus === 'suspected' || a.duplicateStatus === 'duplicate').length, color:'#f59e0b', icon:'🔁' }
+  ];
+  document.getElementById('okbStats').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px">` +
+    stats.map(s => `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:20px">${s.icon}</div>
+      <div style="font-size:22px;font-weight:800;color:${s.color};margin:4px 0">${s.value}</div>
+      <div style="font-size:11px;color:#64748b">${s.label}</div>
+    </div>`).join('') + `</div>`;
+}
+
+function renderOutreachKBFilters(){
+  const archives = S.outreachKnowledgeBase || [];
+  const stages = Object.entries(OUTREACH_STAGES).map(([k,v]) => ({key:k,label:v.label}));
+  document.getElementById('okbFilters').innerHTML = `
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <input class="form-control" id="okbSearchInput" placeholder="🔍 搜索公司名 / 域名 / 联系人 / 邮箱 / 国家 / 产品"
+      style="flex:1;min-width:240px" value="${esc(okbSearch)}" oninput="okbSearch=this.value;renderOutreachKBList()">
+    <select class="form-control" style="width:150px" onchange="okbFilterStage=this.value;renderOutreachKBList()">
+      <option value="">全部阶段</option>
+      ${stages.map(s => `<option value="${s.key}" ${okbFilterStage===s.key?'selected':''}>${s.label}</option>`).join('')}
+    </select>
+    <select class="form-control" style="width:140px" onchange="okbFilterDuplicate=this.value;renderOutreachKBList()">
+      <option value="">去重状态</option>
+      <option value="unique" ${okbFilterDuplicate==='unique'?'selected':''}>唯一</option>
+      <option value="suspected" ${okbFilterDuplicate==='suspected'?'selected':''}>疑似重复</option>
+      <option value="duplicate" ${okbFilterDuplicate==='duplicate'?'selected':''}>高置信重复</option>
+    </select>
+    <select class="form-control" style="width:140px" onchange="okbFilterHasEmail=this.value;renderOutreachKBList()">
+      <option value="">联系方式</option>
+      <option value="has" ${okbFilterHasEmail==='has'?'selected':''}>有邮箱</option>
+      <option value="no" ${okbFilterHasEmail==='no'?'selected':''}>无邮箱</option>
+    </select>
+  </div>`;
+}
+
+function okbResetFilters(){
+  okbSearch=''; okbFilterStage=''; okbFilterDuplicate=''; okbFilterHasEmail='';
+  renderOutreachKBFilters(); renderOutreachKBList();
+}
+
+function renderOutreachKBList(){
+  const archives = (S.outreachKnowledgeBase||[]).slice();
+  const q = okbSearch.toLowerCase().trim();
+  let filtered = archives;
+  if(q){
+    filtered = filtered.filter(a =>
+      (a.customerName||'').toLowerCase().includes(q) ||
+      (a.normalizedDomain||'').includes(q) ||
+      (a.website||'').toLowerCase().includes(q) ||
+      (a.contactName||'').toLowerCase().includes(q) ||
+      (a.emails||[]).some(e => e.toLowerCase().includes(q)) ||
+      (a.country||'').toLowerCase().includes(q) ||
+      (a.mainProducts||'').toLowerCase().includes(q) ||
+      (a.customerType||'').toLowerCase().includes(q)
+    );
+  }
+  if(okbFilterStage) filtered = filtered.filter(a => a.outreachStage === okbFilterStage);
+  if(okbFilterDuplicate) filtered = filtered.filter(a => a.duplicateStatus === okbFilterDuplicate);
+  if(okbFilterHasEmail === 'has') filtered = filtered.filter(a => (a.emails||[]).length > 0);
+  if(okbFilterHasEmail === 'no') filtered = filtered.filter(a => (a.emails||[]).length === 0);
+
+  filtered.sort((a,b) => new Date(b.lastUpdatedAt||0) - new Date(a.lastUpdatedAt||0));
+
+  const el = document.getElementById('okbList');
+  if(filtered.length === 0){
+    el.innerHTML = `<div style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">
+      ${archives.length===0 ? '暂无档案。点击上方"同步/初始化档案"开始构建。' : '没有符合筛选条件的档案。'}
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+      <thead><tr style="background:#f8fafc;color:#475569;font-size:11px;text-align:left">
+        <th style="padding:10px 12px">公司 / 国家</th>
+        <th style="padding:10px 12px">独立站</th>
+        <th style="padding:10px 12px">联系人 / 邮箱</th>
+        <th style="padding:10px 12px">开发阶段</th>
+        <th style="padding:10px 12px">最近开发</th>
+        <th style="padding:10px 12px">去重</th>
+        <th style="padding:10px 12px">操作</th>
+      </tr></thead><tbody>` +
+    filtered.map(a => {
+      const stage = OUTREACH_STAGES[a.outreachStage] || {label:a.outreachStage,color:'#94a3b8'};
+      const latestDraft = (a.developmentHistory||[]).find(h => h.type === 'draft');
+      const dupBadge = a.duplicateStatus === 'duplicate' ? '<span style="background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:3px;font-size:10px">高置信重复</span>'
+        : a.duplicateStatus === 'suspected' ? '<span style="background:#fef3c7;color:#d97706;padding:1px 6px;border-radius:3px;font-size:10px">疑似重复</span>'
+        : '<span style="color:#94a3b8;font-size:10px">唯一</span>';
+      return `<tr style="border-top:1px solid #f1f5f9;cursor:pointer" onclick="openOutreachKBArchive('${a.archiveId}')">
+        <td style="padding:10px 12px"><b>${esc(a.customerName||'(未命名)')}</b><br><span style="color:#94a3b8;font-size:11px">${esc(a.country||'待补充')} · ${esc(a.customerType||'')}</span></td>
+        <td style="padding:10px 12px;font-size:11px">${a.website ? `<a href="${esc(a.website)}" target="_blank" onclick="event.stopPropagation()" style="color:#2563eb">${esc(a.normalizedDomain||a.website)}</a>` : '<span style="color:#cbd5e1">待补充</span>'}</td>
+        <td style="padding:10px 12px;font-size:11px">${esc(a.contactName||'待补充')}${a.contactTitle?' · '+esc(a.contactTitle):''}<br>${(a.emails||[])[0] ? esc((a.emails||[])[0]) : '<span style="color:#cbd5e1">无邮箱</span>'}</td>
+        <td style="padding:10px 12px"><span style="background:${stage.color}15;color:${stage.color};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">${stage.label}</span></td>
+        <td style="padding:10px 12px;font-size:11px;color:#64748b">${latestDraft?esc(latestDraft.subject.substring(0,30)):'<span style="color:#cbd5e1">未生成开发信</span>'}<br>${a.lastOutreachAt?esc(new Date(a.lastOutreachAt).toLocaleDateString()):''}</td>
+        <td style="padding:10px 12px">${dupBadge}</td>
+        <td style="padding:10px 12px"><button class="btn btn-outline btn-sm" style="font-size:11px" onclick="event.stopPropagation();openOutreachKBArchive('${a.archiveId}')">查看</button></td>
+      </tr>`;
+    }).join('') + `</tbody></table></div>
+    <div style="font-size:11px;color:#94a3b8;margin-top:8px">共 ${filtered.length} 条档案${q?'（筛选自 '+archives.length+' 条）':''}</div>`;
+}
+
+function syncAllOutreachKB(){
+  const result = syncAllToOutreachKB();
+  toast(`✅ 同步完成：新建 ${result.created} 条，更新 ${result.updated} 条，共 ${result.total} 条档案`);
+  renderOutreachKBStats(); renderOutreachKBFilters(); renderOutreachKBList();
+}
+
+function openOutreachKBArchive(archiveId){
+  const a = getOutreachArchiveById(archiveId);
+  if(!a){ toast('档案不存在','err'); return; }
+  const stage = OUTREACH_STAGES[a.outreachStage] || {label:a.outreachStage,color:'#94a3b8'};
+  const drafts = (a.developmentHistory||[]).filter(h => h.type === 'draft');
+  const comms = (a.developmentHistory||[]).filter(h => h.type === 'communication');
+  const customer = (S.customers||[]).find(c => c.id === a.customerId);
+
+  let timelineHtml = '';
+  if(drafts.length === 0 && comms.length === 0){
+    timelineHtml = '<div style="color:#94a3b8;font-size:12px;padding:12px">暂无开发信或沟通记录。</div>';
+  } else {
+    timelineHtml = (a.developmentHistory||[]).slice(0,20).map(h => {
+      if(h.type === 'draft'){
+        const reviewed = h.reviewStatus === 'reviewed';
+        return `<div style="border-left:3px solid ${reviewed?'#16a34a':'#d97706'};padding:8px 12px;margin:6px 0;background:#f8fafc;border-radius:0 6px 6px 0">
+          <div style="font-size:11px;color:#64748b">${esc(new Date(h.createdAt).toLocaleString())} · 开发信</div>
+          <div style="font-weight:600;font-size:12.5px;margin:2px 0">${esc(h.subject)}</div>
+          <div style="font-size:11px;color:#475569">${esc(h.bodySnippet)}...</div>
+          <div style="font-size:10px;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
+            <span style="background:${h.sent?'#dcfce7':'#fef3c7'};color:${h.sent?'#16a34a':'#92400e'};padding:1px 5px;border-radius:3px">${h.sent?'已发送':h.reviewStatus==='reviewed'?'已审核':'待审核'}</span>
+            ${h.manuallyEdited?'<span style="background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:3px">含人工修正</span>':''}
+            ${h.providerPolicy?'<span style="background:#f1f5f9;color:#475569;padding:1px 5px;border-radius:3px">'+esc(h.providerPolicy)+'</span>':''}
+            ${h.previousVersions&&h.previousVersions.length?'<span style="background:#f1f5f9;color:#475569;padding:1px 5px;border-radius:3px">'+h.previousVersions.length+' 个历史版本</span>':''}
+          </div>
+          ${h.knowledgeSummary ? `<div style="font-size:10px;color:#64748b;margin-top:4px">知识库依据: ${h.knowledgeSummary.factCount} 事实 / ${h.knowledgeSummary.templateCount} 模板 (${esc(h.knowledgeSummary.executionMode||'')})</div>` : ''}
+        </div>`;
+      } else {
+        return `<div style="border-left:3px solid #94a3b8;padding:8px 12px;margin:6px 0;background:#f8fafc;border-radius:0 6px 6px 0">
+          <div style="font-size:11px;color:#64748b">${esc(new Date(h.createdAt).toLocaleString())} · ${esc(h.commType||'沟通')}</div>
+          <div style="font-size:12px;color:#334155">${esc(h.content)}</div>
+        </div>`;
+      }
+    }).join('');
+  }
+
+  let kbContextHtml = '';
+  if(a.currentKnowledgeContext && a.currentKnowledgeContext.status === 'completed'){
+    const kc = a.currentKnowledgeContext;
+    kbContextHtml = `<div style="margin-top:12px">
+      <div style="font-weight:700;font-size:12px;color:#1e40af;margin-bottom:6px">📚 最近开发信知识库依据 (${esc(kc.executionMode||'')} · ${esc(kc.provider||'')})</div>
+      ${(kc.matchedFacts||[]).slice(0,3).map(f => `<div style="font-size:11px;background:#f0fdf4;border-left:3px solid #22c55e;padding:5px 8px;margin:3px 0;border-radius:0 4px 4px 0">
+        <b>${esc(f.title||'')}</b> <span style="color:#64748b">factEligible</span><br>
+        <span style="color:#475569">${esc((f.shortEvidence||'').substring(0,100))}</span><br>
+        <span style="color:#94a3b8;font-size:10px">${esc(f.relativePath||'')} · ${esc(f.sensitivity||'')} · authority:${esc(f.authorityLevel||'')}</span>
+      </div>`).join('')}
+      ${(kc.matchedTemplates||[]).slice(0,2).map(t => `<div style="font-size:11px;background:#fffbeb;border-left:3px solid #f59e0b;padding:5px 8px;margin:3px 0;border-radius:0 4px 4px 0">
+        <b>${esc(t.title||'')}</b> <span style="color:#92400e">templateEligible 仅结构参考</span><br>
+        <span style="color:#94a3b8;font-size:10px">${esc(t.relativePath||'')}</span>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  let dupHtml = '';
+  if(a.duplicateStatus !== 'unique' && a.duplicateOf){
+    const dupArchive = getOutreachArchiveById(a.duplicateOf);
+    dupHtml = `<div style="background:${a.duplicateStatus==='duplicate'?'#fef2f2':'#fffbeb'};border:1px solid ${a.duplicateStatus==='duplicate'?'#fecaca':'#fde68a'};border-radius:8px;padding:10px 12px;margin:10px 0;font-size:12px">
+      ⚠️ ${a.duplicateStatus==='duplicate'?'高置信重复':'疑似重复'}：${esc(a.duplicateReason||'')}
+      ${dupArchive?`<br>关联客户：<b>${esc(dupArchive.customerName)}</b> (${esc(dupArchive.country||'')})`:''}
+      <div style="margin-top:6px;display:flex;gap:6px">
+        <button class="btn btn-outline btn-sm" style="font-size:11px" onclick="confirmOutreachUnique('${a.archiveId}')">确认非重复</button>
+        ${dupArchive?`<button class="btn btn-outline btn-sm" style="font-size:11px" onclick="openOutreachKBArchive('${a.duplicateOf}')">查看关联档案</button>`:''}
+      </div>
+    </div>`;
+  }
+
+  openModal(`
+  <div class="modal-head"><h3>🗂️ ${esc(a.customerName||'客户档案')}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+  <div class="modal-body" style="max-height:75vh;overflow-y:auto">
+    ${dupHtml}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div style="background:#f8fafc;border-radius:8px;padding:12px">
+        <div style="font-weight:700;font-size:12px;margin-bottom:6px;color:#334155">📋 客户基础资料</div>
+        <div style="font-size:12px;line-height:1.8">
+          <b>国家/地区：</b>${esc(a.country||'待补充')}<br>
+          <b>客户类型：</b>${esc(a.customerType||'待补充')}<br>
+          <b>主营产品：</b>${esc(a.mainProducts||'待补充')}<br>
+          <b>来源：</b>${esc(a.source||'未知')}<br>
+          <b>客户状态：</b>${esc(a.customerStatus||'—')}<br>
+          <b>开发阶段：</b><span style="color:${stage.color};font-weight:600">${stage.label}</span><br>
+          <b>首次归档：</b>${esc(a.firstArchivedAt?new Date(a.firstArchivedAt).toLocaleDateString():'—')}<br>
+          <b>最近更新：</b>${esc(a.lastUpdatedAt?new Date(a.lastUpdatedAt).toLocaleDateString():'—')}
+        </div>
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:12px">
+        <div style="font-weight:700;font-size:12px;margin-bottom:6px;color:#334155">📞 联系方式</div>
+        <div style="font-size:12px;line-height:1.8">
+          <b>独立站：</b>${a.website?`<a href="${esc(a.website)}" target="_blank" style="color:#2563eb">${esc(a.normalizedDomain||a.website)}</a>`:'<span style="color:#cbd5e1">待补充</span>'}<br>
+          <b>联系人：</b>${esc(a.contactName||'待补充')}${a.contactTitle?' · '+esc(a.contactTitle):''}<br>
+          <b>邮箱：</b>${(a.emails||[]).length?a.emails.map(e=>esc(e)).join('<br>'):'<span style="color:#cbd5e1">待补充</span>'}<br>
+          <b>电话/WA：</b>${(a.phones||[]).length?a.phones.map(p=>esc(p)).join(', '):'<span style="color:#cbd5e1">待补充</span>'}<br>
+          <b>社媒：</b>${(a.socialLinks||[]).length?a.socialLinks.map(s=>esc(s.type)+': '+esc(s.url)).join('<br>'):'<span style="color:#cbd5e1">—</span>'}
+        </div>
+      </div>
+    </div>
+    ${a.deepAnalysisSummary?`<div style="background:#eff6ff;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11.5px">
+      <b>🔍 官网深度分析摘要：</b>状态 ${esc(a.deepAnalysisSummary.status||'—')} · 关系适配 ${esc(a.deepAnalysisSummary.relationshipFit||'—')} · 抓取 ${(a.deepAnalysisSummary.fetchedPages||[]).length} 页
+      ${a.deepAnalysisSummary.businessRoles&&a.deepAnalysisSummary.businessRoles.length?'<br>商业角色：'+a.deepAnalysisSummary.businessRoles.map(esc).join(', '):''}
+    </div>`:`<div style="background:#f8fafc;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11.5px;color:#94a3b8">🔍 官网资料待补充（可在客户详情页触发深度分析）</div>`}
+    <div style="font-weight:700;font-size:13px;margin:12px 0 6px;color:#334155">📜 开发信版本时间线 (${drafts.length} 封开发信 · ${comms.length} 条沟通)</div>
+    ${timelineHtml}
+    ${kbContextHtml}
+    ${a.notes?`<div style="margin-top:12px;background:#fffbeb;border-radius:8px;padding:10px 12px;font-size:12px"><b>📝 备注：</b>${esc(a.notes)}</div>`:''}
+    <div class="divider"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${customer?`<button class="btn btn-primary" onclick="closeModal();editDraftForCustomer('${a.customerId}')">✉️ 写开发信/跟进信</button>`:''}
+      ${a.outreachStage!=='paused'?`<button class="btn btn-outline" onclick="markOutreachArchiveStatus('${a.archiveId}','paused');closeModal()">⏸️ 标记暂不跟进</button>`:''}
+      ${a.outreachStage!=='do_not_contact'?`<button class="btn btn-outline" style="color:#dc2626;border-color:#fecaca" onclick="if(confirm('确定标记为不再联系？该客户将被阻止生成新开发信。')){markOutreachArchiveStatus('${a.archiveId}','do_not_contact');closeModal()}">🚫 标记不再联系</button>`:''}
+      ${customer?`<button class="btn btn-outline" onclick="closeModal();go('customers')">👥 打开客户台账</button>`:''}
+    </div>
+  </div>`);
+}
+
+function confirmOutreachUnique(archiveId){
+  const a = getOutreachArchiveById(archiveId);
+  if(!a) return;
+  a.duplicateStatus = 'unique';
+  a.duplicateOf = null;
+  a.duplicateReason = '人工确认为唯一客户';
+  a.manuallyMerged = true;
+  persist();
+  toast('已确认为唯一客户');
+  closeModal();
+  renderView();
 }
 
 async function generateCustomerProfile(customerInfo, depth, providerPolicy){

@@ -139,6 +139,7 @@ function retrieveKbContext(options) {
   const result = {
     query: query || '', purpose: purpose, provider: provider, accessScope: accessScope,
     totalMatched: 0, facts: [], templates: [], citations: [], excludedCount: 0,
+    excludedByEligibilityCount: 0, factCount: 0, templateCount: 0,
     policy: { sensitivityAllowed: [], factOnly: factOnly, templateOnly: templateOnly },
     error: null, kbVersion: '', cacheHit: false
   };
@@ -222,11 +223,20 @@ function retrieveKbContext(options) {
     // factOnly/templateOnly 过滤
     if (factOnly && !item.factEligible) continue;
     if (templateOnly && !item.templateEligible) continue;
-    if (item.factEligible && !item.templateEligible) result.facts.push(item);
-    else if (item.templateEligible && !item.factEligible) result.templates.push(item);
-    else { result.facts.push(item); result.templates.push(item); }
-    result.citations.push({ documentId: item.documentId, title: item.title, relativePath: item.relativePath, headingPath: item.headingPath, sensitivity: item.sensitivity, factEligible: item.factEligible, templateEligible: item.templateEligible, score: item.score });
+    // V77.2.2: 独立判断事实和模板资格，避免两者均为false时误入
+    const isFact = item.factEligible === true;
+    const isTemplate = item.templateEligible === true;
+    if (isFact) result.facts.push(item);
+    if (isTemplate) result.templates.push(item);
+    // V77.2.2: citations只包含获资格的切片；两者均为false计入诊断
+    if (isFact || isTemplate) {
+      result.citations.push({ documentId: item.documentId, chunkId: item.chunkId, title: item.title, relativePath: item.relativePath, headingPath: item.headingPath, sensitivity: item.sensitivity, authorityLevel: item.authorityLevel, confidence: item.confidence, factEligible: item.factEligible, templateEligible: item.templateEligible, score: item.score });
+    } else {
+      result.excludedByEligibilityCount++;
+    }
   }
+  result.factCount = result.facts.length;
+  result.templateCount = result.templates.length;
   return result;
 }
 

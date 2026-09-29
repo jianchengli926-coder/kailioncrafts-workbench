@@ -1836,6 +1836,288 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   
+  // ============ V76.0 模块C：公司官网深度分析抓取接口 ============
+  
+  // 从HTML中确定性提取公司信息
+  function extractCompanyInfo(html, url) {
+    const info = {
+      title: '',
+      metaDescription: '',
+      metaKeywords: '',
+      language: '',
+      companyName: '',
+      emails: [],
+      phones: [],
+      addresses: [],
+      socialLinks: [],
+      productCategories: [],
+      wholesaleSignals: [],
+      privateLabelSignals: [],
+      contactUrl: '',
+      aboutUrl: '',
+      productsUrl: '',
+      wholesaleUrl: '',
+      allLinks: []
+    };
+    
+    try {
+      // 页面标题
+      const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      if (titleMatch) info.title = titleMatch[1].trim().replace(/\s+/g, ' ');
+      
+      // Meta Description
+      const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i) || html.match(/<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["']/i);
+      if (descMatch) info.metaDescription = descMatch[1].trim();
+      
+      // Meta Keywords
+      const kwMatch = html.match(/<meta[^>]+name=["']keywords["'][^>]+content=["']([^"']*)["']/i);
+      if (kwMatch) info.metaKeywords = kwMatch[1].trim();
+      
+      // 页面语言
+      const langMatch = html.match(/<html[^>]+lang=["']([^"']*)["']/i);
+      if (langMatch) info.language = langMatch[1].trim();
+      
+      // 公开邮箱（去重）
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+      const emails = html.match(emailRegex) || [];
+      info.emails = [...new Set(emails.filter(e => !e.includes('example.com') && !e.includes('domain.com')))];
+      
+      // 公开电话（国际格式，严格过滤价格/SKU/年份误判）
+      const phoneRegex = /(?:\+\d{1,3}[-.\s]?)?(?:\(?\d{2,4}\)?[-.\s]?)?\d{3,4}[-.\s]\d{3,4}(?:[-.\s]\d{1,4})?/g;
+      const phones = html.match(phoneRegex) || [];
+      info.phones = [...new Set(phones.filter(p => {
+        const digits = p.replace(/\D/g, '');
+        // 过滤：7-15位数字（国际电话范围），排除纯4位年份、纯价格
+        if (digits.length < 7 || digits.length > 15) return false;
+        // 排除常见误判模式
+        if (/^\d{4}$/.test(digits)) return false; // 年份
+        if (/^19\d{2}$/.test(digits)) return false; // 19xx年份
+        if (/^20\d{2}$/.test(digits)) return false; // 20xx年份
+        // 必须包含分隔符或+号（纯连续数字容易是SKU/价格）
+        if (!p.includes('+') && !p.includes('-') && !p.includes(' ') && !p.includes('(') && !p.includes(')')) return false;
+        return true;
+      }))];
+      
+      // 提取所有链接
+      const linkRegex = /<a[^>]+href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
+      let linkMatch;
+      while ((linkMatch = linkRegex.exec(html)) !== null) {
+        const href = linkMatch[1].trim();
+        const text = linkMatch[2].replace(/<[^>]*>/g, '').trim().replace(/\s+/g, ' ');
+        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+          info.allLinks.push({ href, text });
+          const lowerHref = href.toLowerCase();
+          const lowerText = text.toLowerCase();
+          
+          // 识别关键页面
+          if (lowerHref.includes('contact') || lowerText.includes('contact') || lowerText.includes('联系')) {
+            if (!info.contactUrl) info.contactUrl = href;
+          }
+          if (lowerHref.includes('about') || lowerText.includes('about') || lowerText.includes('关于') || lowerText.includes('company')) {
+            if (!info.aboutUrl) info.aboutUrl = href;
+          }
+          if (lowerHref.includes('product') || lowerHref.includes('category') || lowerHref.includes('shop') || lowerHref.includes('catalog') || lowerText.includes('product') || lowerText.includes('产品')) {
+            if (!info.productsUrl) info.productsUrl = href;
+            if (text && text.length < 50 && !info.productCategories.includes(text)) {
+              info.productCategories.push(text);
+            }
+          }
+          if (lowerHref.includes('wholesale') || lowerHref.includes('b2b') || lowerHref.includes('distributor') || lowerText.includes('wholesale') || lowerText.includes('批发') || lowerText.includes('经销')) {
+            if (!info.wholesaleUrl) info.wholesaleUrl = href;
+            if (text && text.length < 50) info.wholesaleSignals.push(text);
+          }
+          if (lowerHref.includes('private-label') || lowerHref.includes('private label') || lowerHref.includes('oem') || lowerHref.includes('odm') || lowerText.includes('private label') || lowerText.includes('贴牌') || lowerText.includes('定制')) {
+            if (text && text.length < 50) info.privateLabelSignals.push(text);
+          }
+          
+          // 社交媒体链接
+          const socialDomains = ['facebook.com', 'instagram.com', 'linkedin.com', 'twitter.com', 'x.com', 'youtube.com', 'tiktok.com', 'pinterest.com'];
+          for (const sd of socialDomains) {
+            if (lowerHref.includes(sd)) {
+              info.socialLinks.push({ platform: sd.replace('.com',''), url: href });
+              break;
+            }
+          }
+        }
+      }
+      
+      // 正文中的Wholesale/B2B信号
+      const bodyText = html.replace(/<[^>]*>/g, ' ').toLowerCase();
+      const wholesaleKeywords = ['wholesale', 'distributor', 'b2b', 'bulk order', 'reseller', 'dealer', '批发', '经销', '代理'];
+      for (const kw of wholesaleKeywords) {
+        if (bodyText.includes(kw) && !info.wholesaleSignals.includes(kw)) {
+          info.wholesaleSignals.push(kw);
+        }
+      }
+      
+      // Private Label/OEM信号
+      const plKeywords = ['private label', 'oem', 'odm', 'custom branding', 'own brand', '贴牌', '定制', '代工'];
+      for (const kw of plKeywords) {
+        if (bodyText.includes(kw) && !info.privateLabelSignals.includes(kw)) {
+          info.privateLabelSignals.push(kw);
+        }
+      }
+      
+      // 公司名称（从title或og:site_name提取）
+      const ogSiteName = html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']*)["']/i);
+      if (ogSiteName) {
+        info.companyName = ogSiteName[1].trim();
+      } else if (info.title) {
+        // 从title中提取公司名（取|或-之前的部分）
+        const namePart = info.title.split(/[|\-–—]/)[0].trim();
+        if (namePart && namePart.length < 60) info.companyName = namePart;
+      }
+      
+    } catch(e) {
+      console.error('提取公司信息失败:', e.message);
+    }
+    
+    // 限制数组长度
+    info.productCategories = info.productCategories.slice(0, 20);
+    info.allLinks = info.allLinks.slice(0, 50);
+    info.socialLinks = [...new Map(info.socialLinks.map(s => [s.url, s])).values()];
+    
+    return info;
+  }
+  
+  // 模块C：批量抓取公司官网并提取信息
+  if (pathname === '/api/company/fetch' && req.method === 'POST') {
+    const scope = getAccessScope(req);
+    if (denyIfPublic(req, res, scope)) return;
+    try {
+      const body = await readBody(req);
+      const baseUrl = (body.url || '').trim();
+      if (!baseUrl) { res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ error: '缺少url参数' })); return; }
+      
+      // SSRF预检查
+      if (!isUrlSafe(baseUrl)) {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'SSRF防护：禁止访问内网或本地地址' }));
+        return;
+      }
+      
+      const baseDomain = new URL(baseUrl).hostname.replace(/^www\./, '');
+      
+      // 确定要抓取的页面（最多5个）
+      const pagesToFetch = [{ url: baseUrl, type: 'homepage', label: '首页' }];
+      
+      // 先抓取首页，从中发现About/Contact/Products/Wholesale页面
+      log(`模块C抓取: scope=${scope}, url=${baseUrl}`, 'REQUEST');
+      
+      const fetchedPages = [];
+      const failedPages = [];
+      let homepageInfo = null;
+      
+      try {
+        const homeResult = await fetchUrl(baseUrl, { timeout: 15000, maxSize: 2*1024*1024 });
+        homepageInfo = extractCompanyInfo(homeResult.body, baseUrl);
+        fetchedPages.push({
+          url: homeResult.finalUrl || baseUrl,
+          type: 'homepage',
+          label: '首页',
+          statusCode: homeResult.statusCode,
+          size: homeResult.size,
+          fetchedAt: homeResult.fetchedAt,
+          info: homepageInfo
+        });
+        
+        // 从首页发现的链接中选择要抓取的页面
+        const discoveredPages = [];
+        if (homepageInfo.aboutUrl) discoveredPages.push({ url: resolveUrl(baseUrl, homepageInfo.aboutUrl), type: 'about', label: '关于我们' });
+        if (homepageInfo.contactUrl) discoveredPages.push({ url: resolveUrl(baseUrl, homepageInfo.contactUrl), type: 'contact', label: '联系我们' });
+        if (homepageInfo.productsUrl) discoveredPages.push({ url: resolveUrl(baseUrl, homepageInfo.productsUrl), type: 'products', label: '产品' });
+        if (homepageInfo.wholesaleUrl) discoveredPages.push({ url: resolveUrl(baseUrl, homepageInfo.wholesaleUrl), type: 'wholesale', label: '批发/B2B' });
+        
+        // 抓取发现的页面（同一域名，间隔1秒）
+        for (const page of discoveredPages.slice(0, 4)) {
+          try {
+            // 确保同一根域名
+            const pageDomain = new URL(page.url).hostname.replace(/^www\./, '');
+            if (pageDomain !== baseDomain && !pageDomain.endsWith('.' + baseDomain) && !baseDomain.endsWith('.' + pageDomain)) {
+              failedPages.push({ url: page.url, type: page.type, label: page.label, error: '跨域名，跳过' });
+              continue;
+            }
+            await new Promise(r => setTimeout(r, 1000)); // 请求间隔1秒
+            const result = await fetchUrl(page.url, { timeout: 15000, maxSize: 2*1024*1024 });
+            const pageInfo = extractCompanyInfo(result.body, page.url);
+            fetchedPages.push({
+              url: result.finalUrl || page.url,
+              type: page.type,
+              label: page.label,
+              statusCode: result.statusCode,
+              size: result.size,
+              fetchedAt: result.fetchedAt,
+              info: pageInfo
+            });
+          } catch(e) {
+            failedPages.push({ url: page.url, type: page.type, label: page.label, error: e.message });
+          }
+        }
+      } catch(e) {
+        failedPages.push({ url: baseUrl, type: 'homepage', label: '首页', error: e.message });
+      }
+      
+      // 合并所有页面的提取信息
+      const mergedInfo = {
+        title: homepageInfo?.title || '',
+        metaDescription: homepageInfo?.metaDescription || '',
+        language: homepageInfo?.language || '',
+        companyName: homepageInfo?.companyName || '',
+        emails: [],
+        phones: [],
+        socialLinks: [],
+        productCategories: [],
+        wholesaleSignals: [],
+        privateLabelSignals: [],
+        keyPages: {}
+      };
+      
+      for (const page of fetchedPages) {
+        // 跳过404/500等错误页面的信息提取
+        if (page.statusCode >= 400) continue;
+        const info = page.info;
+        if (info.emails) mergedInfo.emails.push(...info.emails);
+        if (info.phones) mergedInfo.phones.push(...info.phones);
+        if (info.socialLinks) mergedInfo.socialLinks.push(...info.socialLinks);
+        if (info.productCategories) mergedInfo.productCategories.push(...info.productCategories);
+        if (info.wholesaleSignals) mergedInfo.wholesaleSignals.push(...info.wholesaleSignals);
+        if (info.privateLabelSignals) mergedInfo.privateLabelSignals.push(...info.privateLabelSignals);
+        if (page.type) mergedInfo.keyPages[page.type] = { url: page.url, statusCode: page.statusCode, label: page.label };
+      }
+      
+      // 去重
+      mergedInfo.emails = [...new Set(mergedInfo.emails)];
+      mergedInfo.phones = [...new Set(mergedInfo.phones)];
+      mergedInfo.socialLinks = [...new Map(mergedInfo.socialLinks.map(s => [s.url, s])).values()];
+      mergedInfo.productCategories = [...new Set(mergedInfo.productCategories)].slice(0, 30);
+      mergedInfo.wholesaleSignals = [...new Set(mergedInfo.wholesaleSignals)].slice(0, 20);
+      mergedInfo.privateLabelSignals = [...new Set(mergedInfo.privateLabelSignals)].slice(0, 20);
+      
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        success: true,
+        rootDomain: baseDomain,
+        fetchedPages: fetchedPages,
+        failedPages: failedPages,
+        extractedInfo: mergedInfo,
+        analyzedAt: new Date().toISOString()
+      }));
+      
+      log(`模块C抓取完成: ${baseDomain}, 成功${fetchedPages.length}页, 失败${failedPages.length}页`, 'REQUEST');
+    } catch(e) {
+      const isSSRF = e.message.includes('SSRF');
+      res.writeHead(isSSRF ? 403 : 500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: e.message, ssrfBlocked: isSSRF }));
+      log(`模块C抓取失败: ${e.message}`, isSSRF ? 'WARN' : 'ERROR');
+    }
+    return;
+  }
+  
+  // URL解析辅助函数
+  function resolveUrl(base, relative) {
+    try { return new URL(relative, base).href; } catch(e) { return relative; }
+  }
+  
   // 清除搜索缓存
   if (pathname === '/api/search/cache' && req.method === 'DELETE') {
     const scope = getAccessScope(req);

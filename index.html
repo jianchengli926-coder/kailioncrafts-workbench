@@ -2010,8 +2010,8 @@ const FACT_SANITIZE_RULES = [
 
 const FACT_CONSTRAINT_PROMPT = '\n\n【事实约束·强制】未在公司事实库中确认的SKU数、认证、产能、MOQ、交期、客户案例、出口国家数一律输出"待确认"，不得编造具体数字；合作工厂必须表述为strategic manufacturing partners，不得写成KaiLionCrafts自有工厂或自有认证；不得输出成本、底价、利润、价格优势百分比、免费服务承诺；所有AI输出为草稿，需人工审核后发送。';
 
-function sanitizeFactsForAI(prompt, context = 'kaiLionOutbound'){
-  if(!messages) return m
+function sanitizeFactsForAI(messages, context = 'kaiLionOutbound'){
+  if(!messages) return messages;
 
   // V76.0 上下文感知过滤模式
   // externalCompanyResearch: 分析第三方公司时，保留有URL证据的第三方事实
@@ -2019,18 +2019,23 @@ function sanitizeFactsForAI(prompt, context = 'kaiLionOutbound'){
   // kaiLionOutbound: 对外内容，严格过滤KaiLionCrafts未确认事实（默认）
   if(context === 'externalCompanyResearch'){
     // V76.0 第三方公司研究模式：只过滤KaiLionCrafts内部敏感数据
-    let result = prompt;
+    const extIsStr = typeof messages === 'string';
+    const extMsgs = extIsStr ? [{role:'user', content:messages}] : JSON.parse(JSON.stringify(messages));
     const internalSensitiveWords = ['成本价', '底价', '利润率', '供应商结算价', '内部价', 'cost price', 'bottom price', 'profit margin'];
-    for(const word of internalSensitiveWords){
-      const re = new RegExp(word + '[^。\n]*', 'gi');
-      result = result.replace(re, '[内部数据已过滤]');
+    for(const extMsg of extMsgs){
+      if(!extMsg.content) continue;
+      for(const word of internalSensitiveWords){
+        const re = new RegExp(word + '[^。\n]*', 'gi');
+        extMsg.content = extMsg.content.replace(re, '[内部数据已过滤]');
+      }
     }
-    return result;
+    return extIsStr ? extMsgs[0].content : extMsgs;
   }
   if(context === 'generalInternal'){
-    // 内部模式：基本不过滤，但标记未经确认的信息
-    return prompt;
-  }essages;
+    // 内部模式：基本不过滤
+    return messages;
+  }
+  // kaiLionOutbound 模式：严格过滤（原有逻辑）
   const isString = typeof messages === 'string';
   const msgs = isString ? [{role:'user', content:messages}] : JSON.parse(JSON.stringify(messages));
   let sanitizedCount = 0;
@@ -22311,6 +22316,183 @@ let companyAnalysisState = {
   error: null
 };
 
+// V76.0 模块C完整数据结构与工具函数
+function initDeepAnalysis(rootDomain) {
+  return {
+    status: 'not_started',
+    version: 'v1.0',
+    analyzedAt: null,
+    rootDomain: rootDomain || '',
+    fetchedPages: [],
+    failedPages: [],
+    robotsStatus: 'not_checked',
+    companyIdentity: { name: '', country: '', languages: [], addresses: [] },
+    country: '',
+    languages: [],
+    addresses: [],
+    publicContacts: { emails: [], phones: [], contactForms: [], socialLinks: [] },
+    productCategories: [],
+    customerType: '',
+    customerTypeConfidence: 'low',
+    businessModel: '',
+    wholesaleSignals: [],
+    distributorSignals: [],
+    privateLabelSignals: [],
+    oemOdmSignals: [],
+    amazonPresence: 'unverified', // verified / not_found / unverified
+    productFit: { kitchenKnives: 'unknown', professionalScissors: 'unknown', outdoorKnives: 'unknown', kitchenAccessories: 'unknown' },
+    searchMatchScore: 0,
+    deepAnalysisScore: 0,
+    deepAnalysisLevel: '', // 高潜力 / 中潜力 / 待人工确认 / 不建议继续
+    confidence: 'low',
+    evidence: [], // {claim, value, sourceUrl, sourceType, shortEvidence, confidence, extractionMethod, verifiedAt}
+    risks: [],
+    unknownFields: [],
+    recommendedNextStep: '',
+    reviewStatus: 'pending', // pending / reviewed / needs_revision / do_not_follow
+    reviewNotes: '',
+    aiProvider: '',
+    aiModel: '',
+    aiResponseTime: 0,
+    aiFallbackCount: 0,
+    aiRawResponse: '',
+    extractedInfo: null, // 保留原始确定性提取结果
+    manuallyEdited: false
+  };
+}
+
+function buildEvidence(claim, value, sourceUrl, sourceType, shortEvidence, confidence, extractionMethod) {
+  return {
+    claim: claim,
+    value: value || '',
+    sourceUrl: sourceUrl || '',
+    sourceType: sourceType || 'unknown',
+    shortEvidence: shortEvidence || '',
+    confidence: confidence || 'low',
+    extractionMethod: extractionMethod || 'deterministic',
+    verifiedAt: new Date().toISOString()
+  };
+}
+
+// 深度分析评分（独立于搜索分数）
+function calculateDeepAnalysisScore(da) {
+  if (!da) return { score: 0, level: '待人工确认', breakdown: [] };
+  let score = 0;
+  const breakdown = [];
+  
+  // 1. 公司真实性 (15分)
+  if (da.companyIdentity && da.companyIdentity.name && da.companyIdentity.name !== '未找到') {
+    score += 15;
+    breakdown.push({ item: '公司真实性', points: 15, reason: '官网有明确公司名称' });
+  } else {
+    breakdown.push({ item: '公司真实性', points: 0, reason: '未确认公司名称' });
+  }
+  
+  // 2. 产品匹配 (20分)
+  let productMatchScore = 0;
+  const pf = da.productFit || {};
+  const matchedCategories = Object.values(pf).filter(v => v === 'high' || v === 'medium').length;
+  productMatchScore = Math.min(20, matchedCategories * 10);
+  if (productMatchScore > 0) {
+    score += productMatchScore;
+    breakdown.push({ item: '产品匹配', points: productMatchScore, reason: matchedCategories + '个品类匹配' });
+  } else {
+    breakdown.push({ item: '产品匹配', points: 0, reason: '未发现明确产品匹配' });
+  }
+  
+  // 3. 目标客户类型 (15分)
+  const targetTypes = ['进口商', '批发商', '品牌商', '经销商', '分销商', '亚马逊卖家', '独立站卖家', '连锁零售', 'importer', 'wholesaler', 'distributor', 'brand', 'retailer'];
+  const ct = (da.customerType || '').toLowerCase();
+  let typeScore = 0;
+  for (const tt of targetTypes) {
+    if (ct.includes(tt.toLowerCase())) { typeScore = 15; break; }
+  }
+  if (ct.includes('制造商') || ct.includes('manufacturer')) {
+    typeScore = 5; // 制造商可能是竞争者，低分
+    breakdown.push({ item: '目标客户类型', points: typeScore, reason: '制造商（可能是竞争者，需确认采购需求）' });
+  } else if (typeScore > 0) {
+    score += typeScore;
+    breakdown.push({ item: '目标客户类型', points: typeScore, reason: '目标客户类型: ' + da.customerType });
+  } else {
+    breakdown.push({ item: '目标客户类型', points: 0, reason: '客户类型未确认' });
+  }
+  
+  // 4. B2B/批发/分销信号 (15分)
+  const b2bCount = (da.wholesaleSignals || []).length + (da.distributorSignals || []).length;
+  const b2bScore = Math.min(15, b2bCount * 5);
+  if (b2bScore > 0) {
+    score += b2bScore;
+    breakdown.push({ item: 'B2B/批发信号', points: b2bScore, reason: b2bCount + '个B2B信号' });
+  } else {
+    breakdown.push({ item: 'B2B/批发信号', points: 0, reason: '未检测到B2B信号' });
+  }
+  
+  // 5. OEM/ODM/Private Label信号 (10分)
+  const oemCount = (da.privateLabelSignals || []).length + (da.oemOdmSignals || []).length;
+  const oemScore = Math.min(10, oemCount * 5);
+  if (oemScore > 0) {
+    score += oemScore;
+    breakdown.push({ item: 'OEM/ODM信号', points: oemScore, reason: oemCount + '个OEM/ODM信号' });
+  } else {
+    breakdown.push({ item: 'OEM/ODM信号', points: 0, reason: '未检测到OEM/ODM信号' });
+  }
+  
+  // 6. 公开联系方式完整度 (10分)
+  let contactScore = 0;
+  if (da.publicContacts && da.publicContacts.emails && da.publicContacts.emails.length > 0) contactScore += 5;
+  if (da.publicContacts && da.publicContacts.phones && da.publicContacts.phones.length > 0) contactScore += 3;
+  if (da.publicContacts && da.publicContacts.socialLinks && da.publicContacts.socialLinks.length > 0) contactScore += 2;
+  if (contactScore > 0) {
+    score += contactScore;
+    breakdown.push({ item: '联系方式', points: contactScore, reason: '邮箱/电话/社媒' });
+  } else {
+    breakdown.push({ item: '联系方式', points: 0, reason: '未找到公开联系方式' });
+  }
+  
+  // 7. 国家或市场匹配 (5分)
+  const targetCountries = ['美国', '德国', '英国', '法国', '西班牙', '意大利', '荷兰', '瑞典', '挪威', '丹麦', '芬兰', '波兰', '捷克', '奥地利', '瑞士', '比利时', '葡萄牙', '希腊', 'USA', 'Germany', 'UK', 'United Kingdom', 'France', 'Spain', 'Italy'];
+  let countryScore = 0;
+  for (const tc of targetCountries) {
+    if ((da.country || '').toLowerCase().includes(tc.toLowerCase())) { countryScore = 5; break; }
+  }
+  if (countryScore > 0) {
+    score += countryScore;
+    breakdown.push({ item: '市场匹配', points: countryScore, reason: '目标市场: ' + da.country });
+  } else {
+    breakdown.push({ item: '市场匹配', points: 0, reason: '国家未确认或非目标市场' });
+  }
+  
+  // 8. 证据完整度 (10分)
+  const evidenceCount = (da.evidence || []).filter(e => e.confidence === 'high').length;
+  const evidenceScore = Math.min(10, evidenceCount * 2);
+  if (evidenceScore > 0) {
+    score += evidenceScore;
+    breakdown.push({ item: '证据完整度', points: evidenceScore, reason: evidenceCount + '条高置信证据' });
+  } else {
+    breakdown.push({ item: '证据完整度', points: 0, reason: '高置信证据不足' });
+  }
+  
+  // 扣分项：竞争制造商或不相关风险
+  let penalty = 0;
+  if ((da.risks || []).some(r => r.includes('竞争者') || r.includes('competitor') || r.includes('制造商'))) {
+    penalty += 10;
+    breakdown.push({ item: '风险扣分', points: -10, reason: '可能是竞争者/制造商' });
+  }
+  
+  score = Math.max(0, score - penalty);
+  
+  // 等级判定
+  let level = '待人工确认';
+  if (score >= 70) level = '高潜力';
+  else if (score >= 50) level = '中潜力';
+  else if (score >= 30) level = '待人工确认';
+  else level = '不建议继续';
+  
+  return { score: score, level: level, breakdown: breakdown };
+}
+
+
+
 function startCompanyDeepAnalysis(index) {
   const r = prospectSearchResults[index];
   if (!r || r.sourceType !== 'company_website') {
@@ -22391,93 +22573,143 @@ function renderCompanyAnalysisContent() {
   }
   
   if (state.status === 'complete' && state.result) {
-    const info = state.result.extractedInfo || {};
-    const fetched = state.result.fetchedPages || [];
-    const failed = state.result.failedPages || [];
+    const da = r.deepAnalysis || {};
+    const info = da.extractedInfo || state.result.extractedInfo || {};
+    const fetched = da.fetchedPages || state.result.fetchedPages || [];
+    const failed = da.failedPages || state.result.failedPages || [];
+    const scoreColor = da.deepAnalysisLevel === '高潜力' ? '#166534' : da.deepAnalysisLevel === '中潜力' ? '#92400e' : da.deepAnalysisLevel === '不建议继续' ? '#991b1b' : '#64748b';
+    const scoreBg = da.deepAnalysisLevel === '高潜力' ? '#dcfce7' : da.deepAnalysisLevel === '中潜力' ? '#fef3c7' : da.deepAnalysisLevel === '不建议继续' ? '#fee2e2' : '#f1f5f9';
     
     return `
-      <div style="margin-bottom:16px;padding:12px 16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px">
-        <div style="font-weight:600;color:#166534">✓ 抓取完成</div>
-        <div style="font-size:12px;color:#15803d;margin-top:4px">成功抓取 ${fetched.length} 个页面，失败 ${failed.length} 个</div>
+      <div style="margin-bottom:16px;padding:12px 16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:600;color:#166534">✓ 抓取完成 · ${da.status === 'completed' ? 'AI分析完成' : da.status === 'partial' ? 'AI分析(partial)' : '待AI分析'}</div>
+          <div style="font-size:12px;color:#15803d;margin-top:2px">成功 ${fetched.length} 页，失败 ${failed.length} 页</div>
+        </div>
+        ${da.deepAnalysisScore ? `<div style="text-align:right">
+          <div style="font-size:24px;font-weight:700;color:${scoreColor}">${da.deepAnalysisScore}</div>
+          <div style="font-size:11px;padding:2px 8px;background:${scoreBg};color:${scoreColor};border-radius:4px">${da.deepAnalysisLevel}</div>
+        </div>` : ''}
       </div>
       
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-        <div style="padding:12px;background:#f8fafc;border-radius:8px">
-          <div style="font-size:11px;color:#64748b;margin-bottom:4px">公司名称</div>
-          <div style="font-weight:600;color:#1e293b">${info.companyName || '未找到'}</div>
+      <!-- 基本信息 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+        <div style="padding:10px 12px;background:#f8fafc;border-radius:6px">
+          <div style="font-size:10px;color:#64748b">公司名称</div>
+          <div style="font-weight:600;color:#1e293b;font-size:13px">${da.companyIdentity?.name || info.companyName || '未找到'}</div>
         </div>
-        <div style="padding:12px;background:#f8fafc;border-radius:8px">
-          <div style="font-size:11px;color:#64748b;margin-bottom:4px">网站语言</div>
-          <div style="font-weight:600;color:#1e293b">${info.language || '未找到'}</div>
+        <div style="padding:10px 12px;background:#f8fafc;border-radius:6px">
+          <div style="font-size:10px;color:#64748b">国家 / 客户类型</div>
+          <div style="font-weight:600;color:#1e293b;font-size:13px">${da.country || '未确认'} / ${da.customerType || '未确认'}</div>
         </div>
-        <div style="padding:12px;background:#f8fafc;border-radius:8px">
-          <div style="font-size:11px;color:#64748b;margin-bottom:4px">公开邮箱</div>
-          <div style="font-weight:600;color:#1e293b;font-size:12px">${info.emails && info.emails.length > 0 ? info.emails.join(', ') : '未找到'}</div>
+        <div style="padding:10px 12px;background:#f8fafc;border-radius:6px">
+          <div style="font-size:10px;color:#64748b">公开邮箱</div>
+          <div style="font-weight:600;color:#1e293b;font-size:11px;word-break:break-all">${(da.publicContacts?.emails || info.emails || []).join(', ') || '未找到'}</div>
         </div>
-        <div style="padding:12px;background:#f8fafc;border-radius:8px">
-          <div style="font-size:11px;color:#64748b;margin-bottom:4px">公开电话</div>
-          <div style="font-weight:600;color:#1e293b;font-size:12px">${info.phones && info.phones.length > 0 ? info.phones.join(', ') : '未找到'}</div>
+        <div style="padding:10px 12px;background:#f8fafc;border-radius:6px">
+          <div style="font-size:10px;color:#64748b">Amazon状态 / 置信度</div>
+          <div style="font-weight:600;color:#1e293b;font-size:12px">${da.amazonPresence || 'unverified'} / ${da.confidence || 'low'}</div>
         </div>
       </div>
       
+      <!-- 评分明细 -->
+      ${da.scoreBreakdown ? `
+      <div style="margin-bottom:16px;padding:12px;background:#fafafa;border-radius:6px">
+        <div style="font-weight:600;font-size:12px;color:#1e293b;margin-bottom:8px">📊 深度评分明细</div>
+        ${da.scoreBreakdown.map(b => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0"><span style="color:#64748b">${b.item}</span><span style="font-weight:600;color:${b.points >= 0 ? '#16a34a' : '#dc2626'}">${b.points > 0 ? '+' : ''}${b.points}</span><span style="color:#94a3b8;font-size:10px;flex:1;text-align:right">${b.reason}</span></div>`).join('')}
+      </div>` : ''}
+      
+      <!-- B2B/OEM信号 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        <div style="padding:10px;background:${(da.wholesaleSignals||[]).length > 0 ? '#f0fdf4' : '#f9fafb'};border-radius:6px">
+          <div style="font-size:10px;color:#64748b">批发/经销信号</div>
+          <div style="font-size:11px;color:${(da.wholesaleSignals||[]).length > 0 ? '#166534' : '#94a3b8'};margin-top:2px">${(da.wholesaleSignals||[]).slice(0,5).join(', ') || '未检测到'}</div>
+        </div>
+        <div style="padding:10px;background:${(da.privateLabelSignals||[]).length > 0 || (da.oemOdmSignals||[]).length > 0 ? '#f0f9ff' : '#f9fafb'};border-radius:6px">
+          <div style="font-size:10px;color:#64748b">OEM/ODM/Private Label</div>
+          <div style="font-size:11px;color:${(da.privateLabelSignals||[]).length > 0 ? '#0369a1' : '#94a3b8'};margin-top:2px">${[...(da.privateLabelSignals||[]), ...(da.oemOdmSignals||[])].slice(0,5).join(', ') || '未检测到'}</div>
+        </div>
+      </div>
+      
+      <!-- 产品匹配 -->
+      ${da.productFit ? `
       <div style="margin-bottom:16px">
-        <div style="font-weight:600;color:#1e293b;margin-bottom:8px;font-size:14px">📄 抓取页面</div>
-        ${fetched.map(p => `
-          <div style="padding:8px 12px;background:#f0f9ff;border-radius:6px;margin-bottom:4px;font-size:12px;display:flex;justify-content:space-between">
-            <span style="color:#0369a1">${p.label} (${p.statusCode})</span>
-            <a href="${p.url}" target="_blank" style="color:#3b82f6;font-size:11px">${p.url.substring(0,50)}${p.url.length>50?'...':''}</a>
-          </div>
-        `).join('')}
-        ${failed.length > 0 ? failed.map(p => `
-          <div style="padding:8px 12px;background:#fef2f2;border-radius:6px;margin-bottom:4px;font-size:12px">
-            <span style="color:#991b1b">❌ ${p.label}: ${p.error}</span>
-          </div>
-        `).join('') : ''}
-      </div>
+        <div style="font-weight:600;font-size:12px;color:#1e293b;margin-bottom:6px">🎯 产品品类匹配</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          ${Object.entries(da.productFit).map(([k,v]) => {
+            const labels = {kitchenKnives:'厨房刀', professionalScissors:'专业剪刀', outdoorKnives:'户外刀', kitchenAccessories:'厨房配件'};
+            const colors = {high:'#16a34a', medium:'#ca8a04', low:'#dc2626', unknown:'#94a3b8'};
+            return `<div style="padding:4px 8px;background:#f8fafc;border-radius:4px;font-size:11px;display:flex;justify-content:space-between"><span>${labels[k]||k}</span><span style="color:${colors[v]||'#94a3b8'};font-weight:600">${v}</span></div>`;
+          }).join('')}
+        </div>
+      </div>` : ''}
       
+      <!-- 证据列表 -->
+      ${(da.evidence||[]).length > 0 ? `
       <div style="margin-bottom:16px">
-        <div style="font-weight:600;color:#1e293b;margin-bottom:8px;font-size:14px">🏷️ 产品分类（${info.productCategories?.length || 0}）</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">
-          ${(info.productCategories || []).slice(0,15).map(c => `<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px">${c}</span>`).join('') || '<span style="color:#94a3b8;font-size:12px">未找到</span>'}
+        <div style="font-weight:600;font-size:12px;color:#1e293b;margin-bottom:6px">🔗 证据列表 (${da.evidence.length}条)</div>
+        <div style="max-height:200px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px">
+          ${da.evidence.map((e,i) => `
+            <div style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:11px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:600;color:#1e293b">${e.claim}</span>
+                <span style="padding:1px 6px;background:${e.confidence==='high'?'#dcfce7':e.confidence==='medium'?'#fef3c7':'#fee2e2'};color:${e.confidence==='high'?'#166534':e.confidence==='medium'?'#92400e':'#991b1b'};border-radius:3px;font-size:10px">${e.confidence}</span>
+              </div>
+              <div style="color:#475569;margin-top:2px">${e.value || ''}</div>
+              ${e.sourceUrl ? `<div style="color:#3b82f6;font-size:10px;margin-top:2px;word-break:break-all">📎 ${e.sourceUrl.substring(0,80)}${e.sourceUrl.length>80?'...':''}</div>` : ''}
+              ${e.shortEvidence ? `<div style="color:#94a3b8;font-size:10px;margin-top:1px">依据: ${e.shortEvidence}</div>` : ''}
+            </div>
+          `).join('')}
         </div>
+      </div>` : ''}
+      
+      <!-- 风险和未确认 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        ${(da.risks||[]).length > 0 ? `<div style="padding:10px;background:#fef2f2;border-radius:6px">
+          <div style="font-size:10px;color:#991b1b;font-weight:600">⚠️ 风险</div>
+          <div style="font-size:11px;color:#991b1b;margin-top:2px">${da.risks.slice(0,3).join('; ')}</div>
+        </div>` : ''}
+        ${(da.unknownFields||[]).length > 0 ? `<div style="padding:10px;background:#fffbeb;border-radius:6px">
+          <div style="font-size:10px;color:#92400e;font-weight:600">❓ 未确认信息</div>
+          <div style="font-size:11px;color:#92400e;margin-top:2px">${da.unknownFields.slice(0,3).join('; ')}</div>
+        </div>` : ''}
       </div>
       
+      <!-- 推荐下一步 -->
+      ${da.recommendedNextStep ? `<div style="margin-bottom:16px;padding:10px 12px;background:#eff6ff;border-radius:6px">
+        <div style="font-size:10px;color:#1e40af;font-weight:600">📋 推荐下一步</div>
+        <div style="font-size:12px;color:#1e40af;margin-top:2px">${da.recommendedNextStep}</div>
+      </div>` : ''}
+      
+      <!-- AI模型信息 -->
+      ${da.aiModel ? `<div style="margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:6px;font-size:11px;color:#64748b;display:flex;justify-content:space-between">
+        <span>AI: ${da.aiProvider || 'unknown'} / ${da.aiModel}</span>
+        <span>${da.aiResponseTime}ms · ${da.aiFallbackCount || 0}次fallback</span>
+        <span>${da.analyzedAt ? new Date(da.analyzedAt).toLocaleString('zh-CN') : ''}</span>
+      </div>` : ''}
+      
+      <!-- 抓取页面列表 -->
       <div style="margin-bottom:16px">
-        <div style="font-weight:600;color:#1e293b;margin-bottom:8px;font-size:14px">📊 B2B信号</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="padding:10px;background:${info.wholesaleSignals?.length > 0 ? '#f0fdf4' : '#f9fafb'};border-radius:6px">
-            <div style="font-size:11px;color:#64748b">批发/经销信号</div>
-            <div style="font-weight:600;color:${info.wholesaleSignals?.length > 0 ? '#166534' : '#94a3b8'};font-size:12px;margin-top:2px">${info.wholesaleSignals?.length > 0 ? info.wholesaleSignals.slice(0,5).join(', ') : '未检测到'}</div>
-          </div>
-          <div style="padding:10px;background:${info.privateLabelSignals?.length > 0 ? '#f0f9ff' : '#f9fafb'};border-radius:6px">
-            <div style="font-size:11px;color:#64748b">Private Label/OEM信号</div>
-            <div style="font-weight:600;color:${info.privateLabelSignals?.length > 0 ? '#0369a1' : '#94a3b8'};font-size:12px;margin-top:2px">${info.privateLabelSignals?.length > 0 ? info.privateLabelSignals.slice(0,5).join(', ') : '未检测到'}</div>
-          </div>
-        </div>
+        <div style="font-weight:600;font-size:12px;color:#1e293b;margin-bottom:6px">📄 抓取页面</div>
+        ${fetched.map(p => `<div style="padding:6px 10px;background:#f0f9ff;border-radius:4px;margin-bottom:3px;font-size:11px;display:flex;justify-content:space-between"><span style="color:#0369a1">${p.label} (${p.statusCode})</span><a href="${p.url}" target="_blank" style="color:#3b82f6;font-size:10px;word-break:break-all">${p.url.substring(0,50)}${p.url.length>50?'...':''}</a></div>`).join('')}
+        ${failed.length > 0 ? failed.map(p => `<div style="padding:6px 10px;background:#fef2f2;border-radius:4px;margin-bottom:3px;font-size:11px"><span style="color:#991b1b">❌ ${p.label}: ${p.error}</span></div>`).join('') : ''}
       </div>
       
-      <div style="margin-bottom:16px">
-        <div style="font-weight:600;color:#1e293b;margin-bottom:8px;font-size:14px">🔗 社交媒体（${info.socialLinks?.length || 0}）</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${(info.socialLinks || []).map(s => `<a href="${s.url}" target="_blank" style="background:#f1f5f9;color:#475569;padding:3px 10px;border-radius:4px;font-size:11px;text-decoration:none">${s.platform}</a>`).join('') || '<span style="color:#94a3b8;font-size:12px">未找到</span>'}
-        </div>
+      <!-- 操作按钮 -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb">
+        ${!da.aiAnalysis && da.status !== 'completed' ? `<button onclick="runCompanyAIAnalysis(${state.currentIndex})" style="padding:8px 16px;background:#8b5cf6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px">🤖 开始AI分析</button>` : ''}
+        ${da.status === 'completed' || da.aiAnalysis ? `<button onclick="if(confirm('确定重新分析？将覆盖当前结果'))runCompanyAIAnalysis(${state.currentIndex})" style="padding:8px 16px;background:#f1f5f9;color:#475569;border:none;border-radius:6px;cursor:pointer;font-size:12px">🔄 重新分析</button>` : ''}
+        <button onclick="markDeepAnalysisReviewed(${state.currentIndex})" style="padding:8px 16px;background:${da.reviewStatus==='reviewed'?'#dcfce7':'#f0fdf4'};color:#166534;border:1px solid #86efac;border-radius:6px;cursor:pointer;font-size:12px">${da.reviewStatus==='reviewed'?'✓ 已审核':'✅ 标记已审核'}</button>
+        <button onclick="editDeepAnalysis(${state.currentIndex})" style="padding:8px 16px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;border-radius:6px;cursor:pointer;font-size:12px">✏️ 人工修正</button>
+        <button onclick="setDoNotFollow(${state.currentIndex})" style="padding:8px 16px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;border-radius:6px;cursor:pointer;font-size:12px">🚫 暂不跟进</button>
       </div>
       
-      ${!r.deepAnalysis || !r.deepAnalysis.aiAnalysis ? `
-        <div style="margin-top:20px;padding:16px;background:#faf5ff;border:1px solid #c4b5fd;border-radius:8px">
-          <div style="font-weight:600;color:#5b21b6;margin-bottom:8px">🤖 AI 深度分析</div>
-          <div style="font-size:12px;color:#7c3aed;margin-bottom:12px">基于已抓取页面内容，调用 AI 生成结构化公司分析（客户类型、业务模式、产品匹配度、跟进建议）</div>
-          <button onclick="runCompanyAIAnalysis(${state.currentIndex})" style="padding:10px 24px;background:#8b5cf6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">开始 AI 分析（调用一次）</button>
-        </div>
-      ` : `
-        <div style="margin-top:20px;padding:16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px">
-          <div style="font-weight:600;color:#166534;margin-bottom:8px">✓ AI 分析已完成</div>
-          <div style="white-space:pre-wrap;font-size:13px;color:#1e293b;line-height:1.7">${r.deepAnalysis.aiAnalysis}</div>
-          <button onclick="runCompanyAIAnalysis(${state.currentIndex})" style="margin-top:12px;padding:6px 16px;background:#f1f5f9;color:#475569;border:none;border-radius:6px;cursor:pointer;font-size:12px">重新分析</button>
-        </div>
-      `}
+      <!-- 审核状态 -->
+      ${da.reviewNotes ? `<div style="margin-top:12px;padding:8px 12px;background:#f0f9ff;border-radius:6px;font-size:11px"><span style="color:#1e40af;font-weight:600">审核备注:</span> <span style="color:#1e40af">${da.reviewNotes}</span></div>` : ''}
     `;
   }
+  
+  return '<div>加载中...</div>';  }
   
   return '<div>加载中...</div>';
 }
@@ -22498,13 +22730,36 @@ async function executeCompanyFetch(url, index) {
       companyAnalysisState.result = data;
       // 保存到搜索结果
       if (prospectSearchResults[index]) {
-        prospectSearchResults[index].deepAnalysis = {
-          status: 'fetched',
-          fetchedAt: new Date().toISOString(),
-          extractedInfo: data.extractedInfo,
-          fetchedPages: data.fetchedPages,
-          failedPages: data.failedPages
-        };
+        // 使用完整数据结构初始化
+        const da = initDeepAnalysis(r.rootDomain || new URL(r.url).hostname);
+        da.status = 'fetched';
+        da.analyzedAt = new Date().toISOString();
+        da.extractedInfo = data.extractedInfo;
+        da.fetchedPages = data.fetchedPages;
+        da.failedPages = data.failedPages;
+        da.companyIdentity.name = data.extractedInfo?.companyName || '';
+        da.languages = data.extractedInfo?.language ? [data.extractedInfo.language] : [];
+        da.publicContacts.emails = data.extractedInfo?.emails || [];
+        da.publicContacts.phones = data.extractedInfo?.phones || [];
+        da.publicContacts.socialLinks = data.extractedInfo?.socialLinks || [];
+        da.productCategories = data.extractedInfo?.productCategories || [];
+        da.wholesaleSignals = data.extractedInfo?.wholesaleSignals || [];
+        da.privateLabelSignals = data.extractedInfo?.privateLabelSignals || [];
+        da.searchMatchScore = r.score || 0;
+        // 构建确定性提取的证据
+        if (data.extractedInfo?.companyName) {
+          da.evidence.push(buildEvidence('公司名称', data.extractedInfo.companyName, data.fetchedPages[0]?.url || '', '首页', '页面标题/og:site_name', 'high', 'deterministic'));
+        }
+        if (data.extractedInfo?.emails?.length > 0) {
+          da.evidence.push(buildEvidence('公开邮箱', data.extractedInfo.emails.join(', '), data.extractedInfo.keyPages?.contact?.url || data.fetchedPages[0]?.url || '', 'Contact', '页面邮箱正则提取', 'high', 'deterministic'));
+        }
+        if (data.extractedInfo?.wholesaleSignals?.length > 0) {
+          da.evidence.push(buildEvidence('B2B/批发信号', data.extractedInfo.wholesaleSignals.slice(0,5).join(', '), data.fetchedPages[0]?.url || '', '首页/Products', '页面文字包含wholesale/distributor等', 'medium', 'deterministic'));
+        }
+        if (data.extractedInfo?.privateLabelSignals?.length > 0) {
+          da.evidence.push(buildEvidence('Private Label/OEM信号', data.extractedInfo.privateLabelSignals.slice(0,5).join(', '), data.fetchedPages[0]?.url || '', '首页/Products', '页面文字包含OEM/private label等', 'medium', 'deterministic'));
+        }
+        prospectSearchResults[index].deepAnalysis = da;
         saveProspectSearchResults();
       }
     }
@@ -22525,72 +22780,248 @@ async function runCompanyAIAnalysis(index) {
     return;
   }
   
+  // 再次分析前确认
+  if (r.deepAnalysis.aiAnalysis && !r.deepAnalysis.manuallyEdited) {
+    if (!confirm('已存在AI分析结果，确定要重新分析吗？')) return;
+  }
+  if (r.deepAnalysis.manuallyEdited) {
+    if (!confirm('该分析已被人工修改，重新分析将覆盖人工修改内容，确定继续吗？')) return;
+  }
+  
   const info = r.deepAnalysis.extractedInfo;
   const fetchedPages = r.deepAnalysis.fetchedPages || [];
+  const startTime = Date.now();
   
-  // 构建AI分析Prompt（externalCompanyResearch模式）
-  const prompt = `请基于以下从公司官网抓取的真实信息，对这家公司进行结构化深度分析。
+  // 构建AI分析Prompt - 要求输出结构化JSON
+  const prompt = `请基于以下从公司官网抓取的真实信息，对这家公司进行结构化深度分析。输出必须是严格的JSON格式，不要输出任何JSON以外的文字。
 
 【公司基本信息】
 - 域名: ${r.rootDomain || r.url}
-- 公司名称: ${info.companyName || '未找到'}
+- 公司名称(确定性提取): ${info.companyName || '未找到'}
 - 网站语言: ${info.language || '未找到'}
 - 页面标题: ${info.title || '未找到'}
-- Meta描述: ${(info.metaDescription || '').substring(0, 200)}
+- Meta描述: ${(info.metaDescription || '').substring(0, 300)}
 
 【确定性提取的信息】
 - 公开邮箱: ${info.emails?.join(', ') || '未找到'}
 - 公开电话: ${info.phones?.join(', ') || '未找到'}
-- 产品分类: ${(info.productCategories || []).slice(0,10).join(', ') || '未找到'}
+- 产品分类: ${(info.productCategories || []).slice(0,15).join(' | ') || '未找到'}
 - 批发/B2B信号: ${(info.wholesaleSignals || []).slice(0,10).join(', ') || '未检测到'}
 - Private Label/OEM信号: ${(info.privateLabelSignals || []).slice(0,10).join(', ') || '未检测到'}
-- 社交媒体: ${(info.socialLinks || []).map(s => s.platform).join(', ') || '未找到'}
+- 社交媒体: ${(info.socialLinks || []).map(s => s.platform + ':' + s.url).join(', ') || '未找到'}
 
-【抓取的页面】
-${fetchedPages.map(p => `- ${p.label}: ${p.url} (HTTP ${p.statusCode})`).join('\n')}
+【抓取的页面及URL】
+${fetchedPages.map(p => `- [${p.label}] ${p.url} (HTTP ${p.statusCode})`).join('\n')}
 
-【我们的业务背景】
-KaiLionCrafts是中国阳江的五金刀剪外贸公司，主打OEM/ODM/Private Label，四大品类：厨房刀具、专业剪刀、户外刀具、厨房配件。目标客户是进口商、批发商、品牌商、亚马逊卖家、经销商。
+【KaiLionCrafts业务背景（仅用于匹配判断，不得写入目标公司事实）】
+- 四大产品品类: Kitchen Knives, Professional Scissors, Outdoor Knives, Kitchen Accessories
+- 业务模式: OEM/ODM/Private Label
+- 目标客户: 进口商、批发商、品牌商、亚马逊卖家、经销商
 
-【请分析以下内容，每条必须有证据支持，没有证据的写"未找到"或"无法确认"】
-1. 这是不是一家真实公司？主要业务是什么？
-2. 客户类型判断：品牌商/进口商/批发商/零售商/制造商/混合角色？
-3. 业务模式：B2B/B2C/批发/零售/电商？
-4. 与我们四大产品品类的匹配度（厨房刀/剪刀/户外刀/厨房配件）
-5. 是否存在B2B、批发、经销、Private Label合作信号？
-6. 是否值得人工继续跟进？为什么？
-7. 哪些关键信息尚未确认，需要进一步调查？
-8. 建议的下一步动作。
+【输出JSON格式要求】
+{
+  "companyIdentity": {"name": "", "country": "", "languages": []},
+  "customerType": "",
+  "customerTypeConfidence": "high/medium/low",
+  "businessModel": "",
+  "mainProducts": [],
+  "wholesaleSignals": [],
+  "distributorSignals": [],
+  "privateLabelSignals": [],
+  "oemOdmSignals": [],
+  "amazonPresence": "verified/not_found/unverified",
+  "productFit": {"kitchenKnives": "high/medium/low/unknown", "professionalScissors": "high/medium/low/unknown", "outdoorKnives": "high/medium/low/unknown", "kitchenAccessories": "high/medium/low/unknown"},
+  "publicContacts": {"emails": [], "phones": [], "socialLinks": []},
+  "evidence": [{"claim": "", "value": "", "sourceUrl": "", "sourceType": "首页/About/Contact/Products/Wholesale", "shortEvidence": "", "confidence": "high/medium/low"}],
+  "risks": [],
+  "unknownFields": [],
+  "isRealCompany": true/false,
+  "worthFollowing": true/false,
+  "recommendedNextStep": "",
+  "confidence": "high/medium/low"
+}
 
-注意：所有结论必须基于上面提供的抓取信息，不得编造。每个重要判断请注明来源页面URL。`;
+【严格规则】
+1. 所有结论必须基于上面提供的抓取信息，不得编造。
+2. 每个重要结论必须在evidence数组中有对应的来源URL。
+3. 没有证据的信息写"未找到"或"无法确认"，不要猜测。
+4. 不得猜测采购量、营业额、员工人数、决策人身份、合作意愿、Amazon销量、订单金额。
+5. Amazon状态只能是verified(官网明确链接Amazon店铺)/not_found(未发现)/unverified(无法判断)。
+6. 目标网站出现的OEM/认证只能写成"目标网站声明"，不能写成KaiLionCrafts的事实。
+7. 制造商可能是竞争者，必须在risks中标明。
+8. evidence的sourceUrl必须来自上面列出的抓取页面URL。`;
 
-  companyAnalysisState.status = 'fetching';
+  companyAnalysisState.status = 'analyzing';
   companyAnalysisState.progress = '正在调用 AI 进行深度分析...';
   const contentEl = document.getElementById('companyAnalysisContent');
   if (contentEl) contentEl.innerHTML = renderCompanyAnalysisContent();
   
+  let aiProvider = 'unknown';
+  let aiModel = 'unknown';
+  let fallbackCount = 0;
+  
   try {
     // 调用AI（externalCompanyResearch模式）
     const aiResult = await callAI([
-      {role: 'system', content: '你是专业的B2B外贸客户分析师。你的任务是基于从公司官网抓取的真实信息，对目标公司进行结构化深度分析。所有结论必须有证据支持，不得编造。没有证据的信息写"未找到"或"无法确认"。'},
+      {role: 'system', content: '你是专业的B2B外贸客户分析师。你必须输出严格的JSON格式。所有结论必须有URL证据支持，不得编造。没有证据的信息写"未找到"。'},
       {role: 'user', content: prompt}
     ], { context: 'externalCompanyResearch' });
     
+    const responseTime = Date.now() - startTime;
+    
     if (aiResult && aiResult.content) {
-      r.deepAnalysis.aiAnalysis = aiResult.content;
-      r.deepAnalysis.aiAnalyzedAt = new Date().toISOString();
-      r.deepAnalysis.aiModel = aiResult.model || 'unknown';
+      aiProvider = aiResult.provider || 'glm';
+      aiModel = aiResult.model || 'unknown';
+      fallbackCount = aiResult.fallbackCount || 0;
+      
+      // 尝试解析JSON
+      let parsedData = null;
+      let jsonError = null;
+      try {
+        // 提取JSON（可能被markdown代码块包裹）
+        let jsonStr = aiResult.content.trim();
+        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+        if (jsonMatch) jsonStr = jsonMatch[0];
+        parsedData = JSON.parse(jsonStr);
+      } catch(e) {
+        jsonError = e.message;
+      }
+      
+      // 更新deepAnalysis完整字段
+      const da = r.deepAnalysis;
+      da.aiRawResponse = aiResult.content;
+      da.aiProvider = aiProvider;
+      da.aiModel = aiModel;
+      da.aiResponseTime = responseTime;
+      da.aiFallbackCount = fallbackCount;
+      da.analyzedAt = new Date().toISOString();
+      
+      if (parsedData) {
+        // 从JSON解析结果更新字段
+        if (parsedData.companyIdentity) {
+          da.companyIdentity = { ...da.companyIdentity, ...parsedData.companyIdentity };
+          da.country = parsedData.companyIdentity.country || da.country;
+          da.languages = parsedData.companyIdentity.languages || da.languages;
+        }
+        da.customerType = parsedData.customerType || da.customerType;
+        da.customerTypeConfidence = parsedData.customerTypeConfidence || 'low';
+        da.businessModel = parsedData.businessModel || da.businessModel;
+        da.productCategories = parsedData.mainProducts || da.productCategories;
+        da.wholesaleSignals = parsedData.wholesaleSignals || da.wholesaleSignals;
+        da.distributorSignals = parsedData.distributorSignals || da.distributorSignals;
+        da.privateLabelSignals = parsedData.privateLabelSignals || da.privateLabelSignals;
+        da.oemOdmSignals = parsedData.oemOdmSignals || da.oemOdmSignals;
+        da.amazonPresence = parsedData.amazonPresence || 'unverified';
+        if (parsedData.productFit) da.productFit = { ...da.productFit, ...parsedData.productFit };
+        if (parsedData.publicContacts) da.publicContacts = { ...da.publicContacts, ...parsedData.publicContacts };
+        da.evidence = parsedData.evidence || da.evidence;
+        da.risks = parsedData.risks || da.risks;
+        da.unknownFields = parsedData.unknownFields || da.unknownFields;
+        da.recommendedNextStep = parsedData.recommendedNextStep || '';
+        da.confidence = parsedData.confidence || 'low';
+        da.status = 'completed';
+        
+        // 计算深度分析评分
+        const scoreResult = calculateDeepAnalysisScore(da);
+        da.deepAnalysisScore = scoreResult.score;
+        da.deepAnalysisLevel = scoreResult.level;
+        da.scoreBreakdown = scoreResult.breakdown;
+        
+        toast('✅ AI 分析完成（结构化JSON）');
+      } else {
+        // JSON解析失败，标记partial，保留原始结果
+        da.status = 'partial';
+        da.aiAnalysis = aiResult.content; // 保留原始文本
+        da.unknownFields.push('AI输出JSON解析失败: ' + jsonError);
+        toast('⚠️ AI返回格式异常，已保留原始结果（partial状态）', 'warn');
+      }
+      
       saveProspectSearchResults();
-      companyAnalysisState.status = 'complete';
-      toast('✅ AI 分析完成');
+      companyAnalysisState.status = da.status === 'partial' ? 'complete' : 'complete';
     } else {
       throw new Error('AI 返回为空');
     }
   } catch(e) {
+    // AI失败时仍保留确定性提取结果
+    if (r.deepAnalysis) {
+      r.deepAnalysis.status = 'failed';
+      r.deepAnalysis.unknownFields = r.deepAnalysis.unknownFields || [];
+      r.deepAnalysis.unknownFields.push('AI分析失败: ' + e.message);
+      saveProspectSearchResults();
+    }
     companyAnalysisState.status = 'error';
     companyAnalysisState.error = 'AI 分析失败: ' + e.message;
   }
   
+  if (contentEl) contentEl.innerHTML = renderCompanyAnalysisContent();
+}
+
+// V76.0 人工审核辅助函数
+function markDeepAnalysisReviewed(index) {
+  const r = prospectSearchResults[index];
+  if (!r || !r.deepAnalysis) return;
+  if (r.deepAnalysis.reviewStatus === 'reviewed') {
+    r.deepAnalysis.reviewStatus = 'pending';
+    toast('已取消审核标记');
+  } else {
+    r.deepAnalysis.reviewStatus = 'reviewed';
+    toast('✅ 已标记为已审核');
+  }
+  saveProspectSearchResults();
+  const contentEl = document.getElementById('companyAnalysisContent');
+  if (contentEl) contentEl.innerHTML = renderCompanyAnalysisContent();
+}
+
+function editDeepAnalysis(index) {
+  const r = prospectSearchResults[index];
+  if (!r || !r.deepAnalysis) return;
+  const da = r.deepAnalysis;
+  const currentName = da.companyIdentity?.name || '';
+  const currentCountry = da.country || '';
+  const currentType = da.customerType || '';
+  const currentEmail = (da.publicContacts?.emails || []).join(', ');
+  const currentLevel = da.deepAnalysisLevel || '';
+  const currentNotes = da.reviewNotes || '';
+  
+  const name = prompt('公司名称:', currentName);
+  if (name === null) return;
+  const country = prompt('国家:', currentCountry);
+  if (country === null) return;
+  const type = prompt('客户类型 (进口商/批发商/品牌商/经销商/制造商/混合):', currentType);
+  if (type === null) return;
+  const email = prompt('公开邮箱 (多个用逗号分隔):', currentEmail);
+  if (email === null) return;
+  const level = prompt('潜力等级 (高潜力/中潜力/待人工确认/不建议继续):', currentLevel);
+  if (level === null) return;
+  const notes = prompt('审核备注:', currentNotes);
+  if (notes === null) return;
+  
+  da.companyIdentity = da.companyIdentity || {};
+  da.companyIdentity.name = name;
+  da.country = country;
+  da.customerType = type;
+  da.publicContacts = da.publicContacts || {};
+  da.publicContacts.emails = email ? email.split(',').map(e=>e.trim()).filter(e=>e) : [];
+  da.deepAnalysisLevel = level;
+  da.reviewNotes = notes;
+  da.manuallyEdited = true;
+  da.reviewStatus = 'reviewed';
+  saveProspectSearchResults();
+  toast('✅ 人工修正已保存');
+  const contentEl = document.getElementById('companyAnalysisContent');
+  if (contentEl) contentEl.innerHTML = renderCompanyAnalysisContent();
+}
+
+function setDoNotFollow(index) {
+  const r = prospectSearchResults[index];
+  if (!r || !r.deepAnalysis) return;
+  if (!confirm('确定将此公司标记为"暂不跟进"吗？')) return;
+  r.deepAnalysis.reviewStatus = 'do_not_follow';
+  r.deepAnalysis.deepAnalysisLevel = '不建议继续';
+  r.deepAnalysis.manuallyEdited = true;
+  saveProspectSearchResults();
+  toast('已标记为暂不跟进');
+  const contentEl = document.getElementById('companyAnalysisContent');
   if (contentEl) contentEl.innerHTML = renderCompanyAnalysisContent();
 }
 

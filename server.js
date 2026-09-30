@@ -633,6 +633,10 @@ function serveStaticFile(req, res, filePath) {
   });
 }
 
+// ============ 全局会话与限速存储（跨请求共享，必须在 http.createServer 外部） ============
+const activeSessions = new Map();
+const failedAttempts = new Map(); // ip -> {count, firstFailTime}
+
 // ============ 创建HTTP服务器 ============
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
@@ -704,10 +708,6 @@ const server = http.createServer(async (req, res) => {
   const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8小时
   const MAX_FAILED_ATTEMPTS = 10;
   const FAIL_LOCKOUT_MS = 15 * 60 * 1000; // 15分钟
-
-  // 内存会话存储（不写磁盘）
-  const activeSessions = new Map();
-  const failedAttempts = new Map(); // ip -> {count, firstFailTime}
 
   function hashPassword(password, salt) {
     return crypto.scryptSync(password, salt, 64).toString('hex');
@@ -827,12 +827,13 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secureFlag}`);
   }
 
-  // 访问密码状态（公开最小信息，不泄露默认密码状态或认证状态）
+  // 访问密码状态（公开最小信息：是否已设置密码 + 当前请求是否已认证）
   if (pathname === '/api/access/status' && req.method === 'GET') {
     const config = loadAccessConfig();
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({
-      hasPassword: !!(config.passwordHash || config.password)
+      hasPassword: !!(config.passwordHash || config.password),
+      authenticated: validateSession(req)
     }));
     return;
   }

@@ -1125,9 +1125,13 @@ function getCampaignTaskDerivedEmailState(task){
     if(draft){
       result.hasDraft = true;
       result.latestDraftId = draft.id;
-      if(draft.reviewStatus === 'approved'){ result.reviewStatus = 'approved'; }
+      // V77.4/V78.x 标准枚举：reviewStatus='reviewed'/'unreviewed'，status='已审核'/'待审核'
+      // 兼容历史英文值 approved/pending/rejected
+      const isReviewed = draft.reviewStatus === 'reviewed' || draft.status === '已审核' || draft.reviewStatus === 'approved';
+      const isUnreviewed = draft.reviewStatus === 'unreviewed' || draft.status === '待审核' || draft.reviewStatus === 'pending';
+      if(isReviewed){ result.reviewStatus = 'reviewed'; }
+      else if(isUnreviewed){ result.reviewStatus = 'unreviewed'; }
       else if(draft.reviewStatus === 'rejected'){ result.reviewStatus = 'rejected'; }
-      else if(draft.reviewStatus === 'pending'){ result.reviewStatus = 'pending'; }
     }
   }
   // 从 linkedCommunicationIds 读取沟通记录
@@ -1157,7 +1161,7 @@ function getCampaignTaskDerivedEmailState(task){
   // 推荐阶段
   if(result.hasReplyRecord){ result.recommendedStage = 'replied'; }
   else if(result.hasSentRecord){ result.recommendedStage = 'sent'; }
-  else if(result.reviewStatus === 'approved'){ result.recommendedStage = 'reviewed_ready'; }
+  else if(result.reviewStatus === 'reviewed'){ result.recommendedStage = 'reviewed_ready'; }
   else if(result.hasDraft){ result.recommendedStage = 'draft_pending_review'; }
   return result;
 }
@@ -1245,13 +1249,9 @@ function addCustomerToCampaign(campaignId, customerId, options){
   const customer = evaluation.customer;
   const archive = evaluation.archive;
   const stableId = customer.stableId;
-  // 根据历史安全映射初始 stage
-  let initialStage = 'queued';
+  // 使用派生函数统一计算初始阶段，不重复读取旧枚举
   const derived = evaluation.derivedOutreachState;
-  if(derived.hasReplyRecord){ initialStage = 'replied'; }
-  else if(derived.hasSentRecord){ initialStage = 'sent'; }
-  else if(derived.reviewStatus === 'approved'){ initialStage = 'reviewed_ready'; }
-  else if(derived.hasDraft){ initialStage = 'draft_pending_review'; }
+  const initialStage = derived.recommendedStage || 'queued';
   const now = new Date().toISOString();
   const task = {
     taskId: 'task_' + uid(),
@@ -1438,6 +1438,551 @@ function safePersistCampaignData(snapshot){
     return {success:false, error: 'campaignCustomerTasks 保存失败: ' + e.message};
   }
   return {success:true};
+}
+
+/* ============================================================
+ * V79.0B Campaign UI：列表、创建表单、详情页、状态操作
+ * ============================================================ */
+
+// Campaign 状态标签样式
+function getCampaignStatusBadge(status){
+  const styles = {
+    draft: 'background:#e2e8f0;color:#475569',
+    active: 'background:#dcfce7;color:#166534',
+    paused: 'background:#fef3c7;color:#92400e',
+    completed: 'background:#dbeafe;color:#1e40af',
+    archived: 'background:#f1f5f9;color:#64748b'
+  };
+  const labels = {draft:'草稿',active:'进行中',paused:'已暂停',completed:'已完成',archived:'已归档'};
+  return `<span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;${styles[status]||styles.draft}">${esc(labels[status]||status)}</span>`;
+}
+
+// Campaign Task 阶段标签样式
+function getCampaignTaskStageBadge(stage){
+  const styles = {
+    queued: 'background:#e2e8f0;color:#475569',
+    researching: 'background:#fef3c7;color:#92400e',
+    ready_for_draft: 'background:#fce7f3;color:#9d174d',
+    draft_pending_review: 'background:#fed7aa;color:#9a3412',
+    reviewed_ready: 'background:#bbf7d0;color:#166534',
+    sent: 'background:#bfdbfe;color:#1e40af',
+    replied: 'background:#a7f3d0;color:#065f46',
+    follow_up_due: 'background:#fecaca;color:#991b1b',
+    converted: 'background:#86efac;color:#14532d',
+    paused: 'background:#fef9c3;color:#854d0e',
+    suppressed: 'background:#fecaca;color:#7f1d1d',
+    disqualified: 'background:#e5e7eb;color:#374151',
+    closed: 'background:#f3f4f6;color:#6b7280'
+  };
+  const labels = {queued:'待开发',researching:'研究中',ready_for_draft:'待生成',draft_pending_review:'待审核',reviewed_ready:'待发送',sent:'已发送',replied:'已回复',follow_up_due:'待跟进',converted:'已转化',paused:'已暂停',suppressed:'已抑制',disqualified:'不合格',closed:'已关闭'};
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;${styles[stage]||styles.queued}">${esc(labels[stage]||stage)}</span>`;
+}
+
+// Campaign 列表页
+function viewCampaigns(root){
+  const campaigns = S.campaigns || [];
+  // 全局统计
+  let totalTasks = 0, pendingReview = 0, sentCount = 0, repliedCount = 0, activeCount = 0;
+  campaigns.forEach(c => {
+    if(c.status === 'active') activeCount++;
+    const m = getCampaignMetrics(c.campaignId);
+    totalTasks += m.total;
+    pendingReview += m.draft_pending_review;
+    sentCount += m.sent;
+    repliedCount += m.replied;
+  });
+
+  // 搜索和筛选状态
+  if(!window._campaignListState) window._campaignListState = {search:'', status:'', market:''};
+  const st = window._campaignListState;
+
+  // 筛选
+  let filtered = campaigns.filter(c => {
+    if(st.search && !(c.name||'').toLowerCase().includes(st.search.toLowerCase())) return false;
+    if(st.status && c.status !== st.status) return false;
+    if(st.market && !(c.market||'').toLowerCase().includes(st.market.toLowerCase())) return false;
+    return true;
+  });
+
+  let html = `
+  <div style="max-width:1200px;margin:0 auto">
+    <!-- 顶部标题和操作 -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <h2 style="margin:0 0 4px;font-size:20px;color:#1a365d">🚀 客户开发 Campaign</h2>
+        <p style="margin:0;color:#718096;font-size:13px">管理客户开发任务分组，跟踪每个 Campaign 的阶段和进度</p>
+      </div>
+      <button onclick="openCreateCampaignModal()" style="background:#2c5282;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">+ 新建 Campaign</button>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:12px;color:#718096;margin-bottom:4px">活跃 Campaign</div>
+        <div style="font-size:24px;font-weight:700;color:#2c5282">${activeCount}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:12px;color:#718096;margin-bottom:4px">Campaign 总数</div>
+        <div style="font-size:24px;font-weight:700;color:#1a365d">${campaigns.length}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:12px;color:#718096;margin-bottom:4px">客户任务总数</div>
+        <div style="font-size:24px;font-weight:700;color:#2d3748">${totalTasks}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:12px;color:#718096;margin-bottom:4px">待审核</div>
+        <div style="font-size:24px;font-weight:700;color:#c05621">${pendingReview}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:12px;color:#718096;margin-bottom:4px">已发送</div>
+        <div style="font-size:24px;font-weight:700;color:#2b6cb0">${sentCount}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:12px;color:#718096;margin-bottom:4px">已回复</div>
+        <div style="font-size:24px;font-weight:700;color:#2f855a">${repliedCount}</div>
+      </div>
+    </div>
+
+    <!-- 搜索和筛选 -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <input type="text" placeholder="搜索 Campaign 名称..." value="${esc(st.search)}" oninput="window._campaignListState.search=this.value;viewCampaigns(document.getElementById('mainContent'))" style="flex:1;min-width:180px;padding:6px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+      <select onchange="window._campaignListState.status=this.value;viewCampaigns(document.getElementById('mainContent'))" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        <option value="">全部状态</option>
+        <option value="draft" ${st.status==='draft'?'selected':''}>草稿</option>
+        <option value="active" ${st.status==='active'?'selected':''}>进行中</option>
+        <option value="paused" ${st.status==='paused'?'selected':''}>已暂停</option>
+        <option value="completed" ${st.status==='completed'?'selected':''}>已完成</option>
+        <option value="archived" ${st.status==='archived'?'selected':''}>已归档</option>
+      </select>
+      <input type="text" placeholder="市场筛选..." value="${esc(st.market)}" oninput="window._campaignListState.market=this.value;viewCampaigns(document.getElementById('mainContent'))" style="width:140px;padding:6px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+    </div>
+  `;
+
+  // 空状态
+  if(filtered.length === 0){
+    html += `
+    <div style="background:#fff;border:1px dashed #cbd5e0;border-radius:12px;padding:60px 20px;text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">📋</div>
+      <h3 style="margin:0 0 8px;color:#4a5568;font-size:16px">${campaigns.length === 0 ? '还没有 Campaign' : '没有匹配的 Campaign'}</h3>
+      <p style="margin:0 0 16px;color:#a0aec0;font-size:13px">${campaigns.length === 0 ? '创建第一个 Campaign，开始组织客户开发任务' : '尝试调整搜索或筛选条件'}</p>
+      ${campaigns.length === 0 ? '<button onclick="openCreateCampaignModal()" style="background:#2c5282;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">+ 新建 Campaign</button>' : ''}
+    </div>`;
+  } else {
+    // Campaign 列表表格
+    html += `
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#f7fafc;border-bottom:2px solid #e2e8f0">
+            <th style="text-align:left;padding:10px 14px;color:#4a5568;font-weight:600">名称</th>
+            <th style="text-align:left;padding:10px 14px;color:#4a5568;font-weight:600">状态</th>
+            <th style="text-align:left;padding:10px 14px;color:#4a5568;font-weight:600">市场</th>
+            <th style="text-align:center;padding:10px 14px;color:#4a5568;font-weight:600">任务数</th>
+            <th style="text-align:center;padding:10px 14px;color:#4a5568;font-weight:600">待审核</th>
+            <th style="text-align:center;padding:10px 14px;color:#4a5568;font-weight:600">已发送</th>
+            <th style="text-align:center;padding:10px 14px;color:#4a5568;font-weight:600">已回复</th>
+            <th style="text-align:left;padding:10px 14px;color:#4a5568;font-weight:600">更新时间</th>
+            <th style="text-align:center;padding:10px 14px;color:#4a5568;font-weight:600">操作</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    filtered.forEach(c => {
+      const m = getCampaignMetrics(c.campaignId);
+      const updated = c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('zh-CN') : '-';
+      html += `
+        <tr style="border-bottom:1px solid #edf2f7;cursor:pointer" onclick="go('campaignDetail',{campaignId:'${esc(c.campaignId)}'})">
+          <td style="padding:10px 14px"><b style="color:#2c5282">${esc(c.name)}</b></td>
+          <td style="padding:10px 14px">${getCampaignStatusBadge(c.status)}</td>
+          <td style="padding:10px 14px;color:#4a5568">${esc(c.market||'-')}</td>
+          <td style="padding:10px 14px;text-align:center;font-weight:600">${m.total}</td>
+          <td style="padding:10px 14px;text-align:center;color:#c05621">${m.draft_pending_review}</td>
+          <td style="padding:10px 14px;text-align:center;color:#2b6cb0">${m.sent}</td>
+          <td style="padding:10px 14px;text-align:center;color:#2f855a">${m.replied}</td>
+          <td style="padding:10px 14px;color:#718096;font-size:12px">${esc(updated)}</td>
+          <td style="padding:10px 14px;text-align:center" onclick="event.stopPropagation()">
+            ${renderCampaignStatusActions(c)}
+          </td>
+        </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+  html += `</div>`;
+  root.innerHTML = html;
+}
+
+// Campaign 列表状态操作按钮
+function renderCampaignStatusActions(campaign){
+  let actions = '';
+  if(campaign.status === 'draft'){
+    actions += `<button onclick="confirmCampaignStatusTransition('${esc(campaign.campaignId)}','active','确定要启动此 Campaign 吗？')" style="background:#2f855a;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;margin-right:4px">启动</button>`;
+  }
+  if(campaign.status === 'active'){
+    actions += `<button onclick="confirmCampaignStatusTransition('${esc(campaign.campaignId)}','paused','确定要暂停此 Campaign 吗？')" style="background:#d69e2e;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;margin-right:4px">暂停</button>`;
+    actions += `<button onclick="confirmCampaignStatusTransition('${esc(campaign.campaignId)}','completed','确定要标记此 Campaign 为已完成吗？')" style="background:#3182ce;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;margin-right:4px">完成</button>`;
+  }
+  if(campaign.status === 'paused'){
+    actions += `<button onclick="confirmCampaignStatusTransition('${esc(campaign.campaignId)}','active','确定要恢复此 Campaign 吗？')" style="background:#2f855a;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;margin-right:4px">恢复</button>`;
+  }
+  if(campaign.status !== 'archived'){
+    actions += `<button onclick="confirmCampaignArchive('${esc(campaign.campaignId)}')" style="background:#718096;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer">归档</button>`;
+  } else {
+    actions += `<button onclick="confirmCampaignRestore('${esc(campaign.campaignId)}')" style="background:#4299e1;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer">恢复</button>`;
+  }
+  return actions;
+}
+
+// 确认状态转换
+function confirmCampaignStatusTransition(campaignId, nextStatus, msg){
+  confirmDlg(msg, () => {
+    const result = transitionCampaignStatus(campaignId, nextStatus, 'UI操作');
+    if(result.success){
+      toast('状态已更新');
+      renderView();
+    } else {
+      toast(result.errors.join('; '), 'err');
+    }
+  });
+}
+
+// 确认归档
+function confirmCampaignArchive(campaignId){
+  confirmDlg('确定要归档此 Campaign 吗？归档后可在归档列表中恢复。', () => {
+    const result = archiveCampaign(campaignId, 'UI归档');
+    if(result.success){
+      toast('已归档');
+      renderView();
+    } else {
+      toast(result.errors.join('; '), 'err');
+    }
+  });
+}
+
+// 确认恢复
+function confirmCampaignRestore(campaignId){
+  confirmDlg('确定要恢复此已归档 Campaign 吗？', () => {
+    const result = restoreArchivedCampaign(campaignId);
+    if(result.success){
+      toast('已恢复');
+      renderView();
+    } else {
+      toast(result.errors.join('; '), 'err');
+    }
+  });
+}
+
+// 创建 Campaign 表单
+function openCreateCampaignModal(){
+  const html = `
+    <div class="modal-head"><h3>新建 Campaign</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div id="campaignFormError" style="display:none;background:#fed7d7;color:#9b2c2c;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="grid-column:1/-1">
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">名称 <span style="color:#e53e3e">*</span></label>
+          <input id="cf_name" type="text" placeholder="例如：2026Q1 北美厨具进口商开发" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">描述</label>
+          <textarea id="cf_description" rows="2" placeholder="简要描述此 Campaign 的目标和范围" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;resize:vertical"></textarea>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">开发目标</label>
+          <input id="cf_objective" type="text" placeholder="例如：获取 20 个有效回复" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">市场</label>
+          <input id="cf_market" type="text" placeholder="例如：北美" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">国家/地区（逗号分隔）</label>
+          <input id="cf_countries" type="text" placeholder="US, Canada, UK" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">客户类型（逗号分隔）</label>
+          <input id="cf_customerTypes" type="text" placeholder="importer, distributor" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">产品品类（逗号分隔）</label>
+          <input id="cf_productCategories" type="text" placeholder="kitchenware, bakeware" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">渠道</label>
+          <input type="text" value="email（本阶段仅支持邮件）" disabled style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f7fafc;color:#a0aec0">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">知识库策略</label>
+          <select id="cf_providerPolicy" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+            <option value="online_safe">online_safe（仅 public）</option>
+            <option value="local_only">local_only（public + internal）</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">ICP 版本（可选）</label>
+          <input id="cf_icpVersionId" type="text" placeholder="留空" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">负责人</label>
+          <input id="cf_owner" type="text" placeholder="例如：张三" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">标签（逗号分隔）</label>
+          <input id="cf_tags" type="text" placeholder="重点, Q1目标" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">备注</label>
+          <textarea id="cf_notes" rows="2" placeholder="其他说明" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;resize:vertical"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button onclick="closeModal()" style="padding:8px 18px;border:1px solid #cbd5e0;background:#fff;border-radius:6px;font-size:13px;cursor:pointer">取消</button>
+      <button onclick="submitCampaignForm()" style="padding:8px 18px;background:#2c5282;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">创建 Campaign</button>
+    </div>`;
+  openModal(html, true);
+}
+
+// 解析逗号分隔字段
+function parseCsvField(val){
+  if(!val) return [];
+  return String(val).split(',').map(s => s.trim()).filter(s => s.length > 0);
+}
+
+// 提交 Campaign 表单
+function submitCampaignForm(){
+  const name = document.getElementById('cf_name').value.trim();
+  const errorEl = document.getElementById('campaignFormError');
+
+  const input = {
+    name: name,
+    description: document.getElementById('cf_description').value.trim(),
+    objective: document.getElementById('cf_objective').value.trim(),
+    market: document.getElementById('cf_market').value.trim(),
+    countries: parseCsvField(document.getElementById('cf_countries').value),
+    customerTypes: parseCsvField(document.getElementById('cf_customerTypes').value),
+    productCategories: parseCsvField(document.getElementById('cf_productCategories').value),
+    providerPolicy: document.getElementById('cf_providerPolicy').value,
+    icpVersionId: document.getElementById('cf_icpVersionId').value.trim() || null,
+    owner: document.getElementById('cf_owner').value.trim(),
+    tags: parseCsvField(document.getElementById('cf_tags').value),
+    notes: document.getElementById('cf_notes').value.trim()
+  };
+
+  const result = createCampaign(input);
+  if(result.success){
+    closeModal();
+    toast('Campaign 创建成功');
+    renderView();
+  } else {
+    errorEl.style.display = 'block';
+    errorEl.textContent = result.errors.join('；');
+  }
+}
+
+// Campaign 详情页
+function viewCampaignDetail(root, campaignId){
+  if(!campaignId && routeParams && routeParams.campaignId) campaignId = routeParams.campaignId;
+  const campaign = getCampaignById(campaignId);
+  if(!campaign){
+    root.innerHTML = `<div style="padding:40px;text-align:center"><p>Campaign 不存在</p><button onclick="go('campaigns')" style="margin-top:12px;padding:8px 16px;background:#2c5282;color:#fff;border:none;border-radius:6px;cursor:pointer">返回列表</button></div>`;
+    return;
+  }
+
+  const metrics = getCampaignMetrics(campaignId);
+  const tasks = getCampaignTasks(campaignId);
+
+  // 筛选状态
+  if(!window._campaignDetailState) window._campaignDetailState = {search:'', stage:'', priority:''};
+  const st = window._campaignDetailState;
+
+  // 筛选任务
+  let filteredTasks = tasks.filter(t => {
+    const customer = resolveCampaignTaskCustomer(t);
+    const custName = customer ? (customer.company||'') : '';
+    if(st.search && !custName.toLowerCase().includes(st.search.toLowerCase())) return false;
+    if(st.stage && t.stage !== st.stage) return false;
+    if(st.priority && t.priority !== st.priority) return false;
+    return true;
+  });
+
+  const updated = campaign.updatedAt ? new Date(campaign.updatedAt).toLocaleString('zh-CN') : '-';
+
+  let html = `
+  <div style="max-width:1200px;margin:0 auto">
+    <!-- 顶部 -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+      <div>
+        <button onclick="go('campaigns')" style="background:none;border:none;color:#4299e1;font-size:13px;cursor:pointer;padding:0;margin-bottom:8px">← 返回 Campaign 列表</button>
+        <h2 style="margin:0 0 6px;font-size:20px;color:#1a365d">${esc(campaign.name)}</h2>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          ${getCampaignStatusBadge(campaign.status)}
+          <span style="font-size:12px;color:#718096">更新于 ${esc(updated)}</span>
+          ${campaign.market ? `<span style="font-size:12px;color:#718096">市场：${esc(campaign.market)}</span>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${renderCampaignStatusActions(campaign)}
+      </div>
+    </div>
+
+    <!-- Campaign 信息 -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:13px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+        <div><span style="color:#718096">目标：</span>${esc(campaign.objective||'-')}</div>
+        <div><span style="color:#718096">国家：</span>${esc((campaign.countries||[]).join(', ')||'-')}</div>
+        <div><span style="color:#718096">客户类型：</span>${esc((campaign.customerTypes||[]).join(', ')||'-')}</div>
+        <div><span style="color:#718096">产品品类：</span>${esc((campaign.productCategories||[]).join(', ')||'-')}</div>
+        <div><span style="color:#718096">知识库策略：</span><code style="background:#f0f4f8;padding:1px 6px;border-radius:3px;font-size:12px">${esc(campaign.providerPolicy)}</code></div>
+        <div><span style="color:#718096">负责人：</span>${esc(campaign.owner||'-')}</div>
+      </div>
+      ${campaign.description ? `<div style="margin-top:8px;color:#4a5568">${esc(campaign.description)}</div>` : ''}
+    </div>
+
+    <!-- 概览统计 -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px">
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:#718096">总任务</div>
+        <div style="font-size:20px;font-weight:700;color:#1a365d">${metrics.total}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:#718096">待研究</div>
+        <div style="font-size:20px;font-weight:700;color:#d69e2e">${metrics.researching + metrics.queued + metrics.ready_for_draft}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:#718096">待审核</div>
+        <div style="font-size:20px;font-weight:700;color:#c05621">${metrics.draft_pending_review}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:#718096">已发送</div>
+        <div style="font-size:20px;font-weight:700;color:#2b6cb0">${metrics.sent}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:#718096">已回复</div>
+        <div style="font-size:20px;font-weight:700;color:#2f855a">${metrics.replied}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:#718096">暂停/终止</div>
+        <div style="font-size:20px;font-weight:700;color:#718096">${metrics.paused + metrics.suppressed + metrics.disqualified + metrics.closed}</div>
+      </div>
+    </div>
+
+    <!-- 工具栏 -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input type="text" placeholder="搜索客户名..." value="${esc(st.search)}" oninput="window._campaignDetailState.search=this.value;renderView()" style="flex:1;min-width:150px;padding:6px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+      <select onchange="window._campaignDetailState.stage=this.value;renderView()" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        <option value="">全部阶段</option>
+        <option value="queued" ${st.stage==='queued'?'selected':''}>待开发</option>
+        <option value="researching" ${st.stage==='researching'?'selected':''}>研究中</option>
+        <option value="draft_pending_review" ${st.stage==='draft_pending_review'?'selected':''}>待审核</option>
+        <option value="reviewed_ready" ${st.stage==='reviewed_ready'?'selected':''}>待发送</option>
+        <option value="sent" ${st.stage==='sent'?'selected':''}>已发送</option>
+        <option value="replied" ${st.stage==='replied'?'selected':''}>已回复</option>
+        <option value="paused" ${st.stage==='paused'?'selected':''}>已暂停</option>
+        <option value="closed" ${st.stage==='closed'?'selected':''}>已关闭</option>
+      </select>
+      <select onchange="window._campaignDetailState.priority=this.value;renderView()" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        <option value="">全部优先级</option>
+        <option value="high" ${st.priority==='high'?'selected':''}>高</option>
+        <option value="medium" ${st.priority==='medium'?'selected':''}>中</option>
+        <option value="low" ${st.priority==='low'?'selected':''}>低</option>
+      </select>
+      <button onclick="renderView()" style="padding:6px 12px;border:1px solid #cbd5e0;background:#fff;border-radius:6px;font-size:13px;cursor:pointer">刷新</button>
+      <button onclick="toast('客户添加功能将在 V79.0C 实现','info')" style="padding:6px 12px;background:#edf2f7;color:#718096;border:1px dashed #cbd5e0;border-radius:6px;font-size:13px;cursor:pointer">+ 从知识库添加客户（待实现）</button>
+    </div>
+  `;
+
+  // 任务列表
+  if(filteredTasks.length === 0){
+    html += `
+    <div style="background:#fff;border:1px dashed #cbd5e0;border-radius:12px;padding:40px 20px;text-align:center">
+      <div style="font-size:36px;margin-bottom:10px">👥</div>
+      <h4 style="margin:0 0 6px;color:#4a5568">${tasks.length === 0 ? '此 Campaign 还没有客户任务' : '没有匹配的任务'}</h4>
+      <p style="margin:0;color:#a0aec0;font-size:13px">${tasks.length === 0 ? '客户添加功能将在 V79.0C 实现' : '尝试调整筛选条件'}</p>
+    </div>`;
+  } else {
+    html += `
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#f7fafc;border-bottom:2px solid #e2e8f0">
+            <th style="text-align:left;padding:10px 12px;color:#4a5568;font-weight:600">客户</th>
+            <th style="text-align:left;padding:10px 12px;color:#4a5568;font-weight:600">国家</th>
+            <th style="text-align:left;padding:10px 12px;color:#4a5568;font-weight:600">当前阶段</th>
+            <th style="text-align:left;padding:10px 12px;color:#4a5568;font-weight:600">邮件状态</th>
+            <th style="text-align:center;padding:10px 12px;color:#4a5568;font-weight:600">优先级</th>
+            <th style="text-align:left;padding:10px 12px;color:#4a5568;font-weight:600">加入时间</th>
+            <th style="text-align:center;padding:10px 12px;color:#4a5568;font-weight:600">操作</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    filteredTasks.forEach(t => {
+      const customer = resolveCampaignTaskCustomer(t);
+      const derived = getCampaignTaskDerivedEmailState(t);
+      const custName = customer ? (customer.company||'未知客户') : '客户记录待重新关联';
+      const country = customer ? (customer.country||'-') : '-';
+      const added = t.addedAt ? new Date(t.addedAt).toLocaleDateString('zh-CN') : '-';
+      const priorityLabels = {high:'高',medium:'中',low:'低'};
+      const priorityColors = {high:'#e53e3e',medium:'#d69e2e',low:'#718096'};
+
+      // 邮件派生状态文本
+      let emailStatus = '-';
+      if(derived.hasReplyRecord) emailStatus = '<span style="color:#2f855a">已回复</span>';
+      else if(derived.hasSentRecord) emailStatus = '<span style="color:#2b6cb0">已发送</span>';
+      else if(derived.reviewStatus === 'reviewed' || derived.reviewStatus === 'approved') emailStatus = '<span style="color:#2f855a">已审核</span>';
+      else if(derived.hasDraft) emailStatus = '<span style="color:#c05621">有草稿</span>';
+
+      html += `
+        <tr style="border-bottom:1px solid #edf2f7">
+          <td style="padding:10px 12px">
+            <b style="color:${customer?'#2c5282':'#e53e3e'}">${esc(custName)}</b>
+            ${!customer ? '<div style="font-size:11px;color:#e53e3e;margin-top:2px">客户记录待重新关联</div>' : ''}
+          </td>
+          <td style="padding:10px 12px;color:#4a5568">${esc(country)}</td>
+          <td style="padding:10px 12px">${getCampaignTaskStageBadge(t.stage)}</td>
+          <td style="padding:10px 12px;font-size:12px">${emailStatus}</td>
+          <td style="padding:10px 12px;text-align:center"><span style="color:${priorityColors[t.priority]||'#718096'};font-weight:600">${esc(priorityLabels[t.priority]||t.priority)}</span></td>
+          <td style="padding:10px 12px;color:#718096;font-size:12px">${esc(added)}</td>
+          <td style="padding:10px 12px;text-align:center;white-space:nowrap">
+            ${t.outreachArchiveId ? `<button onclick="openOutreachKBArchive('${esc(t.outreachArchiveId)}')" style="background:#ebf8ff;color:#2b6cb0;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px">档案</button>` : ''}
+            ${t.stage !== 'paused' && !['converted','suppressed','disqualified','closed'].includes(t.stage) ? `<button onclick="confirmCampaignTaskPause('${esc(t.taskId)}')" style="background:#fef3c7;color:#92400e;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px">暂停</button>` : ''}
+            ${t.stage === 'paused' ? `<button onclick="confirmCampaignTaskResume('${esc(t.taskId)}')" style="background:#dcfce7;color:#166534;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px">恢复</button>` : ''}
+            ${!['converted','suppressed','disqualified','closed'].includes(t.stage) ? `<button onclick="confirmCampaignTaskClose('${esc(t.taskId)}')" style="background:#f1f5f9;color:#64748b;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer">关闭</button>` : ''}
+          </td>
+        </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+  html += `</div>`;
+  root.innerHTML = html;
+}
+
+// 任务暂停确认
+function confirmCampaignTaskPause(taskId){
+  confirmDlg('确定要暂停此客户任务吗？', () => {
+    const result = pauseCampaignTask(taskId, 'UI暂停');
+    if(result.success){ toast('已暂停'); renderView(); }
+    else { toast(result.errors.join('; '), 'err'); }
+  });
+}
+
+// 任务恢复确认
+function confirmCampaignTaskResume(taskId){
+  confirmDlg('确定要恢复此客户任务吗？', () => {
+    const result = resumeCampaignTask(taskId);
+    if(result.success){
+      if(result.autoSuppressed){ toast('检测到 doNotContact，已自动抑制', 'info'); }
+      else { toast('已恢复'); }
+      renderView();
+    } else { toast(result.errors.join('; '), 'err'); }
+  });
+}
+
+// 任务关闭确认
+function confirmCampaignTaskClose(taskId){
+  confirmDlg('确定要关闭此客户任务吗？关闭后不可重新打开。', () => {
+    const result = closeCampaignTask(taskId, 'UI关闭');
+    if(result.success){ toast('已关闭'); renderView(); }
+    else { toast(result.errors.join('; '), 'err'); }
+  });
 }
 
 /* ============ 密码登录屏障（服务端验证，可更换，不硬编码） ============ */
@@ -4036,6 +4581,7 @@ const NAV = [
   {key:'customers',icon:'👥',label:'客户台账',title:'客户台账',crumb:'39 家线索 · 按优先级分层'},
   {key:'drafts',icon:'✉️',label:'开发信',title:'开发信管理',crumb:'AI 草稿 · 人工发送'},
   {key:'outreachKB',icon:'🗂️',label:'客户开发知识库',title:'客户开发知识库',crumb:'Outreach Knowledge Base · 搜索去重 · 历史归档'},
+  {key:'campaigns',icon:'🚀',label:'客户开发Campaign',title:'客户开发 Campaign',crumb:'Campaign Management · 任务分组 · 阶段跟踪'},
   {group:'沟通与跟进'},
   {key:'inbox',icon:'📥',label:'AI 收件箱',title:'AI 收件箱',crumb:'客户回复 · AI 提炼重点'},
   {key:'schedule',icon:'📅',label:'跟进日程',title:'跟进日程',crumb:'今天/明天/本周要联系谁'},
@@ -4786,7 +5332,7 @@ function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, prospect:viewProspectDev, devplans:viewDevPlans, planDetail:viewPlanDetail,
-    customers:viewCustomers, drafts:viewDrafts, outreachKB:viewOutreachKB, inbox:viewInbox, schedule:viewSchedule,
+    customers:viewCustomers, drafts:viewDrafts, outreachKB:viewOutreachKB, campaigns:viewCampaigns, campaignDetail:viewCampaignDetail, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
     seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach};
   (map[currentView]||viewDashboard)(c);

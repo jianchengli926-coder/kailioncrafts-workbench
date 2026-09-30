@@ -38,3 +38,39 @@ api_config.json
 # 访问密码配置（含密码，不进Git）
 access_config.json
 __pycache__/
+
+# IDE 和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 环境变量
+.env
+.env.*
+!.env.example
+
+# 操作系统
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 临时文件
+*.tmp
+*.bak
+*.orig
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+
+# 测试覆盖率
+.coverage
+htmlcov/
+.pytest_cache/

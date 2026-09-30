@@ -1174,11 +1174,20 @@ function gradeBadge(g){ if(!g) return '<span class="badge badge-c" title="未评
  * 演示种子数据
  * ============================================================ */
 function seedData(){
-  const mk = (o)=>Object.assign({
-    id:uid(),status:'待跟进',createdAt:daysAgo(Math.floor(Math.random()*25)+1),followUpHistory:[],nextFollowUp:daysLater(2),
-    tags:[], addresses:[], companySize:'', foundedYear:null, registerStatus:'在营', owner:'Leo',
-    customs:{lastPurchase:null,frequency:'',suppliers:[],trend:'稳定'}
-  },o);
+  /* V78.2: mk 使用稳定 ID（基于 identity key），不再每次 seed 重新 uid() */
+  const mk = (o)=>{
+    const c = Object.assign({
+      status:'待跟进',createdAt:daysAgo(Math.floor(Math.random()*25)+1),followUpHistory:[],nextFollowUp:daysLater(2),
+      tags:[], addresses:[], companySize:'', foundedYear:null, registerStatus:'在营', owner:'Leo',
+      customs:{lastPurchase:null,frequency:'',suppliers:[],trend:'稳定'},
+      isDemo:true
+    },o);
+    c.id = getCustomerStableId(c);
+    c.stableId = c.id;
+    c.identityKey = getCustomerIdentityKey(c);
+    c.identityAliases = getCustomerIdentityAliases(c);
+    return c;
+  };
   // 4维评分加权
   const sc = (p,ct,ps,cq)=>({product:p,companyType:ct,purchaseSignal:ps,contactQuality:cq,
     total:Math.round(p*0.35+ct*0.2+ps*0.3+cq*0.15), grade:null});
@@ -9230,7 +9239,18 @@ function deleteCustomTemplate(idx){
 
 /* ---------- 开发信编辑器（抽屉） ---------- */
 function editDraftForCustomer(cid){
-  const c = S.customers.find(x=>x.id===cid); if(!c) return;
+  // V78.2: 使用统一解析函数，支持通过 identity key 查找客户
+  let c = resolveCustomerByIdOrIdentity(cid);
+  if(!c){
+    // 从 archive 构建最小客户对象（V78.1 降级逻辑）
+    const archive = getOutreachArchiveByCustomerId(cid);
+    if(archive){
+      c = { id:cid, company:archive.customerName, country:archive.country, website:archive.website,
+        contact:{name:archive.contactName, email:(archive.emails||[])[0]||''}, status:'活跃',
+        products:archive.mainProducts?archive.mainProducts.split(','):[] };
+    }
+  }
+  if(!c) return;
   let d = S.drafts.find(x=>x.customerId===cid);
   if(!d){
     d = {
@@ -10127,7 +10147,7 @@ function exportData(){
 }
 function resetData(){
   confirmDlg('将清空所有本地数据并重新注入演示数据，确定？', ()=>{
-    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations'].forEach(k=>DB.remove(k));
+    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications'].forEach(k=>DB.remove(k));
     loadState(); seedData(); go('dashboard'); toast('已重置为演示数据');
   });
 }
@@ -17365,6 +17385,321 @@ function getEmailDomain(email){
   return email.split('@')[1].toLowerCase().trim();
 }
 
+/* ============================================================
+ * V78.2 客户身份稳定性系统
+ * ============================================================ */
+
+/* 简单字符串哈希（FNV-1a 32位），用于从 identity key 派生稳定 ID */
+function hashIdentityKey(str){
+  if(!str) return '00000000';
+  let h = 0x811c9dc5;
+  for(let i=0;i<str.length;i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36).padStart(7,'0');
+}
+
+/* 获取客户主邮箱（优先 contact.email，其次 emails 数组第一个） */
+function getCustomerPrimaryEmail(customer){
+  if(!customer) return '';
+  if(customer.contact && customer.contact.email) return customer.contact.email;
+  if(Array.isArray(customer.emails) && customer.emails.length) return customer.emails[0];
+  return '';
+}
+
+/* 获取客户主身份键（按优先级：domain > email > company-country > legacy id） */
+function getCustomerIdentityKey(customer){
+  if(!customer) return '';
+  const domain = normalizeDomain(customer.website);
+  if(domain) return 'domain:' + domain;
+  const email = getCustomerPrimaryEmail(customer);
+  const emailDomain = getEmailDomain(email);
+  if(emailDomain) return 'email:' + emailDomain;
+  const company = normalizeCompanyName(customer.company || customer.customerName || customer.name);
+  const country = (customer.country || '').trim().toLowerCase();
+  if(company && country) return 'company-country:' + company + '|' + country;
+  if(company) return 'company:' + company;
+  return 'legacy:' + (customer.id || 'unknown');
+}
+
+/* 获取客户所有身份别名（用于迁移匹配） */
+function getCustomerIdentityAliases(customer){
+  if(!customer) return [];
+  const aliases = [];
+  const domain = normalizeDomain(customer.website);
+  if(domain) aliases.push('domain:' + domain);
+  const email = getCustomerPrimaryEmail(customer);
+  const emailDomain = getEmailDomain(email);
+  if(emailDomain) aliases.push('email:' + emailDomain);
+  const company = normalizeCompanyName(customer.company || customer.customerName || customer.name);
+  const country = (customer.country || '').trim().toLowerCase();
+  if(company && country) aliases.push('company-country:' + company + '|' + country);
+  if(company) aliases.push('company:' + company);
+  if(customer.id) aliases.push('legacy:' + customer.id);
+  // 去重
+  return [...new Set(aliases)];
+}
+
+/* 基于身份键生成稳定客户 ID（确定性，不随加载变化） */
+function getCustomerStableId(customer){
+  if(!customer) return uid();
+  // 如果已有 stableId 且有效，直接返回
+  if(customer.stableId && typeof customer.stableId === 'string' && customer.stableId.startsWith('cust_')){
+    return customer.stableId;
+  }
+  const key = getCustomerIdentityKey(customer);
+  return 'cust_' + hashIdentityKey(key);
+}
+
+/* 为客户补充 identityKey / identityAliases / stableId（不覆盖已有值） */
+function ensureCustomerIdentity(customer){
+  if(!customer) return customer;
+  // 真实客户已有 ID 不得因 website/email/company 修改而自动改变：
+  // identityKey 和 stableId 只在首次设置时生成，后续不覆盖
+  if(!customer.identityKey) customer.identityKey = getCustomerIdentityKey(customer);
+  if(!customer.identityAliases || !Array.isArray(customer.identityAliases)){
+    customer.identityAliases = getCustomerIdentityAliases(customer);
+  }
+  if(!customer.stableId){
+    let baseId = getCustomerStableId(customer);
+    // stableId 碰撞保护：检查是否有其他客户使用相同的 stableId
+    const customers = S.customers || [];
+    let collisionCount = 0;
+    let finalId = baseId;
+    while(customers.some(c => c !== customer && c.stableId === finalId)){
+      collisionCount++;
+      finalId = baseId + '_' + collisionCount.toString(36);
+    }
+    customer.stableId = finalId;
+  }
+  return customer;
+}
+
+/* 统一客户解析：通过 customerId 或 archive 的身份信息查找客户主记录 */
+function resolveCustomerByIdOrIdentity(customerId, archive){
+  if(!customerId && !archive) return null;
+  const customers = S.customers || [];
+  // 1. 直接 ID 匹配
+  if(customerId){
+    const direct = customers.find(c => c.id === customerId);
+    if(direct) return direct;
+    // 2. stableId 匹配
+    const stable = customers.find(c => c.stableId === customerId);
+    if(stable) return stable;
+  }
+  // 3. 通过 archive 的身份信息匹配
+  if(archive){
+    const archiveAliases = [];
+    if(archive.normalizedDomain) archiveAliases.push('domain:' + archive.normalizedDomain);
+    if(archive.emails && archive.emails.length){
+      const ed = getEmailDomain(archive.emails[0]);
+      if(ed) archiveAliases.push('email:' + ed);
+    }
+    if(archive.normalizedCustomerName && archive.country){
+      archiveAliases.push('company-country:' + archive.normalizedCustomerName + '|' + archive.country.toLowerCase());
+    }
+    if(archive.customerId) archiveAliases.push('legacy:' + archive.customerId);
+    // 遍历客户，找身份别名交集（得分相同则 ambiguous，不静默选择第一条）
+    let bestMatch = null;
+    let bestScore = 0;
+    let tieCount = 0;
+    for(const c of customers){
+      ensureCustomerIdentity(c);
+      const cAliases = c.identityAliases || [];
+      const intersection = cAliases.filter(a => archiveAliases.includes(a));
+      if(intersection.length > bestScore){
+        bestScore = intersection.length;
+        bestMatch = c;
+        tieCount = 1;
+      } else if(intersection.length === bestScore && intersection.length > 0){
+        tieCount++;
+      }
+    }
+    // 得分相同且有多个候选：不静默选择，返回 null 让调用方标记 ambiguous
+    if(bestMatch && bestScore > 0 && tieCount === 1) return bestMatch;
+  }
+  return null;
+}
+
+/* ============================================================
+ * V78.2 客户身份迁移（一次性、安全、幂等）
+ * ============================================================ */
+const CUSTOMER_IDENTITY_MIGRATION_VERSION = 'v78.2';
+
+/* 执行客户身份迁移：将 archive 中的旧 customerId 映射到当前稳定客户 ID */
+function migrateCustomerIdentities(){
+  const archives = S.outreachKnowledgeBase || [];
+  const customers = S.customers || [];
+  const drafts = S.drafts || [];
+  const communications = S.communications || [];
+  if(!archives.length || !customers.length) return {migrated:0, ambiguous:0, unresolved:0, skipped:0, status:'skipped'};
+
+  // 检查迁移版本，避免重复执行（仅 completed 状态跳过，pending_review/failed 允许重试）
+  const migrationState = DB.load('customerIdentityMigration') || {};
+  if(migrationState.version === CUSTOMER_IDENTITY_MIGRATION_VERSION && migrationState.status === 'completed'){
+    return {migrated:0, ambiguous:0, unresolved:0, skipped:archives.length, alreadyMigrated:true, status:'completed'};
+  }
+
+  // 先确保所有客户都有 identity 信息（不覆盖已有值）
+  customers.forEach(c => ensureCustomerIdentity(c));
+
+  // 建立 identityKey -> customer 索引
+  const identityIndex = {};
+  customers.forEach(c => {
+    (c.identityAliases || []).forEach(alias => {
+      if(!identityIndex[alias]) identityIndex[alias] = [];
+      identityIndex[alias].push(c);
+    });
+  });
+
+  let migrated = 0, ambiguous = 0, unresolved = 0, skipped = 0;
+  const idMapping = {}; // oldId -> newCustomer
+  let migrationError = null;
+
+  try {
+    archives.forEach(a => {
+      // 已经能直接匹配的跳过（幂等：已 resolved 且 customerId 有效）
+      const directMatch = customers.find(c => c.id === a.customerId);
+      if(directMatch){
+        if(a.identityResolutionStatus !== 'resolved'){
+          a.identityResolutionStatus = 'resolved';
+          a.identityResolutionMethod = 'direct_id';
+        }
+        skipped++;
+        return;
+      }
+
+      // 收集 archive 的身份别名
+      const archiveAliases = [];
+      if(a.normalizedDomain) archiveAliases.push('domain:' + a.normalizedDomain);
+      if(a.emails && a.emails.length){
+        const ed = getEmailDomain(a.emails[0]);
+        if(ed) archiveAliases.push('email:' + ed);
+      }
+      if(a.normalizedCustomerName && a.country){
+        archiveAliases.push('company-country:' + a.normalizedCustomerName + '|' + a.country.toLowerCase());
+      }
+      if(a.customerId) archiveAliases.push('legacy:' + a.customerId);
+
+      // 查找候选客户（按别名命中数排序）
+      const candidateScores = {};
+      archiveAliases.forEach(alias => {
+        (identityIndex[alias] || []).forEach(c => {
+          if(!candidateScores[c.id]) candidateScores[c.id] = {customer:c, score:0};
+          candidateScores[c.id].score++;
+        });
+      });
+      const candidates = Object.values(candidateScores).sort((a,b) => b.score - a.score);
+
+      if(candidates.length === 1){
+        // 唯一匹配：安全迁移
+        const newCustomer = candidates[0].customer;
+        const oldId = a.customerId;
+        idMapping[oldId] = newCustomer;
+
+        // 更新 archive（幂等：不重复追加 legacyCustomerIds）
+        a.customerId = newCustomer.id;
+        a.identityResolutionStatus = 'resolved';
+        a.identityResolutionMethod = 'identity_match';
+        a.identityResolvedAt = new Date().toISOString();
+        if(!a.legacyCustomerIds) a.legacyCustomerIds = [];
+        if(oldId && !a.legacyCustomerIds.includes(oldId)) a.legacyCustomerIds.push(oldId);
+        migrated++;
+      } else if(candidates.length > 1){
+        // 检查最高分是否唯一（得分相同则 ambiguous）
+        const topScore = candidates[0].score;
+        const topCandidates = candidates.filter(x => x.score === topScore);
+        if(topCandidates.length === 1){
+          // 唯一最高分：安全迁移
+          const newCustomer = topCandidates[0].customer;
+          const oldId = a.customerId;
+          idMapping[oldId] = newCustomer;
+          a.customerId = newCustomer.id;
+          a.identityResolutionStatus = 'resolved';
+          a.identityResolutionMethod = 'identity_match_scored';
+          a.identityResolvedAt = new Date().toISOString();
+          if(!a.legacyCustomerIds) a.legacyCustomerIds = [];
+          if(oldId && !a.legacyCustomerIds.includes(oldId)) a.legacyCustomerIds.push(oldId);
+          migrated++;
+        } else {
+          // 多候选且得分相同：不自动绑定
+          a.identityResolutionStatus = 'ambiguous';
+          a.identityCandidates = topCandidates.map(x => ({customerId:x.customer.id, customerName:x.customer.company, identityKey:x.customer.identityKey, score:x.score}));
+          a.identityResolutionNote = '存在 ' + topCandidates.length + ' 个候选客户得分相同（' + topScore + ' 分），需人工确认';
+          ambiguous++;
+        }
+      } else {
+        // 无候选：保留旧 ID，标记待补充
+        a.identityResolutionStatus = 'unresolved';
+        a.identityResolutionNote = '无法通过域名/邮箱/公司名匹配到客户主记录';
+        unresolved++;
+      }
+    });
+
+    // 同步更新草稿的 customerId（幂等：不重复追加 legacyCustomerIds）
+    if(Object.keys(idMapping).length){
+      drafts.forEach(d => {
+        if(idMapping[d.customerId]){
+          const oldId = d.customerId;
+          d.customerId = idMapping[oldId].id;
+          if(!d.legacyCustomerIds) d.legacyCustomerIds = [];
+          if(oldId && !d.legacyCustomerIds.includes(oldId)) d.legacyCustomerIds.push(oldId);
+        }
+      });
+      // 同步更新沟通记录的 customerId
+      communications.forEach(comm => {
+        if(idMapping[comm.customerId]){
+          const oldId = comm.customerId;
+          comm.customerId = idMapping[oldId].id;
+          if(!comm.legacyCustomerIds) comm.legacyCustomerIds = [];
+          if(oldId && !comm.legacyCustomerIds.includes(oldId)) comm.legacyCustomerIds.push(oldId);
+        }
+      });
+    }
+
+    // 关键修复：持久化所有修改的数据（customers/outreachKnowledgeBase/drafts/communications）
+    // 只有这些数据保存成功后，才能保存迁移状态
+    DB.save('customers', S.customers);
+    DB.save('outreachKnowledgeBase', S.outreachKnowledgeBase);
+    DB.save('drafts', S.drafts);
+    DB.save('communications', S.communications);
+
+    // 确定迁移状态：全部 resolved -> completed，有 ambiguous/unresolved -> pending_review
+    const status = (ambiguous === 0 && unresolved === 0) ? 'completed' : 'pending_review';
+
+    // 保存迁移状态（在数据保存成功之后）
+    DB.save('customerIdentityMigration', {
+      version: CUSTOMER_IDENTITY_MIGRATION_VERSION,
+      status: status,
+      migratedAt: new Date().toISOString(),
+      migratedCount: migrated,
+      ambiguousCount: ambiguous,
+      unresolvedCount: unresolved,
+      skippedCount: skipped,
+      note: status === 'pending_review' ? '存在待人工确认的关联，可重试迁移' : '全部档案已关联'
+    });
+
+    return {migrated, ambiguous, unresolved, skipped, status};
+  } catch(e) {
+    // 保存失败：标记 failed，不标记 completed，允许重试
+    migrationError = e.message;
+    console.error('V78.2 identity migration failed:', e);
+    try {
+      DB.save('customerIdentityMigration', {
+        version: CUSTOMER_IDENTITY_MIGRATION_VERSION,
+        status: 'failed',
+        failedAt: new Date().toISOString(),
+        error: migrationError,
+        note: '迁移失败，可重试'
+      });
+    } catch(saveErr) {
+      console.error('V78.2 migration state save failed:', saveErr);
+    }
+    return {migrated, ambiguous, unresolved, skipped, status:'failed', error:migrationError};
+  }
+}
+
 /* 按 customerId 查找档案 */
 function getOutreachArchiveByCustomerId(cid){
   return (S.outreachKnowledgeBase||[]).find(a => a.customerId === cid);
@@ -17596,11 +17931,15 @@ function syncAllToOutreachKB(){
 
 /* 生成首封开发信前的重复/历史检查 */
 function checkOutreachBeforeGenerate(customerId){
-  const customer = (S.customers||[]).find(c => c.id === customerId);
-  if(!customer) return { allowed:true, reason:'客户不存在' };
+  // V78.2: 使用统一解析函数
   const archive = getOutreachArchiveByCustomerId(customerId);
+  let customer = resolveCustomerByIdOrIdentity(customerId, archive);
+  if(!customer && archive){
+    customer = { id:customerId, company:archive.customerName, country:archive.country, doNotContact:archive.doNotContact, status:archive.customerStatus };
+  }
+  if(!customer) return { allowed:true, reason:'客户不存在' };
 
-  if(customer.doNotContact || customer.blacklisted || customer.unsubscribe){
+  if(customer.doNotContact || customer.blacklisted || customer.unsubscribe || (archive && archive.doNotContact)){
     return { allowed:false, reason:'该客户已标记为不再联系/黑名单', archive: archive };
   }
 
@@ -17663,10 +18002,11 @@ function restoreOutreachArchive(archiveId){
 
 /* V78.1: 从档案详情生成首封开发信 — 必须先通过前置检查 */
 async function generateFirstOutreachEmail(customerId){
-  let c = (S.customers||[]).find(x => x.id === customerId);
-  // V78.1: 如果 S.customers 中找不到（演示数据id变化），从archive构建最小客户对象
+  // V78.2: 使用统一解析函数，支持通过 identity key 查找客户
+  const archive = getOutreachArchiveByCustomerId(customerId);
+  let c = resolveCustomerByIdOrIdentity(customerId, archive);
   if(!c){
-    const archive = getOutreachArchiveByCustomerId(customerId);
+    // 从 archive 构建最小客户对象（降级）
     if(archive){
       c = { id:customerId, company:archive.customerName, country:archive.country, website:archive.website, contact:{name:archive.contactName, email:(archive.emails||[])[0]||''}, status:'活跃', products:archive.mainProducts?archive.mainProducts.split(','):[] };
     }
@@ -17722,9 +18062,10 @@ async function generateFirstOutreachEmail(customerId){
 
 /* V78.1: 重新生成首封草稿 — 保留旧草稿和历史，新草稿进入待审核 */
 async function regenFirstOutreachDraft(customerId){
-  let c = (S.customers||[]).find(x => x.id === customerId);
+  // V78.2: 使用统一解析函数
+  const archive = getOutreachArchiveByCustomerId(customerId);
+  let c = resolveCustomerByIdOrIdentity(customerId, archive);
   if(!c){
-    const archive = getOutreachArchiveByCustomerId(customerId);
     if(archive){
       c = { id:customerId, company:archive.customerName, country:archive.country, website:archive.website, contact:{name:archive.contactName, email:(archive.emails||[])[0]||''}, status:'活跃', products:archive.mainProducts?archive.mainProducts.split(','):[] };
     }
@@ -17913,7 +18254,24 @@ function openOutreachKBArchive(archiveId){
   const stage = OUTREACH_STAGES[a.outreachStage] || {label:a.outreachStage,color:'#94a3b8'};
   const drafts = (a.developmentHistory||[]).filter(h => h.type === 'draft');
   const comms = (a.developmentHistory||[]).filter(h => h.type === 'communication');
-  const customer = (S.customers||[]).find(c => c.id === a.customerId);
+  // V78.2: 使用统一解析函数查找客户
+  const customer = resolveCustomerByIdOrIdentity(a.customerId, a);
+
+  // V78.2: 关联状态提示
+  let linkStatusHtml = '';
+  if(customer){
+    linkStatusHtml = '<div style="background:#dcfce7;border:1px solid #bbf7d0;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#166534">✅ 已关联客户主记录：' + esc(customer.company || customer.customerName || '') + '</div>';
+  } else if(a.identityResolutionStatus === 'ambiguous'){
+    linkStatusHtml = '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#92400e">⚠️ 客户关联待确认：' + esc(a.identityResolutionNote || '存在多个候选客户') + '</div>';
+  } else if(a.identityResolutionStatus === 'unresolved'){
+    linkStatusHtml = '<div style="background:#fee2e2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#991b1b">⚠️ 原客户关联待补充：' + esc(a.identityResolutionNote || '无法匹配到客户主记录') + '</div>';
+  } else {
+    linkStatusHtml = '<div style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#475569">ℹ️ 客户主记录待关联（档案快照模式）</div>';
+  }
+  // legacyCustomerIds 内部状态显示
+  if(a.legacyCustomerIds && a.legacyCustomerIds.length){
+    linkStatusHtml += '<div style="font-size:10px;color:#94a3b8;margin-top:4px">历史 ID: ' + a.legacyCustomerIds.map(esc).join(', ') + '</div>';
+  }
 
   let timelineHtml = '';
   if(drafts.length === 0 && comms.length === 0){
@@ -17986,6 +18344,7 @@ function openOutreachKBArchive(archiveId){
   openModal(`
   <div class="modal-head"><h3>🗂️ ${esc(a.customerName||'客户档案')}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
   <div class="modal-body" style="max-height:75vh;overflow-y:auto">
+    ${linkStatusHtml}
     ${dupHtml}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div style="background:#f8fafc;border-radius:8px;padding:12px">
@@ -20067,6 +20426,10 @@ function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.set
   seedExtra();
   if(DB.load('theme')==='dark') document.body.classList.add('dark');
   if(!S.customers || !S.customers.filter(c=>!c.isDemo).length){ seedData(); }
+  // V78.2: 为所有客户补充身份信息（不覆盖已有值）
+  try { (S.customers||[]).forEach(c => ensureCustomerIdentity(c)); } catch(e){}
+  // V78.2: 执行客户身份迁移（幂等，只执行一次）
+  try { migrateCustomerIdentities(); } catch(e){ console.warn('V78.2 identity migration skipped:', e.message); }
   // 延迟到所有script块加载完成后再渲染，避免第二个script块中的函数未定义
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded',()=>go('dashboard'));

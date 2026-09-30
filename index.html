@@ -17708,6 +17708,576 @@ function getOutreachArchiveById(aid){
   return (S.outreachKnowledgeBase||[]).find(a => a.archiveId === aid);
 }
 
+/* ============================================================
+ * V78.4 客户身份 ambiguous / unresolved 人工确认绑定与安全重试
+ * ============================================================ */
+
+/* 查找档案的身份候选客户（复用迁移逻辑，不修改数据） */
+function findIdentityCandidates(archive){
+  if(!archive) return [];
+  const customers = S.customers || [];
+  customers.forEach(c => ensureCustomerIdentity(c));
+  const identityIndex = {};
+  customers.forEach(c => {
+    (c.identityAliases || []).forEach(alias => {
+      if(!identityIndex[alias]) identityIndex[alias] = [];
+      identityIndex[alias].push(c);
+    });
+  });
+  const archiveAliases = [];
+  if(archive.normalizedDomain) archiveAliases.push('domain:' + archive.normalizedDomain);
+  if(archive.emails && archive.emails.length){
+    const ed = getEmailDomain(archive.emails[0]);
+    if(ed) archiveAliases.push('email:' + ed);
+  }
+  if(archive.normalizedCustomerName && archive.country){
+    archiveAliases.push('company-country:' + archive.normalizedCustomerName + '|' + archive.country.toLowerCase());
+  }
+  if(archive.customerId) archiveAliases.push('legacy:' + archive.customerId);
+  const candidateScores = {};
+  archiveAliases.forEach(alias => {
+    (identityIndex[alias] || []).forEach(c => {
+      if(!candidateScores[c.id]){
+        candidateScores[c.id] = {
+          customerId: c.id, customerName: c.company || c.customerName || '',
+          website: c.website || '', normalizedDomain: c.normalizedDomain || '',
+          country: c.country || '', mainEmail: (c.emails && c.emails.length) ? c.emails[0] : '',
+          identityKey: c.identityKey || '', score: 0, matchedAliases: []
+        };
+      }
+      candidateScores[c.id].score++;
+      candidateScores[c.id].matchedAliases.push(alias);
+    });
+  });
+  return Object.values(candidateScores).sort((a,b) => b.score - a.score);
+}
+
+/* V78.4 修复：按 archive 显式链接更新关联对象，不按 customerId 批量扫描 */
+function updateLinkedObjectsCustomerId(archive, newCustomerId, oldCustomerId){
+  const updated = {drafts: [], communications: [], skippedDrafts: 0, skippedComms: 0};
+  const hasExplicitLinks = Array.isArray(archive.linkedDraftIds) || Array.isArray(archive.linkedCommunicationIds);
+
+  if(!hasExplicitLinks){
+    // 旧 archive 缺少显式链接数组：保守降级，不批量误改
+    console.warn('[V78.4] archive 缺少 linkedDraftIds/linkedCommunicationIds，跳过关联对象更新');
+    return updated;
+  }
+
+  // 只更新 linkedDraftIds 中存在的 draft
+  if(Array.isArray(archive.linkedDraftIds)){
+    archive.linkedDraftIds.forEach(draftId => {
+      const d = (S.drafts||[]).find(x => x.id === draftId);
+      if(d){
+        d.customerId = newCustomerId;
+        if(!d.legacyCustomerIds) d.legacyCustomerIds = [];
+        if(oldCustomerId && !d.legacyCustomerIds.includes(oldCustomerId)){
+          d.legacyCustomerIds.push(oldCustomerId);
+        }
+        updated.drafts.push(draftId);
+      } else {
+        updated.skippedDrafts++;
+      }
+    });
+  }
+
+  // 只更新 linkedCommunicationIds 中存在的 communication
+  if(Array.isArray(archive.linkedCommunicationIds)){
+    archive.linkedCommunicationIds.forEach(commId => {
+      const comm = (S.communications||[]).find(x => x.id === commId);
+      if(comm){
+        comm.customerId = newCustomerId;
+        if(!comm.legacyCustomerIds) comm.legacyCustomerIds = [];
+        if(oldCustomerId && !comm.legacyCustomerIds.includes(oldCustomerId)){
+          comm.legacyCustomerIds.push(oldCustomerId);
+        }
+        updated.communications.push(commId);
+      } else {
+        updated.skippedComms++;
+      }
+    });
+  }
+
+  return updated;
+}
+
+/* V78.4 修复：创建完整操作快照（用于失败补偿和撤销） */
+function createIdentityOperationSnapshot(archive){
+  const snapshot = {
+    archive: JSON.parse(JSON.stringify(archive)),
+    customers: JSON.parse(JSON.stringify(S.customers || [])),
+    drafts: [],
+    communications: [],
+    migrationState: null,
+    timestamp: new Date().toISOString()
+  };
+  // 快照显式链接的 drafts（完整对象，含 legacyCustomerIds）
+  if(Array.isArray(archive.linkedDraftIds)){
+    archive.linkedDraftIds.forEach(draftId => {
+      const d = (S.drafts||[]).find(x => x.id === draftId);
+      if(d) snapshot.drafts.push(JSON.parse(JSON.stringify(d)));
+    });
+  }
+  // 快照显式链接的 communications（完整对象，含 legacyCustomerIds）
+  if(Array.isArray(archive.linkedCommunicationIds)){
+    archive.linkedCommunicationIds.forEach(commId => {
+      const comm = (S.communications||[]).find(x => x.id === commId);
+      if(comm) snapshot.communications.push(JSON.parse(JSON.stringify(comm)));
+    });
+  }
+  // 快照 migration state
+  try {
+    snapshot.migrationState = DB.load('customerIdentityMigration');
+  } catch(e) { snapshot.migrationState = null; }
+  return snapshot;
+}
+
+/* V78.4 修复：从快照恢复内存状态（含 customers） */
+function restoreIdentitySnapshotInMemory(snapshot){
+  // 恢复 customers（findIdentityCandidates 可能通过 ensureCustomerIdentity 修改了身份字段）
+  if(Array.isArray(snapshot.customers)){
+    S.customers = JSON.parse(JSON.stringify(snapshot.customers));
+  }
+  // 恢复 archive
+  const archive = getOutreachArchiveById(snapshot.archive.archiveId);
+  if(archive){
+    Object.keys(archive).forEach(k => delete archive[k]);
+    Object.assign(archive, snapshot.archive);
+  }
+  // 恢复 drafts
+  snapshot.drafts.forEach(savedDraft => {
+    const d = (S.drafts||[]).find(x => x.id === savedDraft.id);
+    if(d){
+      Object.keys(d).forEach(k => delete d[k]);
+      Object.assign(d, savedDraft);
+    }
+  });
+  // 恢复 communications
+  snapshot.communications.forEach(savedComm => {
+    const comm = (S.communications||[]).find(x => x.id === savedComm.id);
+    if(comm){
+      Object.keys(comm).forEach(k => delete comm[k]);
+      Object.assign(comm, savedComm);
+    }
+  });
+}
+
+/* V78.4 修复：带补偿的安全持久化（任一步失败则回滚内存和已写存储） */
+function safePersistIdentityData(snapshot){
+  const writeOrder = [
+    {key: 'customers', data: S.customers},
+    {key: 'outreachKnowledgeBase', data: S.outreachKnowledgeBase},
+    {key: 'drafts', data: S.drafts},
+    {key: 'communications', data: S.communications}
+  ];
+  const writtenKeys = [];
+
+  try {
+    // 1. 按顺序写入主数据
+    for(const item of writeOrder){
+      DB.save(item.key, item.data);
+      writtenKeys.push(item.key);
+    }
+    // 2. 更新 migration state（最后写入）
+    const migrationState = DB.load('customerIdentityMigration') || {version: CUSTOMER_IDENTITY_MIGRATION_VERSION};
+    migrationState.lastManualActionAt = new Date().toISOString();
+    DB.save('customerIdentityMigration', migrationState);
+    writtenKeys.push('customerIdentityMigration');
+    return {success: true};
+  } catch(e) {
+    console.error('[V78.4] 持久化失败，执行补偿回滚:', e.message);
+    // 补偿：恢复内存（含 customers）
+    restoreIdentitySnapshotInMemory(snapshot);
+    // 补偿：已成功写入的存储项写回快照值（必须使用快照，不得回退为当前已变化的 S.xxx）
+    try {
+      if(writtenKeys.includes('customers') && Array.isArray(snapshot.customers)){
+        DB.save('customers', snapshot.customers);
+      }
+      if(writtenKeys.includes('outreachKnowledgeBase')){
+        DB.save('outreachKnowledgeBase', S.outreachKnowledgeBase);
+      }
+      if(writtenKeys.includes('drafts')){
+        DB.save('drafts', S.drafts);
+      }
+      if(writtenKeys.includes('communications')){
+        DB.save('communications', S.communications);
+      }
+      if(writtenKeys.includes('customerIdentityMigration') && snapshot.migrationState !== null){
+        DB.save('customerIdentityMigration', snapshot.migrationState);
+      }
+    } catch(compensateErr) {
+      console.error('[V78.4] 补偿回滚也失败:', compensateErr.message);
+    }
+    return {success: false, error: '持久化失败已回滚: ' + e.message};
+  }
+}
+
+/* 人工确认绑定：将 archive 绑定到指定客户，一致更新关联对象 */
+function manualBindArchiveCustomer(archiveId, targetCustomerId){
+  const archive = getOutreachArchiveById(archiveId);
+  if(!archive){ return {success:false, error:'档案不存在'}; }
+  const targetCustomer = (S.customers||[]).find(c => c.id === targetCustomerId);
+  if(!targetCustomer){ return {success:false, error:'目标客户不存在'}; }
+  if(archive.identityResolutionStatus === 'resolved' && archive.resolvedBy === 'auto'){
+    return {success:false, error:'已自动关联的档案不支持人工重新绑定'};
+  }
+
+  const oldCustomerId = archive.customerId;
+  const oldStatus = archive.identityResolutionStatus;
+
+  // V78.4 修复：创建完整操作快照（用于失败补偿）
+  const snapshot = createIdentityOperationSnapshot(archive);
+
+  // V78.4 修复：清空候选前保存目标候选的匹配依据和得分
+  const targetCandidate = (archive.identityCandidates || []).find(c => c.customerId === targetCustomerId)
+    || findIdentityCandidates(archive).find(c => c.customerId === targetCustomerId);
+  const matchedAliases = targetCandidate ? targetCandidate.matchedAliases : [];
+  const matchScore = targetCandidate ? targetCandidate.score : 0;
+
+  try {
+    // 1. 更新 archive
+    archive.customerId = targetCustomer.id;
+    archive.identityResolutionStatus = 'resolved';
+    archive.resolvedBy = 'manual';
+    archive.identityResolvedAt = new Date().toISOString();
+    archive.identityResolutionMethod = 'manual_bind';
+    archive.identityResolutionNote = '人工确认绑定到客户：' + (targetCustomer.company || targetCustomer.customerName || '');
+    if(!archive.legacyCustomerIds) archive.legacyCustomerIds = [];
+    if(oldCustomerId && !archive.legacyCustomerIds.includes(oldCustomerId)){
+      archive.legacyCustomerIds.push(oldCustomerId);
+    }
+    archive.identityCandidates = [];
+    // 保存撤销快照（独立于补偿快照，保留完整 archive 身份详情）
+    archive.preManualBindSnapshot = {
+      archiveCustomerId: oldCustomerId,
+      archiveStatus: oldStatus,
+      archiveResolvedBy: snapshot.archive.resolvedBy,
+      archiveIdentityResolutionNote: snapshot.archive.identityResolutionNote || '',
+      archiveIdentityCandidates: JSON.parse(JSON.stringify(snapshot.archive.identityCandidates || [])),
+      archiveIdentityResolutionMethod: snapshot.archive.identityResolutionMethod || '',
+      archiveLegacyCustomerIds: JSON.parse(JSON.stringify(snapshot.archive.legacyCustomerIds || [])),
+      draftMappings: snapshot.drafts.map(d => ({draftId: d.id, oldCustomerId: d.customerId, oldLegacyIds: JSON.parse(JSON.stringify(d.legacyCustomerIds || []))})),
+      commMappings: snapshot.communications.map(c => ({commId: c.id, oldCustomerId: c.customerId, oldLegacyIds: JSON.parse(JSON.stringify(c.legacyCustomerIds || []))})),
+      timestamp: new Date().toISOString()
+    };
+    // 审计历史（含真实匹配依据和得分）
+    if(!archive.manualBindHistory) archive.manualBindHistory = [];
+    archive.manualBindHistory.push({
+      action: 'bind',
+      timestamp: new Date().toISOString(),
+      resolvedBy: 'manual',
+      fromCustomerId: oldCustomerId,
+      toCustomerId: targetCustomer.id,
+      toCustomerName: targetCustomer.company || targetCustomer.customerName || '',
+      previousStatus: oldStatus,
+      matchedAliases: matchedAliases,
+      matchScore: matchScore
+    });
+
+    // 2. V78.4 修复：按显式链接更新关联对象
+    const linkResult = updateLinkedObjectsCustomerId(archive, targetCustomer.id, oldCustomerId);
+    if(linkResult.skippedDrafts > 0 || linkResult.skippedComms > 0){
+      console.warn('[V78.4] 部分关联记录未找到:', linkResult);
+    }
+
+    // 3. V78.4 修复：带补偿的安全持久化
+    const persistResult = safePersistIdentityData(snapshot);
+    if(!persistResult.success){
+      return {success:false, error: persistResult.error};
+    }
+
+    return {success:true, archive:archive, targetCustomer:targetCustomer, linkResult:linkResult};
+  } catch(e) {
+    console.error('manualBindArchiveCustomer failed:', e);
+    // 异常时也尝试恢复
+    restoreIdentitySnapshotInMemory(snapshot);
+    return {success:false, error:e.message};
+  }
+}
+
+/* 撤销人工绑定：恢复绑定前状态（含完整 legacyCustomerIds） */
+function undoManualBindArchiveCustomer(archiveId){
+  const archive = getOutreachArchiveById(archiveId);
+  if(!archive){ return {success:false, error:'档案不存在'}; }
+  if(archive.resolvedBy !== 'manual'){ return {success:false, error:'仅人工绑定的档案可撤销'}; }
+  if(!archive.preManualBindSnapshot){ return {success:false, error:'无撤销快照，无法撤销'}; }
+
+  const bindSnapshot = archive.preManualBindSnapshot;
+  const currentCustomerId = archive.customerId;
+
+  // V78.4 修复：创建完整操作快照（用于失败补偿）
+  const snapshot = createIdentityOperationSnapshot(archive);
+
+  try {
+    // 1. 恢复 archive（含完整 identity 详情和 legacyCustomerIds）
+    archive.customerId = bindSnapshot.archiveCustomerId;
+    archive.identityResolutionStatus = bindSnapshot.archiveStatus;
+    archive.resolvedBy = bindSnapshot.archiveResolvedBy || undefined;
+    archive.legacyCustomerIds = JSON.parse(JSON.stringify(bindSnapshot.archiveLegacyCustomerIds || []));
+    // V78.4 修复：恢复原始 identityResolutionNote、identityCandidates、identityResolutionMethod
+    archive.identityResolutionNote = bindSnapshot.archiveIdentityResolutionNote || '';
+    archive.identityCandidates = JSON.parse(JSON.stringify(bindSnapshot.archiveIdentityCandidates || []));
+    archive.identityResolutionMethod = bindSnapshot.archiveIdentityResolutionMethod || '';
+    archive.preManualBindSnapshot = null;
+
+    // 2. V78.4 修复：恢复关联 drafts 的 customerId 和 legacyCustomerIds
+    (bindSnapshot.draftMappings || []).forEach(m => {
+      const d = (S.drafts||[]).find(x => x.id === m.draftId);
+      if(d){
+        d.customerId = m.oldCustomerId;
+        d.legacyCustomerIds = JSON.parse(JSON.stringify(m.oldLegacyIds || []));
+      }
+    });
+
+    // 3. V78.4 修复：恢复关联 communications 的 customerId 和 legacyCustomerIds
+    (bindSnapshot.commMappings || []).forEach(m => {
+      const comm = (S.communications||[]).find(x => x.id === m.commId);
+      if(comm){
+        comm.customerId = m.oldCustomerId;
+        comm.legacyCustomerIds = JSON.parse(JSON.stringify(m.oldLegacyIds || []));
+      }
+    });
+
+    // 4. 审计历史（保留原操作引用）
+    if(!archive.manualBindHistory) archive.manualBindHistory = [];
+    const lastBindIndex = [...archive.manualBindHistory].reverse().findIndex(h => h.action === 'bind');
+    archive.manualBindHistory.push({
+      action: 'undo',
+      timestamp: new Date().toISOString(),
+      resolvedBy: 'manual',
+      fromCustomerId: currentCustomerId,
+      toCustomerId: bindSnapshot.archiveCustomerId,
+      restoredStatus: bindSnapshot.archiveStatus,
+      undidBindIndex: lastBindIndex >= 0 ? archive.manualBindHistory.length - 1 - lastBindIndex : null
+    });
+
+    // 5. V78.4 修复：带补偿的安全持久化
+    const persistResult = safePersistIdentityData(snapshot);
+    if(!persistResult.success){
+      return {success:false, error: persistResult.error};
+    }
+
+    return {success:true, archive:archive};
+  } catch(e) {
+    console.error('undoManualBindArchiveCustomer failed:', e);
+    restoreIdentitySnapshotInMemory(snapshot);
+    return {success:false, error:e.message};
+  }
+}
+
+/* V78.4 修复：retry 自动关联的共享 helper（复用安全关联逻辑） */
+function autoResolveArchiveToCustomer(archive, targetCustomer, oldCustomerId, method, matchedAliases, matchScore){
+  archive.customerId = targetCustomer.id;
+  archive.identityResolutionStatus = 'resolved';
+  archive.resolvedBy = 'auto';
+  archive.identityResolvedAt = new Date().toISOString();
+  archive.identityResolutionMethod = method;
+  archive.identityResolutionNote = '重试匹配成功：' + (targetCustomer.company || targetCustomer.customerName || '');
+  if(!archive.legacyCustomerIds) archive.legacyCustomerIds = [];
+  if(oldCustomerId && !archive.legacyCustomerIds.includes(oldCustomerId)){
+    archive.legacyCustomerIds.push(oldCustomerId);
+  }
+  archive.identityCandidates = [];
+  // V78.4 修复：按显式链接更新关联对象（不批量扫描）
+  return updateLinkedObjectsCustomerId(archive, targetCustomer.id, oldCustomerId);
+}
+
+/* 重新尝试匹配 unresolved/ambiguous 档案 */
+function retryArchiveIdentityMatch(archiveId){
+  const archive = getOutreachArchiveById(archiveId);
+  if(!archive){ return {success:false, error:'档案不存在'}; }
+  if(archive.identityResolutionStatus === 'resolved' && archive.resolvedBy === 'auto'){
+    return {success:false, error:'已自动关联的档案无需重试'};
+  }
+
+  // V78.4 修复：创建完整操作快照
+  const snapshot = createIdentityOperationSnapshot(archive);
+
+  try {
+    const candidates = findIdentityCandidates(archive);
+    const oldCustomerId = archive.customerId;
+
+    if(candidates.length === 0){
+      archive.identityResolutionStatus = 'unresolved';
+      archive.identityResolutionNote = '重新匹配后仍无法通过域名/邮箱/公司名匹配到客户主记录';
+      archive.identityCandidates = [];
+      const persistResult = safePersistIdentityData(snapshot);
+      if(!persistResult.success) return {success:false, error: persistResult.error};
+      return {success:true, status:'unresolved', candidates:0};
+    }
+
+    // 检查最高分是否唯一
+    const topScore = candidates[0].score;
+    const topCandidates = candidates.filter(c => c.score === topScore);
+
+    if(topCandidates.length === 1){
+      // 唯一最高分候选（含唯一候选情况）：自动 resolved
+      const target = topCandidates[0];
+      const targetCustomer = (S.customers||[]).find(c => c.id === target.customerId);
+      if(targetCustomer){
+        const method = candidates.length === 1 ? 'retry_match' : 'retry_match_scored';
+        // V78.4 修复：复用共享 helper
+        const linkResult = autoResolveArchiveToCustomer(archive, targetCustomer, oldCustomerId, method, target.matchedAliases, target.score);
+        const persistResult = safePersistIdentityData(snapshot);
+        if(!persistResult.success) return {success:false, error: persistResult.error};
+        return {success:true, status:'resolved', candidates:1, targetCustomer:targetCustomer, linkResult:linkResult};
+      }
+    }
+
+    // 多候选且得分相同：保持 ambiguous
+    archive.identityResolutionStatus = 'ambiguous';
+    archive.identityResolutionNote = '重试匹配后仍存在 ' + topCandidates.length + ' 个候选客户得分相同（' + topScore + ' 分），需人工确认';
+    archive.identityCandidates = topCandidates;
+    const persistResult = safePersistIdentityData(snapshot);
+    if(!persistResult.success) return {success:false, error: persistResult.error};
+    return {success:true, status:'ambiguous', candidates:topCandidates.length};
+
+  } catch(e) {
+    console.error('retryArchiveIdentityMatch failed:', e);
+    restoreIdentitySnapshotInMemory(snapshot);
+    return {success:false, error:e.message};
+  }
+}
+
+/* 渲染身份关联状态区域（含候选列表和操作按钮） */
+function renderIdentityResolutionSection(archive){
+  if(!archive) return '';
+  const customer = resolveCustomerByIdOrIdentity(archive.customerId, archive);
+  let html = '';
+
+  if(customer && archive.identityResolutionStatus === 'resolved'){
+    const isManual = archive.resolvedBy === 'manual';
+    html += '<div style="background:#dcfce7;border:1px solid #bbf7d0;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#166534">';
+    html += '✅ 已关联客户主记录：<b>' + esc(customer.company || customer.customerName || '') + '</b>';
+    html += isManual ? ' <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-size:10px;margin-left:6px">人工确认</span>' : '';
+    html += '</div>';
+    // 人工绑定的显示撤销按钮
+    if(isManual){
+      html += '<div style="margin-bottom:12px"><button class="btn btn-outline btn-sm" style="font-size:11px;background:#fef2f2;color:#991b1b;border-color:#fecaca" onclick="confirmUndoManualBind(\'' + archive.archiveId + '\')">↩️ 撤销人工绑定</button></div>';
+    }
+  } else if(archive.identityResolutionStatus === 'ambiguous'){
+    html += '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#92400e">';
+    html += '⚠️ 客户关联待确认：' + esc(archive.identityResolutionNote || '存在多个候选客户');
+    html += '</div>';
+    // 候选列表
+    const candidates = archive.identityCandidates && archive.identityCandidates.length
+      ? archive.identityCandidates
+      : findIdentityCandidates(archive);
+    if(candidates.length){
+      html += '<div style="margin-bottom:12px">';
+      html += '<div style="font-weight:600;font-size:11.5px;color:#475569;margin-bottom:6px">候选客户（' + candidates.length + ' 个）：</div>';
+      candidates.forEach((c, idx) => {
+        html += '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;margin:4px 0;font-size:11.5px">';
+        html += '<div style="font-weight:600;color:#78350f">' + esc(c.customerName || '未命名客户') + ' <span style="background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:3px;font-size:10px">' + c.score + ' 分匹配</span></div>';
+        if(c.normalizedDomain) html += '<div style="color:#64748b;margin-top:2px">🌐 ' + esc(c.normalizedDomain) + '</div>';
+        if(c.country) html += '<div style="color:#64748b">📍 ' + esc(c.country) + '</div>';
+        if(c.mainEmail) html += '<div style="color:#64748b">✉️ ' + esc(c.mainEmail) + '</div>';
+        if(c.matchedAliases && c.matchedAliases.length){
+          html += '<div style="color:#94a3b8;font-size:10px;margin-top:2px">匹配依据: ' + c.matchedAliases.map(esc).join(', ') + '</div>';
+        }
+        html += '<button class="btn btn-primary btn-sm" style="font-size:11px;margin-top:6px;background:#16a34a;border-color:#16a34a" onclick="confirmManualBind(\'' + archive.archiveId + '\',\'' + c.customerId + '\')">✓ 确认绑定此客户</button>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    // 重试按钮
+    html += '<div style="margin-bottom:12px"><button class="btn btn-outline btn-sm" style="font-size:11px" onclick="confirmRetryMatch(\'' + archive.archiveId + '\')">🔄 重新尝试匹配</button></div>';
+  } else if(archive.identityResolutionStatus === 'unresolved'){
+    html += '<div style="background:#fee2e2;border:1px solid #fecaca;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#991b1b">';
+    html += '⚠️ 原客户关联待补充：' + esc(archive.identityResolutionNote || '无法匹配到客户主记录');
+    html += '</div>';
+    html += '<div style="margin-bottom:12px"><button class="btn btn-outline btn-sm" style="font-size:11px" onclick="confirmRetryMatch(\'' + archive.archiveId + '\')">🔄 重新尝试匹配</button></div>';
+  } else {
+    html += '<div style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#475569">';
+    html += 'ℹ️ 客户主记录待关联（档案快照模式）';
+    html += '</div>';
+  }
+
+  // legacyCustomerIds 内部状态显示
+  if(archive.legacyCustomerIds && archive.legacyCustomerIds.length){
+    html += '<div style="font-size:10px;color:#94a3b8;margin-bottom:8px">历史 ID: ' + archive.legacyCustomerIds.map(esc).join(', ') + '</div>';
+  }
+
+  // 人工绑定审计历史
+  if(archive.manualBindHistory && archive.manualBindHistory.length){
+    html += '<details style="margin-bottom:12px"><summary style="font-size:11px;color:#64748b;cursor:pointer">📋 关联操作历史 (' + archive.manualBindHistory.length + ' 条)</summary>';
+    html += '<div style="font-size:10.5px;color:#94a3b8;margin-top:4px;padding-left:8px">';
+    archive.manualBindHistory.slice(-5).reverse().forEach(h => {
+      html += '<div style="margin:2px 0">[' + esc(new Date(h.timestamp).toLocaleString()) + '] ' + (h.action === 'bind' ? '人工绑定' : '撤销绑定') + ': ' + esc(h.toCustomerName || h.toCustomerId || '') + '</div>';
+    });
+    html += '</div></details>';
+  }
+
+  return html;
+}
+
+/* 人工绑定确认弹窗 */
+function confirmManualBind(archiveId, customerId){
+  const archive = getOutreachArchiveById(archiveId);
+  const customer = (S.customers||[]).find(c => c.id === customerId);
+  if(!archive || !customer){ toast('档案或客户不存在','err'); return; }
+  const draftCount = (S.drafts||[]).filter(d => d.customerId === archive.customerId).length;
+  const commCount = (S.communications||[]).filter(c => c.customerId === archive.customerId).length;
+  confirmDlg(
+    '确认将档案 <b>' + esc(archive.customerName || '') + '</b> 绑定到客户 <b>' + esc(customer.company || customer.customerName || '') + '</b>？<br><br>' +
+    '此操作将同步更新：<br>' +
+    '• 档案的 customerId<br>' +
+    '• 关联的 ' + draftCount + ' 封开发信草稿<br>' +
+    '• 关联的 ' + commCount + ' 条沟通记录<br><br>' +
+    '原始 ID 将保留到 legacyCustomerIds，可后续撤销。',
+    function(){
+      const result = manualBindArchiveCustomer(archiveId, customerId);
+      if(result.success){
+        toast('✅ 已绑定到客户：' + (customer.company || customer.customerName || ''));
+        openOutreachKBArchive(archiveId);
+      } else {
+        toast('❌ 绑定失败：' + result.error, 'err');
+      }
+    }
+  );
+}
+
+/* 撤销人工绑定确认弹窗 */
+function confirmUndoManualBind(archiveId){
+  const archive = getOutreachArchiveById(archiveId);
+  if(!archive){ toast('档案不存在','err'); return; }
+  confirmDlg(
+    '确认撤销人工绑定？<br><br>档案将恢复为绑定前的状态（' + esc(archive.preManualBindSnapshot?.archiveStatus || 'ambiguous') + '），关联的开发信和沟通记录也将恢复。<br><br>审计历史会保留。',
+    function(){
+      const result = undoManualBindArchiveCustomer(archiveId);
+      if(result.success){
+        toast('✅ 已撤销人工绑定');
+        openOutreachKBArchive(archiveId);
+      } else {
+        toast('❌ 撤销失败：' + result.error, 'err');
+      }
+    }
+  );
+}
+
+/* 重新匹配确认弹窗 */
+function confirmRetryMatch(archiveId){
+  const archive = getOutreachArchiveById(archiveId);
+  if(!archive){ toast('档案不存在','err'); return; }
+  confirmDlg(
+    '确认重新尝试匹配客户身份？<br><br>将使用现有域名、邮箱、公司名等信息重新匹配客户主记录。<br>唯一候选将自动关联，多候选保持待确认，零候选保持待补充。<br><br>不会创建虚构客户，不会调用外部搜索。',
+    function(){
+      const result = retryArchiveIdentityMatch(archiveId);
+      if(result.success){
+        if(result.status === 'resolved'){
+          toast('✅ 匹配成功，已关联客户');
+        } else if(result.status === 'ambiguous'){
+          toast('⚠️ 仍有 ' + result.candidates + ' 个候选，需人工确认');
+        } else {
+          toast('ℹ️ 未找到匹配客户');
+        }
+        openOutreachKBArchive(archiveId);
+      } else {
+        toast('❌ 匹配失败：' + result.error, 'err');
+      }
+    }
+  );
+}
+
 /* 计算客户当前开发阶段 */
 function getOutreachStage(customer, drafts){
   if(!customer) return 'not_started';
@@ -18257,21 +18827,8 @@ function openOutreachKBArchive(archiveId){
   // V78.2: 使用统一解析函数查找客户
   const customer = resolveCustomerByIdOrIdentity(a.customerId, a);
 
-  // V78.2: 关联状态提示
-  let linkStatusHtml = '';
-  if(customer){
-    linkStatusHtml = '<div style="background:#dcfce7;border:1px solid #bbf7d0;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#166534">✅ 已关联客户主记录：' + esc(customer.company || customer.customerName || '') + '</div>';
-  } else if(a.identityResolutionStatus === 'ambiguous'){
-    linkStatusHtml = '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#92400e">⚠️ 客户关联待确认：' + esc(a.identityResolutionNote || '存在多个候选客户') + '</div>';
-  } else if(a.identityResolutionStatus === 'unresolved'){
-    linkStatusHtml = '<div style="background:#fee2e2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#991b1b">⚠️ 原客户关联待补充：' + esc(a.identityResolutionNote || '无法匹配到客户主记录') + '</div>';
-  } else {
-    linkStatusHtml = '<div style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#475569">ℹ️ 客户主记录待关联（档案快照模式）</div>';
-  }
-  // legacyCustomerIds 内部状态显示
-  if(a.legacyCustomerIds && a.legacyCustomerIds.length){
-    linkStatusHtml += '<div style="font-size:10px;color:#94a3b8;margin-top:4px">历史 ID: ' + a.legacyCustomerIds.map(esc).join(', ') + '</div>';
-  }
+  // V78.4: 身份关联状态区域（含候选列表、人工绑定、撤销、重试）
+  const linkStatusHtml = renderIdentityResolutionSection(a);
 
   let timelineHtml = '';
   if(drafts.length === 0 && comms.length === 0){

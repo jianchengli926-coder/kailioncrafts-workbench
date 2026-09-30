@@ -861,6 +861,585 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
   };
 })();
 
+/* ============================================================
+ * V79.0A Campaign 数据层、状态机与可靠持久化
+ * ============================================================ */
+const CAMPAIGN_STATUSES = ['draft','active','paused','completed','archived'];
+const CAMPAIGN_TASK_STAGES = ['queued','researching','ready_for_draft','draft_pending_review','reviewed_ready','sent','replied','follow_up_due','converted','paused','suppressed','disqualified','closed'];
+const CAMPAIGN_TASK_PRIORITIES = ['high','medium','low'];
+const CAMPAIGN_PROVIDER_POLICIES = ['online_safe','local_only'];
+const CAMPAIGN_TERMINAL_STAGES = ['converted','suppressed','disqualified','closed'];
+
+// Campaign 合法状态转换
+const CAMPAIGN_STATUS_TRANSITIONS = {
+  draft: ['active','archived'],
+  active: ['paused','completed','archived'],
+  paused: ['active','archived'],
+  completed: ['archived'],
+  archived: [] // 恢复通过 restoreArchivedCampaign 单独处理
+};
+
+// CampaignTask 合法状态转换
+const CAMPAIGN_TASK_TRANSITIONS = {
+  queued: ['researching','ready_for_draft','paused','suppressed','disqualified','closed'],
+  researching: ['ready_for_draft','paused','suppressed','disqualified','closed'],
+  ready_for_draft: ['draft_pending_review','paused','suppressed','disqualified','closed'],
+  draft_pending_review: ['reviewed_ready','ready_for_draft','paused','suppressed','disqualified','closed'],
+  reviewed_ready: ['sent','draft_pending_review','paused','suppressed','disqualified','closed'],
+  sent: ['replied','follow_up_due','paused','suppressed','closed'],
+  follow_up_due: ['sent','replied','paused','suppressed','closed'],
+  replied: ['follow_up_due','converted','paused','suppressed','closed'],
+  paused: [], // 恢复通过 resumeCampaignTask 单独处理，必须重新检查 suppression
+  converted: [],
+  suppressed: [],
+  disqualified: [],
+  closed: []
+};
+
+function normalizeCampaignName(name){
+  if(!name || typeof name !== 'string') return '';
+  return name.trim().replace(/\s+/g,' ').toLowerCase();
+}
+
+function getCampaignById(campaignId){
+  if(!campaignId) return null;
+  return (S.campaigns || []).find(c => c.campaignId === campaignId) || null;
+}
+
+function getCampaignTasks(campaignId){
+  if(!campaignId) return [];
+  return (S.campaignCustomerTasks || []).filter(t => t.campaignId === campaignId);
+}
+
+function getCampaignTaskById(taskId){
+  if(!taskId) return null;
+  return (S.campaignCustomerTasks || []).find(t => t.taskId === taskId) || null;
+}
+
+function getCampaignMetrics(campaignId){
+  const tasks = getCampaignTasks(campaignId);
+  const metrics = {};
+  CAMPAIGN_TASK_STAGES.forEach(s => { metrics[s] = 0; });
+  tasks.forEach(t => { if(metrics[t.stage] !== undefined) metrics[t.stage]++; });
+  metrics.total = tasks.length;
+  return metrics;
+}
+
+function validateCampaignInput(input, existingCampaignId){
+  const errors = [];
+  if(!input || typeof input !== 'object'){ errors.push('输入无效'); return {valid:false, errors}; }
+  if(!input.name || !String(input.name).trim()){ errors.push('名称必填'); }
+  const normalized = normalizeCampaignName(input.name);
+  if(normalized){
+    const dup = (S.campaigns || []).find(c =>
+      c.normalizedName === normalized &&
+      c.campaignId !== existingCampaignId &&
+      c.status !== 'archived'
+    );
+    if(dup){ errors.push('名称已存在（大小写不敏感）'); }
+  }
+  if(input.providerPolicy && !CAMPAIGN_PROVIDER_POLICIES.includes(input.providerPolicy)){
+    errors.push('providerPolicy 非法');
+  }
+  if(input.status && !CAMPAIGN_STATUSES.includes(input.status)){
+    errors.push('status 非法');
+  }
+  return {valid: errors.length === 0, errors, normalizedName: normalized};
+}
+
+function createCampaign(input){
+  const validation = validateCampaignInput(input, null);
+  if(!validation.valid){ return {success:false, errors: validation.errors}; }
+  const now = new Date().toISOString();
+  const campaign = {
+    campaignId: 'camp_' + uid(),
+    name: String(input.name).trim(),
+    normalizedName: validation.normalizedName,
+    description: input.description || '',
+    status: input.status || 'draft',
+    objective: input.objective || '',
+    market: input.market || '',
+    countries: Array.isArray(input.countries) ? input.countries : [],
+    customerTypes: Array.isArray(input.customerTypes) ? input.customerTypes : [],
+    productCategories: Array.isArray(input.productCategories) ? input.productCategories : [],
+    channels: ['email'],
+    providerPolicy: CAMPAIGN_PROVIDER_POLICIES.includes(input.providerPolicy) ? input.providerPolicy : 'online_safe',
+    icpVersionId: input.icpVersionId || null,
+    createdAt: now,
+    updatedAt: now,
+    startedAt: input.status === 'active' ? now : null,
+    pausedAt: null,
+    completedAt: null,
+    archivedAt: null,
+    archivedFromStatus: null,
+    owner: input.owner || '',
+    notes: input.notes || '',
+    tags: Array.isArray(input.tags) ? input.tags : [],
+    schemaVersion: 1
+  };
+  const snapshot = createCampaignOperationSnapshot();
+  S.campaigns.unshift(campaign);
+  const persistResult = safePersistCampaignData(snapshot);
+  if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+  return {success:true, campaign};
+}
+
+function updateCampaign(campaignId, patch){
+  const campaign = getCampaignById(campaignId);
+  if(!campaign){ return {success:false, errors:['Campaign 不存在']}; }
+  // 先完整校验所有 patch 字段，不允许部分修改后才返回错误
+  const errors = [];
+  let normalizedName = null;
+  if(patch.name !== undefined){
+    const validation = validateCampaignInput({...campaign, name: patch.name}, campaignId);
+    if(!validation.valid){ errors.push(...validation.errors); }
+    normalizedName = validation.normalizedName;
+  }
+  if(patch.providerPolicy !== undefined && !CAMPAIGN_PROVIDER_POLICIES.includes(patch.providerPolicy)){
+    errors.push('providerPolicy 非法');
+  }
+  const arrayFields = ['countries','customerTypes','productCategories','tags'];
+  arrayFields.forEach(f => {
+    if(patch[f] !== undefined && !Array.isArray(patch[f])){
+      errors.push(f + ' 必须是数组');
+    }
+  });
+  if(errors.length > 0){ return {success:false, errors}; }
+  // 校验通过后创建快照，再修改
+  const snapshot = createCampaignOperationSnapshot();
+  if(patch.name !== undefined){
+    campaign.name = String(patch.name).trim();
+    campaign.normalizedName = normalizedName;
+  }
+  const allowedFields = ['description','objective','market','countries','customerTypes','productCategories','providerPolicy','icpVersionId','owner','notes','tags'];
+  allowedFields.forEach(f => {
+    if(patch[f] !== undefined){ campaign[f] = patch[f]; }
+  });
+  campaign.updatedAt = new Date().toISOString();
+  const persistResult = safePersistCampaignData(snapshot);
+  if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+  return {success:true, campaign};
+}
+
+function transitionCampaignStatus(campaignId, nextStatus, note){
+  const campaign = getCampaignById(campaignId);
+  if(!campaign){ return {success:false, errors:['Campaign 不存在']}; }
+  if(!CAMPAIGN_STATUSES.includes(nextStatus)){ return {success:false, errors:['目标状态非法']}; }
+  if(campaign.status === nextStatus){ return {success:true, campaign}; }
+  if(campaign.status === 'archived'){ return {success:false, errors:['已归档 Campaign 请使用 restoreArchivedCampaign']}; }
+  const allowed = CAMPAIGN_STATUS_TRANSITIONS[campaign.status] || [];
+  if(!allowed.includes(nextStatus)){ return {success:false, errors:[`不允许从 ${campaign.status} 转换到 ${nextStatus}`]}; }
+  // 校验通过后创建快照，再修改
+  const snapshot = createCampaignOperationSnapshot();
+  const now = new Date().toISOString();
+  const oldStatus = campaign.status;
+  campaign.status = nextStatus;
+  campaign.updatedAt = now;
+  if(nextStatus === 'active' && !campaign.startedAt){ campaign.startedAt = now; }
+  if(nextStatus === 'paused'){ campaign.pausedAt = now; }
+  if(nextStatus === 'active' && oldStatus === 'paused'){ campaign.pausedAt = null; }
+  if(nextStatus === 'completed'){ campaign.completedAt = now; }
+  const persistResult = safePersistCampaignData(snapshot);
+  if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+  return {success:true, campaign};
+}
+
+function archiveCampaign(campaignId, note){
+  const campaign = getCampaignById(campaignId);
+  if(!campaign){ return {success:false, errors:['Campaign 不存在']}; }
+  if(campaign.status === 'archived'){ return {success:true, campaign}; }
+  // 校验通过后创建快照，再修改
+  const snapshot = createCampaignOperationSnapshot();
+  const now = new Date().toISOString();
+  campaign.archivedFromStatus = campaign.status;
+  campaign.status = 'archived';
+  campaign.archivedAt = now;
+  campaign.updatedAt = now;
+  const persistResult = safePersistCampaignData(snapshot);
+  if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+  return {success:true, campaign};
+}
+
+function restoreArchivedCampaign(campaignId){
+  const campaign = getCampaignById(campaignId);
+  if(!campaign){ return {success:false, errors:['Campaign 不存在']}; }
+  if(campaign.status !== 'archived'){ return {success:false, errors:['Campaign 未归档']}; }
+  const targetStatus = campaign.archivedFromStatus || 'draft';
+  if(!CAMPAIGN_STATUSES.includes(targetStatus) || targetStatus === 'archived'){
+    return {success:false, errors:['归档前状态无效']};
+  }
+  // 恢复前重新验证名称冲突（修改前完成）
+  const dup = (S.campaigns || []).find(c =>
+    c.normalizedName === campaign.normalizedName &&
+    c.campaignId !== campaign.campaignId &&
+    c.status !== 'archived'
+  );
+  if(dup){ return {success:false, errors:['名称与其他未归档 Campaign 冲突']}; }
+  // 校验通过后创建快照，再修改
+  const snapshot = createCampaignOperationSnapshot();
+  const now = new Date().toISOString();
+  campaign.status = targetStatus;
+  campaign.archivedAt = null;
+  campaign.archivedFromStatus = null;
+  campaign.updatedAt = now;
+  const persistResult = safePersistCampaignData(snapshot);
+  if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+  return {success:true, campaign};
+}
+
+function resolveCampaignTaskCustomer(task){
+  if(!task) return null;
+  if(task.stableCustomerId){
+    const byStable = (S.customers || []).find(c => c.stableId === task.stableCustomerId);
+    if(byStable) return byStable;
+  }
+  if(task.customerId){
+    const byId = (S.customers || []).find(c => c.id === task.customerId);
+    if(byId) return byId;
+  }
+  return null;
+}
+
+function getCampaignTaskDerivedEmailState(task){
+  const result = {
+    hasDraft: false,
+    reviewStatus: 'not_reviewed',
+    hasSentRecord: false,
+    hasReplyRecord: false,
+    latestDraftId: null,
+    latestCommunicationId: null,
+    recommendedStage: task ? task.stage : 'queued',
+    source: 'derived'
+  };
+  if(!task) return result;
+  // 从 assignedDraftId 或 archive.linkedDraftIds 读取草稿
+  let draftId = task.assignedDraftId;
+  if(!draftId && task.outreachArchiveId){
+    const archive = (S.outreachKnowledgeBase || []).find(a => a.archiveId === task.outreachArchiveId);
+    if(archive && Array.isArray(archive.linkedDraftIds) && archive.linkedDraftIds.length > 0){
+      draftId = archive.linkedDraftIds[archive.linkedDraftIds.length - 1];
+    }
+  }
+  if(draftId){
+    const draft = (S.drafts || []).find(d => d.id === draftId);
+    if(draft){
+      result.hasDraft = true;
+      result.latestDraftId = draft.id;
+      if(draft.reviewStatus === 'approved'){ result.reviewStatus = 'approved'; }
+      else if(draft.reviewStatus === 'rejected'){ result.reviewStatus = 'rejected'; }
+      else if(draft.reviewStatus === 'pending'){ result.reviewStatus = 'pending'; }
+    }
+  }
+  // 从 linkedCommunicationIds 读取沟通记录
+  const commIds = task.linkedCommunicationIds || [];
+  if(commIds.length > 0){
+    const comms = (S.communications || []).filter(c => commIds.includes(c.id));
+    if(comms.length > 0){
+      result.latestCommunicationId = comms[comms.length - 1].id;
+      const hasSent = comms.some(c => c.type === 'sent' || c.direction === 'outbound');
+      const hasReply = comms.some(c => c.type === 'reply' || c.direction === 'inbound');
+      if(hasSent){ result.hasSentRecord = true; result.source = 'communication_record'; }
+      if(hasReply){ result.hasReplyRecord = true; }
+    }
+  }
+  // 从 outreachArchive 读取开发历史
+  if(task.outreachArchiveId){
+    const archive = (S.outreachKnowledgeBase || []).find(a => a.archiveId === task.outreachArchiveId);
+    if(archive && Array.isArray(archive.developmentHistory) && archive.developmentHistory.length > 0){
+      const history = archive.developmentHistory;
+      const latest = history[history.length - 1];
+      if(latest){
+        if(latest.sent === true || latest.status === 'sent'){ result.hasSentRecord = true; }
+        if(latest.replied === true || latest.status === 'replied'){ result.hasReplyRecord = true; }
+      }
+    }
+  }
+  // 推荐阶段
+  if(result.hasReplyRecord){ result.recommendedStage = 'replied'; }
+  else if(result.hasSentRecord){ result.recommendedStage = 'sent'; }
+  else if(result.reviewStatus === 'approved'){ result.recommendedStage = 'reviewed_ready'; }
+  else if(result.hasDraft){ result.recommendedStage = 'draft_pending_review'; }
+  return result;
+}
+
+function evaluateCustomerForCampaign(campaignId, customerId){
+  const result = {
+    eligible: false,
+    blockers: [],
+    warnings: [],
+    customer: null,
+    archive: null,
+    existingTaskInCampaign: null,
+    activeCampaignTasks: [],
+    derivedOutreachState: null
+  };
+  const campaign = getCampaignById(campaignId);
+  if(!campaign){ result.blockers.push('Campaign 不存在'); return result; }
+  if(campaign.status === 'archived' || campaign.status === 'completed'){
+    result.blockers.push('Campaign 已归档或已完成'); return result;
+  }
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer){ result.blockers.push('客户不存在'); return result; }
+  result.customer = customer;
+  // 确保身份字段
+  ensureCustomerIdentity(customer);
+  const stableId = customer.stableId;
+  if(!stableId){ result.blockers.push('客户稳定身份生成失败'); return result; }
+  // 查找客户开发档案
+  const archive = (S.outreachKnowledgeBase || []).find(a =>
+    a.customerId === customerId || a.stableCustomerId === stableId ||
+    (a.normalizedDomain && customer.website && normalizeDomain(customer.website) === a.normalizedDomain)
+  );
+  result.archive = archive;
+  // 身份解析状态
+  if(archive && archive.identityResolutionStatus && archive.identityResolutionStatus !== 'resolved'){
+    result.blockers.push('客户身份未解析（' + archive.identityResolutionStatus + '）');
+  }
+  // doNotContact
+  if(customer.doNotContact === true || (archive && archive.doNotContact === true)){
+    result.blockers.push('客户标记为 doNotContact');
+  }
+  // 高风险重复
+  if(archive && archive.duplicateStatus === '高置信重复'){
+    result.blockers.push('客户为高置信重复，需先处理去重');
+  }
+  // 同 Campaign 重复任务
+  const existingInCampaign = getCampaignTasks(campaignId).find(t =>
+    t.stableCustomerId === stableId && t.stage !== 'closed'
+  );
+  if(existingInCampaign){
+    result.blockers.push('客户已在此 Campaign 中（任务 ' + existingInCampaign.taskId + '）');
+    result.existingTaskInCampaign = existingInCampaign;
+  }
+  // 其他 active Campaign 同客户
+  const otherActiveTasks = (S.campaignCustomerTasks || []).filter(t =>
+    t.stableCustomerId === stableId &&
+    t.campaignId !== campaignId &&
+    t.stage !== 'closed' &&
+    t.stage !== 'disqualified'
+  );
+  if(otherActiveTasks.length > 0){
+    result.warnings.push('客户已在其他 ' + otherActiveTasks.length + ' 个活跃 Campaign 中');
+    result.activeCampaignTasks = otherActiveTasks;
+  }
+  // 派生邮件状态
+  const tempTask = {stableCustomerId: stableId, customerId, outreachArchiveId: archive ? archive.archiveId : null, stage: 'queued'};
+  result.derivedOutreachState = getCampaignTaskDerivedEmailState(tempTask);
+  if(result.derivedOutreachState.hasReplyRecord){
+    result.warnings.push('客户已有回复记录，不应作为新首封客户');
+  } else if(result.derivedOutreachState.hasSentRecord){
+    result.warnings.push('客户已有发送记录，不应作为新首封客户');
+  } else if(result.derivedOutreachState.hasDraft){
+    result.warnings.push('客户已有开发信草稿');
+  }
+  result.eligible = result.blockers.length === 0;
+  return result;
+}
+
+function addCustomerToCampaign(campaignId, customerId, options){
+  options = options || {};
+  const evaluation = evaluateCustomerForCampaign(campaignId, customerId);
+  if(!evaluation.eligible){
+    return {success:false, errors: evaluation.blockers, warnings: evaluation.warnings};
+  }
+  const customer = evaluation.customer;
+  const archive = evaluation.archive;
+  const stableId = customer.stableId;
+  // 根据历史安全映射初始 stage
+  let initialStage = 'queued';
+  const derived = evaluation.derivedOutreachState;
+  if(derived.hasReplyRecord){ initialStage = 'replied'; }
+  else if(derived.hasSentRecord){ initialStage = 'sent'; }
+  else if(derived.reviewStatus === 'approved'){ initialStage = 'reviewed_ready'; }
+  else if(derived.hasDraft){ initialStage = 'draft_pending_review'; }
+  const now = new Date().toISOString();
+  const task = {
+    taskId: 'task_' + uid(),
+    campaignId: campaignId,
+    customerId: customerId,
+    stableCustomerId: stableId,
+    outreachArchiveId: archive ? archive.archiveId : null,
+    stage: initialStage,
+    previousStage: null,
+    priority: CAMPAIGN_TASK_PRIORITIES.includes(options.priority) ? options.priority : 'medium',
+    scoreSnapshot: typeof options.score === 'number' ? options.score : (customer.scores && customer.scores.total) || 0,
+    scoreExplanationSnapshot: options.scoreExplanation || '',
+    source: options.source || 'manual',
+    sourceQuery: options.sourceQuery || null,
+    addedAt: now,
+    lastUpdatedAt: now,
+    assignedDraftId: derived.latestDraftId,
+    linkedCommunicationIds: [],
+    stopReason: null,
+    pausedReason: null,
+    nextAction: null,
+    nextActionAt: null,
+    notes: options.notes || '',
+    auditHistory: [{at: now, from: null, to: initialStage, actor: options.actor || 'user', note: '加入 Campaign，初始阶段根据历史映射为 ' + initialStage}],
+    schemaVersion: 1
+  };
+  const snapshot = createCampaignOperationSnapshot();
+  S.campaignCustomerTasks.push(task);
+  const persistResult = safePersistCampaignData(snapshot);
+  if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+  return {success:true, task, warnings: evaluation.warnings};
+}
+
+function transitionCampaignTaskStage(taskId, nextStage, note, actor){
+  const task = getCampaignTaskById(taskId);
+  if(!task){ return {success:false, errors:['任务不存在']}; }
+  if(!CAMPAIGN_TASK_STAGES.includes(nextStage)){ return {success:false, errors:['目标阶段非法']}; }
+  if(task.stage === nextStage){ return {success:true, task}; }
+  if(CAMPAIGN_TERMINAL_STAGES.includes(task.stage) && task.stage !== 'paused'){
+    return {success:false, errors:[`${task.stage} 为终止状态，不允许转换`]};
+  }
+  if(task.stage === 'paused'){
+    return {success:false, errors:['paused 状态请使用 resumeCampaignTask']};
+  }
+  const allowed = CAMPAIGN_TASK_TRANSITIONS[task.stage] || [];
+  if(!allowed.includes(nextStage)){
+    return {success:false, errors:[`不允许从 ${task.stage} 转换到 ${nextStage}`]};
+  }
+  // 校验通过后创建快照，再修改
+  const snapshot = createCampaignOperationSnapshot();
+  const now = new Date().toISOString();
+  task.previousStage = task.stage;
+  task.stage = nextStage;
+  task.lastUpdatedAt = now;
+  task.auditHistory.push({at: now, from: task.previousStage, to: nextStage, actor: actor || 'user', note: note || ''});
+  const persistResult = safePersistCampaignData(snapshot);
+  if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+  return {success:true, task};
+}
+
+function pauseCampaignTask(taskId, reason){
+  const task = getCampaignTaskById(taskId);
+  if(!task){ return {success:false, errors:['任务不存在']}; }
+  if(task.stage === 'paused'){ return {success:true, task}; }
+  if(CAMPAIGN_TERMINAL_STAGES.includes(task.stage)){ return {success:false, errors:['终止状态不可暂停']}; }
+  // 校验通过后创建快照，再修改
+  const snapshot = createCampaignOperationSnapshot();
+  const now = new Date().toISOString();
+  task.previousStage = task.stage;
+  task.stage = 'paused';
+  task.pausedReason = reason || '';
+  task.lastUpdatedAt = now;
+  task.auditHistory.push({at: now, from: task.previousStage, to: 'paused', actor: 'user', note: '暂停: ' + (reason || '')});
+  const persistResult = safePersistCampaignData(snapshot);
+  if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+  return {success:true, task};
+}
+
+function resumeCampaignTask(taskId){
+  const task = getCampaignTaskById(taskId);
+  if(!task){ return {success:false, errors:['任务不存在']}; }
+  if(task.stage !== 'paused'){ return {success:false, errors:['任务未暂停']}; }
+  // 重新检查 suppression
+  const customer = resolveCampaignTaskCustomer(task);
+  if(customer && customer.doNotContact === true){
+    // 自动 suppressed 分支：先创建快照，再修改
+    const snapshot = createCampaignOperationSnapshot();
+    task.stage = 'suppressed';
+    task.stopReason = '恢复时检测到 doNotContact';
+    task.lastUpdatedAt = new Date().toISOString();
+    task.auditHistory.push({at: new Date().toISOString(), from: 'paused', to: 'suppressed', actor: 'system', note: '恢复时检测到 doNotContact，自动抑制'});
+    const persistResult = safePersistCampaignData(snapshot);
+    if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+    return {success:true, task, autoSuppressed: true};
+  }
+  const targetStage = task.previousStage || 'queued';
+  if(!CAMPAIGN_TASK_STAGES.includes(targetStage) || CAMPAIGN_TERMINAL_STAGES.includes(targetStage)){
+    return {success:false, errors:['无法确定恢复阶段']};
+  }
+  // 正常恢复分支：先创建快照，再修改
+  const snapshot = createCampaignOperationSnapshot();
+  const now = new Date().toISOString();
+  task.stage = targetStage;
+  task.pausedReason = null;
+  task.lastUpdatedAt = now;
+  task.auditHistory.push({at: now, from: 'paused', to: targetStage, actor: 'user', note: '恢复开发'});
+  const persistResult = safePersistCampaignData(snapshot);
+  if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+  return {success:true, task};
+}
+
+function closeCampaignTask(taskId, reason){
+  const task = getCampaignTaskById(taskId);
+  if(!task){ return {success:false, errors:['任务不存在']}; }
+  if(task.stage === 'closed'){ return {success:true, task}; }
+  // 校验通过后创建快照，再修改
+  const snapshot = createCampaignOperationSnapshot();
+  const now = new Date().toISOString();
+  task.previousStage = task.stage;
+  task.stage = 'closed';
+  task.stopReason = reason || '';
+  task.lastUpdatedAt = now;
+  task.auditHistory.push({at: now, from: task.previousStage, to: 'closed', actor: 'user', note: '关闭: ' + (reason || '')});
+  const persistResult = safePersistCampaignData(snapshot);
+  if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+  return {success:true, task};
+}
+
+function syncCampaignTaskCustomerIdentity(taskId){
+  const task = getCampaignTaskById(taskId);
+  if(!task){ return {success:false, errors:['任务不存在']}; }
+  const customer = resolveCampaignTaskCustomer(task);
+  if(!customer){ return {success:false, errors:['无法解析客户']}; }
+  ensureCustomerIdentity(customer);
+  const stableChanged = customer.stableId && customer.stableId !== task.stableCustomerId;
+  const customerIdChanged = customer.id && customer.id !== task.customerId;
+  if(!stableChanged && !customerIdChanged){
+    return {success:true, task, changed: false};
+  }
+  // 有变化时创建快照，再修改
+  const snapshot = createCampaignOperationSnapshot();
+  const now = new Date().toISOString();
+  if(stableChanged){
+    const oldStable = task.stableCustomerId;
+    task.stableCustomerId = customer.stableId;
+    task.auditHistory.push({at: now, from: oldStable, to: customer.stableId, actor: 'system', note: '同步稳定客户身份'});
+  }
+  if(customerIdChanged){
+    task.customerId = customer.id;
+  }
+  task.lastUpdatedAt = now;
+  const persistResult = safePersistCampaignData(snapshot);
+  if(!persistResult.success){ return {success:false, errors:['持久化失败: ' + persistResult.error]}; }
+  return {success:true, task, changed: true};
+}
+
+function createCampaignOperationSnapshot(){
+  return {
+    campaigns: JSON.parse(JSON.stringify(S.campaigns || [])),
+    campaignCustomerTasks: JSON.parse(JSON.stringify(S.campaignCustomerTasks || []))
+  };
+}
+
+function restoreCampaignOperationSnapshot(snapshot){
+  if(!snapshot) return;
+  if(Array.isArray(snapshot.campaigns)){ S.campaigns = JSON.parse(JSON.stringify(snapshot.campaigns)); }
+  if(Array.isArray(snapshot.campaignCustomerTasks)){ S.campaignCustomerTasks = JSON.parse(JSON.stringify(snapshot.campaignCustomerTasks)); }
+}
+
+function safePersistCampaignData(snapshot){
+  try {
+    DB.save('campaigns', S.campaigns);
+  } catch(e){
+    // 第一项失败，恢复内存
+    restoreCampaignOperationSnapshot(snapshot);
+    return {success:false, error: 'campaigns 保存失败: ' + e.message};
+  }
+  try {
+    DB.save('campaignCustomerTasks', S.campaignCustomerTasks);
+  } catch(e){
+    // 第二项失败，补偿写回第一项
+    try { DB.save('campaigns', snapshot.campaigns); } catch(e2){}
+    restoreCampaignOperationSnapshot(snapshot);
+    return {success:false, error: 'campaignCustomerTasks 保存失败: ' + e.message};
+  }
+  return {success:true};
+}
+
 /* ============ 密码登录屏障（服务端验证，可更换，不硬编码） ============ */
 let ACCESS_IS_DEFAULT = false;
 async function checkLock(e){
@@ -1008,7 +1587,7 @@ window.onunhandledrejection = function(event){
 console.log('%c✅ 全局错误处理已启用', 'color:#0f7b3f;font-weight:bold');
 
 /* ---------- 全局状态 ---------- */
-let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[], outreachKnowledgeBase:[] };
+let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[], outreachKnowledgeBase:[], campaigns:[], campaignCustomerTasks:[] };
 function loadState(){
   S.customers = DB.load('customers') || [];
   S.plans = DB.load('plans') || [];
@@ -1172,6 +1751,12 @@ function getTimelineEvents(cid, limit=50){
   S.contentHistory = DB.load('contentHistory') || null;
   S.communications = DB.load('communications') || null;
   S.outreachKnowledgeBase = DB.load('outreachKnowledgeBase') || [];
+  // V79.0A Campaign 数据层
+  S.campaigns = DB.load('campaigns') || [];
+  S.campaignCustomerTasks = DB.load('campaignCustomerTasks') || [];
+  // 非数组安全降级
+  if(!Array.isArray(S.campaigns)){ console.warn('[V79.0A] campaigns 非数组，降级为空数组'); S.campaigns = []; }
+  if(!Array.isArray(S.campaignCustomerTasks)){ console.warn('[V79.0A] campaignCustomerTasks 非数组，降级为空数组'); S.campaignCustomerTasks = []; }
   S.orders = DB.load('orders') || [];
   S.followupTasks = DB.load('followupTasks') || [];
   S.opportunities = DB.load('opportunities') || [];
@@ -1190,7 +1775,7 @@ function getTimelineEvents(cid, limit=50){
   Object.keys(S).forEach(k => {
     if (S[k] === null) {
       // 根据属性名判断应该初始化为数组还是对象
-      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks'];
+      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks'];
       if (arrayKeys.includes(k)) S[k] = [];
       else S[k] = {};
     }
@@ -1237,6 +1822,7 @@ function persist(){
   DB.save('mailQueue',S.mailQueue); DB.save('mailLogs',S.mailLogs); DB.save('smtpConfig',S.smtpConfig);
   DB.save('devPlans',S.devPlans); DB.save('apiLogs',S.apiLogs); DB.save('pipeline2',S.pipeline2);
   DB.save('outreachKnowledgeBase',S.outreachKnowledgeBase);
+  DB.save('campaigns',S.campaigns); DB.save('campaignCustomerTasks',S.campaignCustomerTasks);
 }
 
 /* V74.6 导出客户数据为CSV */
@@ -10253,7 +10839,7 @@ function saveSettings(){
 }
 function exportData(){
   const data = {};
-  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations'].forEach(k=>{ if(S[k]!==undefined) data[k]=S[k]; });
+  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks'].forEach(k=>{ if(S[k]!==undefined) data[k]=S[k]; });
   const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'kailion-ark-backup-'+todayStr()+'.json'; a.click();
@@ -10261,7 +10847,7 @@ function exportData(){
 }
 function resetData(){
   confirmDlg('将清空所有本地数据并重新注入演示数据，确定？', ()=>{
-    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications'].forEach(k=>DB.remove(k));
+    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications','campaigns','campaignCustomerTasks','campaignSchemaVersion'].forEach(k=>DB.remove(k));
     loadState(); seedData(); go('dashboard'); toast('已重置为演示数据');
   });
 }

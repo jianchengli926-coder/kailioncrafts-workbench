@@ -645,40 +645,38 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ============ 可信代理边界判断 ============
+  // 只有来自本机回环地址的请求才可能是本机 Cloudflare Tunnel 反代
+  // 非回环直连请求一律忽略所有 X-Forwarded-* 和 CF-* 代理头（防伪造）
+  function isTrustedTunnelRequest(req) {
+    const socketIp = req.socket.remoteAddress || '';
+    return socketIp === '127.0.0.1' || socketIp === '::1' || socketIp === '::ffff:127.0.0.1';
+  }
+
+  // ============ 安全响应头 ============
+  // isHttps 仅在直连 TLS 或可信 Tunnel + x-forwarded-proto=https 时成立
+  const isHttps = !!req.socket.encrypted || (isTrustedTunnelRequest(req) && req.headers['x-forwarded-proto'] === 'https');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  // CSP: 允许内联脚本（现有单文件架构）、ECharts CDN、data:图片
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'self'");
+  if (isHttps) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+
   // ============ API路由 ============
 
-  // 健康检查API
+  // 健康检查API（最小信息，不暴露内部配置）
   if (pathname === '/api/health') {
-    const ollama = await checkOllama();
-    const onlineChecks = await Promise.all(
-      ONLINE_APIS.map(api => checkOnlineAPI(api.name, api.url))
-    );
-
-    const health = {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      server: { host: HOST, port: PORT },
-      ollama: {
-        running: ollama.running,
-        models: ollama.models,
-        url: OLLAMA_URL
-      },
-      onlineApis: onlineChecks,
-      fallback: {
-        onlineAvailable: onlineChecks.some(a => a.available),
-        localAvailable: ollama.running,
-        strategy: '在线模型优先 → 全部失败时自动切换到本地Ollama模型'
-      }
-    };
-
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify(health, null, 2));
-    log(`健康检查: Ollama=${ollama.running ? '运行中' : '未运行'}, 在线=${onlineChecks.filter(a=>a.available).length}/${onlineChecks.length}`, 'SUCCESS');
+    res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
     return;
   }
 
-  // Ollama代理API（公网禁用）
+  // Ollama代理API（需认证+公网禁用）
   if (pathname.startsWith('/api/ollama/')) {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (scope === 'public') {
       res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -704,8 +702,8 @@ const server = http.createServer(async (req, res) => {
   const ACCESS_CONFIG_FILE = path.join(ROOT_DIR, 'access_config.json');
   const SESSION_COOKIE_NAME = 'kl_session';
   const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8小时
-  const MAX_FAILED_ATTEMPTS = 5;
-  const FAIL_LOCKOUT_MS = 60 * 1000; // 1分钟
+  const MAX_FAILED_ATTEMPTS = 10;
+  const FAIL_LOCKOUT_MS = 15 * 60 * 1000; // 15分钟
 
   // 内存会话存储（不写磁盘）
   const activeSessions = new Map();
@@ -763,7 +761,14 @@ const server = http.createServer(async (req, res) => {
   }
 
   function getClientIp(req) {
-    return req.socket.remoteAddress || 'unknown';
+    const socketIp = req.socket.remoteAddress || 'unknown';
+    // 仅可信 Tunnel 请求（回环地址）才读取 cf-connecting-ip
+    // 非回环直连请求忽略所有代理头，防止伪造
+    const cfConnectingIp = req.headers['cf-connecting-ip'];
+    if (isTrustedTunnelRequest(req) && cfConnectingIp && typeof cfConnectingIp === 'string') {
+      return cfConnectingIp.split(',')[0].trim();
+    }
+    return socketIp;
   }
 
   function isRateLimited(ip) {
@@ -785,15 +790,21 @@ const server = http.createServer(async (req, res) => {
   function createSession(res) {
     const token = crypto.randomBytes(32).toString('hex');
     activeSessions.set(token, { createdAt: Date.now(), expiresAt: Date.now() + SESSION_TTL_MS });
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_MS / 1000}`);
+    const secureFlag = isHttps ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secureFlag}`);
     return token;
   }
 
-  function validateSession(req) {
+  /* 从请求 Cookie 提取当前 session token */
+  function getSessionToken(req) {
     const cookies = req.headers.cookie || '';
     const match = cookies.match(new RegExp(SESSION_COOKIE_NAME + '=([^;]+)'));
-    if (!match) return false;
-    const token = match[1];
+    return match ? match[1] : null;
+  }
+
+  function validateSession(req) {
+    const token = getSessionToken(req);
+    if (!token) return false;
     const session = activeSessions.get(token);
     if (!session) return false;
     if (Date.now() > session.expiresAt) {
@@ -803,21 +814,25 @@ const server = http.createServer(async (req, res) => {
     return true;
   }
 
-  function destroySession(res) {
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`);
+  /* 统一认证中间件：未认证返回 401，已认证返回 true */
+  function requireAuth(req, res) {
+    if (validateSession(req)) return true;
+    res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: '未认证，请先登录', code: 'AUTH_REQUIRED' }));
+    return false;
   }
 
-  // 访问密码状态（公开，不泄露密码）
+  function destroySession(res) {
+    const secureFlag = isHttps ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secureFlag}`);
+  }
+
+  // 访问密码状态（公开最小信息，不泄露默认密码状态或认证状态）
   if (pathname === '/api/access/status' && req.method === 'GET') {
     const config = loadAccessConfig();
-    const ip = getClientIp(req);
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({
-      hasPassword: !!(config.passwordHash || config.password),
-      isDefault: config.changed === false,
-      passwordHint: config.changed === false ? '首次运行已生成临时密码，请在本机登录后立即修改' : null,
-      authenticated: validateSession(req),
-      rateLimited: isRateLimited(ip)
+      hasPassword: !!(config.passwordHash || config.password)
     }));
     return;
   }
@@ -827,7 +842,7 @@ const server = http.createServer(async (req, res) => {
     const ip = getClientIp(req);
     if (isRateLimited(ip)) {
       res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ valid: false, error: '尝试次数过多，请1分钟后再试' }));
+      res.end(JSON.stringify({ valid: false, error: '尝试次数过多，请15分钟后再试' }));
       return;
     }
     try {
@@ -853,8 +868,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 登出
+  // 登出（撤销服务端 session + 清除 Cookie）
   if (pathname === '/api/access/logout' && req.method === 'POST') {
+    const token = getSessionToken(req);
+    if (token) activeSessions.delete(token);
     destroySession(res);
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ success: true }));
@@ -911,8 +928,9 @@ const server = http.createServer(async (req, res) => {
   // ============ 知识库API（只读） ============
 
   // 访问范围调试接口（仅本机可访问）
-  // AI模型配置接口（读取api_config.json，不返回完整Key）
+  // AI模型配置接口（需认证，读取api_config.json，不返回完整Key）
   if (pathname === '/api/ai/config') {
+    if (!requireAuth(req, res)) return;
     try {
       const configPath = require('path').join(ROOT_DIR, 'api_config.json');
       if (!require('fs').existsSync(configPath)) {
@@ -948,6 +966,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/kb/scope-debug') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (scope !== 'local') {
       res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -963,8 +982,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 知识库状态
+  // 知识库状态（需认证）
   if (pathname === '/api/kb/status') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     try {
       // V77.0 Phase 1.2: KB_ROOT为null时fail-closed
@@ -1053,6 +1073,7 @@ const server = http.createServer(async (req, res) => {
 
   // 知识库索引（支持分页和分类过滤）
   if (pathname === '/api/kb/index') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     // V77.0 Phase 1.2: KB_ROOT为null时fail-closed
     if (!KB_ROOT) {
@@ -1110,6 +1131,7 @@ const server = http.createServer(async (req, res) => {
 
   // 知识库单个文件内容（增强敏感过滤）
   if (pathname === '/api/kb/file') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     // V77.0 Phase 1.2: KB_ROOT为null时fail-closed
     if (!KB_ROOT) {
@@ -1213,6 +1235,7 @@ const server = http.createServer(async (req, res) => {
 
   // V77.1 知识库分类树（按访问范围过滤）
   if (pathname === '/api/kb/tree') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (!KB_ROOT) {
       res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1351,6 +1374,7 @@ const server = http.createServer(async (req, res) => {
 
   // V77.1 知识库文档详情
   if (pathname === '/api/kb/document') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (!KB_ROOT) {
       res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1486,6 +1510,7 @@ const server = http.createServer(async (req, res) => {
 
   // 知识库服务端检索（前端不再全量拉取索引）
   if (pathname === '/api/kb/search') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     // V77.0 Phase 1.2: KB_ROOT为null时fail-closed
     if (!KB_ROOT) {
@@ -1682,6 +1707,7 @@ const server = http.createServer(async (req, res) => {
 
   // V77.2 统一知识库上下文检索API（精准开发客户画像/模块C复用）
   if (pathname === '/api/kb/context') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (!KB_ROOT) {
       res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -2272,6 +2298,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/search/config' && req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     const config = loadSearchConfig();
@@ -2301,6 +2328,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/search/config' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     try {
@@ -2336,6 +2364,7 @@ const server = http.createServer(async (req, res) => {
 
   // V75.8 Tavily连接测试（不消耗搜索额度，调用usage接口验证Key有效性）
   if (pathname === '/api/search/test' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     try {
@@ -2385,6 +2414,7 @@ const server = http.createServer(async (req, res) => {
 
   // 统一搜索
   if (pathname === '/api/search' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     try {
@@ -2405,6 +2435,7 @@ const server = http.createServer(async (req, res) => {
 
   // 额度使用统计（接入Tavily官方用量，本地计数作补充）
   if (pathname === '/api/search/usage' && req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     const month = getCurrentMonthKey();
@@ -2486,6 +2517,7 @@ const server = http.createServer(async (req, res) => {
 
   // 网页抓取
   if (pathname === '/api/fetch' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     try {
@@ -3008,6 +3040,7 @@ const server = http.createServer(async (req, res) => {
 
   // 模块C：批量抓取公司官网并提取信息
   if (pathname === '/api/company/fetch' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     try {
@@ -3323,6 +3356,7 @@ const server = http.createServer(async (req, res) => {
 
   // 清除搜索缓存
   if (pathname === '/api/search/cache' && req.method === 'DELETE') {
+    if (!requireAuth(req, res)) return;
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     searchCache = {};

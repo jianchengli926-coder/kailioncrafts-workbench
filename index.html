@@ -747,6 +747,120 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
 
 <script>
 
+/* ============ V78.5 统一 401 会话失效处理 ============ */
+(function(){
+  const _origFetch = window.fetch.bind(window);
+  let _sessionExpiredHandled = false;
+  let _manualLogout = false;
+
+  // 判断是否为同源 /api/* 请求（前缀匹配，用于决定是否检查 401）
+  function isSameOriginApi(url){
+    try {
+      if(typeof url === 'string'){
+        if(url.charAt(0) === '/' && url.indexOf('/api/') === 0) return true;
+        const u = new URL(url, window.location.origin);
+        return u.origin === window.location.origin && u.pathname.indexOf('/api/') === 0;
+      }
+      if(url && url.url){ return isSameOriginApi(url.url); }
+      return false;
+    } catch(e){ return false; }
+  }
+
+  // 精确路径匹配（用于 logout/verify/status，避免 -extra 后缀误判）
+  function isExactApiPath(url, exactPath){
+    try {
+      let pathname;
+      if(typeof url === 'string'){
+        if(url.charAt(0) === '/'){
+          pathname = url.split('?')[0].split('#')[0];
+        } else {
+          const u = new URL(url, window.location.origin);
+          if(u.origin !== window.location.origin) return false;
+          pathname = u.pathname;
+        }
+      } else if(url && url.url){
+        return isExactApiPath(url.url, exactPath);
+      } else {
+        return false;
+      }
+      return pathname === exactPath;
+    } catch(e){ return false; }
+  }
+
+  // 会话失效处理（只执行一次，直到登录成功后重置）
+  function handleSessionExpired(){
+    if(_sessionExpiredHandled) return;
+    _sessionExpiredHandled = true;
+    try { sessionStorage.removeItem('kl_unlocked'); } catch(e){}
+    try {
+      const ls = document.getElementById('lockScreen');
+      if(ls){ ls.style.display = 'flex'; ls.classList.remove('hidden'); }
+      const inp = document.getElementById('lockInput');
+      if(inp){ inp.value=''; setTimeout(()=>inp.focus(),100); }
+    } catch(e){}
+    // 主动登出成功后不重复显示 session-expired toast
+    if(!_manualLogout){
+      try {
+        if(typeof toast === 'function'){
+          toast('登录已失效，请重新验证访问密码', 'err');
+        }
+      } catch(e){}
+    }
+  }
+
+  // 获取 fetch 请求方法（默认 GET，统一大写）
+  function getFetchMethod(input, init){
+    try {
+      if(init && init.method) return String(init.method).toUpperCase();
+      if(input && typeof input === 'object' && input.method) return String(input.method).toUpperCase();
+      return 'GET';
+    } catch(e){ return 'GET'; }
+  }
+
+  // 检查响应：登录成功重置标志 / logout 成功设置 manualLogout
+  function checkResponseAction(url, init, response){
+    try {
+      response.clone().json().then(function(data){
+        // /api/access/verify 精确路径 + valid:true → 登录成功
+        if(isExactApiPath(url, '/api/access/verify') && data && data.valid === true){
+          _sessionExpiredHandled = false;
+          _manualLogout = false;
+        }
+        // /api/access/status 精确路径 + authenticated:true → 已有有效会话
+        if(isExactApiPath(url, '/api/access/status') && data && data.authenticated === true){
+          _sessionExpiredHandled = false;
+          _manualLogout = false;
+        }
+        // /api/access/logout 精确路径 + POST + 200 + success:true → 主动登出成功
+        if(isExactApiPath(url, '/api/access/logout') && getFetchMethod(url, init) === 'POST' && response.status === 200 && data && data.success === true){
+          _manualLogout = true;
+        }
+      }).catch(function(){});
+    } catch(e){}
+  }
+
+  // 包装全局 fetch
+  window.fetch = function(input, init){
+    const isApi = isSameOriginApi(input);
+    return _origFetch(input, init).then(function(response){
+      if(!isApi) return response;
+      // 检查登录成功 / logout 成功
+      if(response.status === 200){
+        checkResponseAction(input, init, response);
+      }
+      // 只处理 401 + AUTH_REQUIRED
+      if(response.status === 401){
+        response.clone().text().then(function(text){
+          if(text && text.indexOf('AUTH_REQUIRED') !== -1){
+            handleSessionExpired();
+          }
+        }).catch(function(){});
+      }
+      return response;
+    });
+  };
+})();
+
 /* ============ 密码登录屏障（服务端验证，可更换，不硬编码） ============ */
 let ACCESS_IS_DEFAULT = false;
 async function checkLock(e){

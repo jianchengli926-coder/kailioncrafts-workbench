@@ -1168,13 +1168,8 @@ function getCampaignTaskDerivedEmailState(task){
     if(draft){
       result.hasDraft = true;
       result.latestDraftId = draft.id;
-      // V77.4/V78.x 标准枚举：reviewStatus='reviewed'/'unreviewed'，status='已审核'/'待审核'
-      // 兼容历史英文值 approved/pending/rejected
-      const isReviewed = draft.reviewStatus === 'reviewed' || draft.status === '已审核' || draft.reviewStatus === 'approved';
-      const isUnreviewed = draft.reviewStatus === 'unreviewed' || draft.status === '待审核' || draft.reviewStatus === 'pending';
-      if(isReviewed){ result.reviewStatus = 'reviewed'; }
-      else if(isUnreviewed){ result.reviewStatus = 'unreviewed'; }
-      else if(draft.reviewStatus === 'rejected'){ result.reviewStatus = 'rejected'; }
+      // V79.0D1 修复：使用统一归一化函数（fail-closed）
+      result.reviewStatus = normalizeDraftReviewStatus(draft);
     }
   }
   // 从 linkedCommunicationIds 读取沟通记录
@@ -1183,25 +1178,43 @@ function getCampaignTaskDerivedEmailState(task){
     const comms = (S.communications || []).filter(c => commIds.includes(c.id));
     if(comms.length > 0){
       result.latestCommunicationId = comms[comms.length - 1].id;
-      const hasSent = comms.some(c => c.type === 'sent' || c.direction === 'outbound');
-      const hasReply = comms.some(c => c.type === 'reply' || c.direction === 'inbound');
+      // V79.0D1 修正：发送证据需要明确字段，普通 outbound 不直接当成发送证据
+      const hasSent = comms.some(c =>
+        c.type === 'sent' || c.status === 'sent' || c.sentAt ||
+        c.manualSendSource === 'manual_mark' || c.evidenceType === 'manual' ||
+        c.deliveryStatus === 'delivered' || c.deliveryStatus === 'sent'
+      );
+      // 回复证据：明确 inbound/reply
+      const hasReply = comms.some(c =>
+        c.type === 'reply' || c.type === 'inbound' || c.direction === 'inbound' ||
+        c.status === 'replied' || c.replied === true
+      );
       if(hasSent){ result.hasSentRecord = true; result.source = 'communication_record'; }
-      if(hasReply){ result.hasReplyRecord = true; }
+      if(hasReply){ result.hasReplyRecord = true; result.source = 'inbound_communication'; }
     }
   }
-  // 从 outreachArchive 读取开发历史
+  // 从 outreachArchive 读取开发历史（V79.0D1：使用 some() 扫描全部，不只读取最后一条）
   if(task.outreachArchiveId){
     const archive = (S.outreachKnowledgeBase || []).find(a => a.archiveId === task.outreachArchiveId);
     if(archive && Array.isArray(archive.developmentHistory) && archive.developmentHistory.length > 0){
       const history = archive.developmentHistory;
-      const latest = history[history.length - 1];
-      if(latest){
-        if(latest.sent === true || latest.status === 'sent'){ result.hasSentRecord = true; }
-        if(latest.replied === true || latest.status === 'replied'){ result.hasReplyRecord = true; }
-      }
+      // 扫描全部历史记录
+      const hasSent = history.some(h => h.sent === true || h.status === 'sent' || h.sentAt);
+      const hasReply = history.some(h => h.replied === true || h.status === 'replied' || h.repliedAt);
+      if(hasSent){ result.hasSentRecord = true; }
+      if(hasReply){ result.hasReplyRecord = true; }
     }
   }
-  // 推荐阶段
+  // 从草稿状态派生（V79.0D1：人工标记发送明确标记）
+  if(draftId){
+    const draft = (S.drafts || []).find(d => d.id === draftId);
+    if(draft && draft.status === '已发送'){
+      result.hasSentRecord = true;
+      result.source = draft.manualSendSource || 'draft_status';
+      result.deliveryStatus = draft.deliveryStatus || 'unknown';
+    }
+  }
+  // 推荐阶段（事实优先级：回复 > 发送 > 已审核 > 有草稿）
   if(result.hasReplyRecord){ result.recommendedStage = 'replied'; }
   else if(result.hasSentRecord){ result.recommendedStage = 'sent'; }
   else if(result.reviewStatus === 'reviewed'){ result.recommendedStage = 'reviewed_ready'; }
@@ -1238,7 +1251,14 @@ function evaluateCustomerForCampaign(campaignId, customerId){
   );
   result.archive = archive;
   // 身份解析状态：只有明确 resolved 才允许，ambiguous/unresolved/unknown 都是 blocker
-  const idStatus = normalizeIdentityResolutionStatus(archive ? archive.identityResolutionStatus : null);
+  let idStatus = normalizeIdentityResolutionStatus(archive ? archive.identityResolutionStatus : null);
+  // V79.0D1 旧档案兼容性：没有 identityResolutionStatus 但 customerId 能匹配到客户，视为 resolved
+  if(idStatus === 'unknown' && archive && archive.customerId){
+    const matchedCustomer = (S.customers || []).find(c => c.id === archive.customerId || c.stableId === archive.customerId);
+    if(matchedCustomer){
+      idStatus = 'resolved';
+    }
+  }
   if(idStatus !== 'resolved'){
     const idLabels = {ambiguous:'待确认', unresolved:'未关联', unknown:'身份状态未知'};
     result.blockers.push('客户身份未解析（' + (idLabels[idStatus] || idStatus) + '）');
@@ -1312,7 +1332,9 @@ function addCustomerToCampaign(campaignId, customerId, options){
     sourceQuery: options.sourceQuery || null,
     addedAt: now,
     lastUpdatedAt: now,
-    assignedDraftId: derived.latestDraftId,
+    // V79.0D1 修复：不自动复用历史 Draft 作为独占操作草稿
+    // 历史开发情况继续通过 archive 和派生状态读取
+    assignedDraftId: null,
     linkedCommunicationIds: [],
     stopReason: null,
     pausedReason: null,
@@ -1482,6 +1504,679 @@ function safePersistCampaignData(snapshot){
     return {success:false, error: 'campaignCustomerTasks 保存失败: ' + e.message};
   }
   return {success:true};
+}
+
+/* ============================================================
+ * V79.0D1 Campaign 开发信联动数据层与原子补偿
+ * 复用现有开发信生成、编辑、审核逻辑，建立 CampaignTask 与 Draft 显式关联
+ * ============================================================ */
+
+// 跨集合操作快照：包含所有可能修改的集合
+function createOutreachWorkflowSnapshot(){
+  return {
+    drafts: JSON.parse(JSON.stringify(S.drafts || [])),
+    campaignCustomerTasks: JSON.parse(JSON.stringify(S.campaignCustomerTasks || [])),
+    outreachKnowledgeBase: JSON.parse(JSON.stringify(S.outreachKnowledgeBase || [])),
+    communications: JSON.parse(JSON.stringify(S.communications || [])),
+    customers: JSON.parse(JSON.stringify(S.customers || []))
+  };
+}
+
+function restoreOutreachWorkflowSnapshotInMemory(snapshot){
+  if(!snapshot) return;
+  if(Array.isArray(snapshot.drafts)){ S.drafts = JSON.parse(JSON.stringify(snapshot.drafts)); }
+  if(Array.isArray(snapshot.campaignCustomerTasks)){ S.campaignCustomerTasks = JSON.parse(JSON.stringify(snapshot.campaignCustomerTasks)); }
+  if(Array.isArray(snapshot.outreachKnowledgeBase)){ S.outreachKnowledgeBase = JSON.parse(JSON.stringify(snapshot.outreachKnowledgeBase)); }
+  if(Array.isArray(snapshot.communications)){ S.communications = JSON.parse(JSON.stringify(snapshot.communications)); }
+  if(Array.isArray(snapshot.customers)){ S.customers = JSON.parse(JSON.stringify(snapshot.customers)); }
+}
+
+// 统一安全持久化：固定顺序，任一步失败恢复内存并补偿已写入项
+// changedKeys 指定实际修改的集合，未修改的集合不执行 DB.save
+// 补偿按 savedKeys 逆序执行，补偿错误收集到 compensationErrors
+function safePersistOutreachWorkflowData(snapshot, changedKeys){
+  const allKeys = ['drafts','campaignCustomerTasks','outreachKnowledgeBase','communications','customers'];
+  // 去重 changedKeys
+  const uniqueKeys = [...new Set(changedKeys || [])];
+  const keysToSave = allKeys.filter(k => uniqueKeys.includes(k));
+  const savedKeys = [];
+
+  for(const key of keysToSave){
+    try {
+      DB.save(key, S[key]);
+      savedKeys.push(key);
+    } catch(e){
+      // 失败：恢复全部内存
+      restoreOutreachWorkflowSnapshotInMemory(snapshot);
+      // 补偿：按 savedKeys 逆序对已成功写入的 key 使用快照原值写回
+      const compensationErrors = [];
+      for(let i = savedKeys.length - 1; i >= 0; i--){
+        const savedKey = savedKeys[i];
+        try { DB.save(savedKey, snapshot[savedKey]); }
+        catch(e2){ compensationErrors.push({key: savedKey, error: e2.message}); }
+      }
+      return {
+        success: false,
+        error: key + ' 保存失败: ' + e.message,
+        failedAt: key,
+        compensationComplete: compensationErrors.length === 0,
+        compensationErrors: compensationErrors
+      };
+    }
+  }
+  return {success: true, compensationComplete: true, compensationErrors: []};
+}
+
+// 审核状态归一化（fail-closed）
+// reviewStatus 为权威字段，只有缺失时才回退到旧 status
+function normalizeDraftReviewStatus(draft){
+  if(!draft) return 'unknown';
+  // reviewStatus 存在时以它为准
+  if(draft.reviewStatus === 'reviewed' || draft.reviewStatus === 'approved') return 'reviewed';
+  if(draft.reviewStatus === 'unreviewed' || draft.reviewStatus === 'pending') return 'unreviewed';
+  if(draft.reviewStatus === 'rejected') return 'rejected';
+  if(draft.reviewStatus) return 'unknown'; // 未知值 fail-closed
+  // reviewStatus 缺失时回退到旧 status
+  if(draft.status === '已审核') return 'reviewed';
+  if(draft.status === '待审核' || draft.status === '已修改') return 'unreviewed';
+  return 'unknown';
+}
+
+// Draft 与 CampaignTask 独占关联校验
+function validateDraftCampaignLink(draftId, taskId){
+  const draft = (S.drafts || []).find(d => d.id === draftId);
+  const task = getCampaignTaskById(taskId);
+  if(!draft || !task) return {success:false, errors:['Draft 或 Task 不存在']};
+
+  // 检查 draft.campaignTaskId
+  if(draft.campaignTaskId && draft.campaignTaskId !== taskId){
+    return {success:false, errors:['Draft 已属于其他 Task: ' + draft.campaignTaskId], conflict: 'draft_belongs_other_task'};
+  }
+
+  // 检查 task.assignedDraftId
+  if(task.assignedDraftId && task.assignedDraftId !== draftId){
+    return {success:false, errors:['Task 已绑定其他 Draft: ' + task.assignedDraftId], conflict: 'task_has_other_draft'};
+  }
+
+  // 检查是否有其他 task 引用同一 draftId
+  const otherTasks = (S.campaignCustomerTasks || []).filter(t =>
+    t.assignedDraftId === draftId && t.taskId !== taskId
+  );
+  if(otherTasks.length > 0){
+    return {success:false, errors:['Draft 被多个 Task 引用'], conflict: 'link_conflict', otherTaskIds: otherTasks.map(t=>t.taskId)};
+  }
+
+  // 检查 campaignId 一致性
+  if(draft.campaignId && task.campaignId && draft.campaignId !== task.campaignId){
+    return {success:false, errors:['CampaignId 不一致'], conflict: 'campaign_mismatch'};
+  }
+
+  // 检查 customerId 一致性
+  if(draft.customerId && task.customerId && draft.customerId !== task.customerId){
+    return {success:false, errors:['CustomerId 不一致'], conflict: 'customer_mismatch'};
+  }
+
+  return {success:true, draft, task};
+}
+
+// 获取 Draft 独占关联的 CampaignTask（fail-closed）
+function getExclusiveCampaignTaskByDraftId(draftId){
+  if(!draftId) return {success:false, errors:['draftId 为空']};
+  const draft = (S.drafts || []).find(d => d.id === draftId);
+  if(!draft) return {success:false, errors:['Draft 不存在']};
+
+  // 如果 draft.campaignTaskId 存在，只能返回该 task
+  if(draft.campaignTaskId){
+    const task = getCampaignTaskById(draft.campaignTaskId);
+    if(!task) return {success:false, errors:['Draft.campaignTaskId 指向不存在的 Task']};
+    // 验证双向关联
+    if(task.assignedDraftId && task.assignedDraftId !== draftId){
+      return {success:false, errors:['双向关联冲突'], conflict: 'link_conflict'};
+    }
+    return {success:true, task, draft};
+  }
+
+  // 否则查找 task.assignedDraftId === draftId
+  const tasks = (S.campaignCustomerTasks || []).filter(t => t.assignedDraftId === draftId);
+  if(tasks.length === 0) return {success:true, task:null, draft, noLink:true};
+  if(tasks.length > 1){
+    return {success:false, errors:['Draft 被多个 Task 引用'], conflict: 'link_conflict', taskIds: tasks.map(t=>t.taskId)};
+  }
+  return {success:true, task: tasks[0], draft};
+}
+
+// 获取 task 关联的有效草稿
+function getCampaignTaskLinkedDraft(task){
+  if(!task) return null;
+  if(task.assignedDraftId){
+    const draft = (S.drafts || []).find(d => d.id === task.assignedDraftId);
+    if(draft) return draft;
+  }
+  return null;
+}
+
+// 将草稿显式关联到 CampaignTask（独占检查）
+function linkDraftToCampaignTask(taskId, draftId){
+  const validation = validateDraftCampaignLink(draftId, taskId);
+  if(!validation.success) return validation;
+  const task = validation.task;
+  const draft = validation.draft;
+  task.assignedDraftId = draftId;
+  draft.campaignId = task.campaignId;
+  draft.campaignTaskId = taskId;
+  return {success:true, task, draft};
+}
+
+// 从草稿同步单个 CampaignTask 状态
+function syncCampaignTaskFromDraft(taskId, options={}){
+  const task = getCampaignTaskById(taskId);
+  if(!task) return {success:false, errors:['任务不存在']};
+  const draft = getCampaignTaskLinkedDraft(task);
+  if(!draft) return {success:true, task, changed:false};
+
+  const derived = getCampaignTaskDerivedEmailState(task);
+  let targetStage = null;
+  let source = null;
+
+  if(options.forceStage){
+    targetStage = options.forceStage;
+    source = options.source || 'manual';
+  } else if(derived.hasReplyRecord){
+    targetStage = 'replied';
+    source = 'inbound_communication';
+  } else if(derived.hasSentRecord || draft.status === '已发送'){
+    targetStage = 'sent';
+    source = draft.manualSendSource || 'draft_status';
+  } else if(derived.reviewStatus === 'reviewed'){
+    targetStage = 'reviewed_ready';
+    source = 'draft_reviewed';
+  } else if(derived.hasDraft || draft.reviewStatus === 'unreviewed' || draft.status === '待审核' || draft.status === '已修改'){
+    targetStage = 'draft_pending_review';
+    source = 'draft_edited';
+  }
+
+  if(targetStage && task.stage !== targetStage && !CAMPAIGN_TERMINAL_STAGES.includes(task.stage)){
+    const now = new Date().toISOString();
+    task.previousStage = task.stage;
+    task.stage = targetStage;
+    task.lastUpdatedAt = now;
+    task.auditHistory.push({
+      at: now, from: task.previousStage, to: targetStage,
+      actor: 'system', source: source,
+      note: options.note || ('草稿同步: ' + source),
+      draftId: draft.id
+    });
+    return {success:true, task, changed:true, newStage: targetStage};
+  }
+  return {success:true, task, changed:false};
+}
+
+// 从草稿同步所有显式关联的 CampaignTask
+function syncCampaignTasksFromDraft(draftId, options={}){
+  const tasks = getCampaignTasksByDraftId(draftId);
+  const results = [];
+  for(const task of tasks){
+    const r = syncCampaignTaskFromDraft(task.taskId, options);
+    results.push(r);
+  }
+  return results;
+}
+
+// CampaignTask 生成首封草稿（异步快照时机修复 + archive 原子同步）
+async function generateCampaignTaskDraft(taskId){
+  // 第一步：初步校验（不创建快照）
+  const task0 = getCampaignTaskById(taskId);
+  if(!task0) return {success:false, errors:['任务不存在']};
+
+  const campaign0 = getCampaignById(task0.campaignId);
+  if(!campaign0) return {success:false, errors:['Campaign 不存在']};
+  if(campaign0.status !== 'active') return {success:false, errors:['Campaign 非 active 状态，禁止生成草稿']};
+
+  if(CAMPAIGN_TERMINAL_STAGES.includes(task0.stage)){
+    return {success:false, errors:['任务已终止，禁止生成草稿']};
+  }
+
+  const allowedStages = ['queued','researching','ready_for_draft'];
+  if(!allowedStages.includes(task0.stage)){
+    return {success:false, errors:['当前阶段 ' + task0.stage + ' 不允许生成首封草稿']};
+  }
+
+  const customer0 = resolveCampaignTaskCustomer(task0);
+  if(!customer0) return {success:false, errors:['客户无法解析']};
+  if(!customer0.stableId) return {success:false, errors:['客户身份待迁移，禁止生成草稿']};
+
+  const archive0 = (S.outreachKnowledgeBase || []).find(a => a.archiveId === task0.outreachArchiveId);
+  if(!archive0) return {success:false, errors:['客户开发档案不存在']};
+
+  let idStatus = normalizeIdentityResolutionStatus(archive0.identityResolutionStatus);
+  // V79.0D1 旧档案兼容性：没有 identityResolutionStatus 但 customerId 能匹配到客户，视为 resolved
+  if(idStatus === 'unknown' && archive0.customerId){
+    const matchedCustomer = (S.customers || []).find(c => c.id === archive0.customerId || c.stableId === archive0.customerId);
+    if(matchedCustomer){
+      idStatus = 'resolved';
+    }
+  }
+  if(idStatus !== 'resolved') return {success:false, errors:['客户身份状态为 ' + idStatus + '，禁止生成草稿']};
+
+  const dupStatus = normalizeOutreachDuplicateStatus(archive0.duplicateStatus);
+  if(dupStatus === 'duplicate' || dupStatus === 'unknown'){
+    return {success:false, errors:['客户去重状态为 ' + dupStatus + '，禁止生成草稿']};
+  }
+
+  if(customer0.doNotContact === true || archive0.doNotContact === true){
+    return {success:false, errors:['客户为 doNotContact，禁止生成草稿']};
+  }
+
+  if(task0.stage === 'suppressed') return {success:false, errors:['任务已抑制，禁止生成草稿']};
+
+  const derived0 = getCampaignTaskDerivedEmailState(task0);
+  if(derived0.hasSentRecord || derived0.hasReplyRecord){
+    return {success:false, errors:['已有发送或回复记录，禁止重新生成首封草稿']};
+  }
+
+  if(task0.assignedDraftId){
+    const existingDraft = (S.drafts || []).find(d => d.id === task0.assignedDraftId);
+    if(existingDraft) return {success:false, errors:['任务已关联草稿，禁止重复生成']};
+  }
+
+  // 第二步：调用生成函数（不持有快照）
+  let result;
+  try {
+    result = await generateOutreachEmailDraft(customer0, {
+      providerPolicy: campaign0.providerPolicy || 'online_safe',
+      lang: customer0.country === '德国' ? 'de' : customer0.country === '日本' ? 'ja' : 'en',
+      tone: 'professional'
+    });
+  } catch(e){
+    return {success:false, errors:['生成异常: ' + e.message]};
+  }
+
+  if(result.error){
+    return {success:false, errors:['生成失败: ' + result.error]};
+  }
+
+  // 第三步：生成结果返回后重新获取对象并二次校验
+  const task = getCampaignTaskById(taskId);
+  if(!task) return {success:false, errors:['任务在生成期间被删除']};
+
+  const campaign = getCampaignById(task.campaignId);
+  if(!campaign || campaign.status !== 'active'){
+    return {success:false, errors:['Campaign 状态在生成期间发生变化，禁止创建草稿']};
+  }
+
+  if(CAMPAIGN_TERMINAL_STAGES.includes(task.stage)){
+    return {success:false, errors:['任务在生成期间被终止，禁止创建草稿']};
+  }
+
+  if(!allowedStages.includes(task.stage)){
+    return {success:false, errors:['任务阶段在生成期间变为 ' + task.stage + '，禁止创建草稿']};
+  }
+
+  const customer = resolveCampaignTaskCustomer(task);
+  if(!customer || !customer.stableId){
+    return {success:false, errors:['客户身份在生成期间发生变化，禁止创建草稿']};
+  }
+
+  const archive = (S.outreachKnowledgeBase || []).find(a => a.archiveId === task.outreachArchiveId);
+  if(!archive){
+    return {success:false, errors:['客户开发档案在生成期间被删除，禁止创建草稿']};
+  }
+
+  const idStatus2 = normalizeIdentityResolutionStatus(archive.identityResolutionStatus);
+  if(idStatus2 !== 'resolved'){
+    return {success:false, errors:['客户身份状态在生成期间变为 ' + idStatus2 + '，禁止创建草稿']};
+  }
+
+  const dupStatus2 = normalizeOutreachDuplicateStatus(archive.duplicateStatus);
+  if(dupStatus2 === 'duplicate' || dupStatus2 === 'unknown'){
+    return {success:false, errors:['客户去重状态在生成期间变为 ' + dupStatus2 + '，禁止创建草稿']};
+  }
+
+  if(customer.doNotContact === true || archive.doNotContact === true){
+    return {success:false, errors:['客户在生成期间变为 doNotContact，禁止创建草稿']};
+  }
+
+  const derived = getCampaignTaskDerivedEmailState(task);
+  if(derived.hasSentRecord || derived.hasReplyRecord){
+    return {success:false, errors:['生成期间出现发送或回复记录，禁止创建草稿']};
+  }
+
+  if(task.assignedDraftId){
+    return {success:false, errors:['生成期间任务已关联其他草稿，禁止创建']};
+  }
+
+  // 第四步：二次校验通过，创建快照
+  const snapshot = createOutreachWorkflowSnapshot();
+  const now = new Date().toISOString();
+
+  try {
+    // 创建草稿
+    const draft = {
+      id: uid(),
+      customerId: customer.id,
+      customerName: customer.company,
+      country: customer.country,
+      language: customer.country === '德国' ? '德语' : customer.country === '日本' ? '日语' : '英语',
+      subject: result.subject || '',
+      body: result.body || '',
+      content: result.body || '',
+      aiNotes: result.aiNotes || ['V79.0D1 Campaign 任务生成：统一知识库事实访问层'],
+      status: '待审核',
+      createdAt: now,
+      sentAt: null,
+      reviewStatus: 'unreviewed',
+      reviewNotes: '',
+      manuallyEdited: false,
+      knowledgeContext: result.knowledgeContext,
+      providerPolicy: campaign.providerPolicy || 'online_safe',
+      campaignId: campaign.campaignId,
+      campaignTaskId: task.taskId,
+      previousVersions: []
+    };
+    S.drafts.unshift(draft);
+
+    // 关联任务
+    task.assignedDraftId = draft.id;
+    task.previousStage = task.stage;
+    task.stage = 'draft_pending_review';
+    task.lastUpdatedAt = now;
+    task.auditHistory.push({
+      at: now, from: task.previousStage, to: 'draft_pending_review',
+      actor: 'system', action: 'campaign_draft_generated',
+      source: 'ai_generation', draftId: draft.id,
+      note: 'Campaign 任务首封草稿已生成'
+    });
+
+    // 第五步：同步 archive（在持久化前）
+    syncCustomerToOutreachKB(customer.id);
+    const changedKeys = ['drafts','campaignCustomerTasks','outreachKnowledgeBase'];
+
+    // 第六步：统一持久化
+    const persistResult = safePersistOutreachWorkflowData(snapshot, changedKeys);
+    if(!persistResult.success){
+      return {success:false, errors:['持久化失败: ' + persistResult.error], persistResult};
+    }
+
+    return {success:true, task, draft};
+  } catch(e){
+    restoreOutreachWorkflowSnapshotInMemory(snapshot);
+    return {success:false, errors:['生成异常: ' + e.message]};
+  }
+}
+
+// CampaignTask 重新生成草稿（完整 fail-closed + 异步快照时机 + archive 原子同步）
+async function regenerateCampaignTaskDraft(taskId){
+  // 第一步：初步校验（不创建快照）
+  const task0 = getCampaignTaskById(taskId);
+  if(!task0) return {success:false, errors:['任务不存在']};
+
+  const campaign0 = getCampaignById(task0.campaignId);
+  if(!campaign0) return {success:false, errors:['Campaign 不存在']};
+  if(campaign0.status !== 'active') return {success:false, errors:['Campaign 非 active，禁止重新生成']};
+
+  if(CAMPAIGN_TERMINAL_STAGES.includes(task0.stage)){
+    return {success:false, errors:['任务已终止，禁止重新生成']};
+  }
+
+  if(task0.stage === 'suppressed') return {success:false, errors:['任务已抑制，禁止重新生成']};
+
+  const draft0 = getCampaignTaskLinkedDraft(task0);
+  if(!draft0) return {success:false, errors:['任务未关联草稿']};
+
+  // 独占关联校验
+  const linkCheck = getExclusiveCampaignTaskByDraftId(draft0.id);
+  if(!linkCheck.success){
+    return {success:false, errors:['Draft 独占关联校验失败: ' + (linkCheck.errors||[]).join('; ')]};
+  }
+
+  const derived0 = getCampaignTaskDerivedEmailState(task0);
+  if(derived0.hasSentRecord || derived0.hasReplyRecord){
+    return {success:false, errors:['已有发送或回复记录，禁止重新生成首封草稿']};
+  }
+
+  const customer0 = resolveCampaignTaskCustomer(task0);
+  if(!customer0) return {success:false, errors:['客户无法解析']};
+  if(!customer0.stableId) return {success:false, errors:['客户身份待迁移，禁止重新生成']};
+
+  // archive 必须存在（fail-closed）
+  const archive0 = (S.outreachKnowledgeBase || []).find(a => a.archiveId === task0.outreachArchiveId);
+  if(!archive0) return {success:false, errors:['客户开发档案不存在，禁止重新生成']};
+
+  if(customer0.doNotContact === true || archive0.doNotContact === true){
+    return {success:false, errors:['客户为 doNotContact，禁止重新生成']};
+  }
+
+  let idStatus = normalizeIdentityResolutionStatus(archive0.identityResolutionStatus);
+  // V79.0D1 旧档案兼容性：没有 identityResolutionStatus 但 customerId 能匹配到客户，视为 resolved
+  if(idStatus === 'unknown' && archive0.customerId){
+    const matchedCustomer = (S.customers || []).find(c => c.id === archive0.customerId || c.stableId === archive0.customerId);
+    if(matchedCustomer){
+      idStatus = 'resolved';
+    }
+  }
+  if(idStatus !== 'resolved') return {success:false, errors:['客户身份状态为 ' + idStatus + '，禁止重新生成']};
+
+  const dupStatus = normalizeOutreachDuplicateStatus(archive0.duplicateStatus);
+  if(dupStatus === 'duplicate' || dupStatus === 'unknown'){
+    return {success:false, errors:['客户去重状态为 ' + dupStatus + '，禁止重新生成']};
+  }
+
+  // 第二步：调用生成函数（不持有快照）
+  let result;
+  try {
+    result = await generateOutreachEmailDraft(customer0, {
+      providerPolicy: draft0.providerPolicy || campaign0.providerPolicy || 'online_safe',
+      lang: draft0.language === '中文' ? 'zh' : draft0.language === '德语' ? 'de' : draft0.language === '日语' ? 'ja' : 'en',
+      tone: 'professional'
+    });
+  } catch(e){
+    return {success:false, errors:['重新生成异常: ' + e.message]};
+  }
+
+  if(result.error){
+    return {success:false, errors:['重新生成失败: ' + result.error]};
+  }
+
+  // 第三步：生成结果返回后重新获取对象并二次校验
+  const task = getCampaignTaskById(taskId);
+  if(!task) return {success:false, errors:['任务在生成期间被删除']};
+
+  const campaign = getCampaignById(task.campaignId);
+  if(!campaign || campaign.status !== 'active'){
+    return {success:false, errors:['Campaign 状态在生成期间发生变化，禁止重新生成']};
+  }
+
+  if(CAMPAIGN_TERMINAL_STAGES.includes(task.stage)){
+    return {success:false, errors:['任务在生成期间被终止，禁止重新生成']};
+  }
+
+  const draft = (S.drafts || []).find(d => d.id === draft0.id);
+  if(!draft) return {success:false, errors:['草稿在生成期间被删除']};
+
+  const linkCheck2 = getExclusiveCampaignTaskByDraftId(draft.id);
+  if(!linkCheck2.success || !linkCheck2.task || linkCheck2.task.taskId !== taskId){
+    return {success:false, errors:['Draft 独占关联在生成期间发生变化，禁止重新生成']};
+  }
+
+  const derived = getCampaignTaskDerivedEmailState(task);
+  if(derived.hasSentRecord || derived.hasReplyRecord){
+    return {success:false, errors:['生成期间出现发送或回复记录，禁止重新生成']};
+  }
+
+  const customer = resolveCampaignTaskCustomer(task);
+  if(!customer || !customer.stableId){
+    return {success:false, errors:['客户身份在生成期间发生变化，禁止重新生成']};
+  }
+
+  const archive = (S.outreachKnowledgeBase || []).find(a => a.archiveId === task.outreachArchiveId);
+  if(!archive){
+    return {success:false, errors:['客户开发档案在生成期间被删除，禁止重新生成']};
+  }
+
+  if(customer.doNotContact === true || archive.doNotContact === true){
+    return {success:false, errors:['客户在生成期间变为 doNotContact，禁止重新生成']};
+  }
+
+  // 第四步：二次校验通过，创建快照
+  const snapshot = createOutreachWorkflowSnapshot();
+  const now = new Date().toISOString();
+
+  try {
+    // 保留旧版本
+    draft.previousVersions = draft.previousVersions || [];
+    draft.previousVersions.unshift({
+      subject: draft.subject, body: draft.body || draft.content || '',
+      reviewNotes: draft.reviewNotes || '', savedAt: now,
+      manuallyEdited: !!draft.manuallyEdited
+    });
+    draft.previousVersions = draft.previousVersions.slice(0,5);
+
+    // 更新草稿
+    draft.subject = result.subject;
+    draft.body = result.body;
+    draft.content = result.body;
+    draft.knowledgeContext = result.knowledgeContext;
+    draft.reviewStatus = 'unreviewed';
+    draft.reviewNotes = '重新生成前版本已保留；请重新人工审核。';
+    draft.manuallyEdited = false;
+    draft.status = '待审核';
+    draft.aiNotes = ['V79.0D1 重新生成：统一知识库事实访问层', '旧版本已保存，事实与模板分离'];
+
+    // 更新任务
+    task.previousStage = task.stage;
+    task.stage = 'draft_pending_review';
+    task.lastUpdatedAt = now;
+    task.auditHistory.push({
+      at: now, from: task.previousStage, to: 'draft_pending_review',
+      actor: 'system', action: 'campaign_draft_regenerated',
+      source: 'ai_regeneration', draftId: draft.id,
+      note: 'Campaign 任务草稿已重新生成，旧版本已保留'
+    });
+
+    // 第五步：同步 archive（在持久化前）
+    syncCustomerToOutreachKB(customer.id);
+    const changedKeys = ['drafts','campaignCustomerTasks','outreachKnowledgeBase'];
+
+    // 第六步：统一持久化
+    const persistResult = safePersistOutreachWorkflowData(snapshot, changedKeys);
+    if(!persistResult.success){
+      return {success:false, errors:['持久化失败: ' + persistResult.error], persistResult};
+    }
+
+    return {success:true, task, draft};
+  } catch(e){
+    restoreOutreachWorkflowSnapshotInMemory(snapshot);
+    return {success:false, errors:['重新生成异常: ' + e.message]};
+  }
+}
+
+// CampaignTask 人工标记已发送（幂等 + 审核状态 fail-closed + archive 原子同步）
+function markCampaignTaskManuallySent(taskId){
+  const task = getCampaignTaskById(taskId);
+  if(!task) return {success:false, errors:['任务不存在']};
+
+  const campaign = getCampaignById(task.campaignId);
+  if(!campaign) return {success:false, errors:['Campaign 不存在']};
+  if(campaign.status !== 'active') return {success:false, errors:['Campaign 非 active，禁止标记发送']};
+
+  if(CAMPAIGN_TERMINAL_STAGES.includes(task.stage) && task.stage !== 'sent'){
+    return {success:false, errors:['任务已终止，禁止标记发送']};
+  }
+
+  const draft = getCampaignTaskLinkedDraft(task);
+  if(!draft) return {success:false, errors:['任务未关联草稿']};
+
+  // 独占关联校验
+  const linkCheck = getExclusiveCampaignTaskByDraftId(draft.id);
+  if(!linkCheck.success){
+    return {success:false, errors:['Draft 独占关联校验失败: ' + (linkCheck.errors||[]).join('; ')]};
+  }
+
+  // 审核状态 fail-closed（使用归一化函数）
+  const reviewStatus = normalizeDraftReviewStatus(draft);
+  if(reviewStatus !== 'reviewed'){
+    return {success:false, errors:['草稿审核状态为 ' + reviewStatus + '，禁止标记发送（需人工审核通过）']};
+  }
+
+  const derived = getCampaignTaskDerivedEmailState(task);
+  if(derived.hasReplyRecord){
+    return {success:false, errors:['已有回复记录，禁止重复标记发送']};
+  }
+
+  if(task.stage === 'suppressed') return {success:false, errors:['任务已抑制，禁止标记发送']};
+
+  // V79.0D1 阻断修复：doNotContact 检查（customer 和 archive）
+  const dncCustomer = resolveCampaignTaskCustomer(task);
+  if(dncCustomer && dncCustomer.doNotContact === true){
+    return {success:false, errors:['客户标记为 doNotContact，禁止标记发送']};
+  }
+  const dncArchive = task.outreachArchiveId ? (S.outreachKnowledgeBase || []).find(a => a.archiveId === task.outreachArchiveId) : null;
+  if(dncArchive && dncArchive.doNotContact === true){
+    return {success:false, errors:['客户档案标记为 doNotContact，禁止标记发送']};
+  }
+
+  // 幂等检查：已人工标记发送则直接返回
+  if(draft.status === '已发送' && draft.sentAt && task.stage === 'sent'){
+    return {success:true, alreadySent:true, task, draft, message:'该草稿已人工标记发送'};
+  }
+
+  // 数据冲突处理：draft 已发送但 task 不是 sent
+  if(draft.status === '已发送' && draft.sentAt && task.stage !== 'sent'){
+    // 安全同步 task 到 sent，记录一次 reconciled，不创建第二次发送事实
+    const snapshot = createOutreachWorkflowSnapshot();
+    const now = new Date().toISOString();
+    task.previousStage = task.stage;
+    task.stage = 'sent';
+    task.lastUpdatedAt = now;
+    task.auditHistory.push({
+      at: now, from: task.previousStage, to: 'sent',
+      actor: 'system', action: 'manual_send_state_reconciled',
+      source: 'reconciliation', draftId: draft.id,
+      note: '草稿已标记发送，同步任务状态（非新发送事实）'
+    });
+    const persistResult = safePersistOutreachWorkflowData(snapshot, ['campaignCustomerTasks']);
+    if(!persistResult.success){
+      return {success:false, errors:['状态同步持久化失败: ' + persistResult.error]};
+    }
+    return {success:true, reconciled:true, task, draft};
+  }
+
+  // 创建快照
+  const snapshot = createOutreachWorkflowSnapshot();
+  const now = new Date().toISOString();
+
+  // 更新草稿：明确标记为人工发送，不声称真实投递
+  draft.status = '已发送';
+  draft.sentAt = now;
+  draft.manualSendSource = 'manual_mark';
+  draft.deliveryStatus = 'unknown'; // 明确表示无真实投递证据
+  draft.evidenceType = 'manual';
+
+  // 更新任务
+  task.previousStage = task.stage;
+  task.stage = 'sent';
+  task.lastUpdatedAt = now;
+  task.auditHistory.push({
+    at: now, from: task.previousStage, to: 'sent',
+    actor: 'user', action: 'campaign_draft_manually_marked_sent',
+    source: 'manual_mark', draftId: draft.id,
+    deliveryStatus: 'unknown', evidenceType: 'manual',
+    note: '人工标记已发送（非真实投递证据，无 SMTP/Webhook/Delivery/Open/Click 确认）'
+  });
+
+  // 同步 archive（在持久化前）
+  const customer = resolveCampaignTaskCustomer(task);
+  if(customer){
+    syncCustomerToOutreachKB(customer.id);
+  }
+  const changedKeys = ['drafts','campaignCustomerTasks','outreachKnowledgeBase'];
+
+  const persistResult = safePersistOutreachWorkflowData(snapshot, changedKeys);
+  if(!persistResult.success){
+    return {success:false, errors:['持久化失败: ' + persistResult.error], persistResult};
+  }
+
+  return {success:true, task, draft};
 }
 
 /* ============================================================
@@ -10927,6 +11622,19 @@ function openDraftEditor(did, isNew){
 }
 function saveDraft(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
+
+  // V79.0D1 修复：独占关联校验（fail-closed）
+  const linkCheck = getExclusiveCampaignTaskByDraftId(did);
+  if(!linkCheck.success){
+    toast('Draft 关联冲突，保存失败: ' + (linkCheck.errors||[]).join('; '), 'err');
+    return;
+  }
+  const linkedTask = linkCheck.task;
+
+  // V79.0D1：创建跨集合快照
+  const snapshot = createOutreachWorkflowSnapshot();
+  const changedKeys = ['drafts'];
+
   d.subject = document.getElementById('dr_subject').value;
   d.body = document.getElementById('dr_body').value;
   d.content = d.body;
@@ -10934,10 +11642,50 @@ function saveDraft(did){
   d.manuallyEdited = true;
   d.reviewStatus = 'unreviewed';
   d.status = '已修改';
-  persist(); syncCustomerToOutreachKB(d.customerId); toast('草稿已保存');
+
+  // V79.0D1：只同步唯一显式关联的 CampaignTask
+  if(linkedTask && !CAMPAIGN_TERMINAL_STAGES.includes(linkedTask.stage)){
+    changedKeys.push('campaignCustomerTasks');
+    const now = new Date().toISOString();
+    linkedTask.previousStage = linkedTask.stage;
+    linkedTask.stage = 'draft_pending_review';
+    linkedTask.lastUpdatedAt = now;
+    linkedTask.auditHistory.push({
+      at: now, from: linkedTask.previousStage, to: 'draft_pending_review',
+      actor: 'user', action: 'campaign_draft_edited',
+      source: 'manual_edit', draftId: did,
+      note: '关联草稿已人工编辑，重置为待审核'
+    });
+  }
+
+  // V79.0D1：同步 archive（在持久化前，纳入同一原子事务）
+  syncCustomerToOutreachKB(d.customerId);
+  changedKeys.push('outreachKnowledgeBase');
+
+  // V79.0D1：统一安全持久化
+  const persistResult = safePersistOutreachWorkflowData(snapshot, changedKeys);
+  if(!persistResult.success){
+    toast('保存失败: ' + persistResult.error, 'err');
+    return;
+  }
+  // 成功后不再调用 syncCustomerToOutreachKB（已在事务内完成）
+  toast('草稿已保存');
 }
 function markDraftReviewed(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
+
+  // V79.0D1 修复：独占关联校验（fail-closed）
+  const linkCheck = getExclusiveCampaignTaskByDraftId(did);
+  if(!linkCheck.success){
+    toast('Draft 关联冲突，审核失败: ' + (linkCheck.errors||[]).join('; '), 'err');
+    return;
+  }
+  const linkedTask = linkCheck.task;
+
+  // V79.0D1：创建跨集合快照
+  const snapshot = createOutreachWorkflowSnapshot();
+  const changedKeys = ['drafts'];
+
   d.subject = document.getElementById('dr_subject').value;
   d.body = document.getElementById('dr_body').value;
   d.content = d.body;
@@ -10945,21 +11693,97 @@ function markDraftReviewed(did){
   d.reviewStatus = 'reviewed';
   d.reviewedAt = now();
   d.status = '已审核';
-  persist(); syncCustomerToOutreachKB(d.customerId);
+
+  // V79.0D1：只同步唯一显式关联的 CampaignTask
+  if(linkedTask && !CAMPAIGN_TERMINAL_STAGES.includes(linkedTask.stage) && linkedTask.stage !== 'reviewed_ready'){
+    changedKeys.push('campaignCustomerTasks');
+    const now = new Date().toISOString();
+    linkedTask.previousStage = linkedTask.stage;
+    linkedTask.stage = 'reviewed_ready';
+    linkedTask.lastUpdatedAt = now;
+    linkedTask.auditHistory.push({
+      at: now, from: linkedTask.previousStage, to: 'reviewed_ready',
+      actor: 'user', action: 'campaign_draft_reviewed',
+      source: 'manual_review', draftId: did,
+      note: '关联草稿已人工审核'
+    });
+  }
+
+  // V79.0D1：同步 archive（在持久化前，纳入同一原子事务）
+  syncCustomerToOutreachKB(d.customerId);
+  changedKeys.push('outreachKnowledgeBase');
+
+  // V79.0D1：统一安全持久化
+  const persistResult = safePersistOutreachWorkflowData(snapshot, changedKeys);
+  if(!persistResult.success){
+    toast('审核保存失败: ' + persistResult.error, 'err');
+    return;
+  }
+  // 成功后不再调用 syncCustomerToOutreachKB（已在事务内完成）
   toast('✅ 已标记人工审核；发送前仍请确认收件人与内容');
   openDraftEditor(did);
 }
 function markSent(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
-  if(d.reviewStatus !== 'reviewed'){ toast('请先完成人工审核并标记已审核','err'); return; }
+
+  // V79.0D1 修复：审核状态 fail-closed（使用归一化函数）
+  const reviewStatus = normalizeDraftReviewStatus(d);
+  if(reviewStatus !== 'reviewed'){ toast('请先完成人工审核并标记已审核','err'); return; }
+
+  // V79.0D1 修复：独占关联校验
+  const linkCheck = getExclusiveCampaignTaskByDraftId(did);
+  if(!linkCheck.success){
+    toast('Draft 关联冲突，标记发送失败: ' + (linkCheck.errors||[]).join('; '), 'err');
+    return;
+  }
+
+  // V79.0D1 修复：如果 Draft 明确关联 CampaignTask，必须复用共享安全函数
+  if(linkCheck.task){
+    const result = markCampaignTaskManuallySent(linkCheck.task.taskId);
+    if(!result.success){
+      toast('标记发送失败: ' + (result.errors||[]).join('; '), 'err');
+      return;
+    }
+    if(result.alreadySent){
+      toast('该草稿已人工标记发送');
+    } else {
+      toast('已人工标记发送（无真实投递证据）');
+    }
+    closeDrawer(); renderView();
+    return;
+  }
+
+  // 无关联 CampaignTask：普通草稿原行为
+  // V79.0D1：创建跨集合快照
+  const snapshot = createOutreachWorkflowSnapshot();
+  const changedKeys = ['drafts'];
+
   d.subject = document.getElementById('dr_subject').value;
   d.body = document.getElementById('dr_body').value;
   d.content = d.body;
   d.reviewNotes = document.getElementById('dr_review_notes').value.trim();
   d.status = '已发送'; d.sentAt = now();
-  const c = S.customers.find(x=>x.id===d.customerId);
-  if(c){ c.status = '已回复'; c.nextFollowUp = daysLater(3); }
-  persist(); syncCustomerToOutreachKB(d.customerId); toast('已标记发送，跟进序列已启动'); closeDrawer(); renderView();
+  // V79.0D1：明确标记人工发送，不声称真实投递
+  d.manualSendSource = 'manual_mark';
+  d.deliveryStatus = 'unknown';
+  d.evidenceType = 'manual';
+
+  // V79.0D1 修复：不再把 customer.status 错误设置为"已回复"
+  // 回复状态只能来自明确 inbound communication 或人工确认的回复记录
+
+  // V79.0D1：同步 archive（在持久化前，纳入同一原子事务）
+  syncCustomerToOutreachKB(d.customerId);
+  changedKeys.push('outreachKnowledgeBase');
+
+  // V79.0D1：统一安全持久化
+  const persistResult = safePersistOutreachWorkflowData(snapshot, changedKeys);
+  if(!persistResult.success){
+    toast('标记发送失败: ' + persistResult.error, 'err');
+    return;
+  }
+  // 成功后不再调用 syncCustomerToOutreachKB（已在事务内完成）
+  toast('已人工标记发送（无真实投递证据）');
+  closeDrawer(); renderView();
 }
 async function regenDraft(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
@@ -10968,9 +11792,45 @@ async function regenDraft(did){
   if(d.manuallyEdited || d.reviewStatus === 'reviewed'){
     if(!confirm('该草稿已有人工修正或审核。重新生成会保留旧版本，但会把新版本设为待审核。确定继续吗？')) return;
   }
+
+  // V79.0D1 修复：独占关联校验
+  const linkCheck = getExclusiveCampaignTaskByDraftId(did);
+  if(!linkCheck.success){
+    toast('Draft 关联冲突，重新生成失败: ' + (linkCheck.errors||[]).join('; '), 'err');
+    return;
+  }
+
+  // V79.0D1 修复：如果 Draft 明确关联 CampaignTask，必须复用共享安全函数
+  if(linkCheck.task){
+    toast('正在通过统一知识库事实访问层重新生成...');
+    const result = await regenerateCampaignTaskDraft(linkCheck.task.taskId);
+    if(!result.success){
+      toast('重新生成失败: ' + (result.errors||[]).join('; '), 'err');
+      return;
+    }
+    openDraftEditor(d.id);
+    toast('✅ 已重新生成，旧版本已保留，等待人工审核');
+    return;
+  }
+
+  // 无关联 CampaignTask：普通草稿原流程
+  // V79.0D1：检查是否已有发送或回复记录（通过 archive）
+  const archive = (S.outreachKnowledgeBase || []).find(a => a.customerId === d.customerId);
+  if(archive){
+    const derived = getCampaignTaskDerivedEmailState({outreachArchiveId: archive.archiveId, assignedDraftId: null, linkedCommunicationIds: archive.linkedCommunicationIds || []});
+    if(derived.hasSentRecord || derived.hasReplyRecord){
+      toast('已有发送或回复记录，禁止重新生成首封草稿','err'); return;
+    }
+  }
+
   toast('正在通过统一知识库事实访问层重新生成...');
   const result = await generateOutreachEmailDraft(c, {providerPolicy:d.providerPolicy || 'online_safe', lang:d.language==='中文'?'zh':'en', tone:'professional'});
   if(result.error){ toast('重新生成失败：'+result.error,'err'); return; }
+
+  // V79.0D1：创建跨集合快照
+  const snapshot = createOutreachWorkflowSnapshot();
+  const changedKeys = ['drafts'];
+
   d.previousVersions = d.previousVersions || [];
   d.previousVersions.unshift({subject:d.subject, body:d.body || d.content || '', reviewNotes:d.reviewNotes || '', savedAt:now(), manuallyEdited:!!d.manuallyEdited});
   d.previousVersions = d.previousVersions.slice(0,5);
@@ -10983,7 +11843,19 @@ async function regenDraft(did){
   d.manuallyEdited = false;
   d.status = '待审核';
   d.aiNotes = ['V77.4 重新生成：统一知识库事实访问层', '旧版本已保存，事实与模板分离'];
-  persist(); syncCustomerToOutreachKB(d.customerId); openDraftEditor(d.id); toast('✅ 已重新生成，旧版本已保留，等待人工审核');
+
+  // V79.0D1：同步 archive（在持久化前，纳入同一原子事务）
+  syncCustomerToOutreachKB(d.customerId);
+  changedKeys.push('outreachKnowledgeBase');
+
+  // V79.0D1：统一安全持久化
+  const persistResult = safePersistOutreachWorkflowData(snapshot, changedKeys);
+  if(!persistResult.success){
+    toast('重新生成保存失败: ' + persistResult.error, 'err');
+    return;
+  }
+  // 成功后不再调用 syncCustomerToOutreachKB（已在事务内完成）
+  openDraftEditor(d.id); toast('✅ 已重新生成，旧版本已保留，等待人工审核');
 }
 function copyDraft(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;

@@ -1250,15 +1250,8 @@ function evaluateCustomerForCampaign(campaignId, customerId){
     (a.normalizedDomain && customer.website && normalizeDomain(customer.website) === a.normalizedDomain)
   );
   result.archive = archive;
-  // 身份解析状态：只有明确 resolved 才允许，ambiguous/unresolved/unknown 都是 blocker
+  // 身份解析状态：只有明确 resolved 才允许，ambiguous/unresolved/unknown/字段缺失都是 blocker（fail-closed，不推断）
   let idStatus = normalizeIdentityResolutionStatus(archive ? archive.identityResolutionStatus : null);
-  // V79.0D1 旧档案兼容性：没有 identityResolutionStatus 但 customerId 能匹配到客户，视为 resolved
-  if(idStatus === 'unknown' && archive && archive.customerId){
-    const matchedCustomer = (S.customers || []).find(c => c.id === archive.customerId || c.stableId === archive.customerId);
-    if(matchedCustomer){
-      idStatus = 'resolved';
-    }
-  }
   if(idStatus !== 'resolved'){
     const idLabels = {ambiguous:'待确认', unresolved:'未关联', unknown:'身份状态未知'};
     result.blockers.push('客户身份未解析（' + (idLabels[idStatus] || idStatus) + '）');
@@ -1619,30 +1612,62 @@ function validateDraftCampaignLink(draftId, taskId){
   return {success:true, draft, task};
 }
 
-// 获取 Draft 独占关联的 CampaignTask（fail-closed）
+// 获取 Draft 独占关联的 CampaignTask（严格双向一致，fail-closed）
+// Campaign Draft 判定：draft.campaignTaskId 或 draft.campaignId 存在，或有 task.assignedDraftId 引用
+// 必须同时满足：draft.campaignTaskId===task.taskId、task.assignedDraftId===draft.id、campaignId 一致、customerId 一致、恰好一个 task 引用
+// 普通非 Campaign Draft：无 campaignTaskId、无 campaignId、无 task 引用 → 返回 noLink
 function getExclusiveCampaignTaskByDraftId(draftId){
   if(!draftId) return {success:false, errors:['draftId 为空']};
   const draft = (S.drafts || []).find(d => d.id === draftId);
   if(!draft) return {success:false, errors:['Draft 不存在']};
 
-  // 如果 draft.campaignTaskId 存在，只能返回该 task
-  if(draft.campaignTaskId){
-    const task = getCampaignTaskById(draft.campaignTaskId);
-    if(!task) return {success:false, errors:['Draft.campaignTaskId 指向不存在的 Task']};
-    // 验证双向关联
-    if(task.assignedDraftId && task.assignedDraftId !== draftId){
-      return {success:false, errors:['双向关联冲突'], conflict: 'link_conflict'};
-    }
-    return {success:true, task, draft};
+  // 收集所有引用该 Draft 的 Task
+  const referencingTasks = (S.campaignCustomerTasks || []).filter(t => t.assignedDraftId === draftId);
+
+  // 是否为 Campaign Draft：任一字段存在即视为有 Campaign 关联意图
+  const isCampaignDraft = !!(draft.campaignTaskId || draft.campaignId || referencingTasks.length > 0);
+
+  if(!isCampaignDraft){
+    // 普通非 Campaign Draft：无任何关联痕迹
+    return {success:true, task:null, draft, noLink:true};
   }
 
-  // 否则查找 task.assignedDraftId === draftId
-  const tasks = (S.campaignCustomerTasks || []).filter(t => t.assignedDraftId === draftId);
-  if(tasks.length === 0) return {success:true, task:null, draft, noLink:true};
-  if(tasks.length > 1){
-    return {success:false, errors:['Draft 被多个 Task 引用'], conflict: 'link_conflict', taskIds: tasks.map(t=>t.taskId)};
+  // Campaign Draft：必须严格双向一致
+
+  // 1. 恰好一个 task 反向引用
+  if(referencingTasks.length === 0){
+    return {success:false, errors:['Draft 有 Campaign 关联标记但无 Task 反向引用'], conflict:'missing_reverse_link', draft};
   }
-  return {success:true, task: tasks[0], draft};
+  if(referencingTasks.length > 1){
+    return {success:false, errors:['Draft 被多个 Task 引用'], conflict:'multiple_task_references', taskIds: referencingTasks.map(t=>t.taskId), draft};
+  }
+
+  const task = referencingTasks[0];
+
+  // 2. draft.campaignTaskId 必须存在且指向该 task（单边：task 有引用但 draft 无正向链接）
+  if(!draft.campaignTaskId){
+    return {success:false, errors:['Task 引用 Draft 但 Draft.campaignTaskId 为空'], conflict:'missing_forward_link', draft, task};
+  }
+  if(draft.campaignTaskId !== task.taskId){
+    return {success:false, errors:['Draft.campaignTaskId 指向 ' + draft.campaignTaskId + ' 但引用 Task 为 ' + task.taskId], conflict:'task_mismatch', draft, task};
+  }
+
+  // 3. task.assignedDraftId 必须等于 draftId（已由过滤保证，显式校验）
+  if(task.assignedDraftId !== draftId){
+    return {success:false, errors:['Task.assignedDraftId 与 Draft.id 不一致'], conflict:'missing_reverse_link', draft, task};
+  }
+
+  // 4. campaignId 一致
+  if(draft.campaignId && task.campaignId && draft.campaignId !== task.campaignId){
+    return {success:false, errors:['CampaignId 不一致: Draft=' + draft.campaignId + ' Task=' + task.campaignId], conflict:'campaign_mismatch', draft, task};
+  }
+
+  // 5. customerId 一致
+  if(draft.customerId && task.customerId && draft.customerId !== task.customerId){
+    return {success:false, errors:['CustomerId 不一致: Draft=' + draft.customerId + ' Task=' + task.customerId], conflict:'customer_mismatch', draft, task};
+  }
+
+  return {success:true, task, draft};
 }
 
 // 获取 task 关联的有效草稿
@@ -1667,11 +1692,26 @@ function linkDraftToCampaignTask(taskId, draftId){
   return {success:true, task, draft};
 }
 
-// 从草稿同步单个 CampaignTask 状态
+// 从草稿同步单个 CampaignTask 状态（先执行严格双向关联校验）
 function syncCampaignTaskFromDraft(taskId, options={}){
   const task = getCampaignTaskById(taskId);
   if(!task) return {success:false, errors:['任务不存在']};
-  const draft = getCampaignTaskLinkedDraft(task);
+
+  let draft = null;
+  if(task.assignedDraftId){
+    // 严格双向关联校验，禁止直接信任 task.assignedDraftId
+    const linkCheck = getExclusiveCampaignTaskByDraftId(task.assignedDraftId);
+    if(!linkCheck.success){
+      return {success:false, errors:['Draft 独占关联校验失败: ' + (linkCheck.errors||[]).join('; ')], conflict: linkCheck.conflict};
+    }
+    if(linkCheck.task && linkCheck.task.taskId !== taskId){
+      return {success:false, errors:['关联 Task 与当前 Task 不一致'], conflict:'task_mismatch'};
+    }
+    draft = linkCheck.draft;
+  } else {
+    // 无 assignedDraftId：尝试普通草稿查找（非 Campaign Draft）
+    draft = getCampaignTaskLinkedDraft(task);
+  }
   if(!draft) return {success:true, task, changed:false};
 
   const derived = getCampaignTaskDerivedEmailState(task);
@@ -1711,15 +1751,18 @@ function syncCampaignTaskFromDraft(taskId, options={}){
   return {success:true, task, changed:false};
 }
 
-// 从草稿同步所有显式关联的 CampaignTask
+// 从草稿同步显式关联的 CampaignTask（使用严格双向独占关联，不批量更新）
 function syncCampaignTasksFromDraft(draftId, options={}){
-  const tasks = getCampaignTasksByDraftId(draftId);
-  const results = [];
-  for(const task of tasks){
-    const r = syncCampaignTaskFromDraft(task.taskId, options);
-    results.push(r);
+  const linkCheck = getExclusiveCampaignTaskByDraftId(draftId);
+  if(!linkCheck.success){
+    return {success:false, errors:['Draft 独占关联校验失败: ' + (linkCheck.errors||[]).join('; ')], conflict: linkCheck.conflict};
   }
-  return results;
+  if(linkCheck.noLink || !linkCheck.task){
+    return {success:true, results: [], synced:0, noLink:true};
+  }
+  // 唯一合法关联：只同步一个 task
+  const r = syncCampaignTaskFromDraft(linkCheck.task.taskId, options);
+  return {success:true, results: [r], synced:1, taskId: linkCheck.task.taskId};
 }
 
 // CampaignTask 生成首封草稿（异步快照时机修复 + archive 原子同步）
@@ -1749,13 +1792,6 @@ async function generateCampaignTaskDraft(taskId){
   if(!archive0) return {success:false, errors:['客户开发档案不存在']};
 
   let idStatus = normalizeIdentityResolutionStatus(archive0.identityResolutionStatus);
-  // V79.0D1 旧档案兼容性：没有 identityResolutionStatus 但 customerId 能匹配到客户，视为 resolved
-  if(idStatus === 'unknown' && archive0.customerId){
-    const matchedCustomer = (S.customers || []).find(c => c.id === archive0.customerId || c.stableId === archive0.customerId);
-    if(matchedCustomer){
-      idStatus = 'resolved';
-    }
-  }
   if(idStatus !== 'resolved') return {success:false, errors:['客户身份状态为 ' + idStatus + '，禁止生成草稿']};
 
   const dupStatus = normalizeOutreachDuplicateStatus(archive0.duplicateStatus);
@@ -1947,13 +1983,6 @@ async function regenerateCampaignTaskDraft(taskId){
   }
 
   let idStatus = normalizeIdentityResolutionStatus(archive0.identityResolutionStatus);
-  // V79.0D1 旧档案兼容性：没有 identityResolutionStatus 但 customerId 能匹配到客户，视为 resolved
-  if(idStatus === 'unknown' && archive0.customerId){
-    const matchedCustomer = (S.customers || []).find(c => c.id === archive0.customerId || c.stableId === archive0.customerId);
-    if(matchedCustomer){
-      idStatus = 'resolved';
-    }
-  }
   if(idStatus !== 'resolved') return {success:false, errors:['客户身份状态为 ' + idStatus + '，禁止重新生成']};
 
   const dupStatus = normalizeOutreachDuplicateStatus(archive0.duplicateStatus);
@@ -2017,6 +2046,28 @@ async function regenerateCampaignTaskDraft(taskId){
     return {success:false, errors:['客户在生成期间变为 doNotContact，禁止重新生成']};
   }
 
+  // 身份状态必须仍为 resolved（等待期间可能变 ambiguous/unresolved/unknown）
+  const idStatus2 = normalizeIdentityResolutionStatus(archive.identityResolutionStatus);
+  if(idStatus2 !== 'resolved'){
+    return {success:false, errors:['客户身份状态在生成期间变为 ' + idStatus2 + '，禁止重新生成']};
+  }
+
+  // 去重状态必须仍为 unique 或 suspected
+  const dupStatus2 = normalizeOutreachDuplicateStatus(archive.duplicateStatus);
+  if(dupStatus2 === 'duplicate' || dupStatus2 === 'unknown'){
+    return {success:false, errors:['客户去重状态在生成期间变为 ' + dupStatus2 + '，禁止重新生成']};
+  }
+
+  // task 不得变为 suppressed
+  if(task.stage === 'suppressed'){
+    return {success:false, errors:['任务在生成期间变为 suppressed，禁止重新生成']};
+  }
+
+  // task.assignedDraftId 必须未发生变化
+  if(task.assignedDraftId !== draft.id){
+    return {success:false, errors:['任务关联草稿在生成期间发生变化，禁止重新生成']};
+  }
+
   // 第四步：二次校验通过，创建快照
   const snapshot = createOutreachWorkflowSnapshot();
   const now = new Date().toISOString();
@@ -2070,7 +2121,7 @@ async function regenerateCampaignTaskDraft(taskId){
   }
 }
 
-// CampaignTask 人工标记已发送（幂等 + 审核状态 fail-closed + archive 原子同步）
+// CampaignTask 人工标记已发送（严格双向关联 + 幂等前置 + 完整安全检查 + archive 原子同步）
 function markCampaignTaskManuallySent(taskId){
   const task = getCampaignTaskById(taskId);
   if(!task) return {success:false, errors:['任务不存在']};
@@ -2083,14 +2134,19 @@ function markCampaignTaskManuallySent(taskId){
     return {success:false, errors:['任务已终止，禁止标记发送']};
   }
 
-  const draft = getCampaignTaskLinkedDraft(task);
-  if(!draft) return {success:false, errors:['任务未关联草稿']};
-
-  // 独占关联校验
-  const linkCheck = getExclusiveCampaignTaskByDraftId(draft.id);
-  if(!linkCheck.success){
-    return {success:false, errors:['Draft 独占关联校验失败: ' + (linkCheck.errors||[]).join('; ')]};
+  // 通过严格双向关联获取 Draft（禁止直接信任 task.assignedDraftId）
+  let draft = null;
+  if(task.assignedDraftId){
+    const linkCheck = getExclusiveCampaignTaskByDraftId(task.assignedDraftId);
+    if(!linkCheck.success){
+      return {success:false, errors:['Draft 独占关联校验失败: ' + (linkCheck.errors||[]).join('; ')], conflict: linkCheck.conflict};
+    }
+    if(!linkCheck.task || linkCheck.task.taskId !== taskId){
+      return {success:false, errors:['独占关联 Task 与当前 Task 不一致'], conflict:'task_mismatch'};
+    }
+    draft = linkCheck.draft;
   }
+  if(!draft) return {success:false, errors:['任务未关联草稿']};
 
   // 审核状态 fail-closed（使用归一化函数）
   const reviewStatus = normalizeDraftReviewStatus(draft);
@@ -2103,26 +2159,37 @@ function markCampaignTaskManuallySent(taskId){
     return {success:false, errors:['已有回复记录，禁止重复标记发送']};
   }
 
-  if(task.stage === 'suppressed') return {success:false, errors:['任务已抑制，禁止标记发送']};
-
-  // V79.0D1 阻断修复：doNotContact 检查（customer 和 archive）
-  const dncCustomer = resolveCampaignTaskCustomer(task);
-  if(dncCustomer && dncCustomer.doNotContact === true){
-    return {success:false, errors:['客户标记为 doNotContact，禁止标记发送']};
-  }
-  const dncArchive = task.outreachArchiveId ? (S.outreachKnowledgeBase || []).find(a => a.archiveId === task.outreachArchiveId) : null;
-  if(dncArchive && dncArchive.doNotContact === true){
-    return {success:false, errors:['客户档案标记为 doNotContact，禁止标记发送']};
-  }
-
-  // 幂等检查：已人工标记发送则直接返回
+  // 幂等检查（无写入操作，在业务校验前识别：已 sent 状态不因后来新增 DNC 而重复处理）
   if(draft.status === '已发送' && draft.sentAt && task.stage === 'sent'){
     return {success:true, alreadySent:true, task, draft, message:'该草稿已人工标记发送'};
   }
 
-  // 数据冲突处理：draft 已发送但 task 不是 sent
+  // 以下为有写入操作的路径，需完整业务校验
+  if(task.stage === 'suppressed') return {success:false, errors:['任务已抑制，禁止标记发送']};
+
+  const customer = resolveCampaignTaskCustomer(task);
+  if(!customer) return {success:false, errors:['客户无法解析，禁止标记发送']};
+  if(!customer.stableId) return {success:false, errors:['客户身份待迁移，禁止标记发送']};
+
+  const archive = task.outreachArchiveId ? (S.outreachKnowledgeBase || []).find(a => a.archiveId === task.outreachArchiveId) : null;
+  if(!archive) return {success:false, errors:['客户开发档案不存在，禁止标记发送']};
+
+  const idStatus = normalizeIdentityResolutionStatus(archive.identityResolutionStatus);
+  if(idStatus !== 'resolved'){
+    return {success:false, errors:['客户身份状态为 ' + idStatus + '，禁止标记发送']};
+  }
+
+  const dupStatus = normalizeOutreachDuplicateStatus(archive.duplicateStatus);
+  if(dupStatus === 'duplicate' || dupStatus === 'unknown'){
+    return {success:false, errors:['客户去重状态为 ' + dupStatus + '，禁止标记发送']};
+  }
+
+  if(customer.doNotContact === true || archive.doNotContact === true){
+    return {success:false, errors:['客户标记为 doNotContact，禁止标记发送']};
+  }
+
+  // 数据冲突处理：draft 已发送但 task 不是 sent → reconciliation（纳入 archive 原子事务，fail-closed）
   if(draft.status === '已发送' && draft.sentAt && task.stage !== 'sent'){
-    // 安全同步 task 到 sent，记录一次 reconciled，不创建第二次发送事实
     const snapshot = createOutreachWorkflowSnapshot();
     const now = new Date().toISOString();
     task.previousStage = task.stage;
@@ -2134,11 +2201,18 @@ function markCampaignTaskManuallySent(taskId){
       source: 'reconciliation', draftId: draft.id,
       note: '草稿已标记发送，同步任务状态（非新发送事实）'
     });
-    const persistResult = safePersistOutreachWorkflowData(snapshot, ['campaignCustomerTasks']);
+    // 同步 archive（纳入同一原子事务）
+    syncCustomerToOutreachKB(customer.id);
+    const persistResult = safePersistOutreachWorkflowData(snapshot, ['campaignCustomerTasks','outreachKnowledgeBase']);
     if(!persistResult.success){
-      return {success:false, errors:['状态同步持久化失败: ' + persistResult.error]};
+      return {success:false, errors:['状态同步持久化失败: ' + persistResult.error], persistResult};
     }
     return {success:true, reconciled:true, task, draft};
+  }
+
+  // 正常标记发送：task.stage 必须为 reviewed_ready，不得从 queued/researching/paused 直接跳 sent
+  if(task.stage !== 'reviewed_ready'){
+    return {success:false, errors:['任务阶段为 ' + task.stage + '，与已审核草稿不一致，需先同步到 reviewed_ready'], conflict:'stage_mismatch'};
   }
 
   // 创建快照
@@ -2164,11 +2238,8 @@ function markCampaignTaskManuallySent(taskId){
     note: '人工标记已发送（非真实投递证据，无 SMTP/Webhook/Delivery/Open/Click 确认）'
   });
 
-  // 同步 archive（在持久化前）
-  const customer = resolveCampaignTaskCustomer(task);
-  if(customer){
-    syncCustomerToOutreachKB(customer.id);
-  }
+  // 同步 archive（在持久化前，纳入同一原子事务）
+  syncCustomerToOutreachKB(customer.id);
   const changedKeys = ['drafts','campaignCustomerTasks','outreachKnowledgeBase'];
 
   const persistResult = safePersistOutreachWorkflowData(snapshot, changedKeys);
@@ -11754,6 +11825,13 @@ function markSent(did){
   }
 
   // 无关联 CampaignTask：普通草稿原行为
+  // V79.0D1 第二轮修复：幂等——已人工标记发送则不覆盖 sentAt、不重复同步 archive、不执行 DB.save
+  if(d.status === '已发送' && d.sentAt){
+    toast('该草稿已人工标记发送');
+    closeDrawer(); renderView();
+    return;
+  }
+
   // V79.0D1：创建跨集合快照
   const snapshot = createOutreachWorkflowSnapshot();
   const changedKeys = ['drafts'];
@@ -20017,6 +20095,89 @@ function resolveCustomerByIdOrIdentity(customerId, archive){
  * ============================================================ */
 const CUSTOMER_IDENTITY_MIGRATION_VERSION = 'v78.2';
 
+/* 身份迁移完整性检查：验证 completed 状态下数据是否真正完整 */
+function checkIdentityMigrationIntegrity(){
+  const customers = S.customers || [];
+  const archives = S.outreachKnowledgeBase || [];
+  const issues = [];
+  // 所有 customer 都已有 stableId、identityKey 和 identityAliases
+  for(const c of customers){
+    if(!c.stableId) issues.push('customer ' + (c.id||'?') + ' 缺 stableId');
+    if(!c.identityKey) issues.push('customer ' + (c.id||'?') + ' 缺 identityKey');
+    if(!c.identityAliases || !Array.isArray(c.identityAliases)) issues.push('customer ' + (c.id||'?') + ' 缺 identityAliases');
+  }
+  // 所有 archive 的 identityResolutionStatus 都是 resolved / ambiguous / unresolved 之一
+  // 所有 resolved archive 的 customerId 都能匹配真实 customer
+  for(const a of archives){
+    const s = normalizeIdentityResolutionStatus(a.identityResolutionStatus);
+    if(s === 'unknown') issues.push('archive ' + (a.archiveId||'?') + ' 身份状态缺失或非法');
+    if(s === 'resolved'){
+      const matched = customers.find(c => c.id === a.customerId);
+      if(!matched) issues.push('resolved archive ' + (a.archiveId||'?') + ' 的 customerId 无法匹配真实客户');
+    }
+  }
+  return {complete: issues.length === 0, issues};
+}
+
+/* 迁移事务持久化：将核心集合与 customerIdentityMigration 纳入同一补偿边界
+ * 任一步失败：恢复内存 + 对已写入 key 逆序补偿到快照原值
+ * migrationState 保存失败时，核心集合也必须回滚存储 */
+function safePersistMigrationTransaction(snapshot, changedKeys, newMigrationState){
+  const allKeys = ['drafts','campaignCustomerTasks','outreachKnowledgeBase','communications','customers'];
+  const uniqueKeys = [...new Set(changedKeys || [])];
+  const keysToSave = allKeys.filter(k => uniqueKeys.includes(k));
+  const savedKeys = [];
+
+  // 捕获 migrationState 原值（DB.load 无法区分不存在与 null，用 localStorage 精确检测）
+  const _migStorageKey = PREFIX + 'customerIdentityMigration';
+  const _migExisted = localStorage.getItem(_migStorageKey) !== null;
+  const _migOriginal = _migExisted ? DB.load('customerIdentityMigration') : undefined;
+
+  // 统一补偿：migrationState 最后写入故最先补偿，然后核心集合逆序补偿
+  function _compensateAll(){
+    restoreOutreachWorkflowSnapshotInMemory(snapshot);
+    const errors = [];
+    // 1. 补偿 migrationState（即使 dirty write 后抛错也必须恢复）
+    try {
+      if(_migExisted){
+        DB.save('customerIdentityMigration', _migOriginal);
+      } else {
+        DB.remove('customerIdentityMigration');
+      }
+    } catch(e){
+      errors.push({key: 'customerIdentityMigration', error: e.message});
+    }
+    // 2. 逆序补偿已保存的核心集合
+    for(let i = savedKeys.length - 1; i >= 0; i--){
+      try { DB.save(savedKeys[i], snapshot[savedKeys[i]]); }
+      catch(e){ errors.push({key: savedKeys[i], error: e.message}); }
+    }
+    return errors;
+  }
+
+  // 1. 按固定顺序保存核心集合
+  for(const key of keysToSave){
+    try {
+      DB.save(key, S[key]);
+      savedKeys.push(key);
+    } catch(e){
+      const compensationErrors = _compensateAll();
+      return {success:false, error: key + ' 保存失败: ' + e.message, failedAt: key, compensationComplete: compensationErrors.length === 0, compensationErrors};
+    }
+  }
+
+  // 2. 保存 migrationState（与核心集合同一事务）
+  try {
+    DB.save('customerIdentityMigration', newMigrationState);
+  } catch(e){
+    // 即使抛错也可能发生 dirty write，必须补偿 migrationState 自身
+    const compensationErrors = _compensateAll();
+    return {success:false, error: 'customerIdentityMigration 保存失败: ' + e.message, failedAt: 'customerIdentityMigration', compensationComplete: compensationErrors.length === 0, compensationErrors};
+  }
+
+  return {success:true, compensationComplete:true, compensationErrors:[]};
+}
+
 /* 执行客户身份迁移：将 archive 中的旧 customerId 映射到当前稳定客户 ID */
 function migrateCustomerIdentities(){
   const archives = S.outreachKnowledgeBase || [];
@@ -20025,11 +20186,18 @@ function migrateCustomerIdentities(){
   const communications = S.communications || [];
   if(!archives.length || !customers.length) return {migrated:0, ambiguous:0, unresolved:0, skipped:0, status:'skipped'};
 
-  // 检查迁移版本，避免重复执行（仅 completed 状态跳过，pending_review/failed 允许重试）
+  // 检查迁移版本：completed 状态需通过完整性检查才跳过，否则重新执行幂等修复
   const migrationState = DB.load('customerIdentityMigration') || {};
   if(migrationState.version === CUSTOMER_IDENTITY_MIGRATION_VERSION && migrationState.status === 'completed'){
-    return {migrated:0, ambiguous:0, unresolved:0, skipped:archives.length, alreadyMigrated:true, status:'completed'};
+    const integrity = checkIdentityMigrationIntegrity();
+    if(integrity.complete){
+      return {migrated:0, ambiguous:0, unresolved:0, skipped:archives.length, alreadyMigrated:true, status:'completed'};
+    }
+    console.log('V78.2 migration completed but integrity check failed (' + integrity.issues.length + ' issues), re-running repair');
   }
+
+  // 在任何修改之前创建快照（用于失败补偿）
+  const snapshot = createOutreachWorkflowSnapshot();
 
   // 先确保所有客户都有 identity 信息（不覆盖已有值）
   customers.forEach(c => ensureCustomerIdentity(c));
@@ -20045,22 +20213,39 @@ function migrateCustomerIdentities(){
 
   let migrated = 0, ambiguous = 0, unresolved = 0, skipped = 0;
   const idMapping = {}; // oldId -> newCustomer
-  let migrationError = null;
 
   try {
     archives.forEach(a => {
-      // 已经能直接匹配的跳过（幂等：已 resolved 且 customerId 有效）
-      const directMatch = customers.find(c => c.id === a.customerId);
-      if(directMatch){
-        if(a.identityResolutionStatus !== 'resolved'){
-          a.identityResolutionStatus = 'resolved';
-          a.identityResolutionMethod = 'direct_id';
-        }
+      const currentStatus = normalizeIdentityResolutionStatus(a.identityResolutionStatus);
+
+      // ambiguous / unresolved：不可自动升级，保持不变
+      if(currentStatus === 'ambiguous' || currentStatus === 'unresolved'){
         skipped++;
         return;
       }
 
-      // 收集 archive 的身份别名
+      // resolved 且 customerId 有效：跳过
+      if(currentStatus === 'resolved'){
+        const validCustomer = customers.find(c => c.id === a.customerId);
+        if(validCustomer){ skipped++; return; }
+        // resolved 但 customerId 失效：已有人工绑定证据的不得覆盖
+        if(a.identityResolutionMethod === 'manual_bind'){ skipped++; return; }
+        // resolved 但 customerId 失效且无人工证据 → 损坏关联，进入安全重新匹配流程（不使用 directMatch 猜测）
+      }
+
+      // 以下处理：unknown 状态 OR resolved-but-invalid-customerId（损坏关联）
+      // unknown 状态可走 directMatch；损坏关联的 customerId 已失效，directMatch 不会命中，自然落入别名匹配
+
+      // 直接 ID 匹配（仅对 unknown 状态有效；损坏关联的 customerId 不匹配真实客户）
+      const directMatch = customers.find(c => c.id === a.customerId);
+      if(directMatch){
+        a.identityResolutionStatus = 'resolved';
+        a.identityResolutionMethod = 'direct_id';
+        skipped++;
+        return;
+      }
+
+      // 收集 archive 的身份别名（依据现有 identity aliases、域名、邮箱域名、公司名和国家）
       const archiveAliases = [];
       if(a.normalizedDomain) archiveAliases.push('domain:' + a.normalizedDomain);
       if(a.emails && a.emails.length){
@@ -20083,12 +20268,10 @@ function migrateCustomerIdentities(){
       const candidates = Object.values(candidateScores).sort((a,b) => b.score - a.score);
 
       if(candidates.length === 1){
-        // 唯一匹配：安全迁移
+        // 唯一候选：安全重绑为 resolved，保留旧 customerId 到 legacyCustomerIds
         const newCustomer = candidates[0].customer;
         const oldId = a.customerId;
         idMapping[oldId] = newCustomer;
-
-        // 更新 archive（幂等：不重复追加 legacyCustomerIds）
         a.customerId = newCustomer.id;
         a.identityResolutionStatus = 'resolved';
         a.identityResolutionMethod = 'identity_match';
@@ -20101,7 +20284,7 @@ function migrateCustomerIdentities(){
         const topScore = candidates[0].score;
         const topCandidates = candidates.filter(x => x.score === topScore);
         if(topCandidates.length === 1){
-          // 唯一最高分：安全迁移
+          // 唯一最高分：安全重绑
           const newCustomer = topCandidates[0].customer;
           const oldId = a.customerId;
           idMapping[oldId] = newCustomer;
@@ -20113,21 +20296,21 @@ function migrateCustomerIdentities(){
           if(oldId && !a.legacyCustomerIds.includes(oldId)) a.legacyCustomerIds.push(oldId);
           migrated++;
         } else {
-          // 多候选且得分相同：不自动绑定
+          // 同分多候选：改为 ambiguous，保存候选和说明
           a.identityResolutionStatus = 'ambiguous';
           a.identityCandidates = topCandidates.map(x => ({customerId:x.customer.id, customerName:x.customer.company, identityKey:x.customer.identityKey, score:x.score}));
           a.identityResolutionNote = '存在 ' + topCandidates.length + ' 个候选客户得分相同（' + topScore + ' 分），需人工确认';
           ambiguous++;
         }
       } else {
-        // 无候选：保留旧 ID，标记待补充
+        // 无候选：改为 unresolved，保存说明
         a.identityResolutionStatus = 'unresolved';
         a.identityResolutionNote = '无法通过域名/邮箱/公司名匹配到客户主记录';
         unresolved++;
       }
     });
 
-    // 同步更新草稿的 customerId（幂等：不重复追加 legacyCustomerIds）
+    // 同步更新草稿和沟通记录的 customerId（幂等：不重复追加 legacyCustomerIds）
     if(Object.keys(idMapping).length){
       drafts.forEach(d => {
         if(idMapping[d.customerId]){
@@ -20137,7 +20320,6 @@ function migrateCustomerIdentities(){
           if(oldId && !d.legacyCustomerIds.includes(oldId)) d.legacyCustomerIds.push(oldId);
         }
       });
-      // 同步更新沟通记录的 customerId
       communications.forEach(comm => {
         if(idMapping[comm.customerId]){
           const oldId = comm.customerId;
@@ -20148,18 +20330,12 @@ function migrateCustomerIdentities(){
       });
     }
 
-    // 关键修复：持久化所有修改的数据（customers/outreachKnowledgeBase/drafts/communications）
-    // 只有这些数据保存成功后，才能保存迁移状态
-    DB.save('customers', S.customers);
-    DB.save('outreachKnowledgeBase', S.outreachKnowledgeBase);
-    DB.save('drafts', S.drafts);
-    DB.save('communications', S.communications);
+    // 修复后重新执行完整性检查
+    const postIntegrity = checkIdentityMigrationIntegrity();
+    // 只有完整性检查通过且没有 ambiguous/unresolved 时，才能写 completed
+    const status = (postIntegrity.complete && ambiguous === 0 && unresolved === 0) ? 'completed' : 'pending_review';
 
-    // 确定迁移状态：全部 resolved -> completed，有 ambiguous/unresolved -> pending_review
-    const status = (ambiguous === 0 && unresolved === 0) ? 'completed' : 'pending_review';
-
-    // 保存迁移状态（在数据保存成功之后）
-    DB.save('customerIdentityMigration', {
+    const newMigrationState = {
       version: CUSTOMER_IDENTITY_MIGRATION_VERSION,
       status: status,
       migratedAt: new Date().toISOString(),
@@ -20167,26 +20343,24 @@ function migrateCustomerIdentities(){
       ambiguousCount: ambiguous,
       unresolvedCount: unresolved,
       skippedCount: skipped,
-      note: status === 'pending_review' ? '存在待人工确认的关联，可重试迁移' : '全部档案已关联'
-    });
+      note: status === 'pending_review' ? '存在待人工确认的关联或数据不完整，可重试迁移' : '全部档案已关联'
+    };
 
-    return {migrated, ambiguous, unresolved, skipped, status};
-  } catch(e) {
-    // 保存失败：标记 failed，不标记 completed，允许重试
-    migrationError = e.message;
-    console.error('V78.2 identity migration failed:', e);
-    try {
-      DB.save('customerIdentityMigration', {
-        version: CUSTOMER_IDENTITY_MIGRATION_VERSION,
-        status: 'failed',
-        failedAt: new Date().toISOString(),
-        error: migrationError,
-        note: '迁移失败，可重试'
-      });
-    } catch(saveErr) {
-      console.error('V78.2 migration state save failed:', saveErr);
+    // 核心集合与 migrationState 纳入同一补偿边界持久化
+    const changedKeys = ['customers','outreachKnowledgeBase'];
+    if(Object.keys(idMapping).length) changedKeys.push('drafts','communications');
+    const persistResult = safePersistMigrationTransaction(snapshot, changedKeys, newMigrationState);
+    if(!persistResult.success){
+      throw new Error('迁移事务持久化失败: ' + persistResult.error);
     }
-    return {migrated, ambiguous, unresolved, skipped, status:'failed', error:migrationError};
+
+    return {migrated, ambiguous, unresolved, skipped, status, integrityComplete: postIntegrity.complete};
+  } catch(e) {
+    // 失败：恢复内存（safePersistMigrationTransaction 已在持久化失败时补偿存储）
+    // 不写新的 failed migrationState 覆盖原始 migrationState
+    restoreOutreachWorkflowSnapshotInMemory(snapshot);
+    console.error('V78.2 identity migration failed:', e);
+    return {migrated, ambiguous, unresolved, skipped, status:'failed', error:e.message};
   }
 }
 

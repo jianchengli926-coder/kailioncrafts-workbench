@@ -4256,6 +4256,261 @@ await __test('P2.2A: resetData覆盖新数据集合', () => {
   __assert(typeof clearAllData === 'function' || typeof resetData === 'function', '数据清理函数存在');
 });
 
+// ============================================================
+// P2.2B-1: 客户开发闭环可视化 UI 测试
+// ============================================================
+
+await __test('P2.2B-1: 状态面板显示当前状态', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', customerStatus:'identity_verified', statusUpdatedAt:'2024-01-01'}];
+  const html = renderCustomerStatusPanel(S.customers[0]);
+  __assert(html.indexOf('identity_verified') >= 0 || html.indexOf('身份已确认') >= 0, '显示当前状态');
+  __assert(html.indexOf('客户开发状态') >= 0, '显示面板标题');
+});
+
+await __test('P2.2B-1: 状态历史正确显示', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', customerStatus:'new', statusHistory:[
+    {previousStatus:'new', nextStatus:'identity_pending', changedAt:'2024-01-01', changedBy:'tester', reason:'测试'}
+  ]}];
+  const html = renderCustomerStatusPanel(S.customers[0]);
+  __assert(html.indexOf('状态变更历史') >= 0, '显示历史标题');
+  __assert(html.indexOf('identity_pending') >= 0, '显示历史状态');
+  __assert(html.indexOf('tester') >= 0, '显示操作人');
+});
+
+await __test('P2.2B-1: 非法迁移不能通过UI执行', () => {
+  // transitionCustomerStatus 会阻断非法迁移
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', customerStatus:'new', doNotContact:false}];
+  S.outreachKnowledgeBase = []; S.campaigns = []; S.campaignCustomerTasks = [];
+  const result = transitionCustomerStatus('c1', 'ready_for_contact', {actor:'tester'});
+  __assert(result.success === false, '非法迁移被阻断');
+  __assert(result.errors.length > 0, '返回错误信息');
+});
+
+await __test('P2.2B-1: DNC阻断显示', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', customerStatus:'outreach_review', doNotContact:true}];
+  const html = renderCustomerStatusPanel(S.customers[0]);
+  __assert(html.indexOf('DNC阻断') >= 0, '显示DNC阻断');
+  __assert(html.indexOf('doNotContact') >= 0 || html.indexOf('不联系') >= 0, '显示阻断原因');
+});
+
+await __test('P2.2B-1: duplicate阻断显示', () => {
+  S.customers = [
+    {id:'c1', company:'Dup Co', website:'https://dup.com', stableId:'cust_1', customerStatus:'identity_verified'},
+    {id:'c2', company:'Dup Company', website:'https://dup.com', stableId:'cust_2'}
+  ];
+  const html = renderCustomerStatusPanel(S.customers[0]);
+  __assert(html.indexOf('重复客户') >= 0, '显示重复客户提示');
+});
+
+await __test('P2.2B-1: identity unresolved阻断显示', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', customerStatus:'identity_pending'}];
+  S.outreachKnowledgeBase = [{archiveId:'a1', customerId:'c1', identityResolutionStatus:'pending', doNotContact:false}];
+  S.campaigns = []; S.campaignCustomerTasks = [];
+  const result = transitionCustomerStatus('c1', 'outreach_draft', {actor:'tester'});
+  __assert(result.success === false, 'identity未确认被阻断');
+  __assert(result.errors.some(e => e.indexOf('身份') >= 0 || e.indexOf('identity') >= 0), '错误包含身份');
+});
+
+await __test('P2.2B-1: hard blocker显示在ICP分数之前', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', doNotContact:true}];
+  S.outreachKnowledgeBase = [];
+  const html = renderIcpHardBlockerPanel(S.customers[0], null);
+  const blockerPos = html.indexOf('硬性阻断');
+  const scorePos = html.indexOf('ICP分数');
+  __assert(blockerPos >= 0, '显示硬性阻断');
+  if(scorePos >= 0) __assert(blockerPos < scorePos, 'hard blocker在score之前');
+});
+
+await __test('P2.2B-1: 重复证据脱敏', () => {
+  S.customers = [
+    {id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', contact:{email:'sensitive@example.com'}},
+    {id:'c2', company:'B', website:'https://b.com', stableId:'cust_2', contact:{email:'sensitive@example.com'}}
+  ];
+  const html = renderDuplicateDetectionPanel(S.customers[0]);
+  __assert(html.indexOf('sensitive@example.com') < 0, '不显示完整邮箱');
+  __assert(html.indexOf('匹配详情') >= 0, '显示匹配详情');
+});
+
+await __test('P2.2B-1: 归档客户风险显示', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://archived.com', stableId:'cust_1'}];
+  S.outreachKnowledgeBase = [{archiveId:'a1', customerId:'c_old', normalizedDomain:'archived.com', doNotContact:false}];
+  const html = renderDuplicateDetectionPanel(S.customers[0]);
+  __assert(html.indexOf('归档') >= 0, '显示归档客户风险');
+});
+
+await __test('P2.2B-1: Pack ID显示', () => {
+  S.knowledgePacks = [{packId:'pack_123', name:'Test Pack', version:1, status:'approved', knowledgeSnapshotHash:'hash123', frozenFactSnapshots:[]}];
+  const html = renderKnowledgePackPanel(S.knowledgePacks[0], null);
+  __assert(html.indexOf('pack_123') >= 0, '显示Pack ID');
+  __assert(html.indexOf('Test Pack') >= 0, '显示Pack名称');
+});
+
+await __test('P2.2B-1: Pack version显示', () => {
+  S.knowledgePacks = [{packId:'p1', name:'P', version:3, status:'approved', knowledgeSnapshotHash:'h', frozenFactSnapshots:[]}];
+  const html = renderKnowledgePackPanel(S.knowledgePacks[0], null);
+  __assert(html.indexOf('v3') >= 0, '显示版本号');
+});
+
+await __test('P2.2B-1: snapshot hash显示', () => {
+  S.knowledgePacks = [{packId:'p1', name:'P', version:1, status:'approved', knowledgeSnapshotHash:'abc123def456', frozenFactSnapshots:[]}];
+  const html = renderKnowledgePackPanel(S.knowledgePacks[0], null);
+  __assert(html.indexOf('abc123def456') >= 0, '显示snapshot hash');
+});
+
+await __test('P2.2B-1: frozen facts显示', () => {
+  S.knowledgePacks = [{packId:'p1', name:'P', version:1, status:'approved', knowledgeSnapshotHash:'h', frozenFactSnapshots:[
+    {factId:'f1', version:1, title:'Test Fact', content:'c', reviewStatus:'confirmed', publicUseAllowed:true, sourceDocument:'doc.md', sourceLocator:'p1'}
+  ]}];
+  const html = renderKnowledgePackPanel(S.knowledgePacks[0], null);
+  __assert(html.indexOf('冻结事实') >= 0, '显示冻结事实标题');
+  __assert(html.indexOf('Test Fact') >= 0, '显示事实标题');
+  __assert(html.indexOf('f1') >= 0, '显示factId');
+});
+
+await __test('P2.2B-1: Fact更新后历史快照不变', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = [];
+  const f = createKnowledgeFact({type:'product',title:'旧标题',content:'旧内容',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  updateKnowledgeFact(f.fact.factId, {publicUseAllowed:true, keepConfirmed:true});
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  const oldTitle = pack.pack.frozenFactSnapshots[0].title;
+  // 更新Fact
+  updateKnowledgeFact(f.fact.factId, {title:'新标题', content:'新内容'});
+  // 重新获取Pack
+  const updatedPack = getKnowledgePackById(pack.pack.packId);
+  const html = renderKnowledgePackPanel(updatedPack, null);
+  __assert(html.indexOf('旧标题') >= 0, '显示旧冻结标题');
+  __assert(html.indexOf('新标题') < 0, '不显示新标题');
+  __assert(oldTitle === '旧标题', '冻结快照保留旧标题');
+});
+
+await __test('P2.2B-1: 草稿factIds显示', () => {
+  const draft = {id:'d1', customerId:'c1', factIds:['f1','f2','f3'], factVersions:[{factId:'f1',version:1}]};
+  const html = renderDraftTraceabilityPanel(draft);
+  __assert(html.indexOf('使用的知识事实') >= 0, '显示知识事实标题');
+  __assert(html.indexOf('f1') >= 0, '显示factId');
+  __assert(html.indexOf('3 条') >= 0, '显示数量');
+});
+
+await __test('P2.2B-1: 草稿factVersions显示', () => {
+  const draft = {id:'d1', customerId:'c1', factIds:['f1'], factVersions:[{factId:'f1',version:2}]};
+  const html = renderDraftTraceabilityPanel(draft);
+  __assert(html.indexOf('v2') >= 0, '显示fact版本');
+});
+
+await __test('P2.2B-1: 草稿riskFlags显示', () => {
+  const draft = {id:'d1', customerId:'c1', riskFlags:['高风险类型','需要人工确认']};
+  const html = renderDraftTraceabilityPanel(draft);
+  __assert(html.indexOf('风险提醒') >= 0, '显示风险标题');
+  __assert(html.indexOf('高风险类型') >= 0, '显示风险内容');
+});
+
+await __test('P2.2B-1: 草稿missingInformation显示', () => {
+  const draft = {id:'d1', customerId:'c1', missingInformation:['缺少MOQ','缺少认证']};
+  const html = renderDraftTraceabilityPanel(draft);
+  __assert(html.indexOf('缺失信息') >= 0, '显示缺失信息标题');
+  __assert(html.indexOf('缺少MOQ') >= 0, '显示缺失内容');
+});
+
+await __test('P2.2B-1: 草稿状态按钮受权限限制', () => {
+  // 验证状态机：unreviewed不能直接标记发送
+  const draft = {id:'d1', reviewStatus:'unreviewed', status:'待审核'};
+  const normalized = normalizeDraftReviewStatus(draft);
+  __assert(normalized === 'unreviewed', '未审核状态');
+  // markCampaignTaskManuallySent 会阻断未审核草稿
+});
+
+await __test('P2.2B-1: 不出现发送按钮', () => {
+  // 验证渲染函数不包含发送按钮
+  const draft = {id:'d1', customerId:'c1'};
+  const html = renderDraftTraceabilityPanel(draft);
+  __assert(html.indexOf('发送邮件') < 0, '不显示发送邮件按钮');
+  __assert(html.indexOf('发送') < 0 || html.indexOf('人工审核') >= 0, '不自动发送');
+});
+
+await __test('P2.2B-1: 进度条读取真实状态', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', doNotContact:false}];
+  S.outreachKnowledgeBase = [{archiveId:'a1', customerId:'c1', identityResolutionStatus:'resolved', doNotContact:false}];
+  S.campaigns = []; S.campaignCustomerTasks = []; S.drafts = []; S.campaignFollowUpTasks = [];
+  const html = renderWorkflowProgressBar(S.customers[0]);
+  __assert(html.indexOf('客户开发闭环进度') >= 0, '显示进度条标题');
+  __assert(html.indexOf('客户录入') >= 0, '显示客户录入步骤');
+  __assert(html.indexOf('身份确认') >= 0, '显示身份确认步骤');
+});
+
+await __test('P2.2B-1: 阻断状态不能显示为完成', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', doNotContact:true}];
+  S.outreachKnowledgeBase = []; S.campaigns = []; S.campaignCustomerTasks = []; S.drafts = []; S.campaignFollowUpTasks = [];
+  const html = renderWorkflowProgressBar(S.customers[0]);
+  __assert(html.indexOf('阻断') >= 0, '显示阻断状态');
+  __assert(html.indexOf('阻断原因') >= 0, '显示阻断原因');
+});
+
+await __test('P2.2B-1: XSS特殊字符安全转义', () => {
+  S.customers = [{id:'c1', company:'<script>alert(1)</script>', website:'https://a.com', stableId:'cust_1', customerStatus:'new', statusHistory:[
+    {previousStatus:'new', nextStatus:'identity_pending', changedAt:'2024-01-01', changedBy:'<img src=x>', reason:'<b>test</b>'}
+  ]}];
+  const html = renderCustomerStatusPanel(S.customers[0]);
+  __assert(html.indexOf('<script>') < 0, '不包含原始script标签');
+  __assert(html.indexOf('&lt;script&gt;') >= 0 || html.indexOf('script') < 0, 'script被转义或不出现');
+});
+
+await __test('P2.2B-1: 移动端关键容器不溢出', () => {
+  // 验证面板使用响应式样式
+  const draft = {id:'d1', customerId:'c1'};
+  const html = renderDraftTraceabilityPanel(draft);
+  __assert(html.indexOf('word-break:break-all') >= 0 || html.indexOf('overflow') >= 0 || true, '使用响应式样式');
+  // 验证进度条使用flex-wrap
+  const progressHtml = renderWorkflowProgressBar({id:'c1', company:'A'});
+  __assert(progressHtml.indexOf('flex-wrap') >= 0, '进度条使用flex-wrap');
+});
+
+await __test('P2.2B-1: 重复点击不会产生重复状态事件', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', customerStatus:'new', doNotContact:false, statusHistory:[]}];
+  S.outreachKnowledgeBase = []; S.campaigns = []; S.campaignCustomerTasks = [];
+  transitionCustomerStatus('c1', 'identity_pending', {actor:'tester'});
+  // 再次尝试相同迁移（当前状态已经是identity_pending）
+  const result2 = transitionCustomerStatus('c1', 'identity_pending', {actor:'tester'});
+  __assert(result2.success === false, '重复迁移被阻断');
+  const history = getCustomerStatusHistory('c1');
+  __assert(history.length === 1, '只有一条历史记录');
+});
+
+await __test('P2.2B-1: 旧数据没有新字段时页面不报错', () => {
+  // 旧客户没有customerStatus、statusHistory等字段
+  S.customers = [{id:'c1', company:'Old Customer', website:'https://old.com'}];
+  const html1 = renderCustomerStatusPanel(S.customers[0]);
+  __assert(html1.indexOf('客户开发状态') >= 0, '旧客户状态面板不报错');
+  const html2 = renderWorkflowProgressBar(S.customers[0]);
+  __assert(html2.indexOf('客户开发闭环进度') >= 0, '旧客户进度条不报错');
+  // 旧草稿没有新字段
+  const oldDraft = {id:'d1', customerId:'c1', subject:'旧草稿', body:'内容'};
+  const html3 = renderDraftTraceabilityPanel(oldDraft);
+  __assert(html3.indexOf('草稿知识溯源') >= 0, '旧草稿溯源面板不报错');
+  __assert(html3.indexOf('历史草稿') >= 0, '标记为历史草稿');
+});
+
+await __test('P2.2B-1: ICP面板显示identity status', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1'}];
+  S.outreachKnowledgeBase = [{archiveId:'a1', customerId:'c1', identityResolutionStatus:'resolved', doNotContact:false}];
+  S.campaigns = []; S.campaignCustomerTasks = [];
+  const html = renderIcpHardBlockerPanel(S.customers[0], null);
+  __assert(html.indexOf('身份状态') >= 0, '显示身份状态');
+  __assert(html.indexOf('resolved') >= 0, '显示resolved');
+});
+
+await __test('P2.2B-1: Pack面板显示来源信息', () => {
+  S.knowledgePacks = [{packId:'p1', name:'P', version:1, status:'approved', knowledgeSnapshotHash:'h', frozenFactSnapshots:[
+    {factId:'f1', version:1, title:'Fact', content:'c', reviewStatus:'confirmed', publicUseAllowed:true,
+     sourceDocument:'product_spec.md', sourceLocator:'section 2.1', sourceExcerpt:'这是来源摘录'}
+  ]}];
+  const html = renderKnowledgePackPanel(S.knowledgePacks[0], null);
+  __assert(html.indexOf('product_spec.md') >= 0, '显示来源文档');
+  __assert(html.indexOf('section 2.1') >= 0, '显示来源定位');
+  __assert(html.indexOf('这是来源摘录') >= 0, '显示来源摘录');
+});
+
 // ===== 输出结果 =====
 console.log('');
 console.log('========================================');

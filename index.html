@@ -23040,6 +23040,398 @@ function logCustomerOutreachEvent(customerId, eventType, detail, actor){
   return event;
 }
 
+/* ============================================================
+ * P2.2B-1 客户开发闭环可视化 UI 渲染函数
+ * ============================================================ */
+
+/* 客户状态机可视化面板 */
+function renderCustomerStatusPanel(customer){
+  if(!customer) return '<div class="panel-empty">客户不存在</div>';
+  const currentStatus = migrateCustomerStatusCompat(customer.customerStatus || 'new');
+  const statusDef = getCustomerStatusDefinition(currentStatus);
+  const history = getCustomerStatusHistory(customer.id) || [];
+  const isDnc = customer.doNotContact === true;
+  const dupResult = detectDuplicateCustomer(customer, {excludeId: customer.id});
+
+  let html = '<div class="status-panel" style="padding:16px;background:#f8fafc;border-radius:8px;margin-bottom:16px;">';
+  html += '<h4 style="margin:0 0 12px 0;font-size:15px;color:#1e293b;">客户开发状态</h4>';
+
+  // 当前状态
+  const statusColors = {
+    new:'#64748b', identity_pending:'#f59e0b', identity_verified:'#10b981',
+    duplicate_review:'#f59e0b', dnc_blocked:'#ef4444', icp_pending:'#f59e0b',
+    icp_qualified:'#10b981', icp_blocked:'#ef4444', knowledge_pack_pending:'#f59e0b',
+    outreach_draft:'#3b82f6', outreach_review:'#f59e0b', ready_for_contact:'#10b981',
+    contacted:'#3b82f6', follow_up:'#8b5cf6', replied:'#10b981',
+    opportunity:'#f59e0b', closed:'#64748b', archived:'#94a3b8'
+  };
+  const color = statusColors[currentStatus] || '#64748b';
+  html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">';
+  html += '<span style="display:inline-block;padding:6px 14px;border-radius:20px;color:#fff;font-size:13px;font-weight:600;background:' + color + ';">' + esc(statusDef.label || currentStatus) + '</span>';
+  html += '<span style="font-size:12px;color:#64748b;">进入时间: ' + esc(customer.statusUpdatedAt || customer.updatedAt || '—') + '</span>';
+  html += '</div>';
+
+  // 阻断提示
+  if(isDnc){
+    html += '<div style="padding:10px 14px;background:#fef2f2;border-left:3px solid #ef4444;border-radius:4px;margin-bottom:10px;font-size:13px;color:#991b1b;">⚠️ DNC阻断：客户标记为不联系，禁止进入对外开发流程</div>';
+  }
+  if(dupResult.isDuplicate){
+    html += '<div style="padding:10px 14px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:4px;margin-bottom:10px;font-size:13px;color:#92400e;">⚠️ 重复客户：检测到 ' + dupResult.matches.length + ' 个匹配，需先处理重复检测</div>';
+  }
+
+  // 状态历史时间线
+  if(history.length > 0){
+    html += '<div style="margin-top:12px;">';
+    html += '<div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:8px;">状态变更历史</div>';
+    html += '<div style="max-height:200px;overflow-y:auto;">';
+    for(const h of history.slice(0, 20)){
+      html += '<div style="padding:8px 12px;border-left:2px solid #e2e8f0;margin-left:8px;margin-bottom:6px;font-size:12px;">';
+      html += '<div style="color:#1e293b;"><b>' + esc(h.previousStatus || '—') + '</b> → <b>' + esc(h.nextStatus || '—') + '</b></div>';
+      html += '<div style="color:#64748b;margin-top:2px;">' + esc(h.changedAt || '') + ' · ' + esc(h.changedBy || 'system') + '</div>';
+      if(h.reason) html += '<div style="color:#475569;margin-top:2px;">原因: ' + esc(h.reason) + '</div>';
+      if(h.blockedBy) html += '<div style="color:#ef4444;margin-top:2px;">阻断: ' + esc(h.blockedBy) + '</div>';
+      html += '</div>';
+    }
+    html += '</div></div>';
+  } else {
+    html += '<div style="font-size:12px;color:#94a3b8;margin-top:8px;">暂无状态变更历史</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+/* 重复客户检测结果面板 */
+function renderDuplicateDetectionPanel(customer){
+  if(!customer) return '<div class="panel-empty">客户不存在</div>';
+  const result = detectDuplicateCustomer(customer, {excludeId: customer.id});
+
+  let html = '<div class="duplicate-panel" style="padding:16px;background:#f8fafc;border-radius:8px;margin-bottom:16px;">';
+  html += '<h4 style="margin:0 0 12px 0;font-size:15px;color:#1e293b;">重复客户检测</h4>';
+
+  if(result.isDuplicate){
+    html += '<div style="padding:10px 14px;background:#fef2f2;border-radius:6px;margin-bottom:12px;font-size:13px;color:#991b1b;font-weight:600;">⚠️ 检测到重复客户（置信度: ' + (result.confidence * 100).toFixed(0) + '%）</div>';
+  } else if(result.hasArchivedRisk){
+    html += '<div style="padding:10px 14px;background:#fffbeb;border-radius:6px;margin-bottom:12px;font-size:13px;color:#92400e;">⚠️ 存在归档客户匹配（风险提示，非active重复）</div>';
+  } else {
+    html += '<div style="padding:10px 14px;background:#f0fdf4;border-radius:6px;margin-bottom:12px;font-size:13px;color:#166534;">✅ 未检测到重复客户</div>';
+  }
+
+  if(result.matches.length > 0){
+    html += '<div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:8px;">匹配详情（已脱敏）</div>';
+    html += '<div style="max-height:180px;overflow-y:auto;">';
+    for(const m of result.matches){
+      const fieldLabels = {stableCustomerId:'稳定ID', domain:'域名', company:'公司名', email:'邮箱', email_domain:'邮箱域名', domain_archived:'归档域名'};
+      html += '<div style="padding:8px 12px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;font-size:12px;">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+      html += '<span style="color:#1e293b;font-weight:600;">' + esc(fieldLabels[m.matchedField] || m.matchedField) + '</span>';
+      html += '<span style="color:#64748b;">置信度: ' + (m.confidence * 100).toFixed(0) + '%</span>';
+      html += '</div>';
+      html += '<div style="color:#475569;margin-top:4px;">匹配客户ID: ' + esc(m.matchedCustomerId || '—') + '</div>';
+      html += '<div style="color:#64748b;margin-top:2px;">证据: ' + esc(m.matchedValueMasked || m.evidence || '—') + '</div>';
+      if(m.isArchived) html += '<div style="color:#f59e0b;margin-top:2px;">归档客户</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  html += '<div style="margin-top:10px;font-size:12px;color:#64748b;">建议: ' + esc(result.isDuplicate ? '请人工核实重复客户，决定合并或保留' : (result.hasArchivedRisk ? '请注意归档客户历史，避免重复联系' : '可继续客户开发流程')) + '</div>';
+  html += '</div>';
+  return html;
+}
+
+/* ICP 和 hard blockers 面板 */
+function renderIcpHardBlockerPanel(customer, campaign){
+  if(!customer) return '<div class="panel-empty">客户不存在</div>';
+
+  let icpScore = null;
+  let hardBlockers = [];
+  let identityStatus = 'unresolved';
+  let productFit = 'unknown';
+  let marketFit = 'unknown';
+  let evidence = [];
+  let missingEvidence = [];
+  let riskFlags = [];
+
+  // 从 archive 获取 identity 状态
+  const archive = (S.outreachKnowledgeBase || []).find(a => a.customerId === customer.id);
+  if(archive){
+    identityStatus = normalizeIdentityResolutionStatus(archive.identityResolutionStatus);
+  }
+
+  // 从 Campaign 获取 ICP 评估
+  if(campaign){
+    const evalResult = evaluateCustomerForCampaign(campaign.campaignId, customer.id);
+    if(evalResult){
+      icpScore = evalResult.icpScore || evalResult.score || null;
+      hardBlockers = evalResult.blockers || [];
+      productFit = evalResult.productFit || 'unknown';
+      marketFit = evalResult.marketFit || 'unknown';
+      evidence = evalResult.evidence || [];
+      missingEvidence = evalResult.missingEvidence || [];
+      riskFlags = evalResult.riskFlags || [];
+    }
+  } else {
+    // 尝试从第一个 active Campaign 获取
+    const activeCampaigns = (S.campaigns || []).filter(c => c.status === 'active');
+    if(activeCampaigns.length > 0){
+      const evalResult = evaluateCustomerForCampaign(activeCampaigns[0].campaignId, customer.id);
+      if(evalResult){
+        icpScore = evalResult.icpScore || evalResult.score || null;
+        hardBlockers = evalResult.blockers || [];
+      }
+    }
+  }
+
+  let html = '<div class="icp-panel" style="padding:16px;background:#f8fafc;border-radius:8px;margin-bottom:16px;">';
+  html += '<h4 style="margin:0 0 12px 0;font-size:15px;color:#1e293b;">ICP 评估与硬性阻断</h4>';
+
+  // hard blockers 优先显示
+  if(hardBlockers.length > 0){
+    html += '<div style="padding:12px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;margin-bottom:12px;">';
+    html += '<div style="font-size:13px;font-weight:700;color:#991b1b;margin-bottom:8px;">🚫 硬性阻断（不可进入对外开发）</div>';
+    for(const b of hardBlockers){
+      html += '<div style="font-size:12px;color:#991b1b;padding:4px 0;">• ' + esc(b) + '</div>';
+    }
+    html += '</div>';
+  }
+
+  // ICP score
+  if(icpScore !== null){
+    const scoreColor = icpScore >= 70 ? '#10b981' : icpScore >= 40 ? '#f59e0b' : '#ef4444';
+    html += '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;">';
+    html += '<div style="text-align:center;">';
+    html += '<div style="font-size:32px;font-weight:700;color:' + scoreColor + ';">' + icpScore + '</div>';
+    html += '<div style="font-size:11px;color:#64748b;">ICP分数（仅建议）</div>';
+    html += '</div>';
+    html += '<div style="flex:1;font-size:12px;">';
+    html += '<div style="color:#475569;">身份状态: <b>' + esc(identityStatus) + '</b></div>';
+    html += '<div style="color:#475569;margin-top:2px;">产品匹配: <b>' + esc(productFit) + '</b></div>';
+    html += '<div style="color:#475569;margin-top:2px;">市场匹配: <b>' + esc(marketFit) + '</b></div>';
+    html += '</div></div>';
+  } else {
+    html += '<div style="padding:10px 14px;background:#f1f5f9;border-radius:6px;margin-bottom:12px;font-size:12px;color:#64748b;">尚未进行 ICP 评估</div>';
+    // 即使没有ICP评估，也显示identity状态
+    html += '<div style="font-size:12px;color:#475569;margin-bottom:8px;">身份状态: <b>' + esc(identityStatus) + '</b></div>';
+  }
+
+  // 证据和缺失
+  if(evidence.length > 0){
+    html += '<div style="font-size:12px;font-weight:600;color:#166534;margin-bottom:4px;">匹配证据</div>';
+    html += '<div style="font-size:11px;color:#475569;margin-bottom:8px;">' + evidence.map(e => '• ' + esc(String(e))).join('<br>') + '</div>';
+  }
+  if(missingEvidence.length > 0){
+    html += '<div style="font-size:12px;font-weight:600;color:#92400e;margin-bottom:4px;">缺失证据</div>';
+    html += '<div style="font-size:11px;color:#78350f;margin-bottom:8px;">' + missingEvidence.map(e => '• ' + esc(String(e))).join('<br>') + '</div>';
+  }
+  if(riskFlags.length > 0){
+    html += '<div style="font-size:12px;font-weight:600;color:#991b1b;margin-bottom:4px;">风险标记</div>';
+    html += '<div style="font-size:11px;color:#991b1b;">' + riskFlags.map(e => '• ' + esc(String(e))).join('<br>') + '</div>';
+  }
+
+  // 结论
+  if(hardBlockers.length > 0){
+    html += '<div style="margin-top:10px;padding:8px 12px;background:#fef2f2;border-radius:6px;font-size:12px;color:#991b1b;font-weight:600;">结论: 存在硬性阻断，不可进入对外开发流程</div>';
+  } else if(icpScore !== null){
+    html += '<div style="margin-top:10px;padding:8px 12px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#166534;font-weight:600;">结论: 无硬性阻断，可进入人工审核流程</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+/* Knowledge Pack 和事实依据面板 */
+function renderKnowledgePackPanel(pack, campaign){
+  if(!pack && !campaign) return '<div class="panel-empty">无 Knowledge Pack</div>';
+  if(!pack && campaign) pack = (S.knowledgePacks || []).find(p => p.packId === campaign.knowledgePackId);
+  if(!pack) return '<div class="panel-empty">Knowledge Pack 不存在</div>';
+
+  let html = '<div class="pack-panel" style="padding:16px;background:#f8fafc;border-radius:8px;margin-bottom:16px;">';
+  html += '<h4 style="margin:0 0 12px 0;font-size:15px;color:#1e293b;">Knowledge Pack 知识依据</h4>';
+
+  // Pack 基本信息
+  const statusColors = {draft:'#f59e0b', approved:'#10b981', archived:'#94a3b8'};
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">';
+  html += '<span style="padding:4px 10px;border-radius:12px;color:#fff;font-size:11px;font-weight:600;background:' + (statusColors[pack.status] || '#64748b') + ';">' + esc(pack.status) + '</span>';
+  html += '<span style="font-size:14px;font-weight:600;color:#1e293b;">' + esc(pack.name || '未命名') + '</span>';
+  html += '<span style="font-size:12px;color:#64748b;">v' + esc(pack.version || '1') + '</span>';
+  html += '</div>';
+
+  html += '<div style="font-size:12px;color:#475569;line-height:1.8;">';
+  html += '<div>Pack ID: <code style="background:#e2e8f0;padding:1px 6px;border-radius:3px;font-size:11px;">' + esc(pack.packId) + '</code></div>';
+  html += '<div>Snapshot Hash: <code style="background:#e2e8f0;padding:1px 6px;border-radius:3px;font-size:11px;word-break:break-all;">' + esc(pack.knowledgeSnapshotHash || '—') + '</code></div>';
+  if(campaign){
+    html += '<div>绑定时间: ' + esc(campaign.knowledgeBoundAt || '—') + '</div>';
+    html += '<div>绑定人: ' + esc(campaign.knowledgeBoundBy || '—') + '</div>';
+  }
+  if(pack.approvedBy) html += '<div>批准人: ' + esc(pack.approvedBy) + ' · ' + esc(pack.approvedAt || '') + '</div>';
+  html += '</div>';
+
+  // hash 校验
+  if(pack.status === 'approved' && pack.frozenFactSnapshots && pack.frozenFactSnapshots.length > 0){
+    const recomputed = _knowledgeSimpleHash(JSON.stringify(pack.frozenFactSnapshots) + '|v' + pack.version);
+    if(recomputed !== pack.knowledgeSnapshotHash){
+      html += '<div style="margin-top:8px;padding:8px 12px;background:#fef2f2;border-radius:6px;font-size:12px;color:#991b1b;">⚠️ Snapshot hash 不一致，数据可能已损坏</div>';
+    }
+  }
+
+  // Frozen facts
+  const frozenFacts = pack.frozenFactSnapshots || [];
+  html += '<div style="margin-top:12px;">';
+  html += '<div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:8px;">冻结事实（' + frozenFacts.length + ' 条）</div>';
+  if(frozenFacts.length === 0){
+    html += '<div style="font-size:12px;color:#94a3b8;">无冻结事实</div>';
+  } else {
+    html += '<div style="max-height:200px;overflow-y:auto;">';
+    for(const f of frozenFacts){
+      const factStatusColor = f.reviewStatus === 'confirmed' ? '#10b981' : '#f59e0b';
+      html += '<div style="padding:8px 12px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;font-size:11px;">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+      html += '<span style="font-weight:600;color:#1e293b;">' + esc(f.title || '无标题') + '</span>';
+      html += '<span style="padding:2px 6px;border-radius:8px;color:#fff;font-size:10px;background:' + factStatusColor + ';">' + esc(f.reviewStatus || 'unknown') + '</span>';
+      html += '</div>';
+      html += '<div style="color:#64748b;">Fact ID: ' + esc(f.factId || '—') + ' · v' + esc(f.version || '1') + ' · 类型: ' + esc(f.type || '—') + '</div>';
+      if(f.claimSubject) html += '<div style="color:#475569;margin-top:2px;">归属主体: ' + esc(f.claimSubject) + '</div>';
+      html += '<div style="color:#64748b;margin-top:2px;">来源: ' + esc(f.sourceDocument || '—') + (f.sourceLocator ? ' · ' + esc(f.sourceLocator) : '') + '</div>';
+      html += '<div style="color:#475569;margin-top:2px;">对外可用: ' + (f.publicUseAllowed ? '✅ 是' : '❌ 否') + '</div>';
+      if(f.sourceExcerpt) html += '<div style="color:#64748b;margin-top:4px;font-style:italic;max-height:40px;overflow:hidden;">摘录: ' + esc(f.sourceExcerpt.substring(0, 100)) + (f.sourceExcerpt.length > 100 ? '...' : '') + '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+/* 草稿知识溯源面板 */
+function renderDraftTraceabilityPanel(draft){
+  if(!draft) return '<div class="panel-empty">草稿不存在</div>';
+  // 兼容迁移
+  draft = migrateDraftMetadataCompat(draft);
+
+  let html = '<div class="draft-trace-panel" style="padding:16px;background:#f8fafc;border-radius:8px;margin-bottom:16px;">';
+  html += '<h4 style="margin:0 0 12px 0;font-size:15px;color:#1e293b;">草稿知识溯源</h4>';
+
+  // 状态和 internalOnly
+  const reviewStatus = normalizeDraftReviewStatus(draft);
+  const statusColors = {unreviewed:'#f59e0b', reviewed:'#10b981', rejected:'#ef4444'};
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">';
+  html += '<span style="padding:4px 10px;border-radius:12px;color:#fff;font-size:11px;font-weight:600;background:' + (statusColors[reviewStatus] || '#64748b') + ';">' + esc(reviewStatus) + '</span>';
+  html += '<span style="font-size:12px;color:#64748b;">类型: ' + esc(draft.draftType || 'first_email') + '</span>';
+  if(draft.internalOnly){
+    html += '<span style="padding:3px 8px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:600;">仅内部</span>';
+  }
+  if(draft.legacyMetadata){
+    html += '<span style="padding:3px 8px;border-radius:8px;background:#e2e8f0;color:#475569;font-size:10px;">历史草稿</span>';
+  }
+  html += '</div>';
+
+  // Knowledge Pack 信息
+  html += '<div style="font-size:12px;color:#475569;line-height:1.8;margin-bottom:10px;">';
+  html += '<div>Knowledge Pack: ' + (draft.knowledgePackId ? '<code style="background:#e2e8f0;padding:1px 6px;border-radius:3px;font-size:11px;">' + esc(draft.knowledgePackId) + '</code>' : '未绑定') + '</div>';
+  if(draft.knowledgePackVersion) html += '<div>Pack 版本: v' + esc(draft.knowledgePackVersion) + '</div>';
+  if(draft.knowledgeSnapshotHash) html += '<div>Snapshot Hash: <code style="background:#e2e8f0;padding:1px 6px;border-radius:3px;font-size:11px;word-break:break-all;">' + esc(draft.knowledgeSnapshotHash) + '</code></div>';
+  html += '<div>创建人: ' + esc(draft.createdBy || 'system') + ' · ' + esc(draft.createdAt || '') + '</div>';
+  if(draft.updatedAt && draft.updatedAt !== draft.createdAt) html += '<div>最后更新: ' + esc(draft.updatedAt) + '</div>';
+  html += '</div>';
+
+  // Fact IDs 和版本
+  if(draft.factIds && draft.factIds.length > 0){
+    html += '<div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:6px;">使用的知识事实（' + draft.factIds.length + ' 条）</div>';
+    html += '<div style="font-size:11px;color:#64748b;margin-bottom:10px;">';
+    for(let i = 0; i < Math.min(draft.factIds.length, 5); i++){
+      const fv = (draft.factVersions || []).find(v => v.factId === draft.factIds[i]);
+      html += '<div>• ' + esc(draft.factIds[i]) + (fv ? ' (v' + esc(fv.version) + ')' : '') + '</div>';
+    }
+    if(draft.factIds.length > 5) html += '<div>... 共 ' + draft.factIds.length + ' 条</div>';
+    html += '</div>';
+  }
+
+  // 确认/推断/缺失/风险
+  if(draft.confirmedClaims && draft.confirmedClaims.length > 0){
+    html += '<div style="font-size:12px;font-weight:600;color:#166534;margin-bottom:4px;">已确认事实</div>';
+    html += '<div style="font-size:11px;color:#166534;margin-bottom:8px;">' + draft.confirmedClaims.map(c => '• ' + esc(String(c))).join('<br>') + '</div>';
+  }
+  if(draft.inferredClaims && draft.inferredClaims.length > 0){
+    html += '<div style="font-size:12px;font-weight:600;color:#92400e;margin-bottom:4px;">推断内容（需人工核实）</div>';
+    html += '<div style="font-size:11px;color:#92400e;margin-bottom:8px;">' + draft.inferredClaims.map(c => '• ' + esc(String(c))).join('<br>') + '</div>';
+  }
+  if(draft.missingInformation && draft.missingInformation.length > 0){
+    html += '<div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:4px;">缺失信息</div>';
+    html += '<div style="font-size:11px;color:#64748b;margin-bottom:8px;">' + draft.missingInformation.map(c => '• ' + esc(String(c))).join('<br>') + '</div>';
+  }
+  if(draft.riskFlags && draft.riskFlags.length > 0){
+    html += '<div style="font-size:12px;font-weight:600;color:#991b1b;margin-bottom:4px;">风险提醒</div>';
+    html += '<div style="font-size:11px;color:#991b1b;">' + draft.riskFlags.map(c => '• ' + esc(String(c))).join('<br>') + '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+/* 客户开发闭环进度条（只读） */
+function renderWorkflowProgressBar(customer){
+  if(!customer) return '<div class="panel-empty">客户不存在</div>';
+  const readiness = validateCustomerOutreachReadiness(customer.id);
+  const steps = readiness.steps || {};
+
+  const stepOrder = ['customer_entry', 'identity_verification', 'duplicate_check', 'dnc_check', 'icp_evaluation', 'knowledge_pack', 'outreach_draft', 'manual_review', 'follow_up'];
+  const stepLabels = {
+    customer_entry:'客户录入', identity_verification:'身份确认', duplicate_check:'重复检测',
+    dnc_check:'DNC检查', icp_evaluation:'ICP评估', knowledge_pack:'知识包绑定',
+    outreach_draft:'开发草稿', manual_review:'人工审核', follow_up:'跟进任务'
+  };
+
+  let html = '<div class="workflow-progress" style="padding:16px;background:#f8fafc;border-radius:8px;margin-bottom:16px;">';
+  html += '<h4 style="margin:0 0 12px 0;font-size:15px;color:#1e293b;">客户开发闭环进度</h4>';
+
+  // 进度条
+  let completedCount = 0;
+  for(const key of stepOrder){
+    if(steps[key] && steps[key].status === 'completed') completedCount++;
+  }
+  const percent = Math.round((completedCount / stepOrder.length) * 100);
+  html += '<div style="height:8px;background:#e2e8f0;border-radius:4px;margin-bottom:16px;overflow:hidden;">';
+  html += '<div style="height:100%;width:' + percent + '%;background:linear-gradient(90deg,#3b82f6,#10b981);border-radius:4px;transition:width .3s;"></div>';
+  html += '</div>';
+  html += '<div style="font-size:12px;color:#64748b;margin-bottom:12px;">' + completedCount + ' / ' + stepOrder.length + ' 步完成</div>';
+
+  // 步骤详情
+  html += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+  for(const key of stepOrder){
+    const step = steps[key] || {status:'pending', label:stepLabels[key]};
+    const statusColors = {completed:'#10b981', pending:'#94a3b8', blocked:'#ef4444', warning:'#f59e0b', missing:'#ef4444'};
+    const color = statusColors[step.status] || '#94a3b8';
+    const icons = {completed:'✓', pending:'○', blocked:'✕', warning:'⚠', missing:'?'};
+    html += '<div style="flex:1;min-width:100px;padding:8px 10px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;text-align:center;" title="' + esc(step.detail || step.label) + '">';
+    html += '<div style="font-size:16px;color:' + color + ';">' + (icons[step.status] || '○') + '</div>';
+    html += '<div style="font-size:11px;color:#475569;margin-top:2px;">' + esc(stepLabels[key] || key) + '</div>';
+    if(step.status === 'blocked'){
+      html += '<div style="font-size:10px;color:#ef4444;margin-top:2px;">阻断</div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // 阻断原因汇总
+  if(readiness.errors && readiness.errors.length > 0){
+    html += '<div style="margin-top:12px;padding:10px 14px;background:#fef2f2;border-radius:6px;">';
+    html += '<div style="font-size:12px;font-weight:600;color:#991b1b;margin-bottom:4px;">阻断原因</div>';
+    for(const e of readiness.errors){
+      html += '<div style="font-size:11px;color:#991b1b;">• ' + esc(e) + '</div>';
+    }
+    html += '</div>';
+  }
+
+  // 建议下一步
+  if(readiness.recommendedNextAction){
+    html += '<div style="margin-top:10px;font-size:12px;color:#475569;">建议下一步: <b>' + esc(readiness.recommendedNextAction) + '</b></div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
 /* 获取客户主邮箱（优先 contact.email，其次 emails 数组第一个） */
 function getCustomerPrimaryEmail(customer){
   if(!customer) return '';

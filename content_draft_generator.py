@@ -22,23 +22,13 @@ from urllib.parse import urlparse
 
 import knowledge_facts as kf
 import prospect_evaluator as pe
+from model_registry import TEXT_CHAIN_IDS, REASONING_CHAIN_IDS
 
 DB_PATH = Path(__file__).parent / "data" / "workbench.db"
 
-# P1.2D 专用四节点文本链（不修改全局 model_registry）
-DRAFT_TEXT_CHAIN = [
-    "glm-4.7-flash",
-    "glm-4-flash",
-    "qwen3.5:9b",
-    "qwen2.5:7b",
-]
-
-# 推理链
-DRAFT_REASONING_CHAIN = [
-    "glm-4.7-flash",
-    "qwen3.5:9b",
-    "deepseek-r1:7b",
-]
+# 模型链统一从 model_registry 读取，避免重复硬编码
+DRAFT_TEXT_CHAIN = TEXT_CHAIN_IDS
+DRAFT_REASONING_CHAIN = REASONING_CHAIN_IDS
 
 DRAFT_TYPES = [
     "first_email",

@@ -304,17 +304,25 @@ class AIClient:
         return resp
 
     # ============ 本地模型调用（Ollama 原生 API） ============
-    def _call_local_chat(self, model_info, messages, temperature=0.7, num_ctx=None):
+    def _call_local_chat(self, model_info, messages, temperature=0.7, num_ctx=None, thinking=False):
         """
         调用本地模型（Ollama 原生 /api/chat）。
         keep_alive 设为合理值保持模型加载，由 release() 统一使用 keep_alive:0 卸载。
         控制 num_ctx 避免 16GB 内存溢出。
+        thinking: 是否启用推理模型的思考模式。标准模式默认关闭。
         """
         if num_ctx is None:
             num_ctx = model_info.get("context_default", 8192)
         # 确保不超过模型最大允许
         max_ctx = model_info.get("context_max", 32768)
         num_ctx = min(num_ctx, max_ctx)
+
+        options = {
+            "temperature": temperature,
+            "num_ctx": num_ctx,
+        }
+        # Ollama 0.30+ 支持 thinking 选项控制推理模型
+        options["thinking"] = thinking
 
         resp = requests.post(
             f"{model_info['base_url'].rstrip('/')}/api/chat",
@@ -323,32 +331,38 @@ class AIClient:
                 "messages": messages,
                 "stream": False,
                 "keep_alive": "5m",  # 保持加载，由 release() 统一卸载
-                "options": {
-                    "temperature": temperature,
-                    "num_ctx": num_ctx,
-                },
+                "options": options,
             },
             timeout=self.timeout,
         )
         return resp
 
     def _parse_local_chat_response(self, resp):
-        """解析 Ollama 原生 /api/chat 响应"""
+        """解析 Ollama 原生 /api/chat 响应
+        Returns:
+            tuple: (content, usage_dict, thinking_meta)
+            - content: 正式响应内容
+            - usage_dict: token 使用统计
+            - thinking_meta: dict 包含 thinking 内容和 empty_response 标记
+        """
         data = resp.json()
         msg = data.get("message", {})
         content = msg.get("content", "")
-        # 推理模型可能有 thinking 内容
-        if not content or len(content.strip()) < 2:
-            thinking = msg.get("thinking", "")
-            if thinking:
-                content = f"[推理模型响应]\n\n{content or '（模型推理较长，请重试获取完整答案）'}"
+        thinking = msg.get("thinking", "")
+        thinking_meta = {
+            "thinking": thinking,
+            "has_thinking": bool(thinking and len(thinking.strip()) > 0),
+            "empty_response": bool(not content or len(content.strip()) < 2),
+        }
+        # 注意：不再用 thinking 代替 content。如果 content 为空，返回空 content，
+        # 由调用方根据 thinking_meta 决定是报错还是故障转移。
         usage = data.get("eval_count", 0)
         usage_dict = {
             "prompt_tokens": data.get("prompt_eval_count", "N/A"),
             "completion_tokens": data.get("eval_count", "N/A"),
             "total_tokens": "N/A",
         }
-        return content, usage_dict
+        return content, usage_dict, thinking_meta
 
     # ============ 本地 FLUX 图像生成 ============
     def _call_local_image(self, model_info, prompt):
@@ -382,12 +396,15 @@ class AIClient:
 
     # ============ 核心：文本聊天 ============
     def chat(self, user_prompt, system_prompt=None, use_lite=False, temperature=0.7,
-             max_retries=2, task_name=None, knowledge_refs=None, manual_model=None):
+             max_retries=2, task_name=None, knowledge_refs=None, manual_model=None,
+             mode="standard"):
         """
         文本聊天/Agent/工具调用统一入口。
         Args:
             manual_model: 手动选择的模型ID（如 'qwen3.5:9b'），为None则自动路由。
                           手动选择只对本次请求生效，不改变全局默认顺序。
+            mode: "standard"（标准模式，关闭thinking，空响应报错）或
+                  "reasoning"（推理模式，允许thinking作为内部诊断元数据）。
         """
         if not user_prompt or not user_prompt.strip():
             return "[错误] 用户输入为空，请输入内容后重试。"
@@ -479,11 +496,23 @@ class AIClient:
                     local_lock_status = "acquired+preloaded"
                     try:
                         # acquire() 已确认目标模型加载完成，此处发送正式请求
-                        resp = self._call_local_chat(model_info, messages, temperature)
+                        # 标准模式关闭 thinking；推理模式允许 thinking 作为内部诊断
+                        thinking_enabled = (mode == "reasoning")
+                        resp = self._call_local_chat(model_info, messages, temperature, thinking=thinking_enabled)
                         req_elapsed = time.time() - req_start
                         if resp.status_code != 200:
                             raise Exception(f"HTTP {resp.status_code}: {resp.text[:120]}")
-                        content, usage = self._parse_local_chat_response(resp)
+                        content, usage, thinking_meta = self._parse_local_chat_response(resp)
+                        # 标准模式：如果 response 为空但 thinking 有内容，不保存 thinking，触发故障转移
+                        if thinking_meta["empty_response"] and thinking_meta["has_thinking"] and mode != "reasoning":
+                            failover_log.append(f"{label} 响应为空（仅thinking），触发故障转移")
+                            failover_details.append({
+                                "from": label, "to": None, "type": "local",
+                                "status_code": 200, "reason": "empty_response_with_thinking",
+                                "elapsed": req_elapsed, "time": datetime.now().strftime("%H:%M:%S"), "mode": mode,
+                            })
+                            content = None
+                            continue
                     finally:
                         # 释放锁（内部卸载模型并轮询确认）
                         release_ok, release_err = local_model_manager.release(model_info["api_model"])
@@ -500,8 +529,18 @@ class AIClient:
                     msg = data["choices"][0]["message"]
                     content = msg.get("content", "")
                     usage = data.get("usage", {})
-                    if (not content or len(content.strip()) < 2) and msg.get("reasoning_content"):
-                        content = f"[推理模型响应]\n\n{content or '（模型推理较长，请重试获取完整答案）'}"
+                    # 注意：不再用 reasoning_content 代替 content。
+                    # 如果 content 为空，由后续逻辑判断是报错还是故障转移。
+                    reasoning_content = msg.get("reasoning_content", "")
+                    if (not content or len(content.strip()) < 2) and reasoning_content and mode != "reasoning":
+                        failover_log.append(f"{label} 响应为空（仅reasoning），触发故障转移")
+                        failover_details.append({
+                            "from": label, "to": None, "type": "online",
+                            "status_code": 200, "reason": "empty_response_with_reasoning",
+                            "elapsed": req_elapsed, "time": datetime.now().strftime("%H:%M:%S"), "mode": mode,
+                        })
+                        content = None
+                        continue
 
                 # 成功处理
                 if content and len(content.strip()) >= 2:
@@ -683,7 +722,7 @@ class AIClient:
                         req_elapsed = time.time() - req_start
                         if resp.status_code != 200:
                             raise Exception(f"HTTP {resp.status_code}: {resp.text[:120]}")
-                        content, _ = self._parse_local_chat_response(resp)
+                        content, _, _ = self._parse_local_chat_response(resp)
                     finally:
                         release_ok, release_err = local_model_manager.release(model_info["api_model"])
                         local_lock_status = "released" if release_ok else f"release_failed:{release_err}"

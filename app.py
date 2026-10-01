@@ -3742,8 +3742,8 @@ EN: ...
 """
                         save_to_kb_button(import_content, "客户管理/导入记录", f"导入记录_{_dt.now().strftime('%Y%m%d_%H%M')}", "md")
 
-                except Exception as e:
-                    st.error(f"导入失败：{e}")
+                    except Exception as e:
+                        st.error(f"导入失败：{e}")
 
 # ============ 页面3：客户分析（旧） ============
 elif page == "🎯 客户分析":

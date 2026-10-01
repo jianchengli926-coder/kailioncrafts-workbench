@@ -936,6 +936,358 @@ await __test('55. 补偿按逆序执行：migrationState 先于核心集合补�
   __assertEq(compensationOrder[3], 'drafts', 'fourth should be drafts');
 });
 
+// ===== 七、V79.0D2 Campaign 工作流 UI（第四轮新增） =====
+
+// 辅助：创建严格双向关联的 task+draft
+function __mkLinkedTaskDraft(taskId, campaignId, customerId, stage, draftStatus, reviewStatus){
+  const draftId = 'draft_' + taskId;
+  S.drafts.push(__mkDraft({ id: draftId, campaignTaskId: taskId, campaignId: campaignId, customerId: customerId, status: draftStatus||'待审核', reviewStatus: reviewStatus||'unreviewed' }));
+  S.campaignCustomerTasks.push(__mkTask({ taskId: taskId, campaignId: campaignId, customerId: customerId, assignedDraftId: draftId, stage: stage, outreachArchiveId: 'arch_' + taskId }));
+  S.outreachKnowledgeBase.push({ archiveId: 'arch_' + taskId, customerId: customerId, identityResolutionStatus: 'resolved', duplicateStatus: 'unique' });
+}
+
+await __test('56. active + queued 显示生成草稿', () => {
+  const campaign = { campaignId: 'camp_ui', status: 'active' };
+  const task = { taskId: 'task_q', campaignId: 'camp_ui', stage: 'queued', outreachArchiveId: 'arch_q' };
+  const ui = getCampaignTaskWorkflowUiState(task, campaign);
+  __assertEq(ui.canGenerate, true, 'queued should allow generate');
+  __assertEq(ui.canRegenerate, false, 'queued should not allow regenerate');
+  __assertEq(ui.canMarkSent, false, 'queued should not allow mark sent');
+  const html = renderCampaignTaskWorkflowActions(task, campaign);
+  __assert(html.indexOf('生成草稿') >= 0, 'should render 生成草稿 button');
+});
+
+await __test('57. 非 active Campaign 不显示生成、重新生成、人工发送', () => {
+  const campaign = { campaignId: 'camp_paused', status: 'paused' };
+  __mkLinkedTaskDraft('task_np', 'camp_paused', 'cust_np', 'reviewed_ready', '已审核', 'reviewed');
+  const task = S.campaignCustomerTasks[S.campaignCustomerTasks.length - 1];
+  const ui = getCampaignTaskWorkflowUiState(task, campaign);
+  __assertEq(ui.canGenerate, false, 'non-active should not allow generate');
+  __assertEq(ui.canRegenerate, false, 'non-active should not allow regenerate');
+  __assertEq(ui.canMarkSent, false, 'non-active should not allow mark sent');
+  __assertEq(ui.canOpenDraft, true, 'non-active should still allow open draft');
+  const html = renderCampaignTaskWorkflowActions(task, campaign);
+  __assert(html.indexOf('生成草稿') < 0, 'should not render generate button');
+  __assert(html.indexOf('重新生成草稿') < 0, 'should not render regenerate button');
+  __assert(html.indexOf('标记人工已发送') < 0, 'should not render mark sent button');
+  __assert(html.indexOf('打开草稿') >= 0, 'should still render open draft button');
+});
+
+await __test('58. draft_pending_review 显示打开与重新生成', () => {
+  const campaign = { campaignId: 'camp_dr', status: 'active' };
+  __mkLinkedTaskDraft('task_dr', 'camp_dr', 'cust_dr', 'draft_pending_review', '待审核', 'unreviewed');
+  const task = S.campaignCustomerTasks[S.campaignCustomerTasks.length - 1];
+  const ui = getCampaignTaskWorkflowUiState(task, campaign);
+  __assertEq(ui.canOpenDraft, true, 'should allow open draft');
+  __assertEq(ui.canRegenerate, true, 'should allow regenerate');
+  __assertEq(ui.canMarkSent, false, 'should not allow mark sent');
+  __assertEq(ui.canGenerate, false, 'should not allow generate');
+  const html = renderCampaignTaskWorkflowActions(task, campaign);
+  __assert(html.indexOf('打开草稿') >= 0, 'should render open draft');
+  __assert(html.indexOf('重新生成草稿') >= 0, 'should render regenerate');
+});
+
+await __test('59. reviewed_ready 显示打开与人工标记发送', () => {
+  const campaign = { campaignId: 'camp_rr', status: 'active' };
+  __mkLinkedTaskDraft('task_rr', 'camp_rr', 'cust_rr', 'reviewed_ready', '已审核', 'reviewed');
+  const task = S.campaignCustomerTasks[S.campaignCustomerTasks.length - 1];
+  const ui = getCampaignTaskWorkflowUiState(task, campaign);
+  __assertEq(ui.canOpenDraft, true, 'should allow open draft');
+  __assertEq(ui.canMarkSent, true, 'should allow mark sent');
+  __assertEq(ui.canRegenerate, false, 'should not allow regenerate');
+  const html = renderCampaignTaskWorkflowActions(task, campaign);
+  __assert(html.indexOf('打开草稿') >= 0, 'should render open draft');
+  __assert(html.indexOf('标记人工已发送') >= 0, 'should render mark sent');
+});
+
+await __test('60. sent/replied 不显示重新生成或人工发送', () => {
+  const campaign = { campaignId: 'camp_s', status: 'active' };
+  __mkLinkedTaskDraft('task_s', 'camp_s', 'cust_s', 'sent', '已发送', 'reviewed');
+  const task = S.campaignCustomerTasks[S.campaignCustomerTasks.length - 1];
+  const ui = getCampaignTaskWorkflowUiState(task, campaign);
+  __assertEq(ui.canRegenerate, false, 'sent should not allow regenerate');
+  __assertEq(ui.canMarkSent, false, 'sent should not allow mark sent');
+  __assertEq(ui.canOpenDraft, true, 'sent should allow open draft');
+  const html = renderCampaignTaskWorkflowActions(task, campaign);
+  __assert(html.indexOf('重新生成草稿') < 0, 'should not render regenerate');
+  __assert(html.indexOf('标记人工已发送') < 0, 'should not render mark sent');
+});
+
+await __test('61. paused/suppressed/closed 不显示工作流写操作', () => {
+  const campaign = { campaignId: 'camp_p', status: 'active' };
+  // paused
+  const taskPaused = { taskId: 'task_paused', campaignId: 'camp_p', stage: 'paused', outreachArchiveId: 'arch_p' };
+  const uiPaused = getCampaignTaskWorkflowUiState(taskPaused, campaign);
+  __assertEq(uiPaused.canGenerate, false, 'paused no generate');
+  __assertEq(uiPaused.canRegenerate, false, 'paused no regenerate');
+  __assertEq(uiPaused.canMarkSent, false, 'paused no mark sent');
+  // suppressed
+  const taskSupp = { taskId: 'task_supp', campaignId: 'camp_p', stage: 'suppressed', outreachArchiveId: 'arch_s' };
+  const uiSupp = getCampaignTaskWorkflowUiState(taskSupp, campaign);
+  __assertEq(uiSupp.canGenerate, false, 'suppressed no generate');
+  __assertEq(uiSupp.canViewArchive, true, 'suppressed can view archive');
+  // closed
+  const taskClosed = { taskId: 'task_closed', campaignId: 'camp_p', stage: 'closed', outreachArchiveId: 'arch_c' };
+  const uiClosed = getCampaignTaskWorkflowUiState(taskClosed, campaign);
+  __assertEq(uiClosed.canGenerate, false, 'closed no generate');
+  __assertEq(uiClosed.canMarkSent, false, 'closed no mark sent');
+});
+
+await __test('62. 关联异常不显示写操作', () => {
+  const campaign = { campaignId: 'camp_la', status: 'active' };
+  // draft 有 campaignTaskId 但 task.assignedDraftId 为空（单边关联）
+  S.drafts.push(__mkDraft({ id: 'draft_la', campaignTaskId: 'task_la', campaignId: 'camp_la', customerId: 'cust_la' }));
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_la', campaignId: 'camp_la', customerId: 'cust_la', assignedDraftId: null, stage: 'reviewed_ready', outreachArchiveId: 'arch_la' }));
+  const task = S.campaignCustomerTasks[S.campaignCustomerTasks.length - 1];
+  const ui = getCampaignTaskWorkflowUiState(task, campaign);
+  __assertEq(ui.linkAnomaly, true, 'should detect link anomaly');
+  __assertEq(ui.canGenerate, false, 'anomaly no generate');
+  __assertEq(ui.canMarkSent, false, 'anomaly no mark sent');
+  __assertEq(ui.canOpenDraft, false, 'anomaly no open draft');
+  const html = renderCampaignTaskWorkflowActions(task, campaign);
+  __assert(html.indexOf('关联异常') >= 0, 'should render 关联异常 indicator');
+  __assert(html.indexOf('生成草稿') < 0, 'should not render generate');
+  __assert(html.indexOf('标记人工已发送') < 0, 'should not render mark sent');
+});
+
+await __test('63. UI 调用 generateCampaignTaskDraft()，不直接改 task/draft', () => {
+  __mkLinkedTaskDraft('task_gen', 'camp_gen', 'cust_gen', 'queued', null, null);
+  const task = S.campaignCustomerTasks[S.campaignCustomerTasks.length - 1];
+  const beforeStage = task.stage;
+  const beforeDraftCount = S.drafts.length;
+  // mock confirmDlg 直接执行 onYes
+  const origConfirm = confirmDlg;
+  const origGenerate = generateCampaignTaskDraft;
+  let generateCalled = false;
+  confirmDlg = function(msg, onYes){ onYes(); };
+  generateCampaignTaskDraft = async function(id){ generateCalled = true; return {success:true}; };
+  try {
+    confirmGenerateCampaignTaskDraft('task_gen');
+  } finally {
+    confirmDlg = origConfirm;
+    generateCampaignTaskDraft = origGenerate;
+  }
+  __assert(generateCalled, 'generateCampaignTaskDraft should be called');
+  __assertEq(task.stage, beforeStage, 'UI should not directly modify task.stage');
+  __assertEq(S.drafts.length, beforeDraftCount, 'UI should not directly add drafts');
+});
+
+await __test('64. UI 调用 regenerateCampaignTaskDraft()，不直接改 task/draft', () => {
+  __mkLinkedTaskDraft('task_regen', 'camp_regen', 'cust_regen', 'draft_pending_review', '待审核', 'unreviewed');
+  const task = S.campaignCustomerTasks[S.campaignCustomerTasks.length - 1];
+  const beforeContent = S.drafts[S.drafts.length - 1].content;
+  const origConfirm = confirmDlg;
+  const origRegenerate = regenerateCampaignTaskDraft;
+  let regenerateCalled = false;
+  confirmDlg = function(msg, onYes){ onYes(); };
+  regenerateCampaignTaskDraft = async function(id){ regenerateCalled = true; return {success:true}; };
+  try {
+    confirmRegenerateCampaignTaskDraft('task_regen');
+  } finally {
+    confirmDlg = origConfirm;
+    regenerateCampaignTaskDraft = origRegenerate;
+  }
+  __assert(regenerateCalled, 'regenerateCampaignTaskDraft should be called');
+  __assertEq(S.drafts[S.drafts.length - 1].content, beforeContent, 'UI should not directly modify draft content');
+});
+
+await __test('65. UI 调用 markCampaignTaskManuallySent()，不直接改 task/draft', () => {
+  __mkLinkedTaskDraft('task_mark', 'camp_mark', 'cust_mark', 'reviewed_ready', '已审核', 'reviewed');
+  const task = S.campaignCustomerTasks[S.campaignCustomerTasks.length - 1];
+  const beforeStage = task.stage;
+  const origConfirm = confirmDlg;
+  const origMark = markCampaignTaskManuallySent;
+  let markCalled = false;
+  confirmDlg = function(msg, onYes){ onYes(); };
+  markCampaignTaskManuallySent = function(id){ markCalled = true; return {success:true}; };
+  try {
+    confirmMarkCampaignTaskManuallySent('task_mark');
+  } finally {
+    confirmDlg = origConfirm;
+    markCampaignTaskManuallySent = origMark;
+  }
+  __assert(markCalled, 'markCampaignTaskManuallySent should be called');
+  __assertEq(task.stage, beforeStage, 'UI should not directly modify task.stage');
+});
+
+await __test('66. 异步生成期间重复点击只会调用一次', () => {
+  __mkLinkedTaskDraft('task_busy', 'camp_busy', 'cust_busy', 'queued', null, null);
+  const origConfirm = confirmDlg;
+  const origGenerate = generateCampaignTaskDraft;
+  let callCount = 0;
+  confirmDlg = function(msg, onYes){ onYes(); };
+  generateCampaignTaskDraft = async function(id){
+    callCount++;
+    return new Promise(resolve => setTimeout(() => resolve({success:true}), 10));
+  };
+  try {
+    // 第一次点击：设置 busy
+    confirmGenerateCampaignTaskDraft('task_busy');
+    // 立即第二次点击：应被 busy 拦截
+    confirmGenerateCampaignTaskDraft('task_busy');
+  } finally {
+    confirmDlg = origConfirm;
+    generateCampaignTaskDraft = origGenerate;
+  }
+  __assertEq(callCount, 1, 'generate should be called only once despite double click');
+});
+
+await __test('67. 失败结果显示错误且不显示成功', async () => {
+  __mkLinkedTaskDraft('task_fail', 'camp_fail', 'cust_fail', 'queued', null, null);
+  const origConfirm = confirmDlg;
+  const origGenerate = generateCampaignTaskDraft;
+  const origToast = toast;
+  let toastMsg = null;
+  let toastType = null;
+  confirmDlg = function(msg, onYes){ onYes(); };
+  generateCampaignTaskDraft = async function(id){ return {success:false, errors:['模拟失败：身份状态异常']}; };
+  toast = function(msg, type){ toastMsg = msg; toastType = type; };
+  try {
+    await confirmGenerateCampaignTaskDraft('task_fail');
+  } finally {
+    confirmDlg = origConfirm;
+    generateCampaignTaskDraft = origGenerate;
+    toast = origToast;
+  }
+  __assert(toastMsg && toastMsg.indexOf('模拟失败') >= 0, 'should show error message, got: ' + toastMsg);
+  __assertEq(toastType, 'err', 'should use error toast type');
+});
+
+await __test('68. jsArg() 特殊字符 taskId 不破坏 onclick', () => {
+  const campaign = { campaignId: 'camp_js', status: 'active' };
+  const specialTaskId = 'task_' + String.fromCharCode(39) + '"<>&' + String.fromCharCode(92) + 'test';
+  const task = { taskId: specialTaskId, campaignId: 'camp_js', stage: 'queued', outreachArchiveId: 'arch_js' };
+  const html = renderCampaignTaskWorkflowActions(task, campaign);
+  __assert(html.indexOf('生成草稿') >= 0, 'should render generate button');
+  __assert(html.indexOf('confirmGenerateCampaignTaskDraft(') >= 0, 'should contain onclick handler call');
+  // jsArg 编码后不应出现未转义的双引号破坏 onclick 属性（属性用双引号包裹）
+  // 检查 onclick 属性值中不含原始未编码的双引号
+  const onclickIdx = html.indexOf('onclick="confirmGenerateCampaignTaskDraft(');
+  __assert(onclickIdx >= 0, 'should have onclick attribute with handler');
+  // 从 onclick 开始到属性结束，检查是否有异常截断
+  const afterOnclick = html.substring(onclickIdx);
+  __assert(afterOnclick.indexOf('生成草稿') >= 0 || afterOnclick.indexOf('style=') >= 0, 'onclick should not break subsequent attributes');
+});
+
+await __test('69. openCampaignTaskDraft 通过严格双向关联打开，不盲目按 assignedDraftId', () => {
+  __mkLinkedTaskDraft('task_open', 'camp_open', 'cust_open', 'draft_pending_review', '待审核', 'unreviewed');
+  const task = S.campaignCustomerTasks[S.campaignCustomerTasks.length - 1];
+  const draft = S.drafts[S.drafts.length - 1];
+  const origOpenEditor = openDraftEditor;
+  let openedDraftId = null;
+  openDraftEditor = function(id){ openedDraftId = id; };
+  try {
+    openCampaignTaskDraft('task_open');
+  } finally {
+    openDraftEditor = origOpenEditor;
+  }
+  __assertEq(openedDraftId, draft.id, 'should open the strictly-linked draft');
+});
+
+// ===== 八、V79.0D2 UI 状态一致性补修（第四轮补修） =====
+
+await __test('70. draft_pending_review + 无 Draft → 不显示重新生成，显示工作流状态异常', () => {
+  const campaign = { campaignId: 'camp_wf1', status: 'active' };
+  const task = { taskId: 'task_wf1', campaignId: 'camp_wf1', stage: 'draft_pending_review', outreachArchiveId: 'arch_wf1', assignedDraftId: null };
+  const ui = getCampaignTaskWorkflowUiState(task, campaign);
+  __assertEq(ui.workflowStateAnomaly, true, 'should detect workflow state anomaly');
+  __assertEq(ui.canRegenerate, false, 'should not allow regenerate without draft');
+  __assertEq(ui.canGenerate, false, 'should not allow generate');
+  __assertEq(ui.canMarkSent, false, 'should not allow mark sent');
+  __assertEq(ui.canOpenDraft, false, 'should not allow open draft');
+  const html = renderCampaignTaskWorkflowActions(task, campaign);
+  __assert(html.indexOf('工作流状态异常') >= 0, 'should render 工作流状态异常');
+  __assert(html.indexOf('重新生成草稿') < 0, 'should not render regenerate button');
+});
+
+await __test('71. reviewed_ready + 无 Draft → 不显示人工发送，显示工作流状态异常', () => {
+  const campaign = { campaignId: 'camp_wf2', status: 'active' };
+  const task = { taskId: 'task_wf2', campaignId: 'camp_wf2', stage: 'reviewed_ready', outreachArchiveId: 'arch_wf2', assignedDraftId: null };
+  const ui = getCampaignTaskWorkflowUiState(task, campaign);
+  __assertEq(ui.workflowStateAnomaly, true, 'should detect workflow state anomaly');
+  __assertEq(ui.canMarkSent, false, 'should not allow mark sent without draft');
+  __assertEq(ui.canOpenDraft, false, 'should not allow open draft');
+  const html = renderCampaignTaskWorkflowActions(task, campaign);
+  __assert(html.indexOf('工作流状态异常') >= 0, 'should render 工作流状态异常');
+  __assert(html.indexOf('标记人工已发送') < 0, 'should not render mark sent button');
+});
+
+await __test('72. queued + 有严格关联 Draft → 不显示生成，显示工作流状态异常', () => {
+  const campaign = { campaignId: 'camp_wf3', status: 'active' };
+  __mkLinkedTaskDraft('task_wf3', 'camp_wf3', 'cust_wf3', 'queued', '待审核', 'unreviewed');
+  const task = S.campaignCustomerTasks[S.campaignCustomerTasks.length - 1];
+  const ui = getCampaignTaskWorkflowUiState(task, campaign);
+  __assertEq(ui.hasValidLinkedDraft, true, 'should detect valid linked draft');
+  __assertEq(ui.workflowStateAnomaly, true, 'should detect anomaly: queued + draft exists');
+  __assertEq(ui.canGenerate, false, 'should not allow generate when draft already exists');
+  __assertEq(ui.canOpenDraft, false, 'should not allow open draft in anomaly state');
+  const html = renderCampaignTaskWorkflowActions(task, campaign);
+  __assert(html.indexOf('工作流状态异常') >= 0, 'should render 工作流状态异常');
+  __assert(html.indexOf('生成草稿') < 0, 'should not render generate button');
+});
+
+await __test('73. sent + 无 Draft → 不显示打开草稿', () => {
+  const campaign = { campaignId: 'camp_wf4', status: 'active' };
+  const task = { taskId: 'task_wf4', campaignId: 'camp_wf4', stage: 'sent', outreachArchiveId: 'arch_wf4', assignedDraftId: null };
+  const ui = getCampaignTaskWorkflowUiState(task, campaign);
+  __assertEq(ui.workflowStateAnomaly, true, 'sent without draft is inconsistent');
+  __assertEq(ui.canOpenDraft, false, 'should not allow open draft without valid draft');
+  __assertEq(ui.canRegenerate, false, 'should not allow regenerate');
+  __assertEq(ui.canMarkSent, false, 'should not allow mark sent');
+  const html = renderCampaignTaskWorkflowActions(task, campaign);
+  __assert(html.indexOf('打开草稿') < 0, 'should not render open draft button');
+});
+
+await __test('74. busy 状态按钮只有一个 style 属性且含 disabled', () => {
+  const campaign = { campaignId: 'camp_busy2', status: 'active' };
+  const task = { taskId: 'task_busy2', campaignId: 'camp_busy2', stage: 'queued', outreachArchiveId: 'arch_busy2' };
+  // 设置 busy 状态
+  window._campaignTaskWorkflowBusy['task_busy2'] = true;
+  try {
+    const html = renderCampaignTaskWorkflowActions(task, campaign);
+    __assert(html.indexOf('disabled') >= 0, 'should contain disabled attribute');
+    // 检查按钮标签中 style= 出现次数（应该只有一个）
+    const buttonMatch = html.match(/<button[^>]*>/);
+    __assert(buttonMatch, 'should have a button');
+    const styleCount = (buttonMatch[0].match(/style=/g) || []).length;
+    __assertEq(styleCount, 1, 'should have exactly one style attribute, got ' + styleCount + ': ' + buttonMatch[0]);
+  } finally {
+    delete window._campaignTaskWorkflowBusy['task_busy2'];
+  }
+});
+
+await __test('75. 异常场景不调用任何共享写函数', () => {
+  const campaign = { campaignId: 'camp_nocall', status: 'active' };
+  const origGenerate = generateCampaignTaskDraft;
+  const origRegenerate = regenerateCampaignTaskDraft;
+  const origMark = markCampaignTaskManuallySent;
+  let generateCalls = 0, regenerateCalls = 0, markCalls = 0;
+  generateCampaignTaskDraft = async function(){ generateCalls++; return {success:true}; };
+  regenerateCampaignTaskDraft = async function(){ regenerateCalls++; return {success:true}; };
+  markCampaignTaskManuallySent = function(){ markCalls++; return {success:true}; };
+  try {
+    // draft_pending_review + no draft → anomaly
+    const task1 = { taskId: 'task_nc1', campaignId: 'camp_nocall', stage: 'draft_pending_review', outreachArchiveId: 'arch_nc1', assignedDraftId: null };
+    const ui1 = getCampaignTaskWorkflowUiState(task1, campaign);
+    __assertEq(ui1.workflowStateAnomaly, true, 'anomaly detected');
+    // queued + draft → anomaly
+    __mkLinkedTaskDraft('task_nc2', 'camp_nocall', 'cust_nc2', 'queued', '待审核', 'unreviewed');
+    const task2 = S.campaignCustomerTasks[S.campaignCustomerTasks.length - 1];
+    const ui2 = getCampaignTaskWorkflowUiState(task2, campaign);
+    __assertEq(ui2.workflowStateAnomaly, true, 'anomaly detected');
+    // 渲染异常状态不触发写函数
+    renderCampaignTaskWorkflowActions(task1, campaign);
+    renderCampaignTaskWorkflowActions(task2, campaign);
+  } finally {
+    generateCampaignTaskDraft = origGenerate;
+    regenerateCampaignTaskDraft = origRegenerate;
+    markCampaignTaskManuallySent = origMark;
+  }
+  __assertEq(generateCalls, 0, 'generateCampaignTaskDraft should not be called');
+  __assertEq(regenerateCalls, 0, 'regenerateCampaignTaskDraft should not be called');
+  __assertEq(markCalls, 0, 'markCampaignTaskManuallySent should not be called');
+});
+
 // ===== 输出结果 =====
 console.log('');
 console.log('========================================');

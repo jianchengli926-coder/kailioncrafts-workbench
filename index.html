@@ -2706,7 +2706,7 @@ function viewCampaignDetail(root, campaignId){
     <div style="background:#fff;border:1px dashed #cbd5e0;border-radius:12px;padding:40px 20px;text-align:center">
       <div style="font-size:36px;margin-bottom:10px">👥</div>
       <h4 style="margin:0 0 6px;color:#4a5568">${tasks.length === 0 ? '此 Campaign 还没有客户任务' : '没有匹配的任务'}</h4>
-      <p style="margin:0;color:#a0aec0;font-size:13px">${tasks.length === 0 ? '客户添加功能将在 V79.0C 实现' : '尝试调整筛选条件'}</p>
+      <p style="margin:0;color:#a0aec0;font-size:13px">${tasks.length === 0 ? '点击上方「从知识库添加客户」按钮，将客户加入此 Campaign' : '尝试调整筛选条件'}</p>
     </div>`;
   } else {
     html += `
@@ -2751,11 +2751,12 @@ function viewCampaignDetail(root, campaignId){
           <td style="padding:10px 12px;font-size:12px">${emailStatus}</td>
           <td style="padding:10px 12px;text-align:center"><span style="color:${priorityColors[t.priority]||'#718096'};font-weight:600">${esc(priorityLabels[t.priority]||t.priority)}</span></td>
           <td style="padding:10px 12px;color:#718096;font-size:12px">${esc(added)}</td>
-          <td style="padding:10px 12px;text-align:center;white-space:nowrap">
-            ${t.outreachArchiveId ? `<button onclick="openOutreachKBArchive(${jsArg(t.outreachArchiveId)})" style="background:#ebf8ff;color:#2b6cb0;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px">档案</button>` : ''}
-            ${t.stage !== 'paused' && !['converted','suppressed','disqualified','closed'].includes(t.stage) ? `<button onclick="confirmCampaignTaskPause(${jsArg(t.taskId)})" style="background:#fef3c7;color:#92400e;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px">暂停</button>` : ''}
-            ${t.stage === 'paused' ? `<button onclick="confirmCampaignTaskResume(${jsArg(t.taskId)})" style="background:#dcfce7;color:#166534;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px">恢复</button>` : ''}
-            ${!['converted','suppressed','disqualified','closed'].includes(t.stage) ? `<button onclick="confirmCampaignTaskClose(${jsArg(t.taskId)})" style="background:#f1f5f9;color:#64748b;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer">关闭</button>` : ''}
+          <td style="padding:10px 12px;text-align:center;max-width:260px">
+            ${t.outreachArchiveId ? `<button onclick="openOutreachKBArchive(${jsArg(t.outreachArchiveId)})" style="background:#ebf8ff;color:#2b6cb0;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">档案</button>` : ''}
+            ${renderCampaignTaskWorkflowActions(t, campaign)}
+            ${t.stage !== 'paused' && !['converted','suppressed','disqualified','closed'].includes(t.stage) ? `<button onclick="confirmCampaignTaskPause(${jsArg(t.taskId)})" style="background:#fef3c7;color:#92400e;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">暂停</button>` : ''}
+            ${t.stage === 'paused' ? `<button onclick="confirmCampaignTaskResume(${jsArg(t.taskId)})" style="background:#dcfce7;color:#166534;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">恢复</button>` : ''}
+            ${!['converted','suppressed','disqualified','closed'].includes(t.stage) ? `<button onclick="confirmCampaignTaskClose(${jsArg(t.taskId)})" style="background:#f1f5f9;color:#64748b;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-bottom:2px">关闭</button>` : ''}
           </td>
         </tr>`;
     });
@@ -2792,6 +2793,248 @@ function confirmCampaignTaskClose(taskId){
     const result = closeCampaignTask(taskId, 'UI关闭');
     if(result.success){ toast('已关闭'); renderView(); }
     else { toast(result.errors.join('; '), 'err'); }
+  });
+}
+
+/* ============================================================
+ * V79.0D2 Campaign 开发信工作流 UI 接入
+ * 只调用已有共享函数，不直接修改数据层
+ * ============================================================ */
+
+// 防重复提交：同一 task 在异步生成期间只能触发一次
+window._campaignTaskWorkflowBusy = window._campaignTaskWorkflowBusy || {};
+
+function _isCampaignTaskWorkflowBusy(taskId){
+  return !!window._campaignTaskWorkflowBusy[taskId];
+}
+function _setCampaignTaskWorkflowBusy(taskId, val){
+  if(val) window._campaignTaskWorkflowBusy[taskId] = true;
+  else delete window._campaignTaskWorkflowBusy[taskId];
+}
+
+/* 根据任务真实阶段和 Campaign 状态，计算允许的 UI 操作（纯读，不修改数据） */
+function getCampaignTaskWorkflowUiState(task, campaign){
+  const state = {
+    canGenerate: false,
+    canRegenerate: false,
+    canMarkSent: false,
+    canOpenDraft: false,
+    canViewArchive: false,
+    linkAnomaly: false,
+    linkError: null,
+    workflowStateAnomaly: false,
+    workflowStateError: null,
+    hasValidLinkedDraft: false,
+    busy: _isCampaignTaskWorkflowBusy(task.taskId),
+    stage: task.stage
+  };
+
+  const isActive = campaign && campaign.status === 'active';
+  const terminalStages = ['suppressed','disqualified','closed','converted'];
+
+  // 查看档案：所有有 archive 的任务都可查看
+  state.canViewArchive = !!task.outreachArchiveId;
+
+  // 终止阶段：仅查看，不显示工作流写操作
+  if(terminalStages.includes(task.stage)){
+    return state;
+  }
+
+  // Draft 严格双向关联检查
+  let linkedDraft = null;
+  const referencingDraft = (S.drafts || []).find(d => d.campaignTaskId === task.taskId);
+  if(task.assignedDraftId){
+    const linkCheck = getExclusiveCampaignTaskByDraftId(task.assignedDraftId);
+    if(!linkCheck.success){
+      state.linkAnomaly = true;
+      state.linkError = (linkCheck.errors || []).join('; ');
+      return state;
+    }
+    if(!linkCheck.task || linkCheck.task.taskId !== task.taskId){
+      state.linkAnomaly = true;
+      state.linkError = '独占关联 Task 与当前 Task 不一致';
+      return state;
+    }
+    linkedDraft = linkCheck.draft;
+  } else if(referencingDraft){
+    state.linkAnomaly = true;
+    state.linkError = 'Draft 引用了此任务，但任务未设置 assignedDraftId（单边关联）';
+    return state;
+  }
+
+  state.hasValidLinkedDraft = !!linkedDraft;
+
+  // 阶段与 Draft 状态一致性 fail-closed 检查
+  const draftStages = ['draft_pending_review','reviewed_ready','sent'];
+  const noDraftStages = ['queued','researching','ready_for_draft'];
+
+  if(noDraftStages.includes(task.stage) && state.hasValidLinkedDraft){
+    state.workflowStateAnomaly = true;
+    state.workflowStateError = '任务阶段为 ' + task.stage + '，但已存在严格关联 Draft，工作流状态不一致';
+  } else if(draftStages.includes(task.stage) && !state.hasValidLinkedDraft){
+    state.workflowStateAnomaly = true;
+    state.workflowStateError = '任务阶段为 ' + task.stage + '，但不存在严格双向关联的有效 Draft';
+  }
+
+  // 工作流状态异常：不显示任何写操作，由渲染层显示只读异常提示
+  if(state.workflowStateAnomaly){
+    return state;
+  }
+
+  // 有有效 Draft 时可打开（非 active 也可查看）
+  if(state.hasValidLinkedDraft){
+    state.canOpenDraft = true;
+  }
+
+  // 以下写操作仅在 Campaign active 时显示
+  if(!isActive) return state;
+
+  // paused：保留现有恢复操作，不显示生成/发送
+  if(task.stage === 'paused'){
+    return state;
+  }
+
+  // sent / replied：不显示重新生成或人工发送
+  if(task.stage === 'sent' || task.stage === 'replied'){
+    return state;
+  }
+
+  // queued / researching / ready_for_draft：生成草稿（已确认无有效 Draft）
+  if(noDraftStages.includes(task.stage)){
+    state.canGenerate = true;
+  }
+
+  // draft_pending_review：重新生成（已确认有有效 Draft）
+  if(task.stage === 'draft_pending_review'){
+    state.canRegenerate = true;
+  }
+
+  // reviewed_ready：标记人工已发送（已确认有有效 Draft）
+  if(task.stage === 'reviewed_ready'){
+    state.canMarkSent = true;
+  }
+
+  return state;
+}
+
+/* 渲染任务工作流操作按钮（紧凑、可换行） */
+function renderCampaignTaskWorkflowActions(task, campaign){
+  const ui = getCampaignTaskWorkflowUiState(task, campaign);
+  let html = '';
+
+  // 关联异常：显示非写入提示，不显示写操作按钮
+  if(ui.linkAnomaly){
+    html += `<span style="background:#fff5f5;color:#c53030;border:1px solid #feb2b2;padding:2px 6px;border-radius:4px;font-size:10px;cursor:help;margin-right:4px;margin-bottom:2px;display:inline-block" title="${esc(ui.linkError||'Draft 关联异常')}">关联异常</span>`;
+    return html;
+  }
+
+  // 工作流状态异常（阶段与 Draft 不一致）：只读提示，不显示写操作
+  if(ui.workflowStateAnomaly){
+    html += `<span style="background:#fffbeb;color:#92400e;border:1px solid #fcd34d;padding:2px 6px;border-radius:4px;font-size:10px;cursor:help;margin-right:4px;margin-bottom:2px;display:inline-block" title="${esc(ui.workflowStateError||'工作流状态异常')}">工作流状态异常</span>`;
+    return html;
+  }
+
+  // busy 状态：分离 disabled 属性与样式，合并为单个 style 属性
+  const disabledAttr = ui.busy ? 'disabled' : '';
+  const busyStyle = ui.busy ? 'opacity:0.5;cursor:not-allowed;' : '';
+
+  // 生成草稿
+  if(ui.canGenerate){
+    html += `<button onclick="confirmGenerateCampaignTaskDraft(${jsArg(task.taskId)})" ${disabledAttr} style="${busyStyle}background:#e6fffa;color:#234e52;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">生成草稿</button>`;
+  }
+
+  // 打开草稿
+  if(ui.canOpenDraft){
+    html += `<button onclick="openCampaignTaskDraft(${jsArg(task.taskId)})" style="background:#ebf8ff;color:#2b6cb0;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">打开草稿</button>`;
+  }
+
+  // 重新生成草稿
+  if(ui.canRegenerate){
+    html += `<button onclick="confirmRegenerateCampaignTaskDraft(${jsArg(task.taskId)})" ${disabledAttr} style="${busyStyle}background:#fef3c7;color:#92400e;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">重新生成草稿</button>`;
+  }
+
+  // 标记人工已发送
+  if(ui.canMarkSent){
+    html += `<button onclick="confirmMarkCampaignTaskManuallySent(${jsArg(task.taskId)})" ${disabledAttr} style="${busyStyle}background:#dcfce7;color:#166534;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">标记人工已发送</button>`;
+  }
+
+  return html;
+}
+
+/* 打开 Campaign Task 关联的 Draft（通过严格双向关联，禁止只按 assignedDraftId 盲目打开） */
+function openCampaignTaskDraft(taskId){
+  const task = getCampaignTaskById(taskId);
+  if(!task){ toast('任务不存在', 'err'); return; }
+  if(!task.assignedDraftId){ toast('任务未关联草稿', 'err'); return; }
+  const linkCheck = getExclusiveCampaignTaskByDraftId(task.assignedDraftId);
+  if(!linkCheck.success){
+    toast('Draft 独占关联校验失败: ' + (linkCheck.errors||[]).join('; '), 'err');
+    return;
+  }
+  if(!linkCheck.task || linkCheck.task.taskId !== taskId){
+    toast('独占关联 Task 与当前 Task 不一致', 'err');
+    return;
+  }
+  if(!linkCheck.draft){ toast('草稿不存在', 'err'); return; }
+  openDraftEditor(linkCheck.draft.id);
+}
+
+/* 确认生成草稿 */
+function confirmGenerateCampaignTaskDraft(taskId){
+  if(_isCampaignTaskWorkflowBusy(taskId)){ toast('正在生成中，请稍候', 'info'); return; }
+  confirmDlg('确定为此客户任务生成首封开发信草稿吗？', async () => {
+    if(_isCampaignTaskWorkflowBusy(taskId)) return;
+    _setCampaignTaskWorkflowBusy(taskId, true);
+    try {
+      const result = await generateCampaignTaskDraft(taskId);
+      if(result.success){
+        toast('草稿已生成，待人工审核');
+      } else {
+        toast((result.errors||[]).join('; '), 'err');
+      }
+    } catch(e) {
+      toast('生成异常: ' + e.message, 'err');
+    } finally {
+      _setCampaignTaskWorkflowBusy(taskId, false);
+      renderView();
+    }
+  });
+}
+
+/* 确认重新生成草稿 */
+function confirmRegenerateCampaignTaskDraft(taskId){
+  if(_isCampaignTaskWorkflowBusy(taskId)){ toast('正在生成中，请稍候', 'info'); return; }
+  confirmDlg('重新生成将覆盖当前草稿内容。旧版本会由现有数据层保留，新版本需重新人工审核。确定继续吗？', async () => {
+    if(_isCampaignTaskWorkflowBusy(taskId)) return;
+    _setCampaignTaskWorkflowBusy(taskId, true);
+    try {
+      const result = await regenerateCampaignTaskDraft(taskId);
+      if(result.success){
+        toast('草稿已重新生成，待人工审核');
+      } else {
+        toast((result.errors||[]).join('; '), 'err');
+      }
+    } catch(e) {
+      toast('重新生成异常: ' + e.message, 'err');
+    } finally {
+      _setCampaignTaskWorkflowBusy(taskId, false);
+      renderView();
+    }
+  });
+}
+
+/* 确认标记人工已发送 */
+function confirmMarkCampaignTaskManuallySent(taskId){
+  if(_isCampaignTaskWorkflowBusy(taskId)){ toast('操作进行中，请稍候', 'info'); return; }
+  confirmDlg('这只记录人工确认的发送状态，不代表 SMTP 投递、客户收件、打开或点击已得到验证。确定标记为已人工发送吗？', () => {
+    const result = markCampaignTaskManuallySent(taskId);
+    if(result.success){
+      if(result.alreadySent){ toast('已人工标记发送'); }
+      else { toast('已人工标记发送'); }
+    } else {
+      toast((result.errors||[]).join('; '), 'err');
+    }
+    renderView();
   });
 }
 

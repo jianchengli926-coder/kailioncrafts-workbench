@@ -137,15 +137,12 @@ def _get_cred(creds, provider_id, fallback_url="", fallback_key=""):
 
 # ============ 活动模型注册表 ============
 # 文本模型自动路由顺序（普通文本/聊天/Agent/工具调用）
-# 严格7节点：GLM-4.7 -> GLM-4 -> 豆包 -> qwen3.5:9b -> deepseek-r1:7b -> qwen2.5:7b -> qwen2.5vl:7b
+# 严格4节点：GLM-4.7 -> GLM-4 -> qwen3.5:9b -> qwen2.5:7b
 TEXT_CHAIN_IDS = [
     "glm-4.7-flash",       # 1. GLM-4.7 Flash
     "glm-4-flash",         # 2. GLM-4 Flash
-    "doubao-seed-2-1-turbo", # 3. 豆包主模型
-    "qwen3.5:9b",          # 4. qwen3.5:9b（默认本地首选）
-    "deepseek-r1:7b",      # 5. deepseek-r1:7b（本地推理备用）
-    "qwen2.5:7b",          # 6. qwen2.5:7b（本地文本备用）
-    "qwen2.5vl:7b",        # 7. qwen2.5vl:7b（本地视觉备用）
+    "qwen3.5:9b",          # 3. qwen3.5:9b（默认本地首选）
+    "qwen2.5:7b",          # 4. qwen2.5:7b（本地文本备用）
 ]
 
 # 推理任务链（GLM → qwen3.5 → deepseek-r1）
@@ -158,9 +155,7 @@ REASONING_CHAIN_IDS = [
 # 本地模型顺序（文本故障转移）
 LOCAL_TEXT_CHAIN_IDS = [
     "qwen3.5:9b",
-    "deepseek-r1:7b",
     "qwen2.5:7b",
-    "qwen2.5vl:7b",
 ]
 
 # 本地推理链（qwen3.5 → deepseek-r1）

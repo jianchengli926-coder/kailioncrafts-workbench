@@ -119,7 +119,16 @@ def _load_voice():
         return {"samples": [], "style_notes": ""}
 def _save_voice(v):
     VOICE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    VOICE_FILE.write_text(_json.dumps(v, ensure_ascii=False, indent=2), encoding="utf-8")
+    import tempfile, os as _os
+    _content = _json.dumps(v, ensure_ascii=False, indent=2)
+    _fd, _tmp = tempfile.mkstemp(dir=str(VOICE_FILE.parent), suffix='.tmp')
+    try:
+        with _os.fdopen(_fd, 'w', encoding='utf-8') as _f:
+            _f.write(_content)
+        _os.replace(_tmp, str(VOICE_FILE))
+    except Exception:
+        try: _os.unlink(_tmp)
+        except OSError: pass
 
 
 # ============ 页面配置 ============
@@ -158,16 +167,28 @@ if not st.session_state["authed"]:
             if pwd == "441723":
                 st.session_state["authed"] = True
                 try:
-                    import json, os
+                    import json, os, tempfile
                     from datetime import datetime
                     log_file = "data/auth_log.json"
                     os.makedirs("data", exist_ok=True)
                     logs = []
                     if os.path.exists(log_file):
-                        logs = json.load(open(log_file, encoding="utf-8"))
-                    logs.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "登录成功"})
-                    json.dump(logs[-100:], open(log_file, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-                except Exception as e:
+                        try:
+                            with open(log_file, encoding="utf-8") as _lf:
+                                logs = json.load(_lf)
+                        except (json.JSONDecodeError, IOError):
+                            logs = []
+                    logs.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "登录成功", "ip": "local"})
+                    # 原子写入：临时文件+replace
+                    _fd, _tmp = tempfile.mkstemp(dir="data", suffix=".tmp")
+                    try:
+                        with os.fdopen(_fd, 'w', encoding='utf-8') as _tf:
+                            json.dump(logs[-100:], _tf, ensure_ascii=False, indent=2)
+                        os.replace(_tmp, log_file)
+                    except Exception:
+                        try: os.unlink(_tmp)
+                        except OSError: pass
+                except Exception:
                     pass
                 st.rerun()
             else:
@@ -565,7 +586,17 @@ def _perf_load():
 
 
 def _perf_save(d):
-    PERF_FILE.write_text(_json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+    import tempfile, os as _os
+    _content = _json.dumps(d, ensure_ascii=False, indent=2)
+    PERF_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _fd, _tmp = tempfile.mkstemp(dir=str(PERF_FILE.parent), suffix='.tmp')
+    try:
+        with _os.fdopen(_fd, 'w', encoding='utf-8') as _f:
+            _f.write(_content)
+        _os.replace(_tmp, str(PERF_FILE))
+    except Exception:
+        try: _os.unlink(_tmp)
+        except OSError: pass
 
 
 def _city_status(city, country, tzname):
@@ -3646,53 +3677,58 @@ EN: ...
 
             uploaded_file = st.file_uploader("选择文件", type=["xlsx", "csv"], key="import_cust_file")
             if uploaded_file is not None:
-                try:
-                    # 读取文件
-                    if uploaded_file.name.endswith(".csv"):
-                        df = pd.read_csv(uploaded_file)
-                    else:
-                        df = pd.read_excel(uploaded_file)
+                # 文件大小限制：最大50MB
+                MAX_UPLOAD_MB = 50
+                if uploaded_file.size > MAX_UPLOAD_MB * 1024 * 1024:
+                    st.error(f"文件过大：{uploaded_file.size / 1024 / 1024:.1f}MB，最大允许 {MAX_UPLOAD_MB}MB")
+                else:
+                    try:
+                        # 读取文件
+                        if uploaded_file.name.endswith(".csv"):
+                            df = pd.read_csv(uploaded_file)
+                        else:
+                            df = pd.read_excel(uploaded_file)
 
-                    st.write(f"文件包含 {len(df)} 行，{len(df.columns)} 列")
-                    st.dataframe(df.head(), use_container_width=True, hide_index=True)
+                        st.write(f"文件包含 {len(df)} 行，{len(df.columns)} 列")
+                        st.dataframe(df.head(), use_container_width=True, hide_index=True)
 
-                    # 字段映射
-                    st.markdown("**字段映射（自动识别，可调整）**")
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        company_col = st.selectbox("公司名称列", df.columns, index=0 if "公司" in str(df.columns[0]) or "company" in str(df.columns[0]).lower() else 0)
-                    with col2:
-                        country_col = st.selectbox("国家列", df.columns, index=1 if len(df.columns) > 1 else 0)
-                    with col3:
-                        source_col = st.selectbox("来源列（可选）", ["（无）"] + list(df.columns))
+                        # 字段映射
+                        st.markdown("**字段映射（自动识别，可调整）**")
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            company_col = st.selectbox("公司名称列", df.columns, index=0 if "公司" in str(df.columns[0]) or "company" in str(df.columns[0]).lower() else 0)
+                        with col2:
+                            country_col = st.selectbox("国家列", df.columns, index=1 if len(df.columns) > 1 else 0)
+                        with col3:
+                            source_col = st.selectbox("来源列（可选）", ["（无）"] + list(df.columns))
 
-                    # 确认导入
-                    if st.button("🚀 确认导入", type="primary", key="confirm_import"):
-                        success_count = 0
-                        skip_count = 0
-                        customers_all = cm.list_customers()
-                        existing_names = [c.get("company_name", "").lower() for c in customers_all]
+                        # 确认导入
+                        if st.button("🚀 确认导入", type="primary", key="confirm_import"):
+                            success_count = 0
+                            skip_count = 0
+                            customers_all = cm.list_customers()
+                            existing_names = [c.get("company_name", "").lower() for c in customers_all]
 
-                        for _, row in df.iterrows():
-                            company_name = str(row.get(company_col, "")).strip()
-                            if not company_name or company_name.lower() in existing_names:
-                                skip_count += 1
-                                continue
-                            country = str(row.get(country_col, "")).strip()
-                            source = str(row.get(source_col, "")).strip() if source_col != "（无）" else "其他"
+                            for _, row in df.iterrows():
+                                company_name = str(row.get(company_col, "")).strip()
+                                if not company_name or company_name.lower() in existing_names:
+                                    skip_count += 1
+                                    continue
+                                country = str(row.get(country_col, "")).strip()
+                                source = str(row.get(source_col, "")).strip() if source_col != "（无）" else "其他"
 
-                            cm.add_customer({
-                                "company_name": company_name,
-                                "country": country,
-                                "source": source if source in CUSTOMER_SOURCES else "其他",
-                                "grade": "C",
-                                "pipeline_stage": "lead",
-                                "score": 0,
-                            })
-                            existing_names.append(company_name.lower())
-                            success_count += 1
+                                cm.add_customer({
+                                    "company_name": company_name,
+                                    "country": country,
+                                    "source": source if source in CUSTOMER_SOURCES else "其他",
+                                    "grade": "C",
+                                    "pipeline_stage": "lead",
+                                    "score": 0,
+                                })
+                                existing_names.append(company_name.lower())
+                                success_count += 1
 
-                        st.success(f"✅ 导入完成：成功 {success_count} 个，跳过（重复）{skip_count} 个")
+                            st.success(f"✅ 导入完成：成功 {success_count} 个，跳过（重复）{skip_count} 个")
 
                         # 保存导入记录到知识库
                         from datetime import datetime as _dt
@@ -10377,7 +10413,8 @@ elif page == "🤖 模型管理":
                 edit_name = st.text_input("供应商名称", value=p['name'], key=f"edit_name_{p['id']}")
                 edit_url = st.text_input("API地址", value=p['base_url'], key=f"edit_url_{p['id']}")
             with col_b:
-                edit_key = st.text_input("API Key", value=p['api_key'], type="password", key=f"edit_key_{p['id']}")
+                _masked = p['api_key'][:4] + "••••" + p['api_key'][-4:] if len(p.get('api_key','')) > 8 else "••••••••"
+                edit_key = st.text_input(f"API Key（当前：{_masked}，留空不修改）", type="password", placeholder="sk-...（留空保持不变）", key=f"edit_key_{p['id']}")
                 edit_models = st.text_area(
                     "模型列表（每行一个）",
                     value='\n'.join(p['models']),
@@ -10391,7 +10428,7 @@ elif page == "🤖 模型管理":
                     p['id'],
                     name=edit_name,
                     base_url=edit_url,
-                    api_key=edit_key,
+                    api_key=edit_key.strip() if edit_key.strip() else p['api_key'],
                     models=models_list
                 )
                 st.success("已保存修改")
@@ -12276,7 +12313,8 @@ elif page == "⚙️ 设置中心":
                     edit_name = st.text_input("供应商名称", value=p['name'], key=f"sc_edit_name_{p['id']}")
                     edit_url = st.text_input("API地址", value=p['base_url'], key=f"sc_edit_url_{p['id']}")
                 with col_b:
-                    edit_key = st.text_input("API Key", value=p['api_key'], type="password", key=f"sc_edit_key_{p['id']}")
+                    _masked = p['api_key'][:4] + "••••" + p['api_key'][-4:] if len(p.get('api_key','')) > 8 else "••••••••"
+                    edit_key = st.text_input(f"API Key（当前：{_masked}，留空不修改）", type="password", placeholder="sk-...（留空保持不变）", key=f"sc_edit_key_{p['id']}")
                     edit_models = st.text_area(
                         "模型列表（每行一个）",
                         value='\n'.join(p['models']),
@@ -12290,7 +12328,7 @@ elif page == "⚙️ 设置中心":
                         p['id'],
                         name=edit_name,
                         base_url=edit_url,
-                        api_key=edit_key,
+                        api_key=edit_key.strip() if edit_key.strip() else p['api_key'],
                         models=models_list
                     )
                     st.success("已保存修改")

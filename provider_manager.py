@@ -4,12 +4,32 @@ KaiLionCrafts AI工作台 - 多供应商管理模块
 类似CC Switch，支持管理多个API中转站，一键切换
 """
 import json
+import os
+import tempfile
 import requests
 from pathlib import Path
 from datetime import datetime
 
 # 供应商配置文件
 PROVIDERS_FILE = Path(__file__).parent / "data" / "ai_providers.json"
+
+
+def atomic_write_json(filepath, data):
+    """原子写入JSON：先写临时文件，再os.replace替换，避免中途损坏"""
+    filepath = Path(filepath)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    content = json.dumps(data, ensure_ascii=False, indent=2)
+    fd, tmp_path = tempfile.mkstemp(dir=str(filepath.parent), suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(content)
+        os.replace(tmp_path, str(filepath))
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def ensure_providers_file():
@@ -49,21 +69,24 @@ def ensure_providers_file():
             "active_provider": "doubao_default",
             "last_switch": datetime.now().isoformat(),
         }
-        PROVIDERS_FILE.write_text(json.dumps(default_providers, ensure_ascii=False, indent=2), encoding='utf-8')
+        atomic_write_json(PROVIDERS_FILE, default_providers)
     return PROVIDERS_FILE
 
 
 def load_providers():
     """加载所有供应商配置"""
     ensure_providers_file()
-    with open(PROVIDERS_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    try:
+        with open(PROVIDERS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        # 配置损坏时返回空结构，避免页面崩溃
+        return {"providers": [], "active_provider": None, "last_switch": None, "_load_error": str(e)}
 
 
 def save_providers(data):
-    """保存供应商配置"""
-    with open(PROVIDERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    """保存供应商配置（原子写入）"""
+    atomic_write_json(PROVIDERS_FILE, data)
 
 
 def add_provider(name, base_url, api_key, models=None, provider_type="online"):
@@ -128,17 +151,22 @@ def delete_provider(provider_id):
 
 
 def set_active_provider(provider_id):
-    """设置当前使用的供应商"""
+    """设置当前使用的供应商（禁止将disabled供应商设为active）"""
     data = load_providers()
+    target = None
+    for p in data['providers']:
+        if p['id'] == provider_id:
+            target = p
+            break
+    if target is None:
+        return None
+    if target.get('disabled', False):
+        # 禁止将已禁用供应商设为active
+        return None
     data['active_provider'] = provider_id
     data['last_switch'] = datetime.now().isoformat()
     save_providers(data)
-
-    # 返回供应商配置，供调用save_config使用
-    for p in data['providers']:
-        if p['id'] == provider_id:
-            return p
-    return None
+    return target
 
 
 def get_active_provider():
@@ -202,24 +230,35 @@ def refresh_ollama_models():
 
 
 def test_provider(provider_id):
-    """测试供应商连接"""
+    """测试供应商连接，区分错误类型"""
     data = load_providers()
     for p in data['providers']:
         if p['id'] == provider_id:
+            if p.get('disabled', False):
+                return {"success": False, "message": "供应商已禁用", "status_code": 0, "error_type": "disabled"}
             try:
-                # 测试模型列表接口
                 resp = requests.get(
                     f"{p['base_url'].rstrip('/')}/models",
                     headers={"Authorization": f"Bearer {p['api_key']}"},
                     timeout=10
                 )
                 if resp.status_code == 200:
-                    return {"success": True, "message": "连接成功", "status_code": 200}
+                    return {"success": True, "message": "连接成功", "status_code": 200, "error_type": None}
+                elif resp.status_code in (401, 403):
+                    return {"success": False, "message": f"认证失败: HTTP {resp.status_code}（API Key错误或无权限）", "status_code": resp.status_code, "error_type": "auth"}
+                elif resp.status_code == 429:
+                    return {"success": False, "message": "请求限流: HTTP 429（稍后重试）", "status_code": 429, "error_type": "rate_limited"}
+                elif resp.status_code in (408, 500, 502, 503, 504):
+                    return {"success": False, "message": f"服务不可用: HTTP {resp.status_code}", "status_code": resp.status_code, "error_type": "server_error"}
                 else:
-                    return {"success": False, "message": f"连接失败: HTTP {resp.status_code}", "status_code": resp.status_code}
+                    return {"success": False, "message": f"连接失败: HTTP {resp.status_code}", "status_code": resp.status_code, "error_type": "unknown"}
+            except requests.exceptions.Timeout:
+                return {"success": False, "message": "请求超时（网络慢或服务无响应）", "status_code": 0, "error_type": "timeout"}
+            except requests.exceptions.ConnectionError:
+                return {"success": False, "message": "网络连接失败（检查API地址和网络）", "status_code": 0, "error_type": "network"}
             except Exception as e:
-                return {"success": False, "message": f"连接异常: {str(e)}", "status_code": 0}
-    return {"success": False, "message": "供应商不存在", "status_code": 0}
+                return {"success": False, "message": f"连接异常: {type(e).__name__}", "status_code": 0, "error_type": "exception"}
+    return {"success": False, "message": "供应商不存在", "status_code": 0, "error_type": "not_found"}
 
 
 def get_provider_stats():

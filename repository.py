@@ -1429,7 +1429,7 @@ class CustomerRepository:
             包含 by_source / source_effective_rate / by_grade / by_stage /
             first_outreach_count / reply_count / positive_reply_count /
             quote_count / closed_count / conversion_rates /
-            avg_follow_up_interval / last_30_days_new / last_30_days_closed 的字典。
+            avg_follow_up_interval / last_30_days_new / last_30_days_closed / historical_imported 的字典。
         """
         stats: Dict[str, Any] = {
             "by_source": {},
@@ -1445,6 +1445,7 @@ class CustomerRepository:
             "avg_follow_up_interval": None,
             "last_30_days_new": 0,
             "last_30_days_closed": 0,
+            "historical_imported": 0,
         }
 
         conn = self._connect()
@@ -1539,9 +1540,12 @@ class CustomerRepository:
                 stats["avg_follow_up_interval"] = round(sum(intervals) / len(intervals), 2)
 
             # 近 30 天新增 / 成交
+            # 注意：迁移客户（migrated_at IS NOT NULL）不计入"近30天新增"，
+            # 因为它们是历史导入数据，不是系统内新增。
             cutoff = (datetime.utcnow() - timedelta(days=30)).isoformat()
             cur = conn.execute(
-                "SELECT COUNT(*) AS c FROM prospects WHERE created_at >= ?", (cutoff,)
+                "SELECT COUNT(*) AS c FROM prospects "
+                "WHERE created_at >= ? AND migrated_at IS NULL", (cutoff,)
             )
             stats["last_30_days_new"] = cur.fetchone()["c"]
             cur = conn.execute(
@@ -1549,6 +1553,11 @@ class CustomerRepository:
                 "WHERE status='closed_won' AND updated_at >= ?", (cutoff,)
             )
             stats["last_30_days_closed"] = cur.fetchone()["c"]
+            # 历史导入客户总数（用于看板区分展示）
+            cur = conn.execute(
+                "SELECT COUNT(*) AS c FROM prospects WHERE migrated_at IS NOT NULL"
+            )
+            stats["historical_imported"] = cur.fetchone()["c"]
         finally:
             conn.close()
 

@@ -635,7 +635,7 @@ class TestStatsNoFakeData(TempDBCase):
     def test_dashboard_stats_returns_zeros(self):
         for f in ("first_outreach_count", "reply_count", "positive_reply_count",
                   "quote_count", "closed_count", "last_30_days_new",
-                  "last_30_days_closed"):
+                  "last_30_days_closed", "historical_imported"):
             self.assertEqual(self.stats[f], 0, f"{f} 应为 0")
         self.assertEqual(self.stats["by_source"], {})
         self.assertEqual(self.stats["by_stage"], {})
@@ -712,6 +712,38 @@ class TestDataMigration(TempDBCase):
         deleted = repo.rollback_migration(target["migrated_at"])
         self.assertGreaterEqual(deleted["deleted"], 1)
         self.assertIsNone(repo.get_prospect(target["customer_id"]))
+
+    def test_migrated_customers_not_counted_as_recent_new(self):
+        """迁移客户不计入近30天新增，但计入historical_imported。"""
+        repo = self._repo()
+        # 迁移前：近30天新增=0，历史导入=0
+        stats_before = repo.get_dashboard_stats()
+        self.assertEqual(stats_before["last_30_days_new"], 0)
+        self.assertEqual(stats_before["historical_imported"], 0)
+
+        # 执行迁移（CUSTOMERS_JSON中的客户created_at为近期日期）
+        res = repo.migrate_from_json(json_path=CUSTOMERS_JSON)
+        self.assertGreater(res["migrated"], 0)
+
+        # 迁移后：近30天新增仍为0（迁移客户排除），历史导入=迁移数
+        stats_after = repo.get_dashboard_stats()
+        self.assertEqual(stats_after["last_30_days_new"], 0,
+                         "迁移客户不应计入近30天新增")
+        self.assertEqual(stats_after["historical_imported"], res["migrated"],
+                         "迁移客户应计入historical_imported")
+
+        # 再添加一个非迁移的新客户，验证它会计入近30天新增
+        repo.add_prospect({
+            "company_name": "Test New Customer",
+            "website": "https://test-new.com",
+            "status": "new_lead",
+            "grade": "C",
+        })
+        stats_final = repo.get_dashboard_stats()
+        self.assertEqual(stats_final["last_30_days_new"], 1,
+                         "非迁移新客户应计入近30天新增")
+        self.assertEqual(stats_final["historical_imported"], res["migrated"],
+                         "historical_imported不应包含非迁移客户")
 
 
 # ---------------------------------------------------------------------------

@@ -2585,13 +2585,17 @@ EN: ...
 
                     # 近30天趋势
                     st.markdown("**📈 近30天趋势**")
-                    _n1, _n2 = st.columns(2)
+                    _hist_imported = _stats.get("historical_imported", 0)
+                    _n1, _n2, _n3 = st.columns(3)
                     _n1.metric("近30天新增客户", _stats.get("last_30_days_new", 0))
                     _n2.metric("近30天成交", _stats.get("last_30_days_closed", 0))
+                    _n3.metric("历史导入客户", _hist_imported)
+                    if _hist_imported > 0:
+                        st.caption("历史导入客户不计入近30天新增；迁移时间保留在 migrated_at 字段用于审计。")
                     try:
                         _trend_df = pd.DataFrame({
-                            "指标": ["近30天新增", "近30天成交"],
-                            "数量": [_stats.get("last_30_days_new", 0), _stats.get("last_30_days_closed", 0)],
+                            "指标": ["近30天新增", "近30天成交", "历史导入"],
+                            "数量": [_stats.get("last_30_days_new", 0), _stats.get("last_30_days_closed", 0), _hist_imported],
                         }).set_index("指标")
                         st.bar_chart(_trend_df)
                     except Exception:

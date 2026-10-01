@@ -3039,6 +3039,510 @@ function confirmMarkCampaignTaskManuallySent(taskId){
 }
 
 /* ============================================================
+ * V79.0E1 Campaign 跟进任务与回复闭环数据层
+ * 为 sent/replied CampaignTask 建立后续跟进任务，将 inbound 回复安全同步到 CampaignTask
+ * 不实现真实邮件发送、定时发送、SMTP、Webhook 或外部收件箱接入
+ * ============================================================ */
+
+// Campaign 跟进任务快照（包含跟进任务 + CampaignTask + communications）
+function createCampaignFollowUpSnapshot(){
+  return {
+    campaignFollowUpTasks: JSON.parse(JSON.stringify(S.campaignFollowUpTasks || [])),
+    campaignCustomerTasks: JSON.parse(JSON.stringify(S.campaignCustomerTasks || [])),
+    communications: JSON.parse(JSON.stringify(S.communications || []))
+  };
+}
+
+function restoreCampaignFollowUpSnapshotInMemory(snapshot){
+  if(!snapshot) return;
+  if(Array.isArray(snapshot.campaignFollowUpTasks)){ S.campaignFollowUpTasks = JSON.parse(JSON.stringify(snapshot.campaignFollowUpTasks)); }
+  if(Array.isArray(snapshot.campaignCustomerTasks)){ S.campaignCustomerTasks = JSON.parse(JSON.stringify(snapshot.campaignCustomerTasks)); }
+  if(Array.isArray(snapshot.communications)){ S.communications = JSON.parse(JSON.stringify(snapshot.communications)); }
+}
+
+// Campaign 跟进任务安全持久化（固定顺序，逆序补偿，含 dirty-write 补偿）
+function safePersistCampaignFollowUpData(snapshot, changedKeys){
+  const allKeys = ['campaignFollowUpTasks','campaignCustomerTasks','communications'];
+  const uniqueKeys = [...new Set(changedKeys || [])];
+  const keysToSave = allKeys.filter(k => uniqueKeys.includes(k));
+  const savedKeys = [];
+  // 记录每个 key 的原始 localStorage 状态（用于 dirty-write 补偿）
+  const originalKeyState = {};
+  for(const key of keysToSave){
+    const loaded = DB.load(key);
+    originalKeyState[key] = { exists: loaded !== null, value: loaded };
+  }
+
+  for(const key of keysToSave){
+    try {
+      DB.save(key, S[key]);
+      savedKeys.push(key);
+    } catch(e){
+      // 失败：恢复全部内存
+      restoreCampaignFollowUpSnapshotInMemory(snapshot);
+      const compensationErrors = [];
+      // 1. 首先补偿当前失败 key（dirty-write 场景：可能已写入后抛错）
+      try {
+        if(originalKeyState[key].exists){ DB.save(key, originalKeyState[key].value); }
+        else { DB.remove(key); }
+      }
+      catch(e3){ compensationErrors.push({key: key, error: e3.message}); }
+      // 2. 然后按 savedKeys 逆序补偿之前成功保存的 key
+      for(let i = savedKeys.length - 1; i >= 0; i--){
+        const savedKey = savedKeys[i];
+        try {
+          if(originalKeyState[savedKey].exists){ DB.save(savedKey, originalKeyState[savedKey].value); }
+          else { DB.remove(savedKey); }
+        }
+        catch(e2){ compensationErrors.push({key: savedKey, error: e2.message}); }
+      }
+      return {success:false, error: key + ' 保存失败: ' + e.message, failedAt: key, compensationComplete: compensationErrors.length === 0, compensationErrors};
+    }
+  }
+  return {success:true, compensationComplete:true, compensationErrors:[]};
+}
+
+// 允许创建跟进任务的阶段
+const FOLLOW_UP_ALLOWED_STAGES = ['sent','follow_up_due','replied'];
+
+/* 获取 CampaignTask 的跟进任务计划 */
+function getCampaignTaskFollowUpPlan(taskId){
+  const task = getCampaignTaskById(taskId);
+  if(!task) return {success:false, errors:['任务不存在']};
+  const followUps = (S.campaignFollowUpTasks || []).filter(f => f.campaignTaskId === taskId);
+  const pending = followUps.filter(f => f.status === 'pending');
+  const completed = followUps.filter(f => f.status === 'completed');
+  return {success:true, task, followUps, pending, completed, pendingCount: pending.length, completedCount: completed.length};
+}
+
+/* 创建 Campaign 跟进任务（严格安全条件） */
+function createCampaignFollowUpTask(taskId, input){
+  input = input || {};
+  const task = getCampaignTaskById(taskId);
+  if(!task) return {success:false, errors:['任务不存在']};
+
+  // Campaign 存在且 active
+  const campaign = getCampaignById(task.campaignId);
+  if(!campaign) return {success:false, errors:['Campaign 不存在']};
+  if(campaign.status !== 'active') return {success:false, errors:['Campaign 非 active 状态，禁止创建跟进任务']};
+
+  // task 非 terminal
+  if(CAMPAIGN_TERMINAL_STAGES.includes(task.stage)){
+    return {success:false, errors:['任务已终止（' + task.stage + '），禁止创建跟进任务']};
+  }
+
+  // 阶段限制
+  if(!FOLLOW_UP_ALLOWED_STAGES.includes(task.stage)){
+    return {success:false, errors:['当前阶段 ' + task.stage + ' 不允许创建跟进任务（仅 sent/follow_up_due/replied）']};
+  }
+
+  // customer 解析
+  const customer = resolveCampaignTaskCustomer(task);
+  if(!customer) return {success:false, errors:['客户无法解析']};
+  if(!customer.stableId) return {success:false, errors:['客户缺少 stableId，禁止创建跟进任务']};
+
+  // archive 检查
+  const archive = (S.outreachKnowledgeBase || []).find(a => a.archiveId === task.outreachArchiveId);
+  if(!archive) return {success:false, errors:['客户开发档案不存在']};
+  const idStatus = normalizeIdentityResolutionStatus(archive.identityResolutionStatus);
+  if(idStatus !== 'resolved') return {success:false, errors:['客户身份状态为 ' + idStatus + '，禁止创建跟进任务']};
+  const dupStatus = normalizeOutreachDuplicateStatus(archive.duplicateStatus);
+  if(dupStatus === 'duplicate' || dupStatus === 'unknown'){
+    return {success:false, errors:['客户去重状态为 ' + dupStatus + '，禁止创建跟进任务']};
+  }
+
+  // doNotContact 检查
+  if(customer.doNotContact === true) return {success:false, errors:['客户已标记 doNotContact，禁止创建跟进任务']};
+  if(archive.doNotContact === true) return {success:false, errors:['档案已标记 doNotContact，禁止创建跟进任务']};
+
+  // 不重复创建相同未完成跟进任务
+  const existingPending = (S.campaignFollowUpTasks || []).find(f =>
+    f.campaignTaskId === taskId && f.status === 'pending'
+  );
+  if(existingPending && !input.allowDuplicate){
+    return {success:false, errors:['已存在未完成的跟进任务（' + existingPending.followUpId + '），禁止重复创建'], existingFollowUpId: existingPending.followUpId};
+  }
+
+  // 输入校验
+  if(!_isValidText(input.note, 2000)) return {success:false, errors:['note 必须为字符串且长度不超过 2000']};
+  if(!_isValidText(input.actor, 100)) return {success:false, errors:['actor 必须为字符串且长度不超过 100']};
+
+  // dueAt：默认 7 天后；显式提供时必须为合法日期
+  let dueAt = input.dueAt;
+  if(dueAt !== undefined && dueAt !== null && dueAt !== ''){
+    if(!_isValidDueAt(dueAt)){
+      return {success:false, errors:['dueAt 不是合法日期: ' + String(dueAt)]};
+    }
+  } else {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    dueAt = d.toISOString();
+  }
+
+  const now = new Date().toISOString();
+  const followUp = {
+    followUpId: 'fu_' + uid(),
+    campaignId: task.campaignId,
+    campaignTaskId: taskId,
+    customerId: task.customerId,
+    stableCustomerId: task.stableCustomerId || customer.stableId,
+    sourceTaskStage: task.stage,
+    dueAt: dueAt,
+    status: 'pending',
+    outcome: null,
+    note: input.note || '',
+    createdAt: now,
+    updatedAt: now,
+    completedAt: null,
+    auditHistory: [{at: now, action: 'created', actor: input.actor || 'user', note: input.note || ''}]
+  };
+
+  const snapshot = createCampaignFollowUpSnapshot();
+  if(!S.campaignFollowUpTasks) S.campaignFollowUpTasks = [];
+  S.campaignFollowUpTasks.unshift(followUp);
+
+  const persistResult = safePersistCampaignFollowUpData(snapshot, ['campaignFollowUpTasks']);
+  if(!persistResult.success){
+    return {success:false, errors:['持久化失败: ' + persistResult.error], compensationComplete: persistResult.compensationComplete};
+  }
+
+  return {success:true, followUp, task};
+}
+
+/* 更新跟进任务（仅 note/dueAt/status 等非核心字段，严格输入校验） */
+function updateCampaignFollowUpTask(taskId, input){
+  input = input || {};
+  const followUpId = input.followUpId;
+
+  // followUpId 格式和归属校验
+  const idCheck = _validateFollowUpId(followUpId, taskId);
+  if(!idCheck.valid) return {success:false, errors:[idCheck.error]};
+  const followUp = idCheck.followUp;
+  if(followUp.status === 'completed') return {success:false, errors:['跟进任务已完成，不可修改']};
+
+  // 输入校验
+  if(!_isValidText(input.note, 2000)) return {success:false, errors:['note 必须为字符串且长度不超过 2000']};
+  if(!_isValidText(input.actor, 100)) return {success:false, errors:['actor 必须为字符串且长度不超过 100']};
+
+  // dueAt 校验（显式提供时必须合法）
+  if(input.dueAt !== undefined && input.dueAt !== null && input.dueAt !== ''){
+    if(!_isValidDueAt(input.dueAt)){
+      return {success:false, errors:['dueAt 不是合法日期: ' + String(input.dueAt)]};
+    }
+  }
+
+  // status 校验（非法值必须返回失败，不得静默忽略）
+  if(input.status !== undefined && input.status !== null){
+    if(!['pending','cancelled'].includes(input.status)){
+      return {success:false, errors:['非法 status: ' + String(input.status) + '（允许: pending/cancelled）']};
+    }
+  }
+
+  const snapshot = createCampaignFollowUpSnapshot();
+  const now = new Date().toISOString();
+  if(input.dueAt) followUp.dueAt = input.dueAt;
+  if(input.note !== undefined) followUp.note = input.note;
+  if(input.status) followUp.status = input.status;
+  followUp.updatedAt = now;
+  followUp.auditHistory.push({at: now, action: 'updated', actor: input.actor || 'user', note: '更新跟进任务'});
+
+  const persistResult = safePersistCampaignFollowUpData(snapshot, ['campaignFollowUpTasks']);
+  if(!persistResult.success){
+    return {success:false, errors:['持久化失败: ' + persistResult.error], compensationComplete: persistResult.compensationComplete};
+  }
+  return {success:true, followUp};
+}
+
+// 输入校验辅助：合法日期
+function _isValidDueAt(dueAt){
+  if(!dueAt || typeof dueAt !== 'string') return false;
+  const d = new Date(dueAt);
+  return !isNaN(d.getTime());
+}
+// 输入校验辅助：合法字符串（非对象/非空/长度限制）
+function _isValidText(v, maxLen){
+  if(v === undefined || v === null) return true; // 可选字段允许缺失
+  if(typeof v !== 'string') return false;
+  if(v.length > (maxLen || 2000)) return false;
+  return true;
+}
+// 输入校验辅助：followUpId 格式和归属
+function _validateFollowUpId(followUpId, taskId){
+  if(!followUpId || typeof followUpId !== 'string') return {valid:false, error:'followUpId 必须为非空字符串'};
+  if(!/^fu_/.test(followUpId)) return {valid:false, error:'followUpId 格式无效（应以 fu_ 开头）'};
+  const fu = (S.campaignFollowUpTasks || []).find(f => f.followUpId === followUpId);
+  if(!fu) return {valid:false, error:'跟进任务不存在'};
+  if(fu.campaignTaskId !== taskId) return {valid:false, error:'跟进任务不属于当前任务'};
+  return {valid:true, followUp: fu};
+}
+
+// 内存阶段转换辅助（仅校验 + 内存修改，不持久化）
+// 复用与 transitionCampaignTaskStage 完全相同的校验规则
+function _transitionCampaignTaskStageInMemory(task, nextStage, note, actor){
+  if(!task) return {success:false, errors:['任务不存在']};
+  if(!CAMPAIGN_TASK_STAGES.includes(nextStage)) return {success:false, errors:['目标阶段非法']};
+  if(task.stage === nextStage) return {success:true, task};
+  if(CAMPAIGN_TERMINAL_STAGES.includes(task.stage) && task.stage !== 'paused'){
+    return {success:false, errors:[task.stage + ' 为终止状态，不允许转换']};
+  }
+  if(task.stage === 'paused'){
+    return {success:false, errors:['paused 状态请使用 resumeCampaignTask']};
+  }
+  const allowed = CAMPAIGN_TASK_TRANSITIONS[task.stage] || [];
+  if(!allowed.includes(nextStage)){
+    return {success:false, errors:['不允许从 ' + task.stage + ' 转换到 ' + nextStage]};
+  }
+  // 校验通过，仅修改内存
+  const now = new Date().toISOString();
+  task.previousStage = task.stage;
+  task.stage = nextStage;
+  task.lastUpdatedAt = now;
+  if(!Array.isArray(task.auditHistory)) task.auditHistory = [];
+  task.auditHistory.push({at: now, from: task.previousStage, to: nextStage, actor: actor || 'user', note: note || ''});
+  return {success:true, task};
+}
+
+/* 完成跟进任务（outcome 决定后续阶段，真正原子事务） */
+function completeCampaignFollowUpTask(taskId, outcome){
+  outcome = outcome || {};
+  const followUpId = outcome.followUpId;
+
+  // followUpId 格式和归属校验
+  const idCheck = _validateFollowUpId(followUpId, taskId);
+  if(!idCheck.valid) return {success:false, errors:[idCheck.error]};
+  const followUp = idCheck.followUp;
+  if(followUp.status === 'completed') return {success:false, errors:['跟进任务已完成']};
+
+  const task = getCampaignTaskById(taskId);
+  if(!task) return {success:false, errors:['任务不存在']};
+
+  // outcome.type 校验
+  const allowedOutcomes = ['completed','replied','converted','needs_follow_up'];
+  const outcomeType = outcome.type || 'completed';
+  if(!allowedOutcomes.includes(outcomeType)){
+    return {success:false, errors:['非法 outcome.type: ' + outcomeType + '（允许: ' + allowedOutcomes.join('/') + '）']};
+  }
+  // note/actor 校验
+  if(!_isValidText(outcome.note, 2000)) return {success:false, errors:['outcome.note 必须为字符串且长度不超过 2000']};
+  if(!_isValidText(outcome.actor, 100)) return {success:false, errors:['outcome.actor 必须为字符串且长度不超过 100']};
+
+  // replied：必须有明确 inbound 证据
+  let evidence = null;
+  if(outcomeType === 'replied'){
+    evidence = getCampaignTaskReplyEvidence(taskId);
+    if(!evidence.hasInboundReply){
+      return {success:false, errors:['标记为回复但无明确 inbound 证据，禁止推进阶段']};
+    }
+    if(task.stage !== 'sent' && task.stage !== 'follow_up_due'){
+      return {success:false, errors:['当前阶段 ' + task.stage + ' 不可推进到 replied（仅 sent/follow_up_due）']};
+    }
+  }
+  // converted：只能从 replied 推进
+  if(outcomeType === 'converted'){
+    if(task.stage !== 'replied'){
+      return {success:false, errors:['converted 只能从 replied 阶段推进，当前为 ' + task.stage]};
+    }
+  }
+  // needs_follow_up：必须有合法 nextDueAt
+  if(outcomeType === 'needs_follow_up'){
+    if(!_isValidDueAt(outcome.nextDueAt)){
+      return {success:false, errors:['needs_follow_up 必须提供合法的 nextDueAt']};
+    }
+  }
+
+  const now = new Date().toISOString();
+
+  // === 在任何修改前创建完整快照（真正原子事务） ===
+  const snapshot = createCampaignFollowUpSnapshot();
+  const changedKeys = ['campaignFollowUpTasks'];
+
+  // replied / converted：内存阶段转换（不独立持久化，复用相同校验规则）
+  let transitionResult = null;
+  if(outcomeType === 'replied'){
+    transitionResult = _transitionCampaignTaskStageInMemory(task, 'replied', '跟进确认回复: ' + (outcome.note || ''), outcome.actor || 'user');
+    if(!transitionResult.success){
+      return {success:false, errors:['阶段转换校验失败: ' + (transitionResult.errors || []).join('; ')]};
+    }
+    changedKeys.push('campaignCustomerTasks');
+  } else if(outcomeType === 'converted'){
+    transitionResult = _transitionCampaignTaskStageInMemory(task, 'converted', '跟进确认转化: ' + (outcome.note || ''), outcome.actor || 'user');
+    if(!transitionResult.success){
+      return {success:false, errors:['阶段转换校验失败: ' + (transitionResult.errors || []).join('; ')]};
+    }
+    changedKeys.push('campaignCustomerTasks');
+  }
+
+  // 标记跟进任务完成（内存）
+  followUp.status = 'completed';
+  followUp.outcome = outcomeType;
+  followUp.outcomeNote = outcome.note || '';
+  followUp.completedAt = now;
+  followUp.updatedAt = now;
+  followUp.auditHistory.push({at: now, action: 'completed', actor: outcome.actor || 'user', note: outcome.note || '', outcome: outcomeType});
+
+  // needs_follow_up：创建新跟进任务（内存）
+  let newFollowUp = null;
+  if(outcomeType === 'needs_follow_up'){
+    newFollowUp = {
+      followUpId: 'fu_' + uid(),
+      campaignId: task.campaignId,
+      campaignTaskId: taskId,
+      customerId: task.customerId,
+      stableCustomerId: task.stableCustomerId,
+      sourceTaskStage: task.stage,
+      dueAt: outcome.nextDueAt,
+      status: 'pending',
+      outcome: null,
+      note: '后续跟进',
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      auditHistory: [{at: now, action: 'created', actor: outcome.actor || 'user', note: '后续跟进（由 ' + followUpId + ' 完成触发）'}]
+    };
+    if(!S.campaignFollowUpTasks) S.campaignFollowUpTasks = [];
+    S.campaignFollowUpTasks.unshift(newFollowUp);
+  }
+
+  // 一次原子持久化（campaignFollowUpTasks + campaignCustomerTasks）
+  const persistResult = safePersistCampaignFollowUpData(snapshot, changedKeys);
+  if(!persistResult.success){
+    // safePersist 已恢复内存，不依赖二次逆转
+    return {
+      success:false,
+      errors:['原子持久化失败: ' + persistResult.error],
+      compensationComplete: persistResult.compensationComplete,
+      compensationErrors: persistResult.compensationErrors
+    };
+  }
+
+  const ret = {success:true, followUp, transitionResult};
+  if(newFollowUp) ret.newFollowUp = newFollowUp;
+  return ret;
+}
+
+/* 判断 communication 是否为明确 inbound 回复证据 */
+function isInboundReplyCommunication(comm){
+  if(!comm) return false;
+  // fail-closed：明确 outbound 无论其他字段如何都返回 false
+  if(comm.direction === 'outbound') return false;
+  if(comm.type === 'sent' || comm.type === 'outbound') return false;
+  // 必须有明确 inbound 方向或明确 inbound 类型
+  const hasInboundDirection = comm.direction === 'inbound';
+  const hasInboundType = comm.type === 'inbound' || comm.type === 'reply';
+  if(!hasInboundDirection && !hasInboundType) return false;
+  // replied === true 和 status === 'replied' 不能单独作为证据，
+  // 但在已有明确 inbound direction/type 时不冲突，返回 true
+  return true;
+}
+
+/* 将 inbound 沟通记录显式关联到 CampaignTask（严格显式关联，禁止 customerId 推断） */
+function linkInboundCommunicationToCampaignTask(taskId, communicationId){
+  const task = getCampaignTaskById(taskId);
+  if(!task) return {success:false, errors:['任务不存在']};
+  const comm = (S.communications || []).find(c => c.id === communicationId);
+  if(!comm) return {success:false, errors:['沟通记录不存在']};
+
+  // 必须是明确 inbound 证据
+  if(!isInboundReplyCommunication(comm)){
+    return {success:false, errors:['沟通记录不是明确的 inbound 回复（type/direction/status 均不匹配）']};
+  }
+
+  // 严格显式关联检查（禁止仅凭 customerId/stableCustomerId/邮箱推断）
+  const taskAlreadyLinks = Array.isArray(task.linkedCommunicationIds) && task.linkedCommunicationIds.includes(communicationId);
+  const commAlreadyLinksTask = comm.campaignTaskId === taskId;
+  const commHasConsistentCampaign = comm.campaignId ? comm.campaignId === task.campaignId : true;
+
+  // communication 已属于另一个 CampaignTask → 阻断
+  if(comm.campaignTaskId && comm.campaignTaskId !== taskId){
+    return {success:false, errors:['沟通记录已属于其他 CampaignTask（' + comm.campaignTaskId + '），禁止跨任务关联']};
+  }
+  // communication.campaignId 与 task.campaignId 不一致 → 阻断
+  if(comm.campaignId && comm.campaignId !== task.campaignId){
+    return {success:false, errors:['沟通记录 CampaignId（' + comm.campaignId + '）与任务 CampaignId（' + task.campaignId + '）不一致，禁止关联']};
+  }
+  // 无任何显式关联 → 阻断（禁止 customerId 回退）
+  if(!taskAlreadyLinks && !commAlreadyLinksTask){
+    return {success:false, errors:['沟通记录与任务无显式关联（缺少 campaignTaskId 或 linkedCommunicationIds），禁止按 customerId 推断关联']};
+  }
+
+  const snapshot = createCampaignFollowUpSnapshot();
+  const now = new Date().toISOString();
+
+  // 添加到 task.linkedCommunicationIds
+  if(!Array.isArray(task.linkedCommunicationIds)) task.linkedCommunicationIds = [];
+  if(!task.linkedCommunicationIds.includes(communicationId)){
+    task.linkedCommunicationIds.push(communicationId);
+  }
+  // 在 communication 上记录显式 campaignTaskId
+  comm.campaignTaskId = taskId;
+  comm.campaignId = task.campaignId;
+  comm.linkedAt = now;
+
+  const persistResult = safePersistCampaignFollowUpData(snapshot, ['campaignCustomerTasks','communications']);
+  if(!persistResult.success){
+    return {success:false, errors:['持久化失败: ' + persistResult.error], compensationComplete: persistResult.compensationComplete};
+  }
+
+  // 关联后同步回复状态
+  const syncResult = syncCampaignTaskFromInboundCommunication(taskId, communicationId);
+  return {success:true, task, comm, syncResult};
+}
+
+/* 从 inbound 沟通记录同步 CampaignTask 回复状态 */
+function syncCampaignTaskFromInboundCommunication(taskId, communicationId){
+  const task = getCampaignTaskById(taskId);
+  if(!task) return {success:false, errors:['任务不存在']};
+
+  const evidence = getCampaignTaskReplyEvidence(taskId);
+  if(!evidence.hasInboundReply){
+    return {success:false, errors:['无明确 inbound 回复证据'], evidence};
+  }
+
+  // 只有 sent / follow_up_due 阶段可推进到 replied
+  if(task.stage !== 'sent' && task.stage !== 'follow_up_due'){
+    return {success:false, errors:['当前阶段 ' + task.stage + ' 不可推进到 replied'], evidence};
+  }
+
+  // 复用 transitionCampaignTaskStage
+  const result = transitionCampaignTaskStage(taskId, 'replied', 'inbound 回复同步: ' + (communicationId || ''), 'system');
+  return {success: result.success, errors: result.errors, evidence, transitionResult: result};
+}
+
+/* 获取 CampaignTask 的回复证据（明确 inbound，排除 outbound/草稿/人工标记） */
+function getCampaignTaskReplyEvidence(taskId){
+  const task = getCampaignTaskById(taskId);
+  const result = {hasInboundReply:false, evidence:[], recommendedStage: task ? task.stage : 'queued', source: 'none'};
+  if(!task) return result;
+
+  // 只从 task.linkedCommunicationIds 读取（显式关联，禁止按 customerId 批量扫描）
+  const commIds = Array.isArray(task.linkedCommunicationIds) ? task.linkedCommunicationIds : [];
+  const comms = (S.communications || []).filter(c => commIds.includes(c.id));
+
+  for(const comm of comms){
+    if(isInboundReplyCommunication(comm)){
+      result.hasInboundReply = true;
+      result.evidence.push({
+        communicationId: comm.id,
+        type: comm.type,
+        direction: comm.direction,
+        status: comm.status,
+        replied: comm.replied,
+        createdAt: comm.createdAt
+      });
+    }
+  }
+
+  if(result.hasInboundReply){
+    result.source = 'inbound_communication';
+    if(task.stage === 'sent' || task.stage === 'follow_up_due'){
+      result.recommendedStage = 'replied';
+    }
+  }
+
+  return result;
+}
+
+/* ============================================================
  * V79.0C Campaign 客户选择、重复开发保护与安全加入流程
  * ============================================================ */
 
@@ -3513,7 +4017,7 @@ window.onunhandledrejection = function(event){
 console.log('%c✅ 全局错误处理已启用', 'color:#0f7b3f;font-weight:bold');
 
 /* ---------- 全局状态 ---------- */
-let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[], outreachKnowledgeBase:[], campaigns:[], campaignCustomerTasks:[] };
+let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[], outreachKnowledgeBase:[], campaigns:[], campaignCustomerTasks:[], campaignFollowUpTasks:[] };
 function loadState(){
   S.customers = DB.load('customers') || [];
   S.plans = DB.load('plans') || [];
@@ -3683,6 +4187,8 @@ function getTimelineEvents(cid, limit=50){
   // 非数组安全降级
   if(!Array.isArray(S.campaigns)){ console.warn('[V79.0A] campaigns 非数组，降级为空数组'); S.campaigns = []; }
   if(!Array.isArray(S.campaignCustomerTasks)){ console.warn('[V79.0A] campaignCustomerTasks 非数组，降级为空数组'); S.campaignCustomerTasks = []; }
+  S.campaignFollowUpTasks = DB.load('campaignFollowUpTasks') || [];
+  if(!Array.isArray(S.campaignFollowUpTasks)){ console.warn('[V79.0E1] campaignFollowUpTasks 非数组，降级为空数组'); S.campaignFollowUpTasks = []; }
   S.orders = DB.load('orders') || [];
   S.followupTasks = DB.load('followupTasks') || [];
   S.opportunities = DB.load('opportunities') || [];
@@ -3701,7 +4207,7 @@ function getTimelineEvents(cid, limit=50){
   Object.keys(S).forEach(k => {
     if (S[k] === null) {
       // 根据属性名判断应该初始化为数组还是对象
-      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks'];
+      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks'];
       if (arrayKeys.includes(k)) S[k] = [];
       else S[k] = {};
     }
@@ -3738,7 +4244,7 @@ function persist(){
   DB.save('pipeline',S.pipeline); DB.save('emailTemplates',S.emailTemplates); DB.save('modelSpeedTest',S.modelSpeedTest); DB.save('contentHistory',S.contentHistory); DB.save('communications',S.communications); DB.save('documents',S.documents);
   DB.save('finance',S.finance); DB.save('catalog',S.catalog); DB.save('team',S.team);
   DB.save('linkedin',S.linkedin); DB.save('tools',S.tools); DB.save('workflows',S.workflows);
-  DB.save('orders',S.orders); DB.save('followupTasks',S.followupTasks); DB.save('opportunities',S.opportunities);
+  DB.save('orders',S.orders); DB.save('followupTasks',S.followupTasks); DB.save('opportunities',S.opportunities); DB.save('campaignFollowUpTasks',S.campaignFollowUpTasks);
   DB.save('publicPool',S.publicPool); DB.save('receivables',S.receivables);
   DB.save('imageHistory',S.imageHistory); DB.save('visionHistory',S.visionHistory);
   DB.save('profileHistory',S.profileHistory); DB.save('translateHistory',S.translateHistory);

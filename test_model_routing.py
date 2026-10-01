@@ -41,6 +41,75 @@ class T1Chain(unittest.TestCase):
         ids = [m['id'] for m in get_local_text_chain()]
         self.assertEqual(ids, ['qwen3.5:9b','qwen2.5:7b'])
 
+class T1RegistryDetail(unittest.TestCase):
+    """恢复 f2053c1 的模型注册表详细测试"""
+    def test_doubao_still_in_registry(self):
+        reg = build_model_registry()
+        self.assertIn('doubao-seed-2-1-turbo', reg)
+    def test_qwen35_vision_capable(self):
+        reg = build_model_registry()
+        self.assertTrue(reg['qwen3.5:9b']['vision_capable'])
+    def test_non_vision_excluded(self):
+        ids = [m['id'] for m in get_vision_chain()]
+        self.assertNotIn('deepseek-r1:7b', ids)
+        self.assertNotIn('qwen2.5:7b', ids)
+    def test_flux_real_id(self):
+        reg = build_model_registry()
+        self.assertIn('x/flux2-klein:4b-fp4', reg)
+    def test_qwen35_context_config(self):
+        info = LOCAL_MODELS['qwen3.5:9b']
+        self.assertEqual(info['context_default'], 8192)
+        self.assertEqual(info['context_long'], 16384)
+        self.assertEqual(info['context_max'], 32768)
+    def test_embedding_fixed(self):
+        from model_registry import EMBEDDING_MODEL_ID
+        self.assertEqual(EMBEDDING_MODEL_ID, 'nomic-embed-text:latest')
+
+class T8ErrorDetail(unittest.TestCase):
+    """恢复 f2053c1 的错误分类详细测试"""
+    def test_408(self): self.assertTrue(_classify_error(Exception("t"),408)[0])
+    def test_429(self): self.assertTrue(_classify_error(Exception("t"),429)[0])
+    def test_500(self): self.assertTrue(_classify_error(Exception("t"),500)[0])
+    def test_502(self): self.assertTrue(_classify_error(Exception("t"),502)[0])
+    def test_504(self): self.assertTrue(_classify_error(Exception("t"),504)[0])
+    def test_timeout(self):
+        import requests
+        self.assertTrue(_classify_error(requests.exceptions.Timeout())[0])
+    def test_connection_error(self):
+        import requests
+        self.assertTrue(_classify_error(requests.exceptions.ConnectionError())[0])
+    def test_content_rejection(self):
+        self.assertFalse(_classify_error(Exception("content filter rejected"))[0])
+
+class T7HealthManager(unittest.TestCase):
+    """恢复 f2053c1 的健康状态管理器测试"""
+    def setUp(self): health._states={}
+    def test_429_first_cooldown(self):
+        health.set_status('m', HEALTH_RATE_LIMITED, error="429")
+        s = health.get_status('m')
+        self.assertGreater(s['cooldown_remaining'], 55)
+    def test_429_second_cooldown(self):
+        health.set_status('m', HEALTH_RATE_LIMITED, error="1")
+        health.set_status('m', HEALTH_RATE_LIMITED, error="2")
+        s = health.get_status('m')
+        self.assertGreater(s['cooldown_remaining'], 295)
+    def test_available_resets(self):
+        health.set_status('m', HEALTH_RATE_LIMITED, error="429")
+        health.set_status('m', HEALTH_AVAILABLE, elapsed=1.0)
+        s = health.get_status('m')
+        self.assertEqual(s['cooldown_remaining'], 0)
+    def test_rate_limited_not_available(self):
+        health.set_status('m', HEALTH_RATE_LIMITED, error="429")
+        self.assertFalse(health.is_available('m'))
+    def test_config_error_never_available(self):
+        health.set_status('m', HEALTH_CONFIG_ERROR, error="401")
+        self.assertFalse(health.is_available('m'))
+    def test_429_not_permanent(self):
+        health.set_status('glm-4.6v-flash', HEALTH_RATE_LIMITED, error="429")
+        health._states['glm-4.6v-flash']['cooldown_until'] = time.time() - 1
+        self.assertTrue(health.is_available('glm-4.6v-flash'))
+
+
 class T2Glm47to4(unittest.TestCase):
     def setUp(self): health._states={}; self.c=AIClient()
     @patch('ai_client.requests.post')
@@ -374,8 +443,8 @@ class TIntegration(unittest.TestCase):
 
 def run_all():
     loader=unittest.TestLoader(); suite=unittest.TestSuite()
-    for c in [T1Chain,T2Glm47to4,T3GlmToQwen35,T4CloudToQwen35,T5Qwen35ToQwen25,
-              T8NoFailover,T9Vision429,T10CogviewToFlux,
+    for c in [T1Chain,T1RegistryDetail,T7HealthManager,T2Glm47to4,T3GlmToQwen35,T4CloudToQwen35,
+              T5Qwen35ToQwen25,T8NoFailover,T8ErrorDetail,T9Vision429,T10CogviewToFlux,
               T11ManualFlux,T12Concurrent,T13OldUnloaded,T14PreloadConfirmed,T15NoResidual,
               T16TraceNoSecrets,TIntegration,TP11Chains,TP11ImageManual,TP11LocalOwnership,TP11SlowResponse]:
         suite.addTests(loader.loadTestsFromTestCase(c))

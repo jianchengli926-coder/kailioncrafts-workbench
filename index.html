@@ -4724,6 +4724,10 @@ function renderCampaignKnowledgeSection(campaign){
     if(packInfo.info && packInfo.info.length){
       html += '<div style="margin-top:8px;font-size:11px;color:#856404">' + packInfo.info.map(i=>esc(i)).join('；') + '</div>';
     }
+    // P2.2B-1.5: 完整 frozen facts 溯源面板
+    html += '<div style="margin-top:12px;border-top:1px solid #e4e7eb;padding-top:12px">';
+    html += renderKnowledgePackPanel(p, campaign);
+    html += '</div>';
   }
   html += '</div>';
   return html;
@@ -11748,6 +11752,26 @@ function openCustomerDetail(cid){
         </div>
       </div>
 
+      <!-- P2.2B-1.5 客户开发闭环面板 -->
+      <div class="card card-pad mb16" style="border-left:4px solid #3b82f6;background:linear-gradient(135deg,#eff6ff,#fff)">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>🎯 客户开发闭环</span>
+          <span class="text-sm text-muted">P2.2 精准开发流程</span>
+        </div>
+        <div style="margin-top:8px">
+          ${renderWorkflowProgressBar(c)}
+        </div>
+        <div style="margin-top:12px">
+          ${renderCustomerStatusPanel(c)}
+        </div>
+        <div style="margin-top:12px">
+          ${renderDuplicateDetectionPanel(c)}
+        </div>
+        <div style="margin-top:12px">
+          ${renderIcpHardBlockerPanel(c, null)}
+        </div>
+      </div>
+
       <!-- V75.3 客户价值雷达图 -->
       <div class="card card-pad mb16" style="border-left:4px solid #c9a961;background:linear-gradient(135deg,#fdfbf7,#fff)">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -14063,6 +14087,10 @@ function openDraftEditor(did, isNew){
         <textarea class="form-control" id="dr_body" style="min-height:260px;font-family:Menlo,monospace;font-size:12.5px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${esc(d.body || d.content || '')}</textarea></div>
       <div class="form-group"><label>审核备注</label><textarea class="form-control" id="dr_review_notes" rows="2" placeholder="例如：已核对产品描述；删除未确认认证声明">${esc(d.reviewNotes || '')}</textarea></div>
       <div style="font-size:11px;margin:-4px 0 12px;color:${d.reviewStatus==='reviewed' ? '#166534' : '#92400e'}">审核状态：${d.reviewStatus==='reviewed' ? '✅ 已人工审核' : '⚠️ 待人工审核'}${d.manuallyEdited ? ' · ✏️ 含人工修正' : ''}</div>
+      <!-- P2.2B-1.5 草稿知识溯源面板 -->
+      <div style="margin-bottom:16px">
+        ${renderDraftTraceabilityPanel(d)}
+      </div>
       <div id="draftKbContextBox" style="display:none"></div>
       <div class="divider"></div>
       <div class="card card-pad mb16" style="background:#f7efdd">
@@ -23183,6 +23211,24 @@ function renderIcpHardBlockerPanel(customer, campaign){
     }
   }
 
+  // P2.2B-1.5: 客户级 hard blocker 检测（即使没有Campaign评估也能检测）
+  if(customer.doNotContact === true){
+    if(!hardBlockers.includes('DNC/不联系名单：客户标记为不联系')){
+      hardBlockers.push('DNC/不联系名单：客户标记为不联系');
+    }
+  }
+  // 检测重复客户
+  const dupCheck = detectDuplicateCustomer(customer, {excludeId: customer.id});
+  if(dupCheck.isDuplicate && !hardBlockers.some(b => b.indexOf('重复客户') >= 0)){
+    hardBlockers.push('重复客户：检测到 ' + dupCheck.matches.length + ' 个匹配，需先处理重复检测');
+  }
+  // 检测身份未确认
+  if(identityStatus === 'unresolved' || identityStatus === 'pending'){
+    if(!hardBlockers.some(b => b.indexOf('身份') >= 0)){
+      hardBlockers.push('客户身份未确认：identity_status=' + identityStatus);
+    }
+  }
+
   let html = '<div class="icp-panel" style="padding:16px;background:#f8fafc;border-radius:8px;margin-bottom:16px;">';
   html += '<h4 style="margin:0 0 12px 0;font-size:15px;color:#1e293b;">ICP 评估与硬性阻断</h4>';
 
@@ -23309,7 +23355,7 @@ function renderDraftTraceabilityPanel(draft){
   // 兼容迁移
   draft = migrateDraftMetadataCompat(draft);
 
-  let html = '<div class="draft-trace-panel" style="padding:16px;background:#f8fafc;border-radius:8px;margin-bottom:16px;">';
+  let html = '<div class="draft-trace-panel" style="padding:16px;background:#f8fafc;border-radius:8px;margin-bottom:16px;word-break:break-word;">';
   html += '<h4 style="margin:0 0 12px 0;font-size:15px;color:#1e293b;">草稿知识溯源</h4>';
 
   // 状态和 internalOnly

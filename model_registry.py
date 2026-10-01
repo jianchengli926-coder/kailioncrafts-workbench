@@ -7,10 +7,6 @@ KaiLionCrafts AI工作台 - 模型注册表 v1.0
 import time
 import threading
 from datetime import datetime
-try:
-    import requests
-except ImportError:
-    requests = None
 
 # ============ 健康状态常量 ============
 HEALTH_AVAILABLE = "available"        # 可用
@@ -137,12 +133,15 @@ def _get_cred(creds, provider_id, fallback_url="", fallback_key=""):
 
 # ============ 活动模型注册表 ============
 # 文本模型自动路由顺序（普通文本/聊天/Agent/工具调用）
-# 严格4节点：GLM-4.7 -> GLM-4 -> qwen3.5:9b -> qwen2.5:7b
+# 严格7节点：GLM-4.7 -> GLM-4 -> 豆包 -> qwen3.5:9b -> deepseek-r1:7b -> qwen2.5:7b -> qwen2.5vl:7b
 TEXT_CHAIN_IDS = [
     "glm-4.7-flash",       # 1. GLM-4.7 Flash
     "glm-4-flash",         # 2. GLM-4 Flash
-    "qwen3.5:9b",          # 3. qwen3.5:9b（默认本地首选）
-    "qwen2.5:7b",          # 4. qwen2.5:7b（本地文本备用）
+    "doubao-seed-2-1-turbo", # 3. 豆包主模型
+    "qwen3.5:9b",          # 4. qwen3.5:9b（默认本地首选）
+    "deepseek-r1:7b",      # 5. deepseek-r1:7b（本地推理备用）
+    "qwen2.5:7b",          # 6. qwen2.5:7b（本地文本备用）
+    "qwen2.5vl:7b",        # 7. qwen2.5vl:7b（本地视觉备用）
 ]
 
 # 推理任务链（GLM → qwen3.5 → deepseek-r1）
@@ -155,7 +154,9 @@ REASONING_CHAIN_IDS = [
 # 本地模型顺序（文本故障转移）
 LOCAL_TEXT_CHAIN_IDS = [
     "qwen3.5:9b",
+    "deepseek-r1:7b",
     "qwen2.5:7b",
+    "qwen2.5vl:7b",
 ]
 
 # 本地推理链（qwen3.5 → deepseek-r1）
@@ -433,10 +434,9 @@ def check_ollama_image_gen_support(force=False):
     if _ollama_image_gen_checked and not force:
         return (_ollama_image_gen_capable, "cached")
     try:
-        if requests is None:
-            return (False, "requests未安装")
+        import requests as _req
         # 用 FLUX 模型发送最小生成探测
-        resp = requests.post("http://localhost:11434/api/generate", json={
+        resp = _req.post("http://localhost:11434/api/generate", json={
             "model": "x/flux2-klein:4b-fp4",
             "prompt": ".",
             "stream": False,

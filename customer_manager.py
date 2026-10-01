@@ -137,13 +137,13 @@ class CustomerManager:
         self._atomic_write(data)
 
     def _gen_unique_id(self, existing_ids):
-        """生成不重复的客户ID（8位UUID，冲突时重试）"""
+        """生成不重复的客户ID（cust_前缀+8位UUID，与存量客户格式统一，冲突时重试）"""
         for _ in range(10):
-            cid = str(uuid.uuid4())[:8]
+            cid = "cust_" + str(uuid.uuid4())[:8]
             if cid not in existing_ids:
                 return cid
         # 极端情况：10次都冲突，用更长的ID
-        return str(uuid.uuid4())[:12]
+        return "cust_" + str(uuid.uuid4())[:12]
 
     def _resolve_pipeline_stage(self, status, default="lead"):
         """根据状态解析管道阶段：新状态用 V2 映射，旧中文用旧映射。"""

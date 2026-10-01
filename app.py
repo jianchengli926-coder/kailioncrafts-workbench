@@ -1640,6 +1640,7 @@ elif page == "👥 客户中心":
     # ===== 数据迁移工具（旧 customers.json → SQLite）=====
     with st.expander("🔄 数据迁移工具（旧 customers.json → SQLite）"):
         st.caption("将旧版 customers.json 客户迁移到 SQLite prospects 表（幂等，可重复执行）。")
+        st.warning("⚠️ 迁移前请先备份 data/customers.json。迁移不会删除旧数据，可通过 rollback_migration() 回滚。")
         if st.button("🔄 迁移旧客户数据", key="migrate_json_btn", type="primary"):
             try:
                 import repository as _mig_repo

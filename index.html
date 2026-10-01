@@ -4347,6 +4347,13 @@ function daysLater(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.to
 function fmtDate(iso){ if(!iso) return '-'; let d=new Date(iso); if(isNaN(d.getTime())){ const m=String(iso).match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})[T ]?(\d{1,2})?:?(\d{1,2})?/); if(m){ d=new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0)); } } if(isNaN(d.getTime())) return '-'; return (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
 function fmtDay(iso){ if(!iso) return '-'; let d=new Date(iso); if(isNaN(d.getTime())){ const m=String(iso).match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); if(m){ d=new Date(+m[1],+m[2]-1,+m[3]); } } if(isNaN(d.getTime())) return '-'; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+/* 安全 URL：仅允许 http/https，防止 javascript: 等危险协议 */
+function safeUrl(u){
+  if(!u || typeof u !== 'string') return '';
+  const trimmed = u.trim();
+  if(/^https?:\/\//i.test(trimmed)) return trimmed;
+  return '';
+}
 function toast(msg,type){ type=type||'ok'; const root=document.getElementById('toastRoot'); const t=document.createElement('div'); t.className='toast '+type; t.innerHTML=(type==='ok'?'✓ ':type==='err'?'✕ ':'ℹ ')+esc(msg); root.appendChild(t); setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},2200); }
 
 /* ---------- V74 全局错误处理 - 捕获所有运行时错误 ---------- */
@@ -13817,7 +13824,7 @@ function saveSettings(){
 }
 function exportData(){
   const data = {};
-  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks'].forEach(k=>{ if(S[k]!==undefined) data[k]=S[k]; });
+  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks'].forEach(k=>{ if(S[k]!==undefined) data[k]=S[k]; });
   const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'kailion-ark-backup-'+todayStr()+'.json'; a.click();
@@ -13825,7 +13832,7 @@ function exportData(){
 }
 function resetData(){
   confirmDlg('将清空所有本地数据并重新注入演示数据，确定？', ()=>{
-    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications','campaigns','campaignCustomerTasks','campaignSchemaVersion'].forEach(k=>DB.remove(k));
+    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','campaignSchemaVersion'].forEach(k=>DB.remove(k));
     loadState(); seedData(); go('dashboard'); toast('已重置为演示数据');
   });
 }
@@ -28017,14 +28024,28 @@ async function prospectGenerateQueries(){
     list.innerHTML = prospectGeneratedQueries.map((q,i)=>`
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:10px;background:#f9fafb;border-radius:8px">
         <span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${i+1}</span>
-        <input class="form-control" value="${q.replace(/"/g,'&quot;')}" onchange="prospectGeneratedQueries[${i}]=this.value" style="flex:1;font-size:13px">
-        <button class="btn btn-sm btn-outline" onclick="prospectGeneratedQueries.splice(${i},1);document.getElementById('prospectGeneratedQueriesList').innerHTML=prospectGeneratedQueries.map((q,j)=>'<div style=\\'display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:10px;background:#f9fafb;border-radius:8px\\'><span style=\\'background:#f59e0b;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700\\'>'+(j+1)+'</span><input class=\\'form-control\\' value=\\''+q.replace(/'/g,'&#39;')+'\\' onchange=\\'prospectGeneratedQueries['+j+']=this.value\\' style=\\'flex:1;font-size:13px\\'></div>').join('')" style="color:#ef4444">✕</button>
+        <input class="form-control" value="${esc(q)}" onchange="prospectGeneratedQueries[${i}]=this.value" style="flex:1;font-size:13px">
+        <button class="btn btn-sm btn-outline" onclick="prospectRemoveGeneratedQuery(${i})" style="color:#ef4444">✕</button>
       </div>
     `).join('');
 
     toast('✅ 已生成 ' + prospectGeneratedQueries.length + ' 组搜索词，请检查后执行');
   } catch(e) {
-    list.innerHTML = '<div style="color:#ef4444;padding:10px">生成失败：' + e.message + '</div>';
+    list.innerHTML = '<div style="color:#ef4444;padding:10px">生成失败：' + esc(e.message) + '</div>';
+  }
+}
+
+function prospectRemoveGeneratedQuery(i){
+  prospectGeneratedQueries.splice(i, 1);
+  const list = document.getElementById('prospectGeneratedQueriesList');
+  if(list){
+    list.innerHTML = prospectGeneratedQueries.map((q,j)=>`
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:10px;background:#f9fafb;border-radius:8px">
+        <span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${j+1}</span>
+        <input class="form-control" value="${esc(q)}" onchange="prospectGeneratedQueries[${j}]=this.value" style="flex:1;font-size:13px">
+        <button class="btn btn-sm btn-outline" onclick="prospectRemoveGeneratedQuery(${j})" style="color:#ef4444">✕</button>
+      </div>
+    `).join('');
   }
 }
 
@@ -28726,7 +28747,7 @@ function renderProspectSearch(){
       ${prospectGeneratedQueries.length > 0 ? `
         <div style="background:#f0f9ff;padding:10px 14px;border-radius:8px;margin-bottom:14px">
           <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:6px">当前搜索词（${prospectGeneratedQueries.length}组）</div>
-          <div style="font-size:12px;color:#374151">${prospectGeneratedQueries.map((q,i)=>`<span style="display:inline-block;background:#fff;padding:2px 8px;border-radius:4px;margin:2px;border:1px solid #bae6fd">${i+1}. ${q}</span>`).join('')}</div>
+          <div style="font-size:12px;color:#374151">${prospectGeneratedQueries.map((q,i)=>`<span style="display:inline-block;background:#fff;padding:2px 8px;border-radius:4px;margin:2px;border:1px solid #bae6fd">${i+1}. ${esc(q)}</span>`).join('')}</div>
           <button class="btn btn-sm btn-primary mt8" onclick="prospectExecuteSearch()" ${prospectSearchRunning?'disabled':''}>🚀 ${prospectSearchRunning?'搜索中...':'重新执行搜索'}</button>
         </div>
       ` : `
@@ -28786,27 +28807,27 @@ function renderProspectSearch(){
                 <input type="checkbox" ${r.selected?'checked':''} ${!isCompany?'disabled':''} onchange="prospectSearchResults[${i}].selected=this.checked" style="margin-top:4px;accent-color:#10b981">
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                    <span style="font-weight:700;font-size:14px;color:${isCompany?'#1e293b':'#6b7280'}">${r.title||'无标题'}</span>
-                    <span style="background:${sourceColor}15;color:${sourceColor};padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid ${sourceColor}30">${r.sourceLabel||r.sourceType||'未知'}</span>
+                    <span style="font-weight:700;font-size:14px;color:${isCompany?'#1e293b':'#6b7280'}">${esc(r.title||'无标题')}</span>
+                    <span style="background:${sourceColor}15;color:${sourceColor};padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid ${sourceColor}30">${esc(r.sourceLabel||r.sourceType||'未知')}</span>
                     ${isCompany && r.matchLevel?`<span style="background:${r.matchLevel==='A'?'#dcfce7':r.matchLevel==='B'?'#fef9c3':r.matchLevel==='C'?'#ffedd5':'#fee2e2'};color:${r.matchLevel==='A'?'#166534':r.matchLevel==='B'?'#854d0e':r.matchLevel==='C'?'#9a3412':'#991b1b'};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer" onclick="document.getElementById('matchDetail_${i}').style.display=document.getElementById('matchDetail_${i}').style.display==='none'?'block':'none'">${r.matchScore}分 (${r.matchLevel}级) ⓘ</span>`:''}
-                    ${!isCompany && r.exclusionReason?`<span style="background:#fef2f2;color:#991b1b;padding:2px 6px;border-radius:4px;font-size:10px" title="${r.exclusionReason}">已排除：${r.exclusionReason.substring(0,20)}${r.exclusionReason.length>20?'...':''}</span>`:''}
+                    ${!isCompany && r.exclusionReason?`<span style="background:#fef2f2;color:#991b1b;padding:2px 6px;border-radius:4px;font-size:10px" title="${esc(r.exclusionReason)}">已排除：${esc(r.exclusionReason.substring(0,20))}${r.exclusionReason.length>20?'...':''}</span>`:''}
                     ${r.needsModuleC && isCompany?'<span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-size:10px">⏳ 待模块C确认</span>':''}
                     ${r.inCustomerDB?'<span style="background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:4px;font-size:10px">已在客户库</span>':''}
                     ${r.hitCount && r.hitCount>1?`<span style="background:#e0e7ff;color:#3730a3;padding:1px 6px;border-radius:4px;font-size:10px">命中${r.hitCount}次</span>`:''}
                   </div>
-                  <div style="font-size:12px;color:#3b82f6;margin:4px 0;word-break:break-all"><a href="${r.url}" target="_blank" rel="noopener">${r.url}</a></div>
-                  <div style="font-size:12px;color:#6b7280;line-height:1.5">${(r.content||'').substring(0,180)}${(r.content||'').length>180?'...':''}</div>
+                  <div style="font-size:12px;color:#3b82f6;margin:4px 0;word-break:break-all">${safeUrl(r.url)?`<a href="${safeUrl(r.url)}" target="_blank" rel="noopener">${esc(r.url)}</a>`:esc(r.url||'')}</div>
+                  <div style="font-size:12px;color:#6b7280;line-height:1.5">${esc((r.content||'').substring(0,180))}${(r.content||'').length>180?'...':''}</div>
                   ${isCompany && r.matchDetails?`<div id="matchDetail_${i}" style="display:none;margin-top:8px;padding:8px 10px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0">
                     <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:4px">📊 匹配度评分明细（点击标签可收起）</div>
                     <table style="width:100%;font-size:11px;border-collapse:collapse">
                       <thead><tr style="color:#64748b;text-align:left"><th style="padding:2px 4px;width:80px">维度</th><th style="padding:2px 4px;width:50px">得分</th><th style="padding:2px 4px">说明</th></tr></thead>
-                      <tbody>${r.matchDetails.map(d=>`<tr style="border-top:1px solid #f1f5f9"><td style="padding:2px 4px;color:${d.type==='positive'?'#16a34a':d.type==='negative'?'#dc2626':d.type==='unknown'?'#94a3b8':d.type==='excluded'?'#dc2626':'#65a30d'}">${d.dim}</td><td style="padding:2px 4px;font-weight:700;color:${d.type==='positive'?'#16a34a':d.type==='negative'?'#dc2626':d.type==='unknown'?'#94a3b8':d.type==='excluded'?'#dc2626':'#65a30d'}">${d.points}</td><td style="padding:2px 4px;color:#64748b">${d.reason}</td></tr>`).join('')}</tbody>
+                      <tbody>${r.matchDetails.map(d=>`<tr style="border-top:1px solid #f1f5f9"><td style="padding:2px 4px;color:${d.type==='positive'?'#16a34a':d.type==='negative'?'#dc2626':d.type==='unknown'?'#94a3b8':d.type==='excluded'?'#dc2626':'#65a30d'}">${esc(d.dim)}</td><td style="padding:2px 4px;font-weight:700;color:${d.type==='positive'?'#16a34a':d.type==='negative'?'#dc2626':d.type==='unknown'?'#94a3b8':d.type==='excluded'?'#dc2626':'#65a30d'}">${esc(d.points)}</td><td style="padding:2px 4px;color:#64748b">${esc(d.reason)}</td></tr>`).join('')}</tbody>
                     </table>
                     <div style="font-size:10px;color:#94a3b8;margin-top:4px">说明：无法判断的维度标注"未知"，不给分也不扣分。最终评分基于搜索结果可见信息，深度分析后可更新。</div>
                   </div>`:''}
                   <div style="font-size:11px;color:#9ca3af;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
                     <span>命中搜索词：</span>
-                    ${(r.hitQueries||[r.query]).map(q=>`<span style="background:#f1f5f9;padding:1px 5px;border-radius:3px;font-size:10px">"${q}"</span>`).join('')}
+                    ${(r.hitQueries||[r.query]).map(q=>`<span style="background:#f1f5f9;padding:1px 5px;border-radius:3px;font-size:10px">"${esc(q)}"</span>`).join('')}
                     <span>· ${new Date(r.searchedAt).toLocaleString('zh-CN')}</span>
                   </div>
                   ${isCompany ? `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
@@ -29768,19 +29789,19 @@ function renderProspectLeads(){
               <div style="display:flex;align-items:flex-start;gap:10px">
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                    <span style="font-weight:700;font-size:14px;color:#1e293b">${l.name}</span>
-                    <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px">${l.status||'新线索'}</span>
-                    <span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:4px;font-size:11px">优先级 ${l.priority||'C'}</span>
+                    <span style="font-weight:700;font-size:14px;color:#1e293b">${esc(l.name)}</span>
+                    <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px">${esc(l.status||'新线索')}</span>
+                    <span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:4px;font-size:11px">优先级 ${esc(l.priority||'C')}</span>
                     ${l.analysis?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;font-size:11px">已分析</span>':'<span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:4px;font-size:11px">待分析</span>'}
                   </div>
-                  <div style="font-size:12px;color:#3b82f6;margin:4px 0;word-break:break-all"><a href="${l.url}" target="_blank" rel="noopener">${l.url}</a></div>
-                  <div style="font-size:12px;color:#6b7280;line-height:1.5">${(l.snippet||'').substring(0,150)}${(l.snippet||'').length>150?'...':''}</div>
+                  <div style="font-size:12px;color:#3b82f6;margin:4px 0;word-break:break-all">${safeUrl(l.url)?`<a href="${safeUrl(l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a>`:esc(l.url||'')}</div>
+                  <div style="font-size:12px;color:#6b7280;line-height:1.5">${esc((l.snippet||'').substring(0,150))}${(l.snippet||'').length>150?'...':''}</div>
                   <div style="font-size:11px;color:#9ca3af;margin-top:6px;display:flex;gap:12px;flex-wrap:wrap">
-                    <span>来源：${l.source||''}</span>
-                    <span>搜索词："${l.sourceQuery||''}"</span>
+                    <span>来源：${esc(l.source||'')}</span>
+                    <span>搜索词："${esc(l.sourceQuery||'')}"</span>
                     <span>发现时间：${new Date(l.searchedAt||Date.now()).toLocaleDateString('zh-CN')}</span>
-                    ${l.category?'<span>品类：'+l.category+'</span>':''}
-                    ${l.countries?'<span>国家：'+l.countries+'</span>':''}
+                    ${l.category?'<span>品类：'+esc(l.category)+'</span>':''}
+                    ${l.countries?'<span>国家：'+esc(l.countries)+'</span>':''}
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:6px">
@@ -29816,6 +29837,7 @@ function prospectClearLeads(){
 
 function prospectConvertToCustomer(idx){
   const lead = prospectLeads[idx];
+  if(!lead){ toast('线索不存在','err'); return; }
   if(!S.customers) S.customers = [];
   // 去重
   if(S.customers.find(c=>c.website===lead.url)){
@@ -29836,12 +29858,34 @@ function prospectConvertToCustomer(idx){
     notes: lead.snippet || '',
     nextFollowUp: null
   };
-  S.customers.unshift(newCustomer);
-  try{ DB.save('customers', S.customers); }catch(e){}
+  // 快照：保存前的内存状态
+  const customersSnapshot = JSON.parse(JSON.stringify(S.customers));
+  const leadsSnapshot = JSON.parse(JSON.stringify(prospectLeads));
 
-  // 从线索池移除
+  // 1. 先修改内存并保存客户
+  S.customers.unshift(newCustomer);
+  try{
+    DB.save('customers', S.customers);
+  }catch(e){
+    // 客户保存失败：恢复内存，不移除线索
+    S.customers = customersSnapshot;
+    toast('客户保存失败，线索未移除：' + (e.message||e), 'err');
+    return;
+  }
+
+  // 2. 客户保存成功后，从线索池移除并保存
   prospectLeads.splice(idx, 1);
-  saveProspectLeads();
+  try{
+    saveProspectLeads();
+  }catch(e){
+    // 线索池保存失败：恢复内存和存储
+    prospectLeads = leadsSnapshot;
+    S.customers = customersSnapshot;
+    try{ DB.save('customers', S.customers); }catch(e2){ console.error('恢复客户失败', e2); }
+    try{ saveProspectLeads(); }catch(e2){ console.error('恢复线索池失败', e2); }
+    toast('线索池保存失败，已回滚：' + (e.message||e), 'err');
+    return;
+  }
 
   toast('✅ 已转入客户台账：' + lead.name);
   renderView();
@@ -29858,21 +29902,21 @@ function prospectViewLeadDetail(idx){
         <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280">✕</button>
       </div>
       <div style="font-size:14px;line-height:1.8">
-        <p><b>公司名称：</b>${lead.name}</p>
-        <p><b>官网：</b><a href="${lead.url}" target="_blank">${lead.url}</a></p>
-        <p><b>来源：</b>${lead.source}（搜索词："${lead.sourceQuery||''}"）</p>
+        <p><b>公司名称：</b>${esc(lead.name)}</p>
+        <p><b>官网：</b>${safeUrl(lead.url)?`<a href="${safeUrl(lead.url)}" target="_blank" rel="noopener">${esc(lead.url)}</a>`:esc(lead.url||'')}</p>
+        <p><b>来源：</b>${esc(lead.source)}（搜索词："${esc(lead.sourceQuery||'')}"）</p>
         <p><b>发现时间：</b>${new Date(lead.searchedAt||Date.now()).toLocaleString('zh-CN')}</p>
-        <p><b>品类：</b>${lead.category||'-'}</p>
-        <p><b>目标国家：</b>${lead.countries||'-'}</p>
-        <p><b>客户类型：</b>${lead.customerType||'-'}</p>
-        <p><b>状态：</b>${lead.status||'新线索'}</p>
+        <p><b>品类：</b>${esc(lead.category||'-')}</p>
+        <p><b>目标国家：</b>${esc(lead.countries||'-')}</p>
+        <p><b>客户类型：</b>${esc(lead.customerType||'-')}</p>
+        <p><b>状态：</b>${esc(lead.status||'新线索')}</p>
         <div style="margin-top:12px;padding:12px;background:#f9fafb;border-radius:8px">
           <b>搜索摘要：</b>
-          <div style="font-size:13px;color:#374151;margin-top:6px;white-space:pre-wrap">${lead.snippet||'无'}</div>
+          <div style="font-size:13px;color:#374151;margin-top:6px;white-space:pre-wrap">${esc(lead.snippet||'无')}</div>
         </div>
         <div style="margin-top:12px">
           <b>时间线：</b>
-          ${(lead.timeline||[]).map(t=>`<div style="font-size:12px;color:#6b7280;margin-top:4px">• ${new Date(t.time).toLocaleString('zh-CN')} - ${t.action}：${t.detail||''}</div>`).join('')}
+          ${(lead.timeline||[]).map(t=>`<div style="font-size:12px;color:#6b7280;margin-top:4px">• ${new Date(t.time).toLocaleString('zh-CN')} - ${esc(t.action)}：${esc(t.detail||'')}</div>`).join('')}
         </div>
       </div>
       <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">

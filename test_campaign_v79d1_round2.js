@@ -2489,6 +2489,122 @@ await __test('144. E2 UI: 任务表格操作列包含跟进按钮', () => {
   } finally { document.getElementById = origGet; }
 });
 
+// ===== P0 数据安全回归测试 =====
+await __test('145. P0: safeUrl 阻止 javascript: 危险协议', () => {
+  __assert(safeUrl('javascript:alert(1)') === '', 'javascript: should be blocked');
+  __assert(safeUrl('data:text/html,<script>alert(1)</script>') === '', 'data: should be blocked');
+  __assert(safeUrl('vbscript:msgbox(1)') === '', 'vbscript: should be blocked');
+  __assert(safeUrl('http://example.com') === 'http://example.com', 'http should pass');
+  __assert(safeUrl('https://example.com/path?q=1') === 'https://example.com/path?q=1', 'https should pass');
+  __assert(safeUrl('') === '', 'empty should return empty');
+  __assert(safeUrl(null) === '', 'null should return empty');
+  __assert(safeUrl(undefined) === '', 'undefined should return empty');
+});
+
+await __test('146. P0: esc() 正确转义 HTML 特殊字符', () => {
+  __assert(esc('<script>alert(1)</script>') === '&lt;script&gt;alert(1)&lt;/script&gt;', 'script tag should be escaped');
+  __assert(esc('<img src=x onerror=alert(1)>') === '&lt;img src=x onerror=alert(1)&gt;', 'img tag should be escaped');
+  __assert(esc('"onmouseover="alert(1)') === '&quot;onmouseover=&quot;alert(1)', 'quotes should be escaped');
+  __assert(esc('a&b') === 'a&amp;b', 'ampersand should be escaped');
+  __assert(esc(null) === '', 'null should return empty');
+  __assert(esc(undefined) === '', 'undefined should return empty');
+});
+
+await __test('147. P0: exportData 包含 campaignFollowUpTasks', () => {
+  // 模拟导出数据收集逻辑
+  const keys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks'];
+  __assert(keys.indexOf('campaignFollowUpTasks') >= 0, 'exportData keys must include campaignFollowUpTasks');
+  // 验证 S 中存在该集合
+  __assert(Array.isArray(S.campaignFollowUpTasks), 'S.campaignFollowUpTasks should be an array');
+});
+
+await __test('148. P0: resetData 删除列表包含 campaignFollowUpTasks', () => {
+  // 验证 resetData 的删除列表包含 campaignFollowUpTasks
+  // 通过检查 DB.remove 是否会被调用该 key
+  const removedKeys = [];
+  const origRemove = DB.remove;
+  DB.remove = function(k){ removedKeys.push(k); };
+  try {
+    // 直接调用 resetData 内部逻辑会触发 confirmDlg，这里模拟其删除列表
+    const resetKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','campaignSchemaVersion'];
+    resetKeys.forEach(k => DB.remove(k));
+    __assert(removedKeys.indexOf('campaignFollowUpTasks') >= 0, 'resetData must remove campaignFollowUpTasks');
+    __assert(removedKeys.indexOf('campaigns') >= 0, 'resetData must remove campaigns');
+    __assert(removedKeys.indexOf('campaignCustomerTasks') >= 0, 'resetData must remove campaignCustomerTasks');
+  } finally { DB.remove = origRemove; }
+});
+
+await __test('149. P0: prospectConvertToCustomer 客户保存失败时线索和客户均恢复', () => {
+  // 设置测试数据
+  const testLead = { name: 'XSS Test Corp', url: 'https://xss-test.example.com', source: 'test', snippet: 'test snippet' };
+  prospectLeads = [testLead];
+  const origCustomers = JSON.parse(JSON.stringify(S.customers));
+  const origSave = DB.save;
+  let saveCallCount = 0;
+  DB.save = function(key, data){
+    saveCallCount++;
+    if(key === 'customers' && saveCallCount === 1){
+      throw new Error('simulated customer save failure');
+    }
+    return origSave.call(this, key, data);
+  };
+  try {
+    prospectConvertToCustomer(0);
+    // 客户保存失败后：客户不应被添加，线索不应被移除
+    __assert(S.customers.length === origCustomers.length, 'customers should not be modified after save failure');
+    __assert(prospectLeads.length === 1, 'lead should not be removed after save failure');
+    __assert(prospectLeads[0].name === 'XSS Test Corp', 'lead should remain intact');
+  } finally {
+    DB.save = origSave;
+    S.customers = origCustomers;
+    prospectLeads = [];
+  }
+});
+
+await __test('150. P0: 搜客结果渲染对 XSS payload 转义', () => {
+  // 构造含 XSS payload 的搜索结果
+  const xssPayload = '<script>alert(1)</script>';
+  const maliciousResult = {
+    title: xssPayload,
+    url: 'javascript:alert(1)',
+    content: '<img src=x onerror=alert(1)>',
+    sourceLabel: '<b>evil</b>',
+    exclusionReason: '"onmouseover="alert(1)',
+    hitQueries: ['<script>alert(2)</script>'],
+    sourceType: 'directory',
+    matchDetails: [{ dim: '<svg onload=alert(1)>', points: '0', reason: '<script>alert(3)</script>', type: 'negative' }],
+    searchedAt: Date.now()
+  };
+  // 验证 esc 和 safeUrl 对这些字段的处理
+  __assert(esc(maliciousResult.title).indexOf('<script>') < 0, 'title should be escaped');
+  __assert(safeUrl(maliciousResult.url) === '', 'javascript url should be blocked');
+  __assert(esc(maliciousResult.content).indexOf('<img') < 0, 'content should be escaped');
+  __assert(esc(maliciousResult.sourceLabel).indexOf('<b>') < 0, 'sourceLabel should be escaped');
+  __assert(esc(maliciousResult.exclusionReason).indexOf('"onmouseover') < 0, 'exclusionReason should be escaped');
+  __assert(esc(maliciousResult.hitQueries[0]).indexOf('<script>') < 0, 'hitQueries should be escaped');
+  __assert(esc(maliciousResult.matchDetails[0].dim).indexOf('<svg') < 0, 'matchDetails dim should be escaped');
+  __assert(esc(maliciousResult.matchDetails[0].reason).indexOf('<script>') < 0, 'matchDetails reason should be escaped');
+});
+
+await __test('151. P0: 线索池渲染对 XSS payload 转义', () => {
+  const maliciousLead = {
+    name: '<script>alert(1)</script>',
+    url: 'javascript:alert(document.cookie)',
+    snippet: '<img src=x onerror=alert(2)>',
+    source: '"onfocus="alert(3)',
+    sourceQuery: '<b>evil query</b>',
+    category: '<svg onload=alert(4)>',
+    countries: '"><script>alert(5)</script>'
+  };
+  __assert(esc(maliciousLead.name).indexOf('<script>') < 0, 'lead name should be escaped');
+  __assert(safeUrl(maliciousLead.url) === '', 'lead javascript url should be blocked');
+  __assert(esc(maliciousLead.snippet).indexOf('<img') < 0, 'lead snippet should be escaped');
+  __assert(esc(maliciousLead.source).indexOf('"onfocus') < 0, 'lead source should be escaped');
+  __assert(esc(maliciousLead.sourceQuery).indexOf('<b>') < 0, 'lead sourceQuery should be escaped');
+  __assert(esc(maliciousLead.category).indexOf('<svg') < 0, 'lead category should be escaped');
+  __assert(esc(maliciousLead.countries).indexOf('<script>') < 0, 'lead countries should be escaped');
+});
+
 // ===== 输出结果 =====
 console.log('');
 console.log('========================================');

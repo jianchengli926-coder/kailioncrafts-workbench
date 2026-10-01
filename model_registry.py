@@ -7,6 +7,10 @@ KaiLionCrafts AI工作台 - 模型注册表 v1.0
 import time
 import threading
 from datetime import datetime
+try:
+    import requests
+except ImportError:
+    requests = None
 
 # ============ 健康状态常量 ============
 HEALTH_AVAILABLE = "available"        # 可用
@@ -434,9 +438,10 @@ def check_ollama_image_gen_support(force=False):
     if _ollama_image_gen_checked and not force:
         return (_ollama_image_gen_capable, "cached")
     try:
-        import requests as _req
+        if requests is None:
+            return (False, "requests未安装")
         # 用 FLUX 模型发送最小生成探测
-        resp = _req.post("http://localhost:11434/api/generate", json={
+        resp = requests.post("http://localhost:11434/api/generate", json={
             "model": "x/flux2-klein:4b-fp4",
             "prompt": ".",
             "stream": False,

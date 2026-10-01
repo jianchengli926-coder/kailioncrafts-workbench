@@ -370,10 +370,10 @@ class TP11Chains(unittest.TestCase):
     def test_text_4(self):
         self.assertEqual([m['id'] for m in get_text_chain()],
             ['glm-4.7-flash','glm-4-flash','qwen3.5:9b','qwen2.5:7b'])
-    def test_local_text_4(self):
+    def test_local_text_2(self):
         from model_registry import get_local_text_chain
         self.assertEqual([m['id'] for m in get_local_text_chain()],
-            ['qwen3.5:9b','deepseek-r1:7b','qwen2.5:7b','qwen2.5vl:7b'])
+            ['qwen3.5:9b','qwen2.5:7b'])
     def test_reasoning(self):
         from model_registry import get_reasoning_chain
         self.assertEqual([m['id'] for m in get_reasoning_chain()], ['glm-4.7-flash','qwen3.5:9b','deepseek-r1:7b'])

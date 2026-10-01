@@ -132,6 +132,7 @@ class AIClient:
         # 会话级手动模型覆盖（由前端设置，per-session 生效，不改全局默认）
         self.manual_text_model = None
         self.manual_vision_model = None
+        self.manual_image_model = None
 
     def refresh_registry(self):
         """刷新模型注册表（凭证变更后调用）"""
@@ -430,28 +431,31 @@ class AIClient:
             req_start = time.time()
             try:
                 if mtype == "local":
-                    # 本地模型：获取全局互斥锁
+                    # 本地模型：获取全局互斥锁（acquire内部会卸载旧模型+预加载目标模型+确认已加载）
                     lock_acquired = local_model_manager.acquire(model_info["api_model"], timeout=300)
                     if not lock_acquired:
-                        failover_log.append(f"{label} 锁等待超时")
+                        lock_err = local_model_manager.last_error or "锁等待超时"
+                        failover_log.append(f"{label} 锁获取失败: {lock_err}")
                         failover_details.append({
                             "from": None, "to": label, "type": "local",
-                            "status_code": None, "reason": "本地模型锁等待超时",
+                            "status_code": None, "reason": f"本地模型锁失败: {lock_err}",
                             "elapsed": 0, "time": datetime.now().strftime("%H:%M:%S"), "mode": mode,
                         })
                         continue
-                    local_lock_status = "acquired"
+                    local_lock_status = "acquired+preloaded"
                     try:
-                        # 确认目标模型已加载（发送请求会自动加载）
+                        # acquire() 已确认目标模型加载完成，此处发送正式请求
                         resp = self._call_local_chat(model_info, messages, temperature)
                         req_elapsed = time.time() - req_start
                         if resp.status_code != 200:
                             raise Exception(f"HTTP {resp.status_code}: {resp.text[:120]}")
                         content, usage = self._parse_local_chat_response(resp)
                     finally:
-                        # 释放锁（内部会卸载模型并验证）
-                        local_model_manager.release(model_info["api_model"])
-                        local_lock_status = "released"
+                        # 释放锁（内部卸载模型并轮询确认）
+                        release_ok, release_err = local_model_manager.release(model_info["api_model"])
+                        local_lock_status = "released" if release_ok else f"release_failed:{release_err}"
+                        if not release_ok:
+                            failover_log.append(f"{label} 卸载确认失败: {release_err}")
                 else:
                     # 在线模型
                     resp = self._call_online_chat(model_info, messages, temperature)
@@ -636,9 +640,10 @@ class AIClient:
                 if mtype == "local":
                     lock_acquired = local_model_manager.acquire(model_info["api_model"], timeout=300)
                     if not lock_acquired:
-                        failover_log.append(f"{label} 锁等待超时")
+                        lock_err = local_model_manager.last_error or "锁等待超时"
+                        failover_log.append(f"{label} 锁获取失败: {lock_err}")
                         continue
-                    local_lock_status = "acquired"
+                    local_lock_status = "acquired+preloaded"
                     try:
                         resp = self._call_local_chat(model_info, messages, temperature=0.3)
                         req_elapsed = time.time() - req_start
@@ -646,8 +651,8 @@ class AIClient:
                             raise Exception(f"HTTP {resp.status_code}: {resp.text[:120]}")
                         content, _ = self._parse_local_chat_response(resp)
                     finally:
-                        local_model_manager.release(model_info["api_model"])
-                        local_lock_status = "released"
+                        release_ok, release_err = local_model_manager.release(model_info["api_model"])
+                        local_lock_status = "released" if release_ok else f"release_failed:{release_err}"
                 else:
                     resp = self._call_online_chat(model_info, messages, temperature=0.3, max_tokens=2000)
                     req_elapsed = time.time() - req_start
@@ -724,8 +729,14 @@ class AIClient:
                        task_name=None, manual_model=None):
         """
         图像生成（支持 CogView 云端 + FLUX 本地故障转移）。
+
+        优先级：
+        1. 调用处显式传入 manual_model（最高优先级）
+        2. 会话级 ai.manual_image_model（模型管理页设置）
+        3. 自动模式 CogView → FLUX
+
         Args:
-            manual_model: 'auto' / 'cogview-3-flash' / 'x/flux2-klein:4b-fp4'
+            manual_model: 'auto' / 'cogview-3-flash' / 'x/flux2-klein:4b-fp4' / None
         Returns:
             dict: {"success": bool, "url": str, "error": str, "model": str, "local_path": str}
         """
@@ -734,17 +745,25 @@ class AIClient:
 
         start_time = time.time()
         failover_log = []
-        mode = "manual" if manual_model and manual_model != "auto" else "auto"
+
+        # 确定最终使用的模型选择：显式传参 > 会话级 > 自动
+        effective_manual = manual_model
+        if effective_manual is None:
+            effective_manual = self.manual_image_model
+
+        mode = "manual" if effective_manual and effective_manual != "auto" else "auto"
         local_lock_status = None
 
         # 构建图像生成链
-        if manual_model and manual_model != "auto":
+        if effective_manual and effective_manual != "auto":
+            # 手动模式：严格只尝试指定模型，不故障转移
             registry = build_model_registry()
-            if manual_model in registry and registry[manual_model]["category"] == "image":
-                attempt_chain = [registry[manual_model]]
+            if effective_manual in registry and registry[effective_manual]["category"] == "image":
+                attempt_chain = [registry[effective_manual]]
             else:
-                return {"success": False, "url": None, "error": f"手动选择的图像模型 '{manual_model}' 无效", "model": None}
+                return {"success": False, "url": None, "error": f"手动选择的图像模型 '{effective_manual}' 无效", "model": None}
         else:
+            # 自动模式：CogView → FLUX 故障转移
             attempt_chain = get_image_chain()
 
         for idx, model_info in enumerate(attempt_chain):
@@ -760,18 +779,21 @@ class AIClient:
             req_start = time.time()
             try:
                 if mtype == "local":
-                    # FLUX 本地生成
+                    # FLUX 本地生成：acquire内部已完成预加载确认
                     lock_acquired = local_model_manager.acquire(model_info["api_model"], timeout=300)
                     if not lock_acquired:
-                        failover_log.append(f"{label} 锁等待超时")
+                        lock_err = local_model_manager.last_error or "锁等待超时"
+                        failover_log.append(f"{label} 锁获取失败: {lock_err}")
                         continue
-                    local_lock_status = "acquired"
+                    local_lock_status = "acquired+preloaded"
                     try:
                         result = self._call_local_image(model_info, prompt)
                         req_elapsed = time.time() - req_start
                     finally:
-                        local_model_manager.release(model_info["api_model"])
-                        local_lock_status = "released"
+                        release_ok, release_err = local_model_manager.release(model_info["api_model"])
+                        local_lock_status = "released" if release_ok else f"release_failed:{release_err}"
+                        if not release_ok:
+                            failover_log.append(f"{label} 卸载确认失败: {release_err}")
 
                     if not result["success"]:
                         raise Exception(result["error"])

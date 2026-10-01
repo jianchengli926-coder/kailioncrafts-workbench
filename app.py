@@ -48,6 +48,7 @@ from prompts import (
 # ============ 会话级手动模型覆盖（每次运行重置并从 session_state 恢复） ============
 ai.manual_text_model = st.session_state.get('manual_text_model_id')
 ai.manual_vision_model = st.session_state.get('manual_vision_model_id')
+ai.manual_image_model = st.session_state.get('manual_image_model_id')
 
 
 # ============ 通用：两步删除（防误删） ============
@@ -9955,11 +9956,12 @@ elif page == "🤖 模型管理":
 
         st.caption("手动选择只对当前会话的后续请求生效，不会修改全局默认路由顺序。")
 
-        # 同步到 ai 单例，使全工作台的 ai.chat() / ai.chat_with_image() 生效
+        # 同步到 ai 单例，使全工作台的 ai.chat() / ai.chat_with_image() / ai.generate_image() 生效
         try:
             from ai_client import ai as _ai_singleton
             _ai_singleton.manual_text_model = st.session_state.get('manual_text_model_id')
             _ai_singleton.manual_vision_model = st.session_state.get('manual_vision_model_id')
+            _ai_singleton.manual_image_model = st.session_state.get('manual_image_model_id')
         except Exception:
             pass
     except Exception as _e:

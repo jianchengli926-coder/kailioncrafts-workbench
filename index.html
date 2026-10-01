@@ -959,6 +959,84 @@ function getCampaignTaskById(taskId){
   return (S.campaignCustomerTasks || []).find(t => t.taskId === taskId) || null;
 }
 
+/* V79.0P1: 孤儿数据只读诊断（不自动修复，只报告） */
+function diagnoseOrphanData(){
+  const report = {
+    orphanTasks: [],
+    orphanFollowUps: [],
+    orphanArchives: [],
+    orphanDrafts: [],
+    orphanCommunications: [],
+    summary: {total: 0}
+  };
+  const customers = S.customers || [];
+  const campaigns = S.campaigns || [];
+  const tasks = S.campaignCustomerTasks || [];
+  const archives = S.outreachKnowledgeBase || [];
+  const followUps = S.campaignFollowUpTasks || [];
+  const drafts = S.drafts || [];
+  const communications = S.communications || [];
+
+  const customerIds = new Set(customers.map(c=>c.id));
+  const customerStableIds = new Set(customers.map(c=>c.stableId).filter(Boolean));
+  const campaignIds = new Set(campaigns.map(c=>c.campaignId));
+  const taskIds = new Set(tasks.map(t=>t.taskId));
+  const archiveIds = new Set(archives.map(a=>a.archiveId));
+
+  // 1. orphan task: customer/campaign/archive 不存在
+  for(const t of tasks){
+    const issues = [];
+    if(t.customerId && !customerIds.has(t.customerId)) issues.push('customer_not_found');
+    if(t.stableCustomerId && !customerStableIds.has(t.stableCustomerId)) issues.push('stableCustomer_not_found');
+    if(t.campaignId && !campaignIds.has(t.campaignId)) issues.push('campaign_not_found');
+    if(t.outreachArchiveId && !archiveIds.has(t.outreachArchiveId)) issues.push('archive_not_found');
+    if(issues.length) report.orphanTasks.push({taskId: t.taskId, campaignId: t.campaignId, customerId: t.customerId, issues});
+  }
+
+  // 2. orphan follow-up: task/campaign 不存在
+  for(const f of followUps){
+    const issues = [];
+    if(f.campaignTaskId && !taskIds.has(f.campaignTaskId)) issues.push('task_not_found');
+    if(f.campaignId && !campaignIds.has(f.campaignId)) issues.push('campaign_not_found');
+    if(issues.length) report.orphanFollowUps.push({followUpId: f.followUpId, campaignTaskId: f.campaignTaskId, issues});
+  }
+
+  // 3. orphan archive: customer 不存在且无 stableCustomerId 匹配
+  for(const a of archives){
+    const hasCustomer = a.customerId && customerIds.has(a.customerId);
+    const hasStable = a.stableCustomerId && customerStableIds.has(a.stableCustomerId);
+    if(!hasCustomer && !hasStable){
+      report.orphanArchives.push({archiveId: a.archiveId, customerId: a.customerId, stableCustomerId: a.stableCustomerId});
+    }
+  }
+
+  // 4. orphan draft: customer 不存在或 campaignTaskId 指向不存在 task
+  for(const d of drafts){
+    const issues = [];
+    if(d.customerId && !customerIds.has(d.customerId)) issues.push('customer_not_found');
+    if(d.campaignTaskId && !taskIds.has(d.campaignTaskId)) issues.push('campaignTask_not_found');
+    if(issues.length) report.orphanDrafts.push({draftId: d.id, customerId: d.customerId, campaignTaskId: d.campaignTaskId, issues});
+  }
+
+  // 5. orphan communication: customer 不存在或 campaignTaskId 指向不存在 task
+  for(const c of communications){
+    const issues = [];
+    if(c.customerId && !customerIds.has(c.customerId)) issues.push('customer_not_found');
+    if(c.campaignTaskId && !taskIds.has(c.campaignTaskId)) issues.push('campaignTask_not_found');
+    if(issues.length) report.orphanCommunications.push({commId: c.id, customerId: c.customerId, campaignTaskId: c.campaignTaskId, issues});
+  }
+
+  report.summary = {
+    orphanTasks: report.orphanTasks.length,
+    orphanFollowUps: report.orphanFollowUps.length,
+    orphanArchives: report.orphanArchives.length,
+    orphanDrafts: report.orphanDrafts.length,
+    orphanCommunications: report.orphanCommunications.length,
+    total: report.orphanTasks.length + report.orphanFollowUps.length + report.orphanArchives.length + report.orphanDrafts.length + report.orphanCommunications.length
+  };
+  return report;
+}
+
 function getCampaignMetrics(campaignId){
   const tasks = getCampaignTasks(campaignId);
   const metrics = {};
@@ -22232,7 +22310,10 @@ function syncCustomerToOutreachKB(customerId){
       duplicateStatus: archive.duplicateStatus || 'unique',
       duplicateOf: archive.duplicateOf || null,
       duplicateReason: archive.duplicateReason || '',
-      manuallyMerged: !!archive.manuallyMerged
+      manuallyMerged: !!archive.manuallyMerged,
+      identityResolutionStatus: archive.identityResolutionStatus || 'resolved',
+      resolvedBy: archive.resolvedBy || 'auto_sync',
+      resolvedAt: archive.resolvedAt || now()
     });
   } else {
     archive = Object.assign({
@@ -22240,7 +22321,11 @@ function syncCustomerToOutreachKB(customerId){
       firstArchivedAt: now(),
       duplicateStatus: 'unique',
       duplicateOf: null,
-      duplicateReason: ''
+      duplicateReason: '',
+      identityResolutionStatus: 'resolved',
+      resolvedBy: 'auto_sync',
+      resolvedAt: now(),
+      resolutionNote: '新建档案时自动绑定到客户，仅表示内部一对一关联，不表示外部公司事实已核验'
     }, archiveData);
     if(!S.outreachKnowledgeBase) S.outreachKnowledgeBase = [];
     S.outreachKnowledgeBase.push(archive);
@@ -22403,8 +22488,8 @@ async function generateFirstOutreachEmail(customerId){
     aiNotes:['V78.1 档案首封开发信入口生成', 'V77.4 统一知识库事实访问层']
   });
   persist();
-  // 同步到档案
-  try { syncCustomerToOutreachKB(customerId); } catch(e){}
+  // 同步到档案（失败不阻断草稿生成，但记录警告）
+  try { syncCustomerToOutreachKB(customerId); persist(); } catch(e){ console.warn('[首封开发信] 同步档案失败:', e); toast('档案同步失败，但草稿已生成','err'); }
   toast('首封开发信已生成（待审核）');
   // 打开编辑器
   const newDraft = S.drafts[S.drafts.length-1];
@@ -22434,7 +22519,7 @@ async function regenFirstOutreachDraft(customerId){
     aiNotes:['V78.1 重新生成首封草稿', '旧草稿已保留在历史中', 'V77.4 统一知识库事实访问层']
   });
   persist();
-  try { syncCustomerToOutreachKB(customerId); } catch(e){}
+  try { syncCustomerToOutreachKB(customerId); persist(); } catch(e){ console.warn('[重新生成首封] 同步档案失败:', e); toast('档案同步失败，但草稿已重新生成','err'); }
   toast('首封草稿已重新生成（待审核，旧版本已保留）');
   const newDraft = S.drafts[S.drafts.length-1];
   if(newDraft) openDraftEditor(newDraft.id, true);
@@ -24126,28 +24211,42 @@ function importBackup(){
     reader.onload = (ev) => {
       try {
         const backup = JSON.parse(ev.target.result);
-        if(!backup.data){ toast('无效的备份文件'); return; }
-        if(!confirm('导入备份将覆盖当前所有数据，确定继续？')) return;
-        const d = backup.data;
-        if(d.customers) S.customers = d.customers;
-        if(d.orders) S.orders = d.orders;
-        if(d.products) S.products = d.products;
-        if(d.apis) S.apis = d.apis;
-        if(d.emailHistory) S.emailHistory = d.emailHistory;
-        if(d.whatsappHistory) S.whatsappHistory = d.whatsappHistory;
-        if(d.profileHistory) S.profileHistory = d.profileHistory;
-        if(d.translateHistory) S.translateHistory = d.translateHistory;
-        if(d.replyHistory) S.replyHistory = d.replyHistory;
-        if(d.imageHistory) S.imageHistory = d.imageHistory;
-        if(d.visionHistory) S.visionHistory = d.visionHistory;
-        if(d.pipeline) S.pipeline = d.pipeline;
-        if(d.settings) S.settings = d.settings;
-        // 保存到localStorage
-        Object.keys(d).forEach(key=>DB.save(key, d[key]));
+        // 兼容两种格式：直接 key 或 {data: {...}}
+        const d = backup.data || backup;
+        if(!d || typeof d !== 'object'){ toast('无效的备份文件格式','err'); return; }
+        if(!confirm('导入备份将覆盖当前所有数据，确定继续？\n建议先导出当前数据备份。')) return;
+
+        // V79.0P1: 导入前快照，失败时回滚
+        const allKeys = Object.keys(d);
+        const snapshot = {};
+        allKeys.forEach(k=>{ snapshot[k] = DB.load(k); });
+
+        // 显式设置已知 S 属性（覆盖全部客户开发集合）
+        const sKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','orders','opportunities','followupTasks','customerIdentityMigration','campaignSchemaVersion'];
+        sKeys.forEach(k=>{ if(d[k] !== undefined) S[k] = d[k]; });
+
+        // 持久化全部 key，任一失败则回滚
+        let failedKey = null;
+        for(const key of allKeys){
+          try { DB.save(key, d[key]); }
+          catch(e){ failedKey = key; console.error('导入 '+key+' 失败', e); break; }
+        }
+        if(failedKey){
+          // 回滚已写入的 key
+          allKeys.forEach(k=>{
+            if(k === failedKey) return;
+            try{
+              if(snapshot[k] === null || snapshot[k] === undefined) DB.remove(k);
+              else DB.save(k, snapshot[k]);
+            }catch(e2){ console.error('回滚 '+k+' 失败', e2); }
+          });
+          toast('❌ 导入失败（'+failedKey+'），已回滚','err');
+          return;
+        }
         toast('✅ 备份已导入，页面即将刷新');
         setTimeout(()=>location.reload(), 1500);
       } catch(err) {
-        toast('❌ 备份文件解析失败: '+err.message);
+        toast('❌ 备份文件解析失败: '+err.message, 'err');
       }
     };
     reader.readAsText(file);
@@ -24157,15 +24256,25 @@ function importBackup(){
 
 /* 清空所有数据 */
 function clearAllData(){
-  if(!confirm('⚠️ 确定清空所有数据？此操作不可恢复！\n建议先导出备份。')) return;
-  if(!confirm('再次确认：真的要清空所有客户、订单、产品数据吗？')) return;
-  const keys = ['customers','orders','products','emailHistory','whatsappHistory','profileHistory','translateHistory','replyHistory','imageHistory','visionHistory','pipeline'];
-  keys.forEach(k=>{
-    localStorage.removeItem('kailion_'+k);
-    S[k] = k==='customers'||k==='orders'||k==='products'?[]:undefined;
-  });
-  toast('✅ 数据已清空，页面即将刷新');
-  setTimeout(()=>location.reload(), 1500);
+  if(!confirm('⚠️ 确定清空所有业务数据？此操作不可恢复！\n将清除客户、开发信、Campaign、跟进、知识库档案等全部数据。\n建议先导出备份。')) return;
+  if(!confirm('再次确认：真的要清空所有数据吗？')) return;
+  try {
+    // V79.0P1: 覆盖全部业务集合，使用统一 DB PREFIX
+    const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','outreachKnowledgeBase'];
+    const objectKeys = ['settings','customerIdentityMigration','campaignSchemaVersion'];
+    // 使用 DB.remove（统一 PREFIX）
+    arrayKeys.forEach(k=>{ try{ DB.remove(k); }catch(e){ console.error('清除 '+k+' 失败', e); } S[k]=[]; });
+    objectKeys.forEach(k=>{ try{ DB.remove(k); }catch(e){ console.error('清除 '+k+' 失败', e); } S[k]=null; });
+    // prospectLeads / prospectProfiles 存储无前缀，单独处理
+    try { localStorage.removeItem('prospectLeads'); } catch(e){}
+    try { localStorage.removeItem('prospectProfiles'); } catch(e){}
+    if(typeof prospectLeads !== 'undefined') prospectLeads = [];
+    if(typeof prospectProfiles !== 'undefined') prospectProfiles = [];
+    toast('✅ 全部业务数据已清空，页面即将刷新');
+    setTimeout(()=>location.reload(), 1500);
+  } catch(e){
+    toast('❌ 清空数据失败：' + (e.message||e), 'err');
+  }
 }
 
 /* V41 客户跟进SOP与任务提醒中心 */
@@ -27721,7 +27830,13 @@ function saveProspectProfiles(){
 }
 
 function saveProspectLeads(){
-  try { localStorage.setItem('prospectLeads', JSON.stringify(prospectLeads)); } catch(e){}
+  try {
+    localStorage.setItem('prospectLeads', JSON.stringify(prospectLeads));
+    return {success: true};
+  } catch(e){
+    console.error('[saveProspectLeads] 保存失败:', e);
+    return {success: false, error: e.message || String(e)};
+  }
 }
 
 loadProspectData();
@@ -29759,7 +29874,11 @@ function prospectAddSelectedToLeads(){
     added++;
   }
 
-  saveProspectLeads();
+  const saveResult = saveProspectLeads();
+  if(!saveResult.success){
+    toast('线索池保存失败：' + (saveResult.error||'未知错误'), 'err');
+    return;
+  }
   toast(`✅ 已添加 ${added} 家公司到线索池`);
   prospectTab = 'leads';
   renderView();
@@ -29821,7 +29940,12 @@ function renderProspectLeads(){
 function prospectDeleteLead(idx){
   const name = prospectLeads[idx].name;
   prospectLeads.splice(idx, 1);
-  saveProspectLeads();
+  const saveResult = saveProspectLeads();
+  if(!saveResult.success){
+    prospectLeads.splice(idx, 0, {name}); // 尽力恢复
+    toast('删除失败：线索池保存失败 ' + (saveResult.error||''), 'err');
+    return;
+  }
   toast('已删除线索：' + name);
   renderView();
 }
@@ -29829,21 +29953,42 @@ function prospectDeleteLead(idx){
 function prospectClearLeads(){
   if(prospectLeads.length === 0) return;
   if(!confirm('确定清空线索池？此操作不可撤销。')) return;
+  const backup = JSON.parse(JSON.stringify(prospectLeads));
   prospectLeads = [];
-  saveProspectLeads();
+  const saveResult = saveProspectLeads();
+  if(!saveResult.success){
+    prospectLeads = backup;
+    toast('清空失败：线索池保存失败 ' + (saveResult.error||''), 'err');
+    return;
+  }
   toast('线索池已清空');
   renderView();
 }
 
-function prospectConvertToCustomer(idx){
+/* V79.0P1: 统一 prospect→customer→archive 原子转换流程 */
+function convertProspectToCustomerWithArchive(idx){
   const lead = prospectLeads[idx];
-  if(!lead){ toast('线索不存在','err'); return; }
+  if(!lead){ return {success:false, errors:['线索不存在']}; }
   if(!S.customers) S.customers = [];
-  // 去重
-  if(S.customers.find(c=>c.website===lead.url)){
-    toast('该公司已在客户台账中','err');
-    return;
+  if(!S.outreachKnowledgeBase) S.outreachKnowledgeBase = [];
+
+  // 1. 幂等检查：同 website / normalizedDomain / stableId 不重复创建
+  const leadDomain = normalizeDomain(lead.url);
+  const existingByWebsite = S.customers.find(c => c.website && c.website === lead.url);
+  const existingByDomain = leadDomain ? S.customers.find(c => c.website && normalizeDomain(c.website) === leadDomain) : null;
+  const existing = existingByWebsite || existingByDomain;
+  if(existing){
+    return {
+      success: true,
+      idempotent: true,
+      customer: existing,
+      message: '客户已存在（' + (existingByWebsite ? '同URL' : '同域名') + '），未重复创建',
+      leadRemoved: false
+    };
   }
+
+  // 2. 创建客户，保留结构化来源证据
+  const convertedAt = now();
   const newCustomer = {
     id: uid(),
     company: lead.name,
@@ -29851,43 +29996,104 @@ function prospectConvertToCustomer(idx){
     source: '精准开发-' + (lead.source||''),
     type: lead.customerType || '潜在客户',
     status: '新线索',
-    createdAt: new Date().toISOString(),
+    createdAt: convertedAt,
     contact: {name:'', title:'', email:'', phone:'', whatsapp:'', linkedin:''},
-    scores: {total: 50, grade: 'C'},
+    scores: {total: lead.matchScore || 50, grade: (lead.matchScore>=80?'A':lead.matchScore>=60?'B':'C')},
     tags: [lead.category||'', lead.countries||''].filter(t=>t),
     notes: lead.snippet || '',
-    nextFollowUp: null
+    nextFollowUp: null,
+    prospectSource: {
+      sourceUrl: lead.url || '',
+      source: lead.source || '',
+      sourceQuery: lead.sourceQuery || '',
+      matchScore: lead.matchScore || null,
+      searchedAt: lead.searchedAt || null,
+      category: lead.category || '',
+      countries: lead.countries || '',
+      convertedAt: convertedAt,
+      note: '来源证据来自搜客线索，不代表外部公司事实已人工核验'
+    }
   };
-  // 快照：保存前的内存状态
+
+  // 3. 生成身份字段
+  ensureCustomerIdentity(newCustomer);
+
+  // 4. 快照（内存）
   const customersSnapshot = JSON.parse(JSON.stringify(S.customers));
+  const archivesSnapshot = JSON.parse(JSON.stringify(S.outreachKnowledgeBase));
   const leadsSnapshot = JSON.parse(JSON.stringify(prospectLeads));
 
-  // 1. 先修改内存并保存客户
+  // 5. 修改内存：添加客户
   S.customers.unshift(newCustomer);
-  try{
-    DB.save('customers', S.customers);
-  }catch(e){
-    // 客户保存失败：恢复内存，不移除线索
+
+  // 6. 创建/更新档案（syncCustomerToOutreachKB 会设置 identityResolutionStatus='resolved'）
+  let archive;
+  try {
+    archive = syncCustomerToOutreachKB(newCustomer.id);
+    if(!archive){ throw new Error('档案创建返回空'); }
+    // 标记为 prospect 转换自动解析
+    archive.resolvedBy = 'auto_prospect_conversion';
+    archive.resolvedAt = convertedAt;
+    archive.resolutionNote = '搜客线索转客户时自动绑定，仅表示内部一对一关联，不表示外部公司事实已核验';
+  } catch(e){
     S.customers = customersSnapshot;
-    toast('客户保存失败，线索未移除：' + (e.message||e), 'err');
-    return;
+    return {success:false, errors:['档案创建失败：' + (e.message||e)]};
   }
 
-  // 2. 客户保存成功后，从线索池移除并保存
+  // 7. 持久化 customers
+  try {
+    DB.save('customers', S.customers);
+  } catch(e){
+    S.customers = customersSnapshot;
+    S.outreachKnowledgeBase = archivesSnapshot;
+    return {success:false, errors:['客户保存失败：' + (e.message||e)]};
+  }
+
+  // 8. 持久化 outreachKnowledgeBase
+  try {
+    DB.save('outreachKnowledgeBase', S.outreachKnowledgeBase);
+  } catch(e){
+    // 回滚 customers 存储和内存
+    S.customers = customersSnapshot;
+    S.outreachKnowledgeBase = archivesSnapshot;
+    try { DB.save('customers', S.customers); } catch(e2){ console.error('回滚客户失败', e2); }
+    return {success:false, errors:['档案保存失败，已回滚：' + (e.message||e)]};
+  }
+
+  // 9. 从线索池移除并持久化 prospectLeads
   prospectLeads.splice(idx, 1);
-  try{
-    saveProspectLeads();
-  }catch(e){
-    // 线索池保存失败：恢复内存和存储
+  const leadSaveResult = saveProspectLeads();
+  if(!leadSaveResult.success){
+    // 回滚全部：内存 + 存储
     prospectLeads = leadsSnapshot;
     S.customers = customersSnapshot;
-    try{ DB.save('customers', S.customers); }catch(e2){ console.error('恢复客户失败', e2); }
-    try{ saveProspectLeads(); }catch(e2){ console.error('恢复线索池失败', e2); }
-    toast('线索池保存失败，已回滚：' + (e.message||e), 'err');
-    return;
+    S.outreachKnowledgeBase = archivesSnapshot;
+    try { DB.save('customers', S.customers); } catch(e2){ console.error('回滚客户失败', e2); }
+    try { DB.save('outreachKnowledgeBase', S.outreachKnowledgeBase); } catch(e2){ console.error('回滚档案失败', e2); }
+    return {success:false, errors:['线索池保存失败，已全部回滚：' + (leadSaveResult.error||'')]};
   }
 
-  toast('✅ 已转入客户台账：' + lead.name);
+  return {
+    success: true,
+    idempotent: false,
+    customer: newCustomer,
+    archive: archive,
+    leadRemoved: true,
+    message: '已转入客户台账并创建开发档案'
+  };
+}
+
+function prospectConvertToCustomer(idx){
+  const result = convertProspectToCustomerWithArchive(idx);
+  if(!result.success){
+    toast(result.errors.join('；'), 'err');
+    return;
+  }
+  if(result.idempotent){
+    toast('ℹ ' + result.message, 'err');
+    return;
+  }
+  toast('✅ ' + result.message + '：' + (result.customer ? result.customer.company : ''));
   renderView();
 }
 

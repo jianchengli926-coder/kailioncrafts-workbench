@@ -2137,6 +2137,358 @@ await __test('126. linkInbound: 明确 inbound 但 campaignTaskId 属于其他 t
   __assertEq(S.communications[0].campaignTaskId, 'task_other', 'comm campaignTaskId unchanged');
 });
 
+// ===== 十三、V79.0E2 Campaign 跟进任务 UI =====
+
+// E2 UI 测试辅助：捕获 modal HTML
+let __lastModalHtml = '';
+const __origOpenModalE2 = typeof openModal === 'function' ? openModal : null;
+function __captureModalStart(){
+  __lastModalHtml = '';
+  if(typeof openModal === 'function'){
+    openModal = function(html, wide){ __lastModalHtml = html || ''; };
+  }
+}
+function __captureModalEnd(){
+  if(__origOpenModalE2) openModal = __origOpenModalE2;
+}
+
+// E2 UI 测试辅助：模拟表单输入值
+function __withFormValues(values, fn){
+  const origGet = document.getElementById;
+  document.getElementById = function(id){
+    if(values && values[id] !== undefined){
+      return { value: values[id], textContent: '', innerHTML: '', style: { display: '' }, disabled: false, classList: { add(){}, remove(){}, contains(){return false;} } };
+    }
+    return origGet.call(document, id);
+  };
+  try { return fn(); } finally { document.getElementById = origGet; }
+}
+
+await __test('127. E2 UI: openCampaignTaskFollowUpPanel 渲染待处理和已完成跟进', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i1', stage: 'sent' }));
+  // 创建两个跟进：一个 pending，一个 completed
+  const r1 = createCampaignFollowUpTask('task_i1', { dueAt: new Date(Date.now()+86400000).toISOString(), note: 'pending note' });
+  const fuId = r1.followUp.followUpId;
+  // 手动标记一个 completed（通过数据层完成）
+  S.campaignFollowUpTasks.push({
+    followUpId: 'fu_completed_1', campaignId: 'camp_1', campaignTaskId: 'task_i1', customerId: 'cust_1',
+    stableCustomerId: 'stable_test', sourceTaskStage: 'sent', dueAt: new Date().toISOString(),
+    status: 'completed', outcome: 'completed', outcomeNote: 'done', note: 'old note',
+    createdAt: Date.now()-100000, updatedAt: Date.now()-50000, completedAt: Date.now()-50000, auditHistory: []
+  });
+  __captureModalStart();
+  try {
+    openCampaignTaskFollowUpPanel('task_i1');
+    __assert(__lastModalHtml.indexOf('待处理跟进') >= 0, 'should show pending section');
+    __assert(__lastModalHtml.indexOf('已完成跟进') >= 0, 'should show completed section');
+    __assert(__lastModalHtml.indexOf('pending note') >= 0, 'should show pending note');
+    __assert(__lastModalHtml.indexOf('done') >= 0, 'should show completed outcome note');
+    __assert(__lastModalHtml.indexOf('新建跟进') >= 0, 'should show create button for sent stage');
+  } finally { __captureModalEnd(); }
+});
+
+await __test('128. E2 UI: 非 sent/follow_up_due/replied 阶段不显示新建按钮', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i2', stage: 'queued' }));
+  __captureModalStart();
+  try {
+    openCampaignTaskFollowUpPanel('task_i2');
+    __assert(__lastModalHtml.indexOf('openCreateCampaignFollowUpForm') < 0, 'should NOT show create button for queued');
+    __assert(__lastModalHtml.indexOf('不可新建跟进任务') >= 0, 'should show restriction message');
+  } finally { __captureModalEnd(); }
+});
+
+await __test('129. E2 UI: Campaign 非 active 不显示新建按钮', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign({ status: 'paused' }));
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i3', stage: 'sent' }));
+  __captureModalStart();
+  try {
+    openCampaignTaskFollowUpPanel('task_i3');
+    __assert(__lastModalHtml.indexOf('openCreateCampaignFollowUpForm') < 0, 'should NOT show create button for paused campaign');
+    __assert(__lastModalHtml.indexOf('非 active') >= 0, 'should show non-active message');
+  } finally { __captureModalEnd(); }
+});
+
+await __test('130. E2 UI: openCreateCampaignFollowUpForm 显示默认 7 天到期', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i4', stage: 'sent' }));
+  __captureModalStart();
+  try {
+    openCreateCampaignFollowUpForm('task_i4');
+    __assert(__lastModalHtml.indexOf('新建跟进任务') >= 0, 'should show create form title');
+    __assert(__lastModalHtml.indexOf('fuCreateDueAt') >= 0, 'should have dueAt input');
+    __assert(__lastModalHtml.indexOf('默认 7 天后') >= 0, 'should show default 7 days hint');
+    __assert(__lastModalHtml.indexOf('fuCreateNote') >= 0, 'should have note textarea');
+  } finally { __captureModalEnd(); }
+});
+
+await __test('131. E2 UI: submitCreateCampaignFollowUp 调用数据层并成功', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i5', stage: 'sent' }));
+  const futureDue = new Date(Date.now()+86400000*3).toISOString().slice(0,16);
+  __withFormValues({ fuCreateDueAt: futureDue, fuCreateNote: 'test create note' }, () => {
+    submitCreateCampaignFollowUp('task_i5');
+  });
+  const plan = getCampaignTaskFollowUpPlan('task_i5');
+  __assertEq(plan.pendingCount, 1, 'should have 1 pending follow-up');
+  __assertEq(plan.pending[0].note, 'test create note', 'note should be saved');
+});
+
+await __test('132. E2 UI: submitCreateCampaignFollowUp 失败时显示错误不修改数据', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  // queued 阶段不允许创建
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i6', stage: 'queued' }));
+  const futureDue = new Date(Date.now()+86400000*3).toISOString().slice(0,16);
+  let errShown = false;
+  const origGet = document.getElementById;
+  document.getElementById = function(id){
+    if(id === 'fuCreateDueAt') return { value: futureDue };
+    if(id === 'fuCreateNote') return { value: 'should fail' };
+    if(id === 'fuCreateError') return { textContent: '', style: { display: '' }, set textContent(v){ errShown = true; this._t = v; } };
+    if(id === 'fuCreateSubmitBtn') return { disabled: false };
+    return origGet.call(document, id);
+  };
+  try {
+    submitCreateCampaignFollowUp('task_i6');
+  } finally { document.getElementById = origGet; }
+  const plan = getCampaignTaskFollowUpPlan('task_i6');
+  __assertEq(plan.pendingCount, 0, 'should NOT create follow-up for queued');
+  __assert(errShown, 'should show error message');
+});
+
+await __test('133. E2 UI: openEditCampaignFollowUpForm 显示当前值', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i7', stage: 'sent' }));
+  const r = createCampaignFollowUpTask('task_i7', { dueAt: new Date(Date.now()+86400000*5).toISOString(), note: 'edit me' });
+  const fuId = r.followUp.followUpId;
+  __captureModalStart();
+  try {
+    openEditCampaignFollowUpForm('task_i7', fuId);
+    __assert(__lastModalHtml.indexOf('编辑跟进任务') >= 0, 'should show edit form');
+    __assert(__lastModalHtml.indexOf('edit me') >= 0, 'should show current note');
+    __assert(__lastModalHtml.indexOf('fuEditDueAt') >= 0, 'should have dueAt input');
+  } finally { __captureModalEnd(); }
+});
+
+await __test('134. E2 UI: submitEditCampaignFollowUp 更新到期时间和备注', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i8', stage: 'sent' }));
+  const r = createCampaignFollowUpTask('task_i8', { dueAt: new Date(Date.now()+86400000*5).toISOString(), note: 'old note' });
+  const fuId = r.followUp.followUpId;
+  const newDue = new Date(Date.now()+86400000*10).toISOString().slice(0,16);
+  __withFormValues({ fuEditDueAt: newDue, fuEditNote: 'updated note' }, () => {
+    submitEditCampaignFollowUp('task_i8', fuId);
+  });
+  const plan = getCampaignTaskFollowUpPlan('task_i8');
+  __assertEq(plan.pending[0].note, 'updated note', 'note should be updated');
+});
+
+await __test('135. E2 UI: confirmCancelCampaignFollowUp 取消待处理任务', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i9', stage: 'sent' }));
+  const r = createCampaignFollowUpTask('task_i9', { dueAt: new Date(Date.now()+86400000).toISOString() });
+  const fuId = r.followUp.followUpId;
+  // confirmDlg 的 onYes 会直接执行
+  const origConfirm = confirmDlg;
+  let confirmCalled = false;
+  confirmDlg = function(msg, onYes){ confirmCalled = true; onYes(); };
+  try {
+    confirmCancelCampaignFollowUp('task_i9', fuId);
+  } finally { confirmDlg = origConfirm; }
+  __assert(confirmCalled, 'should call confirmDlg');
+  const plan = getCampaignTaskFollowUpPlan('task_i9');
+  __assertEq(plan.pendingCount, 0, 'pending should be 0 after cancel');
+  const cancelledFu = plan.followUps.find(f => f.followUpId === fuId);
+  __assert(cancelledFu && cancelledFu.status === 'cancelled', 'follow-up should be cancelled');
+});
+
+await __test('136. E2 UI: openCompleteCampaignFollowUpForm 无 inbound 证据时 replied 不可选', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i10', stage: 'sent', linkedCommunicationIds: [] }));
+  const r = createCampaignFollowUpTask('task_i10', { dueAt: new Date(Date.now()+86400000).toISOString() });
+  const fuId = r.followUp.followUpId;
+  __captureModalStart();
+  try {
+    openCompleteCampaignFollowUpForm('task_i10', fuId);
+    __assert(__lastModalHtml.indexOf('完成跟进任务') >= 0, 'should show complete form');
+    __assert(__lastModalHtml.indexOf('未检测到明确 inbound 回复证据') >= 0, 'should show no evidence warning');
+    __assert(__lastModalHtml.indexOf('人工标记发送不算客户回复证据') >= 0, 'should clarify manual send is not reply evidence');
+    // replied option should be disabled
+    __assert(__lastModalHtml.indexOf('value="replied"') >= 0, 'should have replied option');
+    __assert(__lastModalHtml.indexOf('无 inbound 证据，不可选') >= 0, 'should mark replied as unavailable');
+  } finally { __captureModalEnd(); }
+});
+
+await __test('137. E2 UI: openCompleteCampaignFollowUpForm 有 inbound 证据时展示证据来源', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i11', stage: 'sent', linkedCommunicationIds: ['comm_i11'] }));
+  S.communications.push({ id: 'comm_i11', customerId: 'cust_1', type: 'reply', direction: 'inbound', campaignTaskId: 'task_i11', createdAt: Date.now() });
+  const r = createCampaignFollowUpTask('task_i11', { dueAt: new Date(Date.now()+86400000).toISOString() });
+  const fuId = r.followUp.followUpId;
+  __captureModalStart();
+  try {
+    openCompleteCampaignFollowUpForm('task_i11', fuId);
+    __assert(__lastModalHtml.indexOf('已检测到明确 inbound 回复证据') >= 0, 'should show evidence found');
+    __assert(__lastModalHtml.indexOf('comm_i11') >= 0, 'should show communication ID');
+  } finally { __captureModalEnd(); }
+});
+
+await __test('138. E2 UI: submitCompleteCampaignFollowUp completed 成功', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i12', stage: 'sent' }));
+  const r = createCampaignFollowUpTask('task_i12', { dueAt: new Date(Date.now()+86400000).toISOString() });
+  const fuId = r.followUp.followUpId;
+  __withFormValues({ fuCompleteOutcome: 'completed', fuCompleteNote: 'completed note' }, () => {
+    submitCompleteCampaignFollowUp('task_i12', fuId);
+  });
+  const plan = getCampaignTaskFollowUpPlan('task_i12');
+  __assertEq(plan.pendingCount, 0, 'pending should be 0');
+  __assertEq(plan.completedCount, 1, 'completed should be 1');
+  __assertEq(plan.completed[0].outcome, 'completed', 'outcome should be completed');
+});
+
+await __test('139. E2 UI: submitCompleteCampaignFollowUp needs_follow_up 无 nextDueAt 被阻断', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i13', stage: 'sent' }));
+  const r = createCampaignFollowUpTask('task_i13', { dueAt: new Date(Date.now()+86400000).toISOString() });
+  const fuId = r.followUp.followUpId;
+  let errShown = false;
+  const origGet = document.getElementById;
+  document.getElementById = function(id){
+    if(id === 'fuCompleteOutcome') return { value: 'needs_follow_up' };
+    if(id === 'fuCompleteNote') return { value: '' };
+    if(id === 'fuCompleteNextDueAt') return { value: '' };
+    if(id === 'fuCompleteError') return { textContent: '', style: { display: '' }, set textContent(v){ errShown = true; } };
+    if(id === 'fuCompleteSubmitBtn') return { disabled: false };
+    return origGet.call(document, id);
+  };
+  try {
+    submitCompleteCampaignFollowUp('task_i13', fuId);
+  } finally { document.getElementById = origGet; }
+  __assert(errShown, 'should show error for missing nextDueAt');
+  const plan = getCampaignTaskFollowUpPlan('task_i13');
+  __assertEq(plan.pendingCount, 1, 'follow-up should remain pending');
+});
+
+await __test('140. E2 UI: submitCompleteCampaignFollowUp replied 无 inbound 证据被数据层阻断', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i14', stage: 'sent', linkedCommunicationIds: [] }));
+  const r = createCampaignFollowUpTask('task_i14', { dueAt: new Date(Date.now()+86400000).toISOString() });
+  const fuId = r.followUp.followUpId;
+  let errShown = false;
+  const origGet = document.getElementById;
+  document.getElementById = function(id){
+    if(id === 'fuCompleteOutcome') return { value: 'replied' };
+    if(id === 'fuCompleteNote') return { value: 'should fail' };
+    if(id === 'fuCompleteError') return { textContent: '', style: { display: '' }, set textContent(v){ errShown = true; } };
+    if(id === 'fuCompleteSubmitBtn') return { disabled: false };
+    return origGet.call(document, id);
+  };
+  try {
+    submitCompleteCampaignFollowUp('task_i14', fuId);
+  } finally { document.getElementById = origGet; }
+  __assert(errShown, 'should show error for replied without evidence');
+  const plan = getCampaignTaskFollowUpPlan('task_i14');
+  __assertEq(plan.pendingCount, 1, 'follow-up should remain pending');
+  __assertEq(S.campaignCustomerTasks[0].stage, 'sent', 'task stage should remain sent');
+});
+
+await __test('141. E2 UI: 重复点击保护 — submitCreate 连续调用只执行一次', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i15', stage: 'sent' }));
+  const futureDue = new Date(Date.now()+86400000*3).toISOString().slice(0,16);
+  // 模拟第一次调用设置 busy，第二次应被跳过
+  window._campaignFollowUpBusy = window._campaignFollowUpBusy || {};
+  window._campaignFollowUpBusy['create_task_i15'] = true;
+  __withFormValues({ fuCreateDueAt: futureDue, fuCreateNote: 'dup test' }, () => {
+    submitCreateCampaignFollowUp('task_i15');
+  });
+  delete window._campaignFollowUpBusy['create_task_i15'];
+  const plan = getCampaignTaskFollowUpPlan('task_i15');
+  __assertEq(plan.pendingCount, 0, 'should NOT create when busy');
+});
+
+await __test('142. E2 UI: HTML 转义 — 备注中的特殊字符被转义', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i16', stage: 'sent' }));
+  const r = createCampaignFollowUpTask('task_i16', { dueAt: new Date(Date.now()+86400000).toISOString(), note: '<script>alert(1)</script>&"quoted"' });
+  __captureModalStart();
+  try {
+    openCampaignTaskFollowUpPanel('task_i16');
+    __assert(__lastModalHtml.indexOf('<script>alert(1)</script>') < 0, 'raw script tag should NOT appear');
+    __assert(__lastModalHtml.indexOf('&lt;script&gt;') >= 0, 'script tag should be escaped');
+    __assert(__lastModalHtml.indexOf('&amp;') >= 0, 'ampersand should be escaped');
+  } finally { __captureModalEnd(); }
+});
+
+await __test('143. E2 UI: jsArg 特殊字符 taskId 不破坏 onclick', () => {
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  // taskId 含引号和特殊字符（用 fromCharCode 避免模板字面量引号冲突）
+  const specialId = 'task_' + String.fromCharCode(39) + String.fromCharCode(34) + '<img onerror=alert(1)>';
+  S.campaignCustomerTasks.push(__mkTask({ taskId: specialId, stage: 'sent' }));
+  __captureModalStart();
+  try {
+    openCampaignTaskFollowUpPanel(specialId);
+    __assert(__lastModalHtml.length > 0, 'modal should open');
+    __assert(__lastModalHtml.indexOf('<img') < 0, 'raw img tag should NOT appear (should be escaped)');
+    __assert(__lastModalHtml.indexOf('&lt;img') >= 0, 'img tag should be HTML-escaped');
+  } finally { __captureModalEnd(); }
+});
+
+await __test('144. E2 UI: 任务表格操作列包含跟进按钮', () => {
+  // 验证 viewCampaignDetail 生成的 HTML 中包含跟进按钮
+  S.customers.push(__mkCustomer());
+  S.outreachKnowledgeBase.push(__mkArchive());
+  S.campaigns.push(__mkCampaign());
+  S.campaignCustomerTasks.push(__mkTask({ taskId: 'task_i17', stage: 'sent' }));
+  const mockRoot = { innerHTML: '' };
+  const origGet = document.getElementById;
+  document.getElementById = function(id){
+    if(id === 'campaignDetailRoot' || id === 'root') return mockRoot;
+    return origGet.call(document, id);
+  };
+  try {
+    viewCampaignDetail(mockRoot, 'camp_1');
+    __assert(mockRoot.innerHTML.indexOf('跟进') >= 0, 'task table should contain 跟进 button');
+    __assert(mockRoot.innerHTML.indexOf('openCampaignTaskFollowUpPanel') >= 0, 'should call openCampaignTaskFollowUpPanel');
+  } finally { document.getElementById = origGet; }
+});
+
 // ===== 输出结果 =====
 console.log('');
 console.log('========================================');

@@ -2754,6 +2754,7 @@ function viewCampaignDetail(root, campaignId){
           <td style="padding:10px 12px;text-align:center;max-width:260px">
             ${t.outreachArchiveId ? `<button onclick="openOutreachKBArchive(${jsArg(t.outreachArchiveId)})" style="background:#ebf8ff;color:#2b6cb0;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">档案</button>` : ''}
             ${renderCampaignTaskWorkflowActions(t, campaign)}
+            <button onclick="openCampaignTaskFollowUpPanel(${jsArg(t.taskId)})" style="background:#f0f4ff;color:#4c51bf;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">跟进</button>
             ${t.stage !== 'paused' && !['converted','suppressed','disqualified','closed'].includes(t.stage) ? `<button onclick="confirmCampaignTaskPause(${jsArg(t.taskId)})" style="background:#fef3c7;color:#92400e;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">暂停</button>` : ''}
             ${t.stage === 'paused' ? `<button onclick="confirmCampaignTaskResume(${jsArg(t.taskId)})" style="background:#dcfce7;color:#166534;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">恢复</button>` : ''}
             ${!['converted','suppressed','disqualified','closed'].includes(t.stage) ? `<button onclick="confirmCampaignTaskClose(${jsArg(t.taskId)})" style="background:#f1f5f9;color:#64748b;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-bottom:2px">关闭</button>` : ''}
@@ -3540,6 +3541,366 @@ function getCampaignTaskReplyEvidence(taskId){
   }
 
   return result;
+}
+
+/* ============================================================
+ * V79.0E2 Campaign 跟进任务 UI
+ * 只调用 E1 数据层函数，不直接修改 S.* / CampaignTask / communication / follow-up
+ * ============================================================ */
+
+// 防重复提交
+window._campaignFollowUpBusy = window._campaignFollowUpBusy || {};
+function _isFollowUpBusy(key){ return !!window._campaignFollowUpBusy[key]; }
+function _setFollowUpBusy(key, val){ if(val) window._campaignFollowUpBusy[key] = true; else delete window._campaignFollowUpBusy[key]; }
+
+// 默认到期时间（7 天后），用于 UI 展示
+function getCampaignFollowUpDefaultDueAt(){
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toISOString().slice(0,16); // YYYY-MM-DDTHH:mm for datetime-local
+}
+
+// 格式化到期时间显示
+function _fmtFollowUpDueAt(dueAt){
+  if(!dueAt) return '-';
+  const d = new Date(dueAt);
+  if(isNaN(d.getTime())) return esc(String(dueAt));
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+// outcome 显示标签
+const FOLLOW_UP_OUTCOME_LABELS = {
+  completed: '已完成',
+  replied: '客户回复',
+  converted: '已转化',
+  needs_follow_up: '需继续跟进'
+};
+
+/* 打开跟进任务管理面板 */
+function openCampaignTaskFollowUpPanel(taskId){
+  const task = getCampaignTaskById(taskId);
+  if(!task){ toast('任务不存在', 'err'); return; }
+  const customer = resolveCampaignTaskCustomer(task);
+  const custName = customer ? (customer.company || '未知客户') : '客户待关联';
+  const plan = getCampaignTaskFollowUpPlan(taskId);
+  if(!plan.success){ toast((plan.errors||[]).join('; '), 'err'); return; }
+
+  const canCreate = ['sent','follow_up_due','replied'].includes(task.stage);
+  const campaign = getCampaignById(task.campaignId);
+  const campaignActive = campaign && campaign.status === 'active';
+
+  let html = `
+    <div class="modal-head"><h3>跟进任务 — ${esc(custName)}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body" style="max-height:65vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:13px;color:#4a5568">
+          任务阶段：${getCampaignTaskStageBadge(task.stage)}
+          <span style="margin-left:8px;font-size:12px;color:#718096">待处理 ${plan.pendingCount} · 已完成 ${plan.completedCount}</span>
+        </div>
+        ${canCreate && campaignActive ? `<button onclick="openCreateCampaignFollowUpForm(${jsArg(taskId)})" style="background:#4c51bf;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">+ 新建跟进</button>` : ''}
+      </div>
+  `;
+
+  if(!campaignActive){
+    html += `<div style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px">Campaign 非 active 状态，不可新建跟进任务</div>`;
+  } else if(!canCreate){
+    html += `<div style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px">当前阶段（${esc(task.stage)}）不可新建跟进任务（仅 sent / follow_up_due / replied 允许）</div>`;
+  }
+
+  // 待处理跟进
+  html += `<div style="font-size:13px;font-weight:600;color:#2d3748;margin-bottom:8px">待处理跟进</div>`;
+  if(plan.pending.length === 0){
+    html += `<div style="text-align:center;padding:16px;color:#a0aec0;font-size:12px;background:#f7fafc;border-radius:6px;margin-bottom:16px">暂无待处理跟进任务</div>`;
+  } else {
+    plan.pending.forEach(fu => {
+      html += `
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px">
+            <div style="flex:1;min-width:150px">
+              <div style="font-size:12px;color:#718096;margin-bottom:4px">到期：<b style="color:#2d3748">${_fmtFollowUpDueAt(fu.dueAt)}</b></div>
+              ${fu.note ? `<div style="font-size:12px;color:#4a5568;margin-top:4px">${esc(fu.note)}</div>` : ''}
+            </div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button onclick="openEditCampaignFollowUpForm(${jsArg(taskId)},${jsArg(fu.followUpId)})" style="background:#ebf8ff;color:#2b6cb0;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer">编辑</button>
+              <button onclick="openCompleteCampaignFollowUpForm(${jsArg(taskId)},${jsArg(fu.followUpId)})" style="background:#dcfce7;color:#166534;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer">完成</button>
+              <button onclick="confirmCancelCampaignFollowUp(${jsArg(taskId)},${jsArg(fu.followUpId)})" style="background:#fef2f2;color:#991b1b;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer">取消</button>
+            </div>
+          </div>
+        </div>`;
+    });
+  }
+
+  // 已完成跟进
+  html += `<div style="font-size:13px;font-weight:600;color:#2d3748;margin:16px 0 8px">已完成跟进</div>`;
+  if(plan.completed.length === 0){
+    html += `<div style="text-align:center;padding:16px;color:#a0aec0;font-size:12px;background:#f7fafc;border-radius:6px">暂无已完成跟进记录</div>`;
+  } else {
+    plan.completed.forEach(fu => {
+      const outcomeLabel = FOLLOW_UP_OUTCOME_LABELS[fu.outcome] || fu.outcome || '已完成';
+      html += `
+        <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px;opacity:0.85">
+          <div style="font-size:12px;color:#718096;margin-bottom:4px">
+            完成于 ${_fmtFollowUpDueAt(fu.completedAt)} · 结果：<b style="color:#2f855a">${esc(outcomeLabel)}</b>
+          </div>
+          ${fu.outcomeNote ? `<div style="font-size:12px;color:#4a5568;margin-top:4px">${esc(fu.outcomeNote)}</div>` : ''}
+          ${fu.note ? `<div style="font-size:11px;color:#a0aec0;margin-top:2px">原备注：${esc(fu.note)}</div>` : ''}
+        </div>`;
+    });
+  }
+
+  html += `</div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+    </div>`;
+  openModal(html, true);
+}
+
+/* 新建跟进任务表单 */
+function openCreateCampaignFollowUpForm(taskId){
+  const task = getCampaignTaskById(taskId);
+  if(!task) return;
+  const defaultDue = getCampaignFollowUpDefaultDueAt();
+  const html = `
+    <div class="modal-head"><h3>新建跟进任务</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div style="margin-bottom:12px">
+        <label style="display:block;font-size:13px;font-weight:600;color:#2d3748;margin-bottom:4px">到期时间 <span style="color:#e53e3e">*</span></label>
+        <input type="datetime-local" id="fuCreateDueAt" value="${esc(defaultDue)}" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+        <div style="font-size:11px;color:#718096;margin-top:3px">默认 7 天后，可修改</div>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="display:block;font-size:13px;font-weight:600;color:#2d3748;margin-bottom:4px">备注</label>
+        <textarea id="fuCreateNote" rows="3" placeholder="跟进要点、客户反馈等（可选）" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;resize:vertical"></textarea>
+      </div>
+      <div id="fuCreateError" style="color:#e53e3e;font-size:12px;display:none;margin-bottom:8px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" id="fuCreateSubmitBtn" onclick="submitCreateCampaignFollowUp(${jsArg(taskId)})">创建</button>
+    </div>`;
+  openModal(html);
+}
+
+function submitCreateCampaignFollowUp(taskId){
+  const busyKey = 'create_' + taskId;
+  if(_isFollowUpBusy(busyKey)) return;
+  const dueAtInput = document.getElementById('fuCreateDueAt');
+  const noteInput = document.getElementById('fuCreateNote');
+  const errEl = document.getElementById('fuCreateError');
+  const dueAt = dueAtInput ? dueAtInput.value : '';
+  const note = noteInput ? noteInput.value : '';
+
+  if(!dueAt){
+    if(errEl){ errEl.textContent = '请选择到期时间'; errEl.style.display = 'block'; }
+    return;
+  }
+  // 转为 ISO 格式
+  const dueAtIso = new Date(dueAt).toISOString();
+  if(isNaN(new Date(dueAtIso).getTime())){
+    if(errEl){ errEl.textContent = '到期时间格式无效'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  _setFollowUpBusy(busyKey, true);
+  const btn = document.getElementById('fuCreateSubmitBtn');
+  if(btn) btn.disabled = true;
+
+  const result = createCampaignFollowUpTask(taskId, { dueAt: dueAtIso, note: note, actor: 'user' });
+  _setFollowUpBusy(busyKey, false);
+  if(btn) btn.disabled = false;
+
+  if(result.success){
+    toast('跟进任务已创建');
+    closeModal();
+    openCampaignTaskFollowUpPanel(taskId);
+    renderView();
+  } else {
+    if(errEl){ errEl.textContent = (result.errors || []).join('; '); errEl.style.display = 'block'; }
+    else { toast((result.errors || []).join('; '), 'err'); }
+  }
+}
+
+/* 编辑跟进任务表单 */
+function openEditCampaignFollowUpForm(taskId, followUpId){
+  const plan = getCampaignTaskFollowUpPlan(taskId);
+  if(!plan.success){ toast((plan.errors||[]).join('; '), 'err'); return; }
+  const fu = (plan.followUps || []).find(f => f.followUpId === followUpId);
+  if(!fu){ toast('跟进任务不存在', 'err'); return; }
+  if(fu.status === 'completed'){ toast('已完成的跟进不可编辑', 'err'); return; }
+
+  const dueVal = fu.dueAt ? fu.dueAt.slice(0,16) : '';
+  const html = `
+    <div class="modal-head"><h3>编辑跟进任务</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div style="margin-bottom:12px">
+        <label style="display:block;font-size:13px;font-weight:600;color:#2d3748;margin-bottom:4px">到期时间</label>
+        <input type="datetime-local" id="fuEditDueAt" value="${esc(dueVal)}" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="display:block;font-size:13px;font-weight:600;color:#2d3748;margin-bottom:4px">备注</label>
+        <textarea id="fuEditNote" rows="3" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;resize:vertical">${esc(fu.note || '')}</textarea>
+      </div>
+      <div id="fuEditError" style="color:#e53e3e;font-size:12px;display:none;margin-bottom:8px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" id="fuEditSubmitBtn" onclick="submitEditCampaignFollowUp(${jsArg(taskId)},${jsArg(followUpId)})">保存</button>
+    </div>`;
+  openModal(html);
+}
+
+function submitEditCampaignFollowUp(taskId, followUpId){
+  const busyKey = 'edit_' + followUpId;
+  if(_isFollowUpBusy(busyKey)) return;
+  const dueAtInput = document.getElementById('fuEditDueAt');
+  const noteInput = document.getElementById('fuEditNote');
+  const errEl = document.getElementById('fuEditError');
+  const dueAt = dueAtInput ? dueAtInput.value : '';
+  const note = noteInput ? noteInput.value : '';
+
+  const update = { followUpId: followUpId, actor: 'user' };
+  if(dueAt){
+    const dueAtIso = new Date(dueAt).toISOString();
+    if(isNaN(new Date(dueAtIso).getTime())){
+      if(errEl){ errEl.textContent = '到期时间格式无效'; errEl.style.display = 'block'; }
+      return;
+    }
+    update.dueAt = dueAtIso;
+  }
+  if(note !== undefined) update.note = note;
+
+  _setFollowUpBusy(busyKey, true);
+  const btn = document.getElementById('fuEditSubmitBtn');
+  if(btn) btn.disabled = true;
+
+  const result = updateCampaignFollowUpTask(taskId, update);
+  _setFollowUpBusy(busyKey, false);
+  if(btn) btn.disabled = false;
+
+  if(result.success){
+    toast('跟进任务已更新');
+    closeModal();
+    openCampaignTaskFollowUpPanel(taskId);
+    renderView();
+  } else {
+    if(errEl){ errEl.textContent = (result.errors || []).join('; '); errEl.style.display = 'block'; }
+    else { toast((result.errors || []).join('; '), 'err'); }
+  }
+}
+
+/* 取消跟进任务 */
+function confirmCancelCampaignFollowUp(taskId, followUpId){
+  confirmDlg('确定要取消此跟进任务吗？取消后不可恢复。', () => {
+    const result = updateCampaignFollowUpTask(taskId, { followUpId: followUpId, status: 'cancelled', actor: 'user' });
+    if(result.success){ toast('跟进任务已取消'); closeModal(); openCampaignTaskFollowUpPanel(taskId); renderView(); }
+    else { toast((result.errors || []).join('; '), 'err'); }
+  });
+}
+
+/* 完成跟进任务表单（选择 outcome） */
+function openCompleteCampaignFollowUpForm(taskId, followUpId){
+  const plan = getCampaignTaskFollowUpPlan(taskId);
+  if(!plan.success){ toast((plan.errors||[]).join('; '), 'err'); return; }
+  const fu = (plan.followUps || []).find(f => f.followUpId === followUpId);
+  if(!fu){ toast('跟进任务不存在', 'err'); return; }
+  if(fu.status === 'completed'){ toast('跟进任务已完成', 'err'); return; }
+
+  const task = getCampaignTaskById(taskId);
+  const evidence = getCampaignTaskReplyEvidence(taskId);
+  const hasInbound = evidence.hasInboundReply;
+
+  // 回复证据展示
+  let evidenceHtml = '';
+  if(hasInbound && evidence.evidence && evidence.evidence.length > 0){
+    evidenceHtml = `<div style="background:#f0fff4;border:1px solid #9ae6b4;border-radius:6px;padding:8px 10px;margin-bottom:12px;font-size:12px">
+      <div style="font-weight:600;color:#22543d;margin-bottom:4px">已检测到明确 inbound 回复证据：</div>
+      ${evidence.evidence.map(e => `<div style="color:#2f855a">· 沟通记录 ${esc(e.communicationId)}（type=${esc(e.type || '-')}, direction=${esc(e.direction || '-')}）</div>`).join('')}
+    </div>`;
+  } else {
+    evidenceHtml = `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px 10px;margin-bottom:12px;font-size:12px;color:#92400e">
+      未检测到明确 inbound 回复证据。选择"客户回复"需要沟通记录中存在 type=inbound/reply 且 direction=inbound 的明确关联记录。人工标记发送不算客户回复证据。
+    </div>`;
+  }
+
+  const html = `
+    <div class="modal-head"><h3>完成跟进任务</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:#718096;margin-bottom:10px">到期：${_fmtFollowUpDueAt(fu.dueAt)}${fu.note ? ' · ' + esc(fu.note) : ''}</div>
+      ${evidenceHtml}
+      <div style="margin-bottom:12px">
+        <label style="display:block;font-size:13px;font-weight:600;color:#2d3748;margin-bottom:4px">完成结果 <span style="color:#e53e3e">*</span></label>
+        <select id="fuCompleteOutcome" onchange="_onFollowUpOutcomeChange()" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+          <option value="completed">已完成（无阶段变更）</option>
+          <option value="replied" ${hasInbound ? '' : 'disabled'}>客户回复（推进到 replied）${hasInbound ? '' : ' — 无 inbound 证据，不可选'}</option>
+          <option value="converted">已转化（推进到 converted）</option>
+          <option value="needs_follow_up">需继续跟进（创建下一条跟进）</option>
+        </select>
+      </div>
+      <div id="fuNextDueAtWrap" style="margin-bottom:12px;display:none">
+        <label style="display:block;font-size:13px;font-weight:600;color:#2d3748;margin-bottom:4px">下一次跟进时间 <span style="color:#e53e3e">*</span></label>
+        <input type="datetime-local" id="fuCompleteNextDueAt" value="${esc(getCampaignFollowUpDefaultDueAt())}" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="display:block;font-size:13px;font-weight:600;color:#2d3748;margin-bottom:4px">完成备注</label>
+        <textarea id="fuCompleteNote" rows="2" placeholder="跟进结果说明（可选）" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;resize:vertical"></textarea>
+      </div>
+      <div id="fuCompleteError" style="color:#e53e3e;font-size:12px;display:none;margin-bottom:8px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" id="fuCompleteSubmitBtn" onclick="submitCompleteCampaignFollowUp(${jsArg(taskId)},${jsArg(followUpId)})">确认完成</button>
+    </div>`;
+  openModal(html);
+}
+
+function _onFollowUpOutcomeChange(){
+  const sel = document.getElementById('fuCompleteOutcome');
+  const wrap = document.getElementById('fuNextDueAtWrap');
+  if(wrap) wrap.style.display = (sel && sel.value === 'needs_follow_up') ? 'block' : 'none';
+}
+
+function submitCompleteCampaignFollowUp(taskId, followUpId){
+  const busyKey = 'complete_' + followUpId;
+  if(_isFollowUpBusy(busyKey)) return;
+  const outcomeSel = document.getElementById('fuCompleteOutcome');
+  const noteInput = document.getElementById('fuCompleteNote');
+  const nextDueInput = document.getElementById('fuCompleteNextDueAt');
+  const errEl = document.getElementById('fuCompleteError');
+  const outcomeType = outcomeSel ? outcomeSel.value : 'completed';
+  const note = noteInput ? noteInput.value : '';
+
+  const outcome = { followUpId: followUpId, type: outcomeType, note: note, actor: 'user' };
+  if(outcomeType === 'needs_follow_up'){
+    const nextDue = nextDueInput ? nextDueInput.value : '';
+    if(!nextDue){
+      if(errEl){ errEl.textContent = '请选择下一次跟进时间'; errEl.style.display = 'block'; }
+      return;
+    }
+    const nextDueIso = new Date(nextDue).toISOString();
+    if(isNaN(new Date(nextDueIso).getTime())){
+      if(errEl){ errEl.textContent = '下一次跟进时间格式无效'; errEl.style.display = 'block'; }
+      return;
+    }
+    outcome.nextDueAt = nextDueIso;
+  }
+
+  _setFollowUpBusy(busyKey, true);
+  const btn = document.getElementById('fuCompleteSubmitBtn');
+  if(btn) btn.disabled = true;
+
+  const result = completeCampaignFollowUpTask(taskId, outcome);
+  _setFollowUpBusy(busyKey, false);
+  if(btn) btn.disabled = false;
+
+  if(result.success){
+    toast('跟进任务已完成');
+    closeModal();
+    openCampaignTaskFollowUpPanel(taskId);
+    renderView();
+  } else {
+    if(errEl){ errEl.textContent = (result.errors || []).join('; '); errEl.style.display = 'block'; }
+    else { toast((result.errors || []).join('; '), 'err'); }
+  }
 }
 
 /* ============================================================

@@ -4,6 +4,8 @@ KaiLionCrafts AI客户开发工作台 - 客户管理（轻量CRM）v2.0
 新增：销售管道阶段、跟进提醒、活动日志、客户背调
 """
 import json
+import os
+import tempfile
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -37,7 +39,22 @@ class CustomerManager:
     def _ensure_file(self):
         CUSTOMERS_FILE.parent.mkdir(parents=True, exist_ok=True)
         if not CUSTOMERS_FILE.exists():
-            CUSTOMERS_FILE.write_text("[]", encoding="utf-8")
+            self._atomic_write([])
+
+    def _atomic_write(self, data):
+        """原子写入：临时文件+os.replace，失败保留原文件"""
+        content = json.dumps(data, ensure_ascii=False, indent=2)
+        fd, tmp = tempfile.mkstemp(dir=str(CUSTOMERS_FILE.parent), suffix='.tmp')
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, str(CUSTOMERS_FILE))
+        except Exception:
+            try: os.unlink(tmp)
+            except OSError: pass
+            raise
 
     def _load(self):
         try:
@@ -46,16 +63,26 @@ class CustomerManager:
             return []
 
     def _save(self, data):
-        CUSTOMERS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        self._atomic_write(data)
+
+    def _gen_unique_id(self, existing_ids):
+        """生成不重复的客户ID（8位UUID，冲突时重试）"""
+        for _ in range(10):
+            cid = str(uuid.uuid4())[:8]
+            if cid not in existing_ids:
+                return cid
+        # 极端情况：10次都冲突，用更长的ID
+        return str(uuid.uuid4())[:12]
 
     def add_customer(self, customer_data):
         """添加客户"""
         data = self._load()
+        existing_ids = {c.get("id") for c in data}
         # 确保有pipeline_stage
         status = customer_data.get("status", "新客户")
         pipeline_stage = customer_data.get("pipeline_stage", STATUS_TO_PIPELINE.get(status, "lead"))
         customer = {
-            "id": str(uuid.uuid4())[:8],
+            "id": self._gen_unique_id(existing_ids),
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
             "status": status,

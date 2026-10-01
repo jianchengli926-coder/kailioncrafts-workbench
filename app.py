@@ -45,6 +45,27 @@ from prompts import (
     EMAIL_AIDA_ANALYSIS_PROMPT,
 )
 
+# ============ 通用：原子JSON写入（tempfile + os.replace） ============
+import tempfile as _tempfile
+def _atomic_write_json(path, data):
+    """原子写入JSON：先写同目录临时文件，flush后os.replace替换。失败时保留原文件。"""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = _json.dumps(data, ensure_ascii=False, indent=2)
+    fd, tmp = _tempfile.mkstemp(dir=str(path.parent), suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, str(path))
+        return True
+    except Exception as e:
+        try: os.unlink(tmp)
+        except OSError: pass
+        st.error(f"写入失败：{path.name} - {type(e).__name__}")
+        return False
+
 # ============ 会话级手动模型覆盖（每次运行重置并从 session_state 恢复） ============
 ai.manual_text_model = st.session_state.get('manual_text_model_id')
 ai.manual_vision_model = st.session_state.get('manual_vision_model_id')
@@ -162,9 +183,13 @@ if not st.session_state["authed"]:
     # 密码输入框也居中
     _, col_pwd, _ = st.columns([1, 2, 1])
     with col_pwd:
+        _access_pwd = os.environ.get("WORKBENCH_ACCESS_PASSWORD", "")
+        if not _access_pwd:
+            st.error("⚠️ 访问密码未配置。请设置环境变量 WORKBENCH_ACCESS_PASSWORD 后重启工作台。")
+            st.stop()
         pwd = st.text_input("", type="password", label_visibility="collapsed", placeholder="输入访问密码")
         if st.button("进 入", use_container_width=True, type="primary"):
-            if pwd == "441723":
+            if pwd == _access_pwd:
                 st.session_state["authed"] = True
                 try:
                     import json, os, tempfile
@@ -865,7 +890,7 @@ if page == "🏠 仪表盘":
         if st.button("➕ 添加", use_container_width=True):
             if new_todo.strip():
                 todos.append({"task": new_todo.strip(), "done": False, "date": datetime.now().strftime("%Y-%m-%d")})
-                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+                _atomic_write_json(todo_file, todos)
                 st.rerun()
         if todos:
             _todo_changed = False
@@ -877,13 +902,13 @@ if page == "🏠 仪表盘":
                 with col_del:
                     if st.button("🗑", key=f"del_todo_{i}", help="删除此待办"):
                         todos.pop(i)
-                        todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+                        _atomic_write_json(todo_file, todos)
                         st.rerun()
                 if _cb != t.get("done", False):
                     todos[i]["done"] = _cb
                     _todo_changed = True
             if _todo_changed:
-                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+                _atomic_write_json(todo_file, todos)
         else:
             st.caption("暂无待办")
 
@@ -922,7 +947,7 @@ if page == "🏠 仪表盘":
                 sources = DEFAULT_SOURCES.copy()
         else:
             sources = DEFAULT_SOURCES.copy()
-            source_file.write_text(_json.dumps(sources, ensure_ascii=False, indent=2), encoding="utf-8")
+            _atomic_write_json(source_file, sources)
 
         # 右上角编辑入口
         with st.expander("✏️ 编辑客户来源数据", expanded=False):
@@ -935,7 +960,7 @@ if page == "🏠 仪表盘":
                     new_count = st.number_input(f"{name}", min_value=0, value=info.get("count", 0), key=f"src_{name}")
                     new_sources[name] = {"count": new_count, "color": info.get("color", "#9E9E9E")}
             if st.button("💾 保存数据", use_container_width=True, type="primary"):
-                source_file.write_text(_json.dumps(new_sources, ensure_ascii=False, indent=2), encoding="utf-8")
+                _atomic_write_json(source_file, new_sources)
                 st.success("已保存！")
                 st.rerun()
 
@@ -1039,12 +1064,15 @@ elif page == "🖥️ 独立站管理":
     comments_file = inbox_dir / "comments.json"
 
     def _load_json(path):
-        if path.exists():
-            return _json.loads(path.read_text(encoding="utf-8"))
+        try:
+            if path.exists():
+                return _json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, IOError):
+            pass
         return []
 
     def _save_json(path, data):
-        path.write_text(_json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write_json(path, data)
 
     inquiries = _load_json(inquiries_file)
     comments = _load_json(comments_file)
@@ -1509,7 +1537,7 @@ elif page == "🌅 晨间简报":
                             })
                             added += 1
                     if added > 0:
-                        _todo_file.write_text(_json.dumps(_todos, ensure_ascii=False, indent=2), encoding="utf-8")
+                        _atomic_write_json(_todo_file, _todos)
                         st.success(f"✅ 已添加 {added} 条待办到今日待办")
                     else:
                         st.info("未提取到可转换的待办项，请手动添加")
@@ -1796,7 +1824,7 @@ elif page == "👥 客户中心":
                             "export_regions": e_region, "cert": e_cert, "intro": e_intro, "cases": cases,
                         }
                         import json as _j
-                        EP_FILE.write_text(_j.dumps(cases_save, ensure_ascii=False, indent=2), encoding="utf-8")
+                        _atomic_write_json(EP_FILE, cases_save)
                         st.rerun()
                 with ca_col2:
                     if st.button("🗑 删除最后一个案例", key="ep_del_case", use_container_width=True):
@@ -1808,7 +1836,7 @@ elif page == "👥 客户中心":
                                 "export_regions": e_region, "cert": e_cert, "intro": e_intro, "cases": cases,
                             }
                             import json as _j
-                            EP_FILE.write_text(_j.dumps(cases_save, ensure_ascii=False, indent=2), encoding="utf-8")
+                            _atomic_write_json(EP_FILE, cases_save)
                             st.rerun()
 
                 if st.button("💾 保存企业信息与案例", type="primary", key="ep_save", use_container_width=True):
@@ -1828,7 +1856,7 @@ elif page == "👥 客户中心":
                         "cases": saved_cases,
                     }
                     import json as _j
-                    EP_FILE.write_text(_j.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+                    _atomic_write_json(EP_FILE, out)
                     st.success("✅ 企业信息与案例库已保存")
 
             st.markdown("---")
@@ -2557,8 +2585,17 @@ EN: ...
                 with exp_col2:
                     if st.button("📤 导出筛选结果CSV", key="export_filtered"):
                         if rows:
+                            import csv as _csv_mod
+                            from io import StringIO
+                            _buf = StringIO()
+                            _keys = list(rows[0].keys())
+                            _w = _csv_mod.DictWriter(_buf, fieldnames=_keys, extrasaction="ignore")
+                            _w.writeheader()
+                            _w.writerows(rows)
+                            # utf-8-sig 确保Excel正确显示中文
+                            _csv_content = _buf.getvalue().encode("utf-8-sig").decode("utf-8-sig")
                             save_to_kb_button(
-                                "\n".join([",".join([str(v) for v in r.values()]) for r in rows]),
+                                _csv_content,
                                 "客户管理/导出报表",
                                 f"筛选客户_{__import__('datetime').datetime.now().strftime('%Y%m%d_%H%M')}",
                                 "csv"
@@ -2768,8 +2805,7 @@ EN: ...
 
                 def _save_sequences(seqs):
                     os.makedirs(os.path.dirname(SEQ_FILE), exist_ok=True)
-                    with open(SEQ_FILE, "w", encoding="utf-8") as f:
-                        json.dump(seqs, f, ensure_ascii=False, indent=2)
+                    _atomic_write_json(SEQ_FILE, seqs)
 
                 sequences = _load_sequences()
 
@@ -4522,7 +4558,7 @@ elif page == "📦 产品库":
                         _ov.pop(product['sku'], None)
                         price_map[product['sku']] = '待补'
                     _ov_path.parent.mkdir(parents=True, exist_ok=True)
-                    _ov_path.write_text(_json.dumps(_ov, ensure_ascii=False, indent=2), encoding='utf-8')
+                    _atomic_write_json(_ov_path, _ov)
                     st.session_state['product_price_map'] = price_map
                     st.success(f"✅ 已保存价格：{_val or '已清空'}")
                     st.rerun()
@@ -4536,7 +4572,7 @@ elif page == "📦 产品库":
                             pass
                     _ov.pop(product['sku'], None)
                     _ov_path.parent.mkdir(parents=True, exist_ok=True)
-                    _ov_path.write_text(_json.dumps(_ov, ensure_ascii=False, indent=2), encoding='utf-8')
+                    _atomic_write_json(_ov_path, _ov)
                     st.session_state.pop('product_price_map', None)
                     st.session_state.pop(_input_key, None)
                     st.success("✅ 已恢复 txt 默认价格")
@@ -10591,7 +10627,7 @@ elif page == "📋 今日待办":
                         })
                         new_count += 1
                 
-                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+                _atomic_write_json(todo_file, todos)
                 st.success(f"✅ AI已生成 {new_count} 条待办")
                 st.rerun()
     
@@ -10619,7 +10655,7 @@ elif page == "📋 今日待办":
             "due_date": new_due.strftime("%Y-%m-%d") if new_due else "",
             "created_at": today_str
         })
-        todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write_json(todo_file, todos)
         st.rerun()
     
     st.markdown("---")
@@ -10684,7 +10720,7 @@ elif page == "📋 今日待办":
                     st.rerun()
     
     if _changed:
-        todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write_json(todo_file, todos)
     
     # ===== 批量操作 =====
     if todos:
@@ -10694,18 +10730,18 @@ elif page == "📋 今日待办":
             if st.button("✅ 全部标记完成", use_container_width=True):
                 for t in todos:
                     t["done"] = True
-                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+                _atomic_write_json(todo_file, todos)
                 st.rerun()
         with b2:
             if st.button("🧹 清除已完成", use_container_width=True):
                 todos = [t for t in todos if not t.get("done")]
-                todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+                _atomic_write_json(todo_file, todos)
                 st.rerun()
         with b3:
             if st.button("🗑 清空全部", use_container_width=True):
                 if two_step_delete("确认清空", "clear_all_todos", "将删除所有待办，不可恢复") == "yes":
                     todos = []
-                    todo_file.write_text(_json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
+                    _atomic_write_json(todo_file, todos)
                     st.rerun()
     
 # ============ 页面：订单台账 ============
@@ -11174,7 +11210,7 @@ elif page == "🧾 订单台账":
                 return []
         def _save_fac(lst):
             FAC_FILE.parent.mkdir(parents=True, exist_ok=True)
-            FAC_FILE.write_text(_json.dumps(lst, ensure_ascii=False, indent=2), encoding="utf-8")
+            _atomic_write_json(FAC_FILE, lst)
 
         sales_nos = [o["order_no"] for o in fdb.list_sales_orders()]
         if not sales_nos:
@@ -11468,7 +11504,7 @@ elif page == "🧾 订单台账":
             comp["swift"] = c4.text_input("SWIFT/银行", comp["swift"])
             if st.button("保存抬头"):
                 comp_file.parent.mkdir(parents=True, exist_ok=True)
-                comp_file.write_text(_json.dumps(comp, ensure_ascii=False, indent=2), encoding="utf-8")
+                _atomic_write_json(comp_file, comp)
                 st.success("已保存")
 
         # ===== 阶梯MOQ报价生成器 =====
@@ -11889,7 +11925,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "b
                         "keyword":kw,"note":note,"done":False,
                         "date":datetime.now().strftime("%Y-%m-%d")
                     })
-                    ideas_file.write_text(_json.dumps(ideas, ensure_ascii=False, indent=2), encoding="utf-8")
+                    _atomic_write_json(ideas_file, ideas)
                     st.success("已保存")
                     st.rerun()
 
@@ -11906,7 +11942,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "b
                         st.rerun()
                     if c2.button("🗑 删除", key=f"del_{i}"):
                         ideas.pop(i)
-                        ideas_file.write_text(_json.dumps(ideas, ensure_ascii=False, indent=2), encoding="utf-8")
+                        _atomic_write_json(ideas_file, ideas)
                         st.rerun()
                     st.markdown("---")
         else:
@@ -12603,7 +12639,7 @@ elif page == "⚙️ 设置中心":
 
         def _save_json(path, data):
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            _atomic_write_json(path, data)
 
         # ===== 读取数据 =====
         auth_logs = _load_json(AUTH_LOG, [])

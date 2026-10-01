@@ -24213,36 +24213,65 @@ function importBackup(){
         const backup = JSON.parse(ev.target.result);
         // 兼容两种格式：直接 key 或 {data: {...}}
         const d = backup.data || backup;
-        if(!d || typeof d !== 'object'){ toast('无效的备份文件格式','err'); return; }
+        // 最小 schema 校验：必须是对象且至少有一个已知业务 key
+        if(!d || typeof d !== 'object' || Array.isArray(d)){ toast('无效的备份文件格式','err'); return; }
+        const knownKeys = ['customers','drafts','campaigns','campaignCustomerTasks','outreachKnowledgeBase','orders','products','settings'];
+        const hasKnownKey = knownKeys.some(k => d[k] !== undefined);
+        if(!hasKnownKey && !d._backupMeta){ toast('备份文件未包含有效业务数据','err'); return; }
         if(!confirm('导入备份将覆盖当前所有数据，确定继续？\n建议先导出当前数据备份。')) return;
 
-        // V79.0P1: 导入前快照，失败时回滚
-        const allKeys = Object.keys(d);
+        // V79.0P1 修复：导入前快照（含 key 存在状态），失败时 dirty-write 回滚
+        const allKeys = Object.keys(d).filter(k => k !== '_backupMeta');
         const snapshot = {};
-        allKeys.forEach(k=>{ snapshot[k] = DB.load(k); });
+        allKeys.forEach(k=>{
+          try { const v = DB.load(k); snapshot[k] = { exists: v !== null, value: v }; }
+          catch(e){ snapshot[k] = { exists: false, value: null }; }
+        });
+        // 内存快照
+        const memorySnap = {};
+        allKeys.forEach(k=>{ if(S[k] !== undefined) memorySnap[k] = JSON.parse(JSON.stringify(S[k])); });
 
-        // 显式设置已知 S 属性（覆盖全部客户开发集合）
+        // 显式设置已知 S 属性
         const sKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','orders','opportunities','followupTasks','customerIdentityMigration','campaignSchemaVersion'];
         sKeys.forEach(k=>{ if(d[k] !== undefined) S[k] = d[k]; });
 
-        // 持久化全部 key，任一失败则回滚
-        let failedKey = null;
-        for(const key of allKeys){
-          try { DB.save(key, d[key]); }
-          catch(e){ failedKey = key; console.error('导入 '+key+' 失败', e); break; }
+        // 恢复辅助
+        function restoreKey(k){
+          try{
+            if(!snapshot[k].exists) DB.remove(k);
+            else DB.save(k, snapshot[k].value);
+            return null;
+          }catch(e){ return k + ': ' + (e.message||e); }
         }
+
+        // 持久化全部 key，记录已成功写入的 key
+        const savedKeys = [];
+        let failedKey = null;
+        let failedError = null;
+        for(const key of allKeys){
+          try {
+            DB.save(key, d[key]);
+            savedKeys.push(key);
+          } catch(e){
+            failedKey = key; failedError = e.message||String(e); break;
+          }
+        }
+
         if(failedKey){
-          // 回滚已写入的 key
-          allKeys.forEach(k=>{
-            if(k === failedKey) return;
-            try{
-              if(snapshot[k] === null || snapshot[k] === undefined) DB.remove(k);
-              else DB.save(k, snapshot[k]);
-            }catch(e2){ console.error('回滚 '+k+' 失败', e2); }
-          });
-          toast('❌ 导入失败（'+failedKey+'），已回滚','err');
+          // 先补偿当前失败 key（可能已 dirty-write），再逆序补偿已写 key
+          const compErrors = [];
+          const err1 = restoreKey(failedKey);
+          if(err1) compErrors.push(err1);
+          for(let i = savedKeys.length - 1; i >= 0; i--){
+            const err2 = restoreKey(savedKeys[i]);
+            if(err2) compErrors.push(err2);
+          }
+          // 恢复内存
+          allKeys.forEach(k=>{ if(memorySnap[k] !== undefined) S[k] = memorySnap[k]; });
+          toast('❌ 导入失败（'+failedKey+'：'+failedError+'）' + (compErrors.length ? '，补偿未完全成功' : '，已回滚'), 'err');
           return;
         }
+
         toast('✅ 备份已导入，页面即将刷新');
         setTimeout(()=>location.reload(), 1500);
       } catch(err) {
@@ -24258,23 +24287,96 @@ function importBackup(){
 function clearAllData(){
   if(!confirm('⚠️ 确定清空所有业务数据？此操作不可恢复！\n将清除客户、开发信、Campaign、跟进、知识库档案等全部数据。\n建议先导出备份。')) return;
   if(!confirm('再次确认：真的要清空所有数据吗？')) return;
-  try {
-    // V79.0P1: 覆盖全部业务集合，使用统一 DB PREFIX
-    const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','outreachKnowledgeBase'];
-    const objectKeys = ['settings','customerIdentityMigration','campaignSchemaVersion'];
-    // 使用 DB.remove（统一 PREFIX）
-    arrayKeys.forEach(k=>{ try{ DB.remove(k); }catch(e){ console.error('清除 '+k+' 失败', e); } S[k]=[]; });
-    objectKeys.forEach(k=>{ try{ DB.remove(k); }catch(e){ console.error('清除 '+k+' 失败', e); } S[k]=null; });
-    // prospectLeads / prospectProfiles 存储无前缀，单独处理
-    try { localStorage.removeItem('prospectLeads'); } catch(e){}
-    try { localStorage.removeItem('prospectProfiles'); } catch(e){}
-    if(typeof prospectLeads !== 'undefined') prospectLeads = [];
-    if(typeof prospectProfiles !== 'undefined') prospectProfiles = [];
-    toast('✅ 全部业务数据已清空，页面即将刷新');
-    setTimeout(()=>location.reload(), 1500);
-  } catch(e){
-    toast('❌ 清空数据失败：' + (e.message||e), 'err');
+
+  // V79.0P1 修复：快照 + 固定顺序删除 + 失败逆序恢复
+  const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','outreachKnowledgeBase'];
+  const objectKeys = ['settings','customerIdentityMigration','campaignSchemaVersion'];
+  const allKeys = arrayKeys.concat(objectKeys);
+  const specialKeys = ['prospectLeads','prospectProfiles'];
+
+  // 1. 快照：记录每个 key 是否存在及原始值
+  const snapshot = {};
+  allKeys.forEach(k=>{
+    try { const v = DB.load(k); snapshot[k] = { exists: v !== null, value: v }; }
+    catch(e){ snapshot[k] = { exists: false, value: null }; }
+  });
+  specialKeys.forEach(k=>{
+    try { const v = localStorage.getItem(k); snapshot[k] = { exists: v !== null, value: v }; }
+    catch(e){ snapshot[k] = { exists: false, value: null }; }
+  });
+
+  // 2. 内存快照（含独立变量 prospectLeads / prospectProfiles）
+  const memorySnap = {};
+  allKeys.forEach(k=>{ memorySnap[k] = S[k] !== undefined ? JSON.parse(JSON.stringify(S[k])) : undefined; });
+  const prospectLeadsMemorySnap = typeof prospectLeads !== 'undefined' ? JSON.parse(JSON.stringify(prospectLeads)) : null;
+  const prospectProfilesMemorySnap = typeof prospectProfiles !== 'undefined' ? JSON.parse(JSON.stringify(prospectProfiles)) : null;
+
+  // 恢复独立内存变量
+  function restoreSpecialMemory(){
+    if(prospectLeadsMemorySnap !== null && typeof prospectLeads !== 'undefined') prospectLeads = prospectLeadsMemorySnap;
+    if(prospectProfilesMemorySnap !== null && typeof prospectProfiles !== 'undefined') prospectProfiles = prospectProfilesMemorySnap;
   }
+
+  // 3. 恢复辅助
+  function restoreKey(k){
+    try{
+      if(allKeys.includes(k)){
+        if(!snapshot[k].exists) DB.remove(k);
+        else DB.save(k, snapshot[k].value);
+      } else {
+        if(!snapshot[k].exists) localStorage.removeItem(k);
+        else localStorage.setItem(k, snapshot[k].value);
+      }
+      return null;
+    }catch(e){ return k + ': ' + (e.message||e); }
+  }
+
+  // 4. 按固定顺序删除
+  const deletedKeys = [];
+  let failedKey = null;
+  let failedError = null;
+
+  for(const k of allKeys){
+    try {
+      DB.remove(k);
+      deletedKeys.push(k);
+      S[k] = arrayKeys.includes(k) ? [] : null;
+    } catch(e){
+      failedKey = k; failedError = e.message||String(e); break;
+    }
+  }
+  if(!failedKey){
+    for(const k of specialKeys){
+      try {
+        localStorage.removeItem(k);
+        deletedKeys.push(k);
+        if(k === 'prospectLeads' && typeof prospectLeads !== 'undefined') prospectLeads = [];
+        if(k === 'prospectProfiles' && typeof prospectProfiles !== 'undefined') prospectProfiles = [];
+      } catch(e){
+        failedKey = k; failedError = e.message||String(e); break;
+      }
+    }
+  }
+
+  if(failedKey){
+    // 5. 失败：先恢复当前失败 key（可能已 dirty-delete），再逆序恢复已删除 key
+    const compErrors = [];
+    const err1 = restoreKey(failedKey);
+    if(err1) compErrors.push(err1);
+    for(let i = deletedKeys.length - 1; i >= 0; i--){
+      const err2 = restoreKey(deletedKeys[i]);
+      if(err2) compErrors.push(err2);
+    }
+    // 恢复内存（S.* + 独立变量 prospectLeads/prospectProfiles）
+    allKeys.forEach(k=>{ if(memorySnap[k] !== undefined) S[k] = memorySnap[k]; });
+    restoreSpecialMemory();
+    toast('❌ 清空失败（'+failedKey+'：'+failedError+'）' + (compErrors.length ? '，补偿未完全成功' : '，已回滚'), 'err');
+    return { success:false, failedKey, failedError, compensationComplete: compErrors.length===0, compensationErrors: compErrors };
+  }
+
+  toast('✅ 全部业务数据已清空，页面即将刷新');
+  setTimeout(()=>location.reload(), 1500);
+  return { success:true };
 }
 
 /* V41 客户跟进SOP与任务提醒中心 */
@@ -29972,16 +30074,27 @@ function convertProspectToCustomerWithArchive(idx){
   if(!S.customers) S.customers = [];
   if(!S.outreachKnowledgeBase) S.outreachKnowledgeBase = [];
 
-  // 1. 幂等检查：同 website / normalizedDomain / stableId 不重复创建
+  // 1. 幂等检查：同 website / normalizedDomain 不重复创建
   const leadDomain = normalizeDomain(lead.url);
   const existingByWebsite = S.customers.find(c => c.website && c.website === lead.url);
   const existingByDomain = leadDomain ? S.customers.find(c => c.website && normalizeDomain(c.website) === leadDomain) : null;
   const existing = existingByWebsite || existingByDomain;
   if(existing){
+    const existingArchive = getOutreachArchiveByCustomerId(existing.id);
+    if(!existingArchive){
+      return {
+        success: false,
+        idempotent: true,
+        customer: existing,
+        errors: ['客户已存在但客户开发档案缺失，请先执行档案同步'],
+        leadRemoved: false
+      };
+    }
     return {
       success: true,
       idempotent: true,
       customer: existing,
+      archive: existingArchive,
       message: '客户已存在（' + (existingByWebsite ? '同URL' : '同域名') + '），未重复创建',
       leadRemoved: false
     };
@@ -30018,59 +30131,100 @@ function convertProspectToCustomerWithArchive(idx){
   // 3. 生成身份字段
   ensureCustomerIdentity(newCustomer);
 
-  // 4. 快照（内存）
+  // 4. 内存快照
   const customersSnapshot = JSON.parse(JSON.stringify(S.customers));
   const archivesSnapshot = JSON.parse(JSON.stringify(S.outreachKnowledgeBase));
   const leadsSnapshot = JSON.parse(JSON.stringify(prospectLeads));
 
-  // 5. 修改内存：添加客户
+  // 5. localStorage 原始状态快照（区分不存在/null/有值）
+  const storageSnap = {};
+  try { storageSnap.customers = { exists: true, value: JSON.parse(localStorage.getItem(PREFIX+'customers')||'null') }; } catch(e){ storageSnap.customers = { exists: false, value: null }; }
+  if(storageSnap.customers.value === null) storageSnap.customers.exists = false;
+  try { storageSnap.archives = { exists: true, value: JSON.parse(localStorage.getItem(PREFIX+'outreachKnowledgeBase')||'null') }; } catch(e){ storageSnap.archives = { exists: false, value: null }; }
+  if(storageSnap.archives.value === null) storageSnap.archives.exists = false;
+  try { storageSnap.leads = { exists: true, value: localStorage.getItem('prospectLeads') }; } catch(e){ storageSnap.leads = { exists: false, value: null }; }
+  if(storageSnap.leads.value === null) storageSnap.leads.exists = false;
+
+  // 补偿辅助：恢复单个 key 到原始状态
+  function restoreKey(which){
+    const errors = [];
+    if(which === 'customers' || which === 'all'){
+      try{ if(!storageSnap.customers.exists) DB.remove('customers'); else DB.save('customers', storageSnap.customers.value); }
+      catch(e){ errors.push('customers补偿失败: '+(e.message||e)); }
+    }
+    if(which === 'archives' || which === 'all'){
+      try{ if(!storageSnap.archives.exists) DB.remove('outreachKnowledgeBase'); else DB.save('outreachKnowledgeBase', storageSnap.archives.value); }
+      catch(e){ errors.push('outreachKnowledgeBase补偿失败: '+(e.message||e)); }
+    }
+    if(which === 'leads' || which === 'all'){
+      try{ if(!storageSnap.leads.exists) localStorage.removeItem('prospectLeads'); else localStorage.setItem('prospectLeads', storageSnap.leads.value); }
+      catch(e){ errors.push('prospectLeads补偿失败: '+(e.message||e)); }
+    }
+    return errors;
+  }
+
+  function failResult(failedAt, msg, compensate){
+    // 恢复内存
+    S.customers = customersSnapshot;
+    S.outreachKnowledgeBase = archivesSnapshot;
+    prospectLeads = leadsSnapshot;
+    // 逆序补偿存储：先当前失败 key，再之前已写 key
+    const compErrors = [];
+    if(compensate === 'customers'){
+      compErrors.push(...restoreKey('customers'));
+    } else if(compensate === 'archives'){
+      compErrors.push(...restoreKey('archives'));
+      compErrors.push(...restoreKey('customers'));
+    } else if(compensate === 'leads'){
+      compErrors.push(...restoreKey('leads'));
+      compErrors.push(...restoreKey('archives'));
+      compErrors.push(...restoreKey('customers'));
+    } else if(compensate === 'sync'){
+      // sync 失败：只有内存被改，存储未动，不需要存储补偿
+    }
+    return {
+      success: false,
+      failedAt: failedAt,
+      errors: [msg],
+      compensationComplete: compErrors.length === 0,
+      compensationErrors: compErrors
+    };
+  }
+
+  // 6. 修改内存：添加客户
   S.customers.unshift(newCustomer);
 
-  // 6. 创建/更新档案（syncCustomerToOutreachKB 会设置 identityResolutionStatus='resolved'）
+  // 7. 创建/更新档案
   let archive;
   try {
     archive = syncCustomerToOutreachKB(newCustomer.id);
     if(!archive){ throw new Error('档案创建返回空'); }
-    // 标记为 prospect 转换自动解析
     archive.resolvedBy = 'auto_prospect_conversion';
     archive.resolvedAt = convertedAt;
     archive.resolutionNote = '搜客线索转客户时自动绑定，仅表示内部一对一关联，不表示外部公司事实已核验';
   } catch(e){
-    S.customers = customersSnapshot;
-    return {success:false, errors:['档案创建失败：' + (e.message||e)]};
+    return failResult('syncCustomerToOutreachKB', '档案创建失败：' + (e.message||e), 'sync');
   }
 
-  // 7. 持久化 customers
+  // 8. 持久化 customers（含 dirty-write 补偿）
   try {
     DB.save('customers', S.customers);
   } catch(e){
-    S.customers = customersSnapshot;
-    S.outreachKnowledgeBase = archivesSnapshot;
-    return {success:false, errors:['客户保存失败：' + (e.message||e)]};
+    return failResult('customers', '客户保存失败：' + (e.message||e), 'customers');
   }
 
-  // 8. 持久化 outreachKnowledgeBase
+  // 9. 持久化 outreachKnowledgeBase（含 dirty-write 补偿）
   try {
     DB.save('outreachKnowledgeBase', S.outreachKnowledgeBase);
   } catch(e){
-    // 回滚 customers 存储和内存
-    S.customers = customersSnapshot;
-    S.outreachKnowledgeBase = archivesSnapshot;
-    try { DB.save('customers', S.customers); } catch(e2){ console.error('回滚客户失败', e2); }
-    return {success:false, errors:['档案保存失败，已回滚：' + (e.message||e)]};
+    return failResult('outreachKnowledgeBase', '档案保存失败：' + (e.message||e), 'archives');
   }
 
-  // 9. 从线索池移除并持久化 prospectLeads
+  // 10. 从线索池移除并持久化 prospectLeads
   prospectLeads.splice(idx, 1);
   const leadSaveResult = saveProspectLeads();
   if(!leadSaveResult.success){
-    // 回滚全部：内存 + 存储
-    prospectLeads = leadsSnapshot;
-    S.customers = customersSnapshot;
-    S.outreachKnowledgeBase = archivesSnapshot;
-    try { DB.save('customers', S.customers); } catch(e2){ console.error('回滚客户失败', e2); }
-    try { DB.save('outreachKnowledgeBase', S.outreachKnowledgeBase); } catch(e2){ console.error('回滚档案失败', e2); }
-    return {success:false, errors:['线索池保存失败，已全部回滚：' + (leadSaveResult.error||'')]};
+    return failResult('prospectLeads', '线索池保存失败：' + (leadSaveResult.error||''), 'leads');
   }
 
   return {
@@ -30086,7 +30240,11 @@ function convertProspectToCustomerWithArchive(idx){
 function prospectConvertToCustomer(idx){
   const result = convertProspectToCustomerWithArchive(idx);
   if(!result.success){
-    toast(result.errors.join('；'), 'err');
+    let msg = result.errors.join('；');
+    if(result.compensationErrors && result.compensationErrors.length){
+      msg += '（补偿未完全成功：' + result.compensationErrors.join('；') + '）';
+    }
+    toast(msg, 'err');
     return;
   }
   if(result.idempotent){

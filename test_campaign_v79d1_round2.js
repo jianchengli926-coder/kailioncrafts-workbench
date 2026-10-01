@@ -2858,6 +2858,298 @@ await __test('165. P1: 转换后客户可通过 Campaign 评估（eligible）', 
   __assert(evalResult.blockers.length === 0, 'no blockers');
 });
 
+// ===== V79.0P1 第二轮：原子性 dirty-write 补偿测试 =====
+
+await __test('166. P1: syncCustomerToOutreachKB 抛错时三集合都恢复', () => {
+  S.customers = []; S.outreachKnowledgeBase = [];
+  prospectLeads = [__mkProspectLead({name:'Sync Fail Corp', url:'https://syncfail.com'})];
+  const origSync = syncCustomerToOutreachKB;
+  syncCustomerToOutreachKB = function(){ throw new Error('simulated sync failure'); };
+  try {
+    const r = convertProspectToCustomerWithArchive(0);
+    __assert(!r.success, 'should fail on sync error');
+    __assert(r.failedAt === 'syncCustomerToOutreachKB', 'failedAt should be sync');
+    __assert(S.customers.length === 0, 'customers memory restored');
+    __assert(S.outreachKnowledgeBase.length === 0, 'archives memory restored');
+    __assert(prospectLeads.length === 1, 'leads memory restored');
+  } finally { syncCustomerToOutreachKB = origSync; }
+});
+
+await __test('167. P1: customers dirty-write 后抛错时 localStorage 恢复', () => {
+  S.customers = [{id:'orig_cust'}]; S.outreachKnowledgeBase = [];
+  localStorage.setItem(PREFIX+'customers', JSON.stringify(S.customers));
+  prospectLeads = [__mkProspectLead({name:'Dirty Cust', url:'https://dirtycust.com'})];
+  const origSetItem = localStorage.setItem;
+  localStorage.setItem = function(k, v){
+    if(k === PREFIX + 'customers'){
+      // dirty write: 先写入，再抛错
+      origSetItem.call(this, k, v);
+      throw new Error('simulated customers dirty-write failure');
+    }
+    origSetItem.call(this, k, v);
+  };
+  try {
+    const r = convertProspectToCustomerWithArchive(0);
+    __assert(!r.success, 'should fail');
+    __assert(r.failedAt === 'customers', 'failedAt should be customers');
+    __assert(S.customers.length === 1, 'customers memory restored to original');
+    __assert(S.customers[0].id === 'orig_cust', 'customer content restored');
+    const stored = JSON.parse(localStorage.getItem(PREFIX+'customers') || '[]');
+    __assert(stored.length === 1 && stored[0].id === 'orig_cust', 'customers storage restored to original');
+  } finally { localStorage.setItem = origSetItem; }
+});
+
+await __test('168. P1: archive dirty-write 后抛错时 localStorage 恢复', () => {
+  S.customers = []; S.outreachKnowledgeBase = [{archiveId:'orig_arc'}];
+  localStorage.setItem(PREFIX+'outreachKnowledgeBase', JSON.stringify(S.outreachKnowledgeBase));
+  prospectLeads = [__mkProspectLead({name:'Dirty Arc', url:'https://dirtyarc.com'})];
+  const origSetItem = localStorage.setItem;
+  let customersWritten = false;
+  localStorage.setItem = function(k, v){
+    if(k === PREFIX + 'customers'){ customersWritten = true; origSetItem.call(this, k, v); return; }
+    if(k === PREFIX + 'outreachKnowledgeBase'){
+      origSetItem.call(this, k, v); // dirty write
+      throw new Error('simulated archive dirty-write failure');
+    }
+    origSetItem.call(this, k, v);
+  };
+  try {
+    const r = convertProspectToCustomerWithArchive(0);
+    __assert(!r.success, 'should fail');
+    __assert(r.failedAt === 'outreachKnowledgeBase', 'failedAt should be archives');
+    __assert(customersWritten === true, 'customers was written before archive failed');
+    __assert(S.customers.length === 0, 'customers memory restored');
+    __assert(S.outreachKnowledgeBase.length === 1, 'archives memory restored');
+    __assert(S.outreachKnowledgeBase[0].archiveId === 'orig_arc', 'archive content restored');
+    const storedCust = JSON.parse(localStorage.getItem(PREFIX+'customers') || '[]');
+    __assert(storedCust.length === 0, 'customers storage restored');
+    const storedArc = JSON.parse(localStorage.getItem(PREFIX+'outreachKnowledgeBase') || '[]');
+    __assert(storedArc.length === 1 && storedArc[0].archiveId === 'orig_arc', 'archives storage restored');
+  } finally { localStorage.setItem = origSetItem; }
+});
+
+await __test('169. P1: prospectLeads dirty-write 后抛错时 localStorage 恢复', () => {
+  S.customers = []; S.outreachKnowledgeBase = [];
+  prospectLeads = [__mkProspectLead({name:'Dirty Lead', url:'https://dirtylead.com'})];
+  localStorage.setItem('prospectLeads', JSON.stringify(prospectLeads));
+  const origSetItem = localStorage.setItem;
+  localStorage.setItem = function(k, v){
+    if(k === 'prospectLeads'){
+      origSetItem.call(this, k, v); // dirty write
+      throw new Error('simulated prospectLeads dirty-write failure');
+    }
+    origSetItem.call(this, k, v);
+  };
+  try {
+    const r = convertProspectToCustomerWithArchive(0);
+    __assert(!r.success, 'should fail');
+    __assert(r.failedAt === 'prospectLeads', 'failedAt should be leads');
+    __assert(S.customers.length === 0, 'customers memory restored');
+    __assert(S.outreachKnowledgeBase.length === 0, 'archives memory restored');
+    __assert(prospectLeads.length === 1, 'leads memory restored');
+    const storedLeads = JSON.parse(localStorage.getItem('prospectLeads') || '[]');
+    __assert(storedLeads.length === 1, 'leads storage restored');
+    const storedCust = JSON.parse(localStorage.getItem(PREFIX+'customers') || '[]');
+    __assert(storedCust.length === 0, 'customers storage restored');
+  } finally { localStorage.setItem = origSetItem; }
+});
+
+await __test('170. P1: 已有 customer 但无 archive 时返回明确错误', () => {
+  S.customers = [{id:'cust_no_arc', company:'No Archive Corp', website:'https://noarc.com', stableId:'stable_noarc', contact:{}}];
+  S.outreachKnowledgeBase = [];
+  prospectLeads = [__mkProspectLead({name:'No Archive Corp', url:'https://noarc.com'})];
+  const r = convertProspectToCustomerWithArchive(0);
+  __assert(!r.success, 'should fail when customer exists but no archive');
+  __assert(r.idempotent === true, 'should be idempotent detection');
+  __assert(r.errors.some(e => e.indexOf('档案缺失') >= 0), 'error should mention missing archive');
+  __assert(S.customers.length === 1, 'no new customer created');
+  __assert(prospectLeads.length === 1, 'lead not removed');
+});
+
+await __test('171. P1: clearAllData 中间删除失败不显示成功', () => {
+  S.customers = [{id:'c1'}];
+  S.campaigns = [{campaignId:'camp1'}];
+  localStorage.setItem(PREFIX+'customers', JSON.stringify(S.customers));
+  localStorage.setItem(PREFIX+'campaigns', JSON.stringify(S.campaigns));
+  const origRemove = DB.remove;
+  let customersRemoved = false;
+  DB.remove = function(k){
+    if(k === 'customers'){ customersRemoved = true; origRemove.call(this, k); return; }
+    if(k === 'campaigns'){ throw new Error('simulated remove failure'); }
+    origRemove.call(this, k);
+  };
+  try {
+    const r = clearAllData();
+    __assert(r && r.success === false, 'clearAllData should return failure');
+    __assert(r.failedKey === 'campaigns', 'failedKey should be campaigns');
+    __assert(customersRemoved === true, 'customers was removed before failure');
+    // 验证 customers 已恢复
+    const stored = JSON.parse(localStorage.getItem(PREFIX+'customers') || '[]');
+    __assert(stored.length === 1 && stored[0].id === 'c1', 'customers storage restored after failure');
+    __assert(S.customers.length === 1, 'customers memory restored');
+  } finally { DB.remove = origRemove; }
+});
+
+await __test('172. P1: importBackup failedKey dirty-write 后能恢复', () => {
+  // 设置原始数据
+  S.customers = [{id:'orig_imp'}];
+  localStorage.setItem(PREFIX+'customers', JSON.stringify(S.customers));
+  localStorage.setItem(PREFIX+'campaigns', JSON.stringify([{campaignId:'orig_camp'}]));
+
+  const origSetItem = localStorage.setItem;
+  let customersWritten = false;
+  localStorage.setItem = function(k, v){
+    if(k === PREFIX + 'customers'){ customersWritten = true; origSetItem.call(this, k, v); return; }
+    if(k === PREFIX + 'campaigns'){
+      origSetItem.call(this, k, v); // dirty write
+      throw new Error('simulated campaigns dirty-write failure');
+    }
+    origSetItem.call(this, k, v);
+  };
+
+  // 模拟 importBackup 的核心逻辑（不通过 file input）
+  const d = { customers: [{id:'new_cust'}], campaigns: [{campaignId:'new_camp'}] };
+  const allKeys = Object.keys(d);
+  const snapshot = {};
+  allKeys.forEach(k=>{ try{ const v=DB.load(k); snapshot[k]={exists:v!==null,value:v};}catch(e){snapshot[k]={exists:false,value:null};} });
+  const memorySnap = {};
+  allKeys.forEach(k=>{ if(S[k]!==undefined) memorySnap[k]=JSON.parse(JSON.stringify(S[k])); });
+  allKeys.forEach(k=>{ if(d[k]!==undefined) S[k]=d[k]; });
+
+  const savedKeys = [];
+  let failedKey = null, failedError = null;
+  for(const key of allKeys){
+    try{ DB.save(key, d[key]); savedKeys.push(key); }
+    catch(e){ failedKey=key; failedError=e.message; break; }
+  }
+
+  __assert(failedKey === 'campaigns', 'should fail on campaigns');
+  __assert(customersWritten === true, 'customers was written before failure');
+
+  // 执行回滚（模拟 importBackup 的回滚逻辑）
+  function restoreKey(k){
+    try{ if(!snapshot[k].exists) DB.remove(k); else DB.save(k, snapshot[k].value); return null; }
+    catch(e){ return k+': '+(e.message||e); }
+  }
+  const compErrors = [];
+  const err1 = restoreKey(failedKey);
+  if(err1) compErrors.push(err1);
+  for(let i=savedKeys.length-1; i>=0; i--){ const err2=restoreKey(savedKeys[i]); if(err2) compErrors.push(err2); }
+  allKeys.forEach(k=>{ if(memorySnap[k]!==undefined) S[k]=memorySnap[k]; });
+
+  // 验证恢复
+  __assert(S.customers.length === 1 && S.customers[0].id === 'orig_imp', 'customers memory restored');
+  const storedCust = JSON.parse(localStorage.getItem(PREFIX+'customers') || '[]');
+  __assert(storedCust.length === 1 && storedCust[0].id === 'orig_imp', 'customers storage restored');
+  const storedCamp = JSON.parse(localStorage.getItem(PREFIX+'campaigns') || '[]');
+  __assert(storedCamp.length === 1 && storedCamp[0].campaignId === 'orig_camp', 'campaigns storage restored (dirty-write compensated)');
+
+  localStorage.setItem = origSetItem;
+});
+
+// ===== V79.0P1 第二轮补充：clearAllData 独立内存变量恢复 =====
+
+await __test('173. P1: prospectLeads 删除失败时内存和 localStorage 都恢复', () => {
+  // 设置初始数据
+  S.customers = [{id:'c1'}];
+  prospectLeads = [{name:'lead1', url:'https://lead1.com'}];
+  prospectProfiles = [{name:'profile1'}];
+  localStorage.setItem(PREFIX+'customers', JSON.stringify(S.customers));
+  localStorage.setItem('prospectLeads', JSON.stringify(prospectLeads));
+  localStorage.setItem('prospectProfiles', JSON.stringify(prospectProfiles));
+
+  const origRemoveItem = localStorage.removeItem;
+  let customersRemoved = false;
+  localStorage.removeItem = function(k){
+    if(k === PREFIX+'customers'){ customersRemoved = true; origRemoveItem.call(this, k); return; }
+    if(k === 'prospectLeads'){ throw new Error('simulated prospectLeads remove failure'); }
+    origRemoveItem.call(this, k);
+  };
+  try {
+    const r = clearAllData();
+    __assert(r && r.success === false, 'should return failure');
+    __assert(r.failedKey === 'prospectLeads', 'failedKey should be prospectLeads');
+    __assert(customersRemoved === true, 'customers was removed before failure');
+    // 内存恢复
+    __assert(S.customers.length === 1 && S.customers[0].id === 'c1', 'customers memory restored');
+    __assert(prospectLeads.length === 1 && prospectLeads[0].name === 'lead1', 'prospectLeads memory restored');
+    __assert(prospectProfiles.length === 1, 'prospectProfiles memory restored');
+    // localStorage 恢复
+    const storedCust = JSON.parse(localStorage.getItem(PREFIX+'customers') || '[]');
+    __assert(storedCust.length === 1, 'customers storage restored');
+    const storedLeads = JSON.parse(localStorage.getItem('prospectLeads') || '[]');
+    __assert(storedLeads.length === 1 && storedLeads[0].name === 'lead1', 'prospectLeads storage restored');
+  } finally { localStorage.removeItem = origRemoveItem; }
+});
+
+await __test('174. P1: prospectProfiles 删除失败时内存和 localStorage 都恢复', () => {
+  S.customers = [{id:'c2'}];
+  prospectLeads = [{name:'lead2'}];
+  prospectProfiles = [{name:'profile2'}];
+  localStorage.setItem(PREFIX+'customers', JSON.stringify(S.customers));
+  localStorage.setItem('prospectLeads', JSON.stringify(prospectLeads));
+  localStorage.setItem('prospectProfiles', JSON.stringify(prospectProfiles));
+
+  const origRemoveItem = localStorage.removeItem;
+  localStorage.removeItem = function(k){
+    if(k === 'prospectProfiles'){ throw new Error('simulated prospectProfiles remove failure'); }
+    origRemoveItem.call(this, k);
+  };
+  try {
+    const r = clearAllData();
+    __assert(r && r.success === false, 'should return failure');
+    __assert(r.failedKey === 'prospectProfiles', 'failedKey should be prospectProfiles');
+    // 内存恢复
+    __assert(prospectLeads.length === 1, 'prospectLeads memory restored');
+    __assert(prospectProfiles.length === 1 && prospectProfiles[0].name === 'profile2', 'prospectProfiles memory restored');
+    __assert(S.customers.length === 1, 'customers memory restored');
+    // localStorage 恢复
+    const storedProfiles = JSON.parse(localStorage.getItem('prospectProfiles') || '[]');
+    __assert(storedProfiles.length === 1 && storedProfiles[0].name === 'profile2', 'prospectProfiles storage restored');
+    const storedLeads = JSON.parse(localStorage.getItem('prospectLeads') || '[]');
+    __assert(storedLeads.length === 1, 'prospectLeads storage restored');
+  } finally { localStorage.removeItem = origRemoveItem; }
+});
+
+await __test('175. P1: 前置业务集合已删除、特殊 key 失败时全部恢复', () => {
+  S.customers = [{id:'c3'}];
+  S.campaigns = [{campaignId:'camp3'}];
+  S.campaignCustomerTasks = [{taskId:'t3'}];
+  prospectLeads = [{name:'lead3'}];
+  prospectProfiles = [{name:'profile3'}];
+  ['customers','campaigns','campaignCustomerTasks'].forEach(k=>localStorage.setItem(PREFIX+k, JSON.stringify(S[k])));
+  localStorage.setItem('prospectLeads', JSON.stringify(prospectLeads));
+  localStorage.setItem('prospectProfiles', JSON.stringify(prospectProfiles));
+
+  const origRemoveItem = localStorage.removeItem;
+  let businessRemoved = 0;
+  localStorage.removeItem = function(k){
+    if(k === PREFIX+'customers' || k === PREFIX+'campaigns' || k === PREFIX+'campaignCustomerTasks'){
+      businessRemoved++; origRemoveItem.call(this, k); return;
+    }
+    if(k === 'prospectLeads'){ throw new Error('simulated failure after business keys removed'); }
+    origRemoveItem.call(this, k);
+  };
+  try {
+    const r = clearAllData();
+    __assert(r && r.success === false, 'should return failure');
+    __assert(r.failedKey === 'prospectLeads', 'failedKey should be prospectLeads');
+    __assert(businessRemoved >= 3, 'business keys were removed before failure');
+    // 所有内存恢复
+    __assert(S.customers.length === 1, 'customers memory restored');
+    __assert(S.campaigns.length === 1, 'campaigns memory restored');
+    __assert(S.campaignCustomerTasks.length === 1, 'tasks memory restored');
+    __assert(prospectLeads.length === 1, 'prospectLeads memory restored');
+    __assert(prospectProfiles.length === 1, 'prospectProfiles memory restored');
+    // 所有 localStorage 恢复
+    __assert(JSON.parse(localStorage.getItem(PREFIX+'customers')||'[]').length === 1, 'customers storage restored');
+    __assert(JSON.parse(localStorage.getItem(PREFIX+'campaigns')||'[]').length === 1, 'campaigns storage restored');
+    __assert(JSON.parse(localStorage.getItem(PREFIX+'campaignCustomerTasks')||'[]').length === 1, 'tasks storage restored');
+    __assert(JSON.parse(localStorage.getItem('prospectLeads')||'[]').length === 1, 'prospectLeads storage restored');
+    __assert(JSON.parse(localStorage.getItem('prospectProfiles')||'[]').length === 1, 'prospectProfiles storage restored');
+  } finally { localStorage.removeItem = origRemoveItem; }
+});
+
 // ===== 输出结果 =====
 console.log('');
 console.log('========================================');

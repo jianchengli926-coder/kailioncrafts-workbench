@@ -6,7 +6,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from model_registry import (build_model_registry, get_text_chain, get_vision_chain,
     get_image_chain, get_local_text_chain, health, TEXT_CHAIN_IDS, VISION_CHAIN_IDS,
-    IMAGE_CHAIN_IDS, DISABLED_ONLINE_PROVIDERS, LOCAL_MODELS)
+    IMAGE_CHAIN_IDS, DISABLED_ONLINE_PROVIDERS, LOCAL_MODELS,
+    HEALTH_AVAILABLE, HEALTH_RATE_LIMITED, HEALTH_CONFIG_ERROR)
 from local_model_manager import LocalModelManager, local_model_manager, OLLAMA_BASE
 from ai_client import AIClient, ai, _classify_error
 

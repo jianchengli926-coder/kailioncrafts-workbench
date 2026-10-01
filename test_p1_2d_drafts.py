@@ -383,5 +383,42 @@ class TestNoRealDataModification(unittest.TestCase):
         self.assertNotEqual(cdg.DB_PATH, Path(__file__).parent / "data" / "workbench.db")
 
 
+class TestGlobalChainConsistency(unittest.TestCase):
+    """P1.3B: content_draft_generator 使用全局模型链，避免重复硬编码"""
+
+    def test_uses_global_text_chain(self):
+        from model_registry import TEXT_CHAIN_IDS
+        self.assertEqual(cdg.DRAFT_TEXT_CHAIN, TEXT_CHAIN_IDS)
+        self.assertEqual(len(cdg.DRAFT_TEXT_CHAIN), 4)
+
+    def test_uses_global_reasoning_chain(self):
+        from model_registry import REASONING_CHAIN_IDS
+        self.assertEqual(cdg.DRAFT_REASONING_CHAIN, REASONING_CHAIN_IDS)
+        self.assertEqual(len(cdg.DRAFT_REASONING_CHAIN), 3)
+
+    def test_standard_mode_excludes_deepseek(self):
+        chain = cdg.get_draft_model_chain('standard')
+        self.assertNotIn('deepseek-r1:7b', chain)
+        self.assertNotIn('qwen2.5vl:7b', chain)
+        self.assertNotIn('doubao-seed-2-1-turbo', chain)
+
+    def test_standard_mode_excludes_doubao_and_vision(self):
+        chain = cdg.get_draft_model_chain('standard')
+        self.assertEqual(chain, ['glm-4.7-flash', 'glm-4-flash', 'qwen3.5:9b', 'qwen2.5:7b'])
+
+    def test_reasoning_mode_includes_deepseek(self):
+        chain = cdg.get_draft_model_chain('reasoning')
+        self.assertIn('deepseek-r1:7b', chain)
+        self.assertEqual(chain, ['glm-4.7-flash', 'qwen3.5:9b', 'deepseek-r1:7b'])
+
+    def test_no_chain_drift_between_modules(self):
+        """model_registry 和 content_draft_generator 不会出现链路漂移"""
+        from model_registry import TEXT_CHAIN_IDS, REASONING_CHAIN_IDS
+        self.assertEqual(cdg.DRAFT_TEXT_CHAIN, TEXT_CHAIN_IDS)
+        self.assertEqual(cdg.DRAFT_REASONING_CHAIN, REASONING_CHAIN_IDS)
+        # 验证不是独立的列表对象（引用相同）
+        self.assertIs(cdg.DRAFT_TEXT_CHAIN, TEXT_CHAIN_IDS)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

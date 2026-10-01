@@ -2055,29 +2055,59 @@ async function generateCampaignTaskDraft(taskId){
   const now = new Date().toISOString();
 
   try {
+    // P2.2A: 从 Campaign 获取 Knowledge Pack 信息
+    const packId = campaign.knowledgePackId || null;
+    const packVersion = campaign.knowledgePackVersion || null;
+    const packSnapshotHash = campaign.knowledgeSnapshotHash || null;
+    const pack = packId ? (S.knowledgePacks || []).find(p => p.packId === packId) : null;
+    const frozenFacts = (pack && pack.frozenFactSnapshots) ? pack.frozenFactSnapshots : [];
+    const factIds = frozenFacts.map(f => f.factId);
+    const factVersions = frozenFacts.map(f => ({factId: f.factId, version: f.version}));
+
+    // P2.2A: 判断是否 internal-only
+    const isInternalOnly = !packId || !pack || pack.status !== 'approved' || pack.archived === true;
+
     // 创建草稿
     const draft = {
       id: uid(),
+      draftId: null, // 兼容字段，后续填充
       customerId: customer.id,
       customerName: customer.company,
       country: customer.country,
       language: customer.country === '德国' ? '德语' : customer.country === '日本' ? '日语' : '英语',
+      draftType: 'first_email',
       subject: result.subject || '',
       body: result.body || '',
       content: result.body || '',
       aiNotes: result.aiNotes || ['V79.0D1 Campaign 任务生成：统一知识库事实访问层'],
       status: '待审核',
-      createdAt: now,
-      sentAt: null,
       reviewStatus: 'unreviewed',
       reviewNotes: '',
       manuallyEdited: false,
+      internalOnly: isInternalOnly,
+      knowledgePackId: packId,
+      knowledgePackVersion: packVersion,
+      knowledgeSnapshotHash: packSnapshotHash,
+      factIds: factIds,
+      factVersions: factVersions,
+      confirmedClaims: result.confirmedClaims || [],
+      inferredClaims: result.inferredClaims || [],
+      missingInformation: result.missingInformation || [],
+      riskFlags: result.riskFlags || [],
+      sourceTrace: result.sourceTrace || [],
       knowledgeContext: result.knowledgeContext,
       providerPolicy: campaign.providerPolicy || 'online_safe',
       campaignId: campaign.campaignId,
+      taskId: task.taskId,
       campaignTaskId: task.taskId,
-      previousVersions: []
+      createdAt: now,
+      createdBy: 'system',
+      updatedAt: now,
+      sentAt: null,
+      previousVersions: [],
+      legacyMetadata: false
     };
+    draft.draftId = draft.id;
     S.drafts.unshift(draft);
 
     // 关联任务
@@ -2261,6 +2291,21 @@ async function regenerateCampaignTaskDraft(taskId){
     draft.manuallyEdited = false;
     draft.status = '待审核';
     draft.aiNotes = ['V79.0D1 重新生成：统一知识库事实访问层', '旧版本已保存，事实与模板分离'];
+    // P2.2A: 更新知识溯源字段（从当前 Campaign/Pack 获取）
+    const regenPack = campaign.knowledgePackId ? (S.knowledgePacks || []).find(p => p.packId === campaign.knowledgePackId) : null;
+    const regenFrozenFacts = (regenPack && regenPack.frozenFactSnapshots) ? regenPack.frozenFactSnapshots : [];
+    draft.knowledgePackId = campaign.knowledgePackId || draft.knowledgePackId || null;
+    draft.knowledgePackVersion = campaign.knowledgePackVersion || draft.knowledgePackVersion || null;
+    draft.knowledgeSnapshotHash = campaign.knowledgeSnapshotHash || draft.knowledgeSnapshotHash || null;
+    draft.factIds = regenFrozenFacts.map(f => f.factId);
+    draft.factVersions = regenFrozenFacts.map(f => ({factId: f.factId, version: f.version}));
+    draft.confirmedClaims = result.confirmedClaims || draft.confirmedClaims || [];
+    draft.inferredClaims = result.inferredClaims || draft.inferredClaims || [];
+    draft.missingInformation = result.missingInformation || draft.missingInformation || [];
+    draft.riskFlags = result.riskFlags || draft.riskFlags || [];
+    draft.sourceTrace = result.sourceTrace || draft.sourceTrace || [];
+    draft.internalOnly = !campaign.knowledgePackId || !regenPack || regenPack.status !== 'approved';
+    draft.updatedAt = now;
 
     // 更新任务
     task.previousStage = task.stage;
@@ -22306,6 +22351,196 @@ function getEmailDomain(email){
 }
 
 /* ============================================================
+ * P2.2A 重复客户检测系统
+ * ============================================================ */
+
+/* 邮箱标准化：小写、去空格、去别名（+后缀）、去点号（gmail） */
+function normalizeEmail(email){
+  if(!email || typeof email !== 'string' || !email.includes('@')) return '';
+  let e = email.trim().toLowerCase();
+  const parts = e.split('@');
+  if(parts.length !== 2) return '';
+  let local = parts[0];
+  const domain = parts[1];
+  // 去除 + 别名
+  local = local.split('+')[0];
+  // gmail 去点号
+  if(domain === 'gmail.com' || domain === 'googlemail.com'){
+    local = local.replace(/\./g, '');
+  }
+  return local + '@' + domain;
+}
+
+/* 敏感值脱敏：只显示首尾，中间用 * 替代 */
+function maskSensitiveValue(value, type){
+  if(!value || typeof value !== 'string') return '';
+  if(type === 'email'){
+    const parts = value.split('@');
+    if(parts.length !== 2) return '***';
+    const local = parts[0];
+    const domain = parts[1];
+    if(local.length <= 2) return local[0] + '***@' + domain;
+    return local[0] + '***' + local[local.length-1] + '@' + domain;
+  }
+  if(value.length <= 4) return '****';
+  return value.substring(0, 2) + '****' + value.substring(value.length - 2);
+}
+
+/* 检测重复客户，返回匹配证据（不修改任何数据） */
+function detectDuplicateCustomer(customer, options){
+  if(!customer) return {isDuplicate:false, matches:[], confidence:0};
+  options = options || {};
+  const excludeId = options.excludeId || customer.id || null;
+  const customers = S.customers || [];
+  const archives = S.outreachKnowledgeBase || [];
+  const matches = [];
+
+  // 计算当前客户的标准化值
+  const curCompany = normalizeCompanyName(customer.company || customer.customerName || customer.name);
+  const curDomain = normalizeDomain(customer.website);
+  const curEmail = normalizeEmail(getCustomerPrimaryEmail(customer));
+  const curEmailDomain = getEmailDomain(getCustomerPrimaryEmail(customer));
+  const curStableId = customer.stableId || getCustomerStableId(customer);
+
+  // 1. stableCustomerId 匹配（最高优先级）
+  if(curStableId){
+    for(const c of customers){
+      if(c.id === excludeId) continue;
+      if(c.stableId === curStableId){
+        matches.push({
+          matchedCustomerId: c.id,
+          matchedField: 'stableCustomerId',
+          matchedValueHash: hashIdentityKey(curStableId),
+          matchedValueMasked: maskSensitiveValue(curStableId, 'id'),
+          confidence: 0.95,
+          evidence: 'stableCustomerId 完全匹配',
+          isArchived: false
+        });
+      }
+    }
+  }
+
+  // 2. 域名匹配
+  if(curDomain){
+    for(const c of customers){
+      if(c.id === excludeId) continue;
+      if(matches.find(m => m.matchedCustomerId === c.id && m.matchedField === 'domain')) continue;
+      const cDomain = normalizeDomain(c.website);
+      if(cDomain && cDomain === curDomain){
+        matches.push({
+          matchedCustomerId: c.id,
+          matchedField: 'domain',
+          matchedValueHash: hashIdentityKey(curDomain),
+          matchedValueMasked: maskSensitiveValue(curDomain, 'domain'),
+          confidence: 0.90,
+          evidence: '网站域名完全匹配: ' + curDomain,
+          isArchived: false
+        });
+      }
+    }
+    // 归档客户域名匹配（风险提示，不判为 active duplicate）
+    for(const a of archives){
+      if(a.customerId === excludeId) continue;
+      if(a.normalizedDomain && a.normalizedDomain === curDomain){
+        matches.push({
+          matchedCustomerId: a.customerId || a.archiveId,
+          matchedField: 'domain_archived',
+          matchedValueHash: hashIdentityKey(curDomain),
+          matchedValueMasked: maskSensitiveValue(curDomain, 'domain'),
+          confidence: 0.70,
+          evidence: '归档客户域名匹配: ' + curDomain,
+          isArchived: true
+        });
+      }
+    }
+  }
+
+  // 3. 公司名匹配
+  if(curCompany && curCompany.length >= 3){
+    for(const c of customers){
+      if(c.id === excludeId) continue;
+      if(matches.find(m => m.matchedCustomerId === c.id && m.matchedField === 'company')) continue;
+      const cCompany = normalizeCompanyName(c.company || c.customerName || c.name);
+      if(cCompany && cCompany === curCompany){
+        matches.push({
+          matchedCustomerId: c.id,
+          matchedField: 'company',
+          matchedValueHash: hashIdentityKey(curCompany),
+          matchedValueMasked: maskSensitiveValue(curCompany, 'company'),
+          confidence: 0.80,
+          evidence: '公司名标准化后匹配: ' + curCompany.substring(0, 20) + (curCompany.length > 20 ? '...' : ''),
+          isArchived: false
+        });
+      }
+    }
+  }
+
+  // 4. 邮箱完整匹配
+  if(curEmail){
+    for(const c of customers){
+      if(c.id === excludeId) continue;
+      if(matches.find(m => m.matchedCustomerId === c.id && m.matchedField === 'email')) continue;
+      const cEmail = normalizeEmail(getCustomerPrimaryEmail(c));
+      if(cEmail && cEmail === curEmail){
+        matches.push({
+          matchedCustomerId: c.id,
+          matchedField: 'email',
+          matchedValueHash: hashIdentityKey(curEmail),
+          matchedValueMasked: maskSensitiveValue(curEmail, 'email'),
+          confidence: 0.95,
+          evidence: '邮箱完全匹配',
+          isArchived: false
+        });
+      }
+    }
+  }
+
+  // 5. 邮箱域名匹配
+  if(curEmailDomain && curEmailDomain !== 'gmail.com' && curEmailDomain !== 'yahoo.com' && curEmailDomain !== 'hotmail.com' && curEmailDomain !== 'outlook.com'){
+    for(const c of customers){
+      if(c.id === excludeId) continue;
+      if(matches.find(m => m.matchedCustomerId === c.id && (m.matchedField === 'email_domain' || m.matchedField === 'email' || m.matchedField === 'domain'))) continue;
+      const cEmailDomain = getEmailDomain(getCustomerPrimaryEmail(c));
+      if(cEmailDomain && cEmailDomain === curEmailDomain){
+        matches.push({
+          matchedCustomerId: c.id,
+          matchedField: 'email_domain',
+          matchedValueHash: hashIdentityKey(curEmailDomain),
+          matchedValueMasked: maskSensitiveValue(curEmailDomain, 'domain'),
+          confidence: 0.60,
+          evidence: '邮箱域名匹配: ' + curEmailDomain,
+          isArchived: false
+        });
+      }
+    }
+  }
+
+  // 计算总体置信度（取最高）
+  let maxConfidence = 0;
+  let hasActiveDuplicate = false;
+  for(const m of matches){
+    if(m.confidence > maxConfidence) maxConfidence = m.confidence;
+    if(!m.isArchived && m.confidence >= 0.80) hasActiveDuplicate = true;
+  }
+
+  return {
+    isDuplicate: hasActiveDuplicate,
+    hasArchivedRisk: matches.some(m => m.isArchived),
+    matches: matches,
+    confidence: maxConfidence,
+    detectedAt: new Date().toISOString()
+  };
+}
+
+/* 获取重复客户证据（用于 UI 展示，脱敏） */
+function getDuplicateCustomerEvidence(customerId){
+  if(!customerId) return {isDuplicate:false, matches:[]};
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer) return {isDuplicate:false, matches:[], error:'客户不存在'};
+  return detectDuplicateCustomer(customer, {excludeId: customerId});
+}
+
+/* ============================================================
  * V78.2 客户身份稳定性系统
  * ============================================================ */
 
@@ -22318,6 +22553,491 @@ function hashIdentityKey(str){
     h = Math.imul(h, 0x01000193);
   }
   return (h >>> 0).toString(36).padStart(7,'0');
+}
+
+/* ============================================================
+ * P2.2A 客户状态机系统
+ * ============================================================ */
+
+const CUSTOMER_STATUSES = [
+  'new',
+  'identity_pending',
+  'identity_verified',
+  'duplicate_review',
+  'dnc_blocked',
+  'icp_pending',
+  'icp_qualified',
+  'icp_blocked',
+  'knowledge_pack_pending',
+  'outreach_draft',
+  'outreach_review',
+  'ready_for_contact',
+  'contacted',
+  'follow_up',
+  'replied',
+  'opportunity',
+  'closed',
+  'archived'
+];
+
+const CUSTOMER_STATUS_LABELS = {
+  new: '新录入',
+  identity_pending: '身份待确认',
+  identity_verified: '身份已确认',
+  duplicate_review: '重复待审核',
+  dnc_blocked: 'DNC阻断',
+  icp_pending: 'ICP待评估',
+  icp_qualified: 'ICP合格',
+  icp_blocked: 'ICP阻断',
+  knowledge_pack_pending: '待绑定知识包',
+  outreach_draft: '草稿生成中',
+  outreach_review: '草稿待审核',
+  ready_for_contact: '可联系',
+  contacted: '已联系',
+  follow_up: '跟进中',
+  replied: '已回复',
+  opportunity: '商机',
+  closed: '已关闭',
+  archived: '已归档'
+};
+
+/* 状态迁移规则：from -> [allowed to] */
+const CUSTOMER_STATUS_TRANSITIONS = {
+  new: ['identity_pending', 'duplicate_review', 'dnc_blocked', 'archived'],
+  identity_pending: ['identity_verified', 'duplicate_review', 'dnc_blocked', 'archived'],
+  identity_verified: ['duplicate_review', 'dnc_blocked', 'icp_pending', 'archived'],
+  duplicate_review: ['identity_verified', 'dnc_blocked', 'icp_pending', 'archived'],
+  dnc_blocked: ['archived'],
+  icp_pending: ['icp_qualified', 'icp_blocked', 'duplicate_review', 'dnc_blocked', 'archived'],
+  icp_qualified: ['knowledge_pack_pending', 'icp_blocked', 'duplicate_review', 'dnc_blocked', 'archived'],
+  icp_blocked: ['icp_pending', 'duplicate_review', 'dnc_blocked', 'archived'],
+  knowledge_pack_pending: ['outreach_draft', 'icp_blocked', 'duplicate_review', 'dnc_blocked', 'archived'],
+  outreach_draft: ['outreach_review', 'knowledge_pack_pending', 'icp_blocked', 'duplicate_review', 'dnc_blocked', 'archived'],
+  outreach_review: ['ready_for_contact', 'outreach_draft', 'icp_blocked', 'duplicate_review', 'dnc_blocked', 'archived'],
+  ready_for_contact: ['contacted', 'outreach_review', 'icp_blocked', 'duplicate_review', 'dnc_blocked', 'archived'],
+  contacted: ['follow_up', 'replied', 'ready_for_contact', 'archived'],
+  follow_up: ['replied', 'contacted', 'opportunity', 'closed', 'archived'],
+  replied: ['opportunity', 'follow_up', 'contacted', 'closed', 'archived'],
+  opportunity: ['closed', 'follow_up', 'replied', 'archived'],
+  closed: ['archived', 'opportunity'],
+  archived: ['new', 'identity_pending']
+};
+
+/* 获取状态定义 */
+function getCustomerStatusDefinition(status){
+  if(!status || !CUSTOMER_STATUSES.includes(status)){
+    return {valid:false, label:'未知状态', status:status};
+  }
+  return {
+    valid:true,
+    status:status,
+    label:CUSTOMER_STATUS_LABELS[status] || status,
+    allowedTransitions: CUSTOMER_STATUS_TRANSITIONS[status] || []
+  };
+}
+
+/* 检查是否允许状态迁移 */
+function canTransitionCustomerStatus(fromStatus, toStatus){
+  if(!fromStatus || !toStatus) return false;
+  if(!CUSTOMER_STATUSES.includes(fromStatus)) return false;
+  if(!CUSTOMER_STATUSES.includes(toStatus)) return false;
+  const allowed = CUSTOMER_STATUS_TRANSITIONS[fromStatus] || [];
+  return allowed.includes(toStatus);
+}
+
+/* 迁移客户状态（含阻断检查和历史记录） */
+function transitionCustomerStatus(customerId, nextStatus, options){
+  if(!customerId) return {success:false, errors:['客户ID为空']};
+  if(!nextStatus) return {success:false, errors:['目标状态为空']};
+  if(!CUSTOMER_STATUSES.includes(nextStatus)){
+    return {success:false, errors:['无效状态: ' + nextStatus]};
+  }
+
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer) return {success:false, errors:['客户不存在']};
+
+  const currentStatus = customer.customerStatus || 'new';
+  const normalizedCurrent = migrateCustomerStatusCompat(currentStatus);
+
+  // 检查迁移规则
+  if(!canTransitionCustomerStatus(normalizedCurrent, nextStatus)){
+    return {
+      success:false,
+      errors:['不允许从 ' + normalizedCurrent + ' 迁移到 ' + nextStatus],
+      blockedBy:'status_transition_rule'
+    };
+  }
+
+  // 阻断检查
+  const blockers = [];
+
+  // DNC 阻断：不能进入 ready_for_contact
+  if(nextStatus === 'ready_for_contact'){
+    if(customer.doNotContact === true){
+      blockers.push('客户标记为 doNotContact，禁止进入可联系状态');
+    }
+    const archive = (S.outreachKnowledgeBase || []).find(a => a.customerId === customerId);
+    if(archive && archive.doNotContact === true){
+      blockers.push('客户档案标记为 doNotContact，禁止进入可联系状态');
+    }
+  }
+
+  // duplicate 未处理：不能进入 outreach
+  if(nextStatus === 'outreach_draft' || nextStatus === 'outreach_review'){
+    const dupResult = detectDuplicateCustomer(customer, {excludeId: customerId});
+    if(dupResult.isDuplicate){
+      blockers.push('检测到重复客户，需先处理重复检测');
+    }
+  }
+
+  // identity 未确认：不能进入 outreach
+  if(nextStatus === 'outreach_draft' || nextStatus === 'outreach_review' || nextStatus === 'ready_for_contact'){
+    const archive = (S.outreachKnowledgeBase || []).find(a => a.customerId === customerId);
+    if(archive){
+      const idStatus = normalizeIdentityResolutionStatus(archive.identityResolutionStatus);
+      if(idStatus !== 'resolved'){
+        blockers.push('客户身份状态为 ' + idStatus + '，禁止进入对外开发流程');
+      }
+    } else {
+      blockers.push('客户开发档案不存在，身份未确认');
+    }
+  }
+
+  // hard blocker：不能进入 ready_for_contact
+  if(nextStatus === 'ready_for_contact'){
+    const activeCampaigns = (S.campaigns || []).filter(c => c.status === 'active');
+    for(const camp of activeCampaigns){
+      const task = (S.campaignCustomerTasks || []).find(t =>
+        t.campaignId === camp.campaignId &&
+        (t.customerId === customerId || t.stableCustomerId === customer.stableId)
+      );
+      if(task){
+        const evalResult = evaluateCustomerForCampaign(camp.campaignId, customerId);
+        if(evalResult && evalResult.blockers && evalResult.blockers.length > 0){
+          blockers.push('Campaign ' + camp.name + ' 存在 hard blockers: ' + evalResult.blockers.join(', '));
+          break;
+        }
+      }
+    }
+  }
+
+  // 未绑定 approved Knowledge Pack：不能进入对外开发流程
+  if(nextStatus === 'outreach_draft' || nextStatus === 'outreach_review' || nextStatus === 'ready_for_contact'){
+    const hasApprovedPack = (S.campaigns || []).some(c =>
+      c.status === 'active' &&
+      c.knowledgePackId &&
+      c.knowledgePackStatus === 'approved'
+    );
+    if(!hasApprovedPack){
+      // 检查客户是否绑定了 Pack
+      const customerPack = customer.knowledgePackId;
+      if(!customerPack){
+        blockers.push('未绑定已批准的 Knowledge Pack，禁止进入对外开发流程');
+      }
+    }
+  }
+
+  if(blockers.length > 0){
+    return {
+      success:false,
+      errors:blockers,
+      blockedBy:'hard_blockers',
+      blockers:blockers
+    };
+  }
+
+  // 执行迁移
+  const now = new Date().toISOString();
+  const actor = (options && options.actor) || 'system';
+  const reason = (options && options.reason) || '';
+  const evidence = (options && options.evidence) || null;
+
+  // 保存历史
+  if(!Array.isArray(customer.statusHistory)) customer.statusHistory = [];
+  customer.statusHistory.push({
+    previousStatus: normalizedCurrent,
+    nextStatus: nextStatus,
+    changedAt: now,
+    changedBy: actor,
+    reason: reason,
+    evidence: evidence,
+    blockedBy: null
+  });
+
+  customer.customerStatus = nextStatus;
+  customer.statusUpdatedAt = now;
+
+  // 持久化
+  const snapshot = createOutreachWorkflowSnapshot();
+  try {
+    const persistResult = safePersistOutreachWorkflowData(snapshot, ['customers']);
+    if(!persistResult.success){
+      restoreOutreachWorkflowSnapshotInMemory(snapshot);
+      return {success:false, errors:['持久化失败: ' + persistResult.error]};
+    }
+    return {success:true, customer, previousStatus:normalizedCurrent, nextStatus:nextStatus};
+  } catch(e){
+    restoreOutreachWorkflowSnapshotInMemory(snapshot);
+    return {success:false, errors:['迁移异常: ' + e.message]};
+  }
+}
+
+/* 获取客户状态历史 */
+function getCustomerStatusHistory(customerId){
+  if(!customerId) return [];
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer || !Array.isArray(customer.statusHistory)) return [];
+  return customer.statusHistory;
+}
+
+/* 旧状态兼容迁移（不修改数据，只返回标准化状态） */
+function migrateCustomerStatusCompat(status){
+  if(!status) return 'new';
+  if(CUSTOMER_STATUSES.includes(status)) return status;
+
+  // 旧状态映射
+  const compatMap = {
+    'active': 'identity_verified',
+    'inactive': 'new',
+    'pending': 'identity_pending',
+    'verified': 'identity_verified',
+    'blocked': 'dnc_blocked',
+    'archived': 'archived',
+    'new_customer': 'new',
+    'prospect': 'icp_pending',
+    'qualified': 'icp_qualified',
+    'customer': 'contacted',
+    'lead': 'new'
+  };
+
+  if(compatMap[status]) return compatMap[status];
+
+  // 模糊匹配
+  const lower = String(status).toLowerCase();
+  if(lower.includes('dnc') || lower.includes('do not')) return 'dnc_blocked';
+  if(lower.includes('duplicate')) return 'duplicate_review';
+  if(lower.includes('identity')) return 'identity_pending';
+  if(lower.includes('icp')) return 'icp_pending';
+  if(lower.includes('draft')) return 'outreach_draft';
+  if(lower.includes('review')) return 'outreach_review';
+  if(lower.includes('contact')) return 'contacted';
+  if(lower.includes('follow')) return 'follow_up';
+  if(lower.includes('reply')) return 'replied';
+  if(lower.includes('archive')) return 'archived';
+
+  return 'new';
+}
+
+/* ============================================================
+ * P2.2A 客户开发闭环约束系统
+ * ============================================================ */
+
+/* 客户开发准备度检查：返回每一步的状态和阻断原因 */
+function validateCustomerOutreachReadiness(customerId, options){
+  if(!customerId) return {ready:false, errors:['客户ID为空'], steps:{}};
+  options = options || {};
+
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer) return {ready:false, errors:['客户不存在'], steps:{}};
+
+  const steps = {};
+  const errors = [];
+  const warnings = [];
+
+  // 1. 客户录入
+  steps.customer_entry = {
+    status: customer ? 'completed' : 'missing',
+    label: '客户录入'
+  };
+
+  // 2. 身份确认
+  const archive = (S.outreachKnowledgeBase || []).find(a => a.customerId === customerId);
+  let identityStatus = 'pending';
+  if(archive){
+    identityStatus = normalizeIdentityResolutionStatus(archive.identityResolutionStatus);
+  }
+  steps.identity_verification = {
+    status: identityStatus === 'resolved' ? 'completed' : 'pending',
+    label: '身份确认',
+    detail: identityStatus
+  };
+  if(identityStatus !== 'resolved'){
+    errors.push('客户身份未确认（当前: ' + identityStatus + '）');
+  }
+
+  // 3. 重复检测
+  const dupResult = detectDuplicateCustomer(customer, {excludeId: customerId});
+  steps.duplicate_check = {
+    status: dupResult.isDuplicate ? 'blocked' : (dupResult.hasArchivedRisk ? 'warning' : 'completed'),
+    label: '重复检测',
+    detail: dupResult.isDuplicate ? ('发现 ' + dupResult.matches.length + ' 个重复') : '无重复'
+  };
+  if(dupResult.isDuplicate){
+    errors.push('检测到重复客户，需先处理');
+  }
+  if(dupResult.hasArchivedRisk){
+    warnings.push('存在归档客户匹配，请注意');
+  }
+
+  // 4. DNC 检查
+  const isDnc = customer.doNotContact === true || (archive && archive.doNotContact === true);
+  steps.dnc_check = {
+    status: isDnc ? 'blocked' : 'completed',
+    label: 'DNC检查',
+    detail: isDnc ? '客户标记为不联系' : '未标记DNC'
+  };
+  if(isDnc){
+    errors.push('客户标记为 doNotContact，禁止开发');
+  }
+
+  // 5. ICP 评估
+  let icpScore = null;
+  let icpBlockers = [];
+  const activeCampaigns = (S.campaigns || []).filter(c => c.status === 'active');
+  if(activeCampaigns.length > 0){
+    const camp = activeCampaigns[0];
+    const evalResult = evaluateCustomerForCampaign(camp.campaignId, customerId);
+    if(evalResult){
+      icpScore = evalResult.icpScore || evalResult.score || null;
+      icpBlockers = evalResult.blockers || [];
+    }
+  }
+  steps.icp_evaluation = {
+    status: icpScore !== null ? 'completed' : 'pending',
+    label: 'ICP评估',
+    detail: icpScore !== null ? ('分数: ' + icpScore) : '未评估'
+  };
+  if(icpBlockers.length > 0){
+    errors.push('ICP hard blockers: ' + icpBlockers.join(', '));
+  }
+
+  // 6. Knowledge Pack 绑定
+  const hasPack = customer.knowledgePackId || activeCampaigns.some(c => c.knowledgePackId && c.knowledgePackStatus === 'approved');
+  let packStatus = 'pending';
+  let packDetail = '未绑定';
+  if(customer.knowledgePackId){
+    const pack = (S.knowledgePacks || []).find(p => p.packId === customer.knowledgePackId);
+    if(pack){
+      if(pack.status === 'approved' && !pack.archived){
+        packStatus = 'completed';
+        packDetail = pack.name + ' v' + pack.version;
+      } else if(pack.archived){
+        packStatus = 'blocked';
+        packDetail = 'Pack已归档';
+        errors.push('Knowledge Pack 已归档');
+      } else {
+        packStatus = 'pending';
+        packDetail = 'Pack未批准';
+        errors.push('Knowledge Pack 未批准');
+      }
+    }
+  } else if(activeCampaigns.some(c => c.knowledgePackId && c.knowledgePackStatus === 'approved')){
+    packStatus = 'completed';
+    packDetail = '通过Campaign绑定';
+  } else {
+    errors.push('未绑定已批准的 Knowledge Pack');
+  }
+  steps.knowledge_pack = {
+    status: packStatus,
+    label: '知识包绑定',
+    detail: packDetail
+  };
+
+  // 7. 开发草稿
+  const hasDraft = (S.drafts || []).some(d => d.customerId === customerId && d.reviewStatus);
+  steps.outreach_draft = {
+    status: hasDraft ? 'completed' : 'pending',
+    label: '开发草稿',
+    detail: hasDraft ? '已有草稿' : '未生成'
+  };
+
+  // 8. 人工审核
+  const hasReviewedDraft = (S.drafts || []).some(d => d.customerId === customerId && normalizeDraftReviewStatus(d) === 'reviewed');
+  steps.manual_review = {
+    status: hasReviewedDraft ? 'completed' : 'pending',
+    label: '人工审核',
+    detail: hasReviewedDraft ? '已审核' : '待审核'
+  };
+  if(!hasReviewedDraft && hasDraft){
+    warnings.push('草稿待人工审核');
+  }
+
+  // 9. 跟进任务
+  const hasFollowUp = (S.campaignFollowUpTasks || []).some(t => t.customerId === customerId || t.stableCustomerId === customer.stableId);
+  steps.follow_up = {
+    status: hasFollowUp ? 'completed' : 'pending',
+    label: '跟进任务',
+    detail: hasFollowUp ? '已有跟进' : '未创建'
+  };
+
+  return {
+    ready: errors.length === 0,
+    errors: errors,
+    warnings: warnings,
+    steps: steps,
+    icpScore: icpScore,
+    hardBlockers: icpBlockers,
+    duplicateMatches: dupResult.matches,
+    recommendedNextAction: errors.length > 0
+      ? '先解决阻断: ' + errors[0]
+      : (warnings.length > 0 ? warnings[0] : '可以进入对外开发流程')
+  };
+}
+
+/* 旧草稿兼容迁移：补充缺失字段，不修改内容 */
+function migrateDraftMetadataCompat(draft){
+  if(!draft) return draft;
+  let changed = false;
+
+  if(!draft.draftId){ draft.draftId = draft.id; changed = true; }
+  if(!draft.draftType){ draft.draftType = 'first_email'; changed = true; }
+  if(draft.internalOnly === undefined){ draft.internalOnly = false; changed = true; }
+  if(!draft.knowledgePackId){ draft.knowledgePackId = null; changed = true; }
+  if(!draft.knowledgePackVersion){ draft.knowledgePackVersion = null; changed = true; }
+  if(!draft.knowledgeSnapshotHash){ draft.knowledgeSnapshotHash = null; changed = true; }
+  if(!Array.isArray(draft.factIds)){ draft.factIds = []; changed = true; }
+  if(!Array.isArray(draft.factVersions)){ draft.factVersions = []; changed = true; }
+  if(!Array.isArray(draft.confirmedClaims)){ draft.confirmedClaims = []; changed = true; }
+  if(!Array.isArray(draft.inferredClaims)){ draft.inferredClaims = []; changed = true; }
+  if(!Array.isArray(draft.missingInformation)){ draft.missingInformation = []; changed = true; }
+  if(!Array.isArray(draft.riskFlags)){ draft.riskFlags = []; changed = true; }
+  if(!Array.isArray(draft.sourceTrace)){ draft.sourceTrace = []; changed = true; }
+  if(!draft.createdBy){ draft.createdBy = 'legacy'; changed = true; }
+  if(!draft.updatedAt){ draft.updatedAt = draft.createdAt || new Date().toISOString(); changed = true; }
+  if(draft.legacyMetadata === undefined){ draft.legacyMetadata = changed; changed = true; }
+
+  return draft;
+}
+
+/* 批量迁移旧草稿（仅内存，不持久化） */
+function migrateAllDraftsMetadata(){
+  const drafts = S.drafts || [];
+  let migrated = 0;
+  for(const draft of drafts){
+    const before = JSON.stringify(draft);
+    migrateDraftMetadataCompat(draft);
+    if(JSON.stringify(draft) !== before) migrated++;
+  }
+  return {migrated: migrated, total: drafts.length};
+}
+
+/* 记录客户开发事件 */
+function logCustomerOutreachEvent(customerId, eventType, detail, actor){
+  if(!customerId || !eventType) return null;
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer) return null;
+
+  if(!Array.isArray(customer.outreachEvents)) customer.outreachEvents = [];
+  const event = {
+    eventId: uid(),
+    eventType: eventType,
+    detail: detail || '',
+    actor: actor || 'system',
+    at: new Date().toISOString()
+  };
+  customer.outreachEvents.unshift(event);
+  customer.outreachEvents = customer.outreachEvents.slice(0, 100); // 保留最近100条
+  return event;
 }
 
 /* 获取客户主邮箱（优先 contact.email，其次 emails 数组第一个） */

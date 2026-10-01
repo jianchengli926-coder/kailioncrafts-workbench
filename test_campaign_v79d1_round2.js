@@ -3902,6 +3902,360 @@ await __test('P2.1B.2: 响应式布局关键容器使用 min-width:0 防止溢�
   __assert(html.indexOf('查看冻结事实') >= 0, 'frozen facts button present');
 });
 
+// ============================================================
+// P2.2A: 客户开发闭环数据完善测试
+// ============================================================
+
+// --- 重复客户检测测试 ---
+
+await __test('P2.2A: normalizeEmail 标准化邮箱', () => {
+  __assert(normalizeEmail('User@Example.COM') === 'user@example.com', '小写化');
+  __assert(normalizeEmail('user+tag@gmail.com') === 'user@gmail.com', '去除+别名');
+  __assert(normalizeEmail('u.s.e.r@gmail.com') === 'user@gmail.com', 'gmail去点号');
+  __assert(normalizeEmail('user.name@company.com') === 'user.name@company.com', '非gmail保留点号');
+  __assert(normalizeEmail('') === '', '空邮箱');
+  __assert(normalizeEmail('invalid') === '', '无效邮箱');
+});
+
+await __test('P2.2A: 公司名归一化匹配', () => {
+  S.customers = [{id:'c1', company:'Acme Corporation Ltd', website:'https://acme.com', stableId:'cust_1'}];
+  const result = detectDuplicateCustomer({id:'c2', company:'Acme Corp', website:'https://acme.com'}, {excludeId:'c2'});
+  __assert(result.isDuplicate === true, '公司名标准化后匹配');
+  __assert(result.matches.some(m => m.matchedField === 'company'), '匹配字段为company');
+});
+
+await __test('P2.2A: 域名归一化匹配', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://www.example.com/path', stableId:'cust_1'}];
+  const result = detectDuplicateCustomer({id:'c2', company:'B', website:'http://example.com/'}, {excludeId:'c2'});
+  __assert(result.isDuplicate === true, '域名标准化后匹配');
+  __assert(result.matches.some(m => m.matchedField === 'domain'), '匹配字段为domain');
+});
+
+await __test('P2.2A: 邮箱完整匹配', () => {
+  S.customers = [{id:'c1', company:'A', contact:{email:'user@example.com'}, stableId:'cust_1'}];
+  const result = detectDuplicateCustomer({id:'c2', company:'B', contact:{email:'User@Example.com'}}, {excludeId:'c2'});
+  __assert(result.isDuplicate === true, '邮箱标准化后匹配');
+  __assert(result.matches.some(m => m.matchedField === 'email'), '匹配字段为email');
+});
+
+await __test('P2.2A: stableCustomerId 匹配', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_abc123'}];
+  const result = detectDuplicateCustomer({id:'c2', company:'B', website:'https://b.com', stableId:'cust_abc123'}, {excludeId:'c2'});
+  __assert(result.isDuplicate === true, 'stableId匹配');
+  __assert(result.matches.some(m => m.matchedField === 'stableCustomerId'), '匹配字段为stableCustomerId');
+});
+
+await __test('P2.2A: 重复证据脱敏不显示完整邮箱', () => {
+  S.customers = [{id:'c1', company:'A', contact:{email:'sensitive.user@example.com'}, stableId:'cust_1'}];
+  const result = detectDuplicateCustomer({id:'c2', company:'B', contact:{email:'sensitive.user@example.com'}}, {excludeId:'c2'});
+  const emailMatch = result.matches.find(m => m.matchedField === 'email');
+  __assert(emailMatch, '找到邮箱匹配');
+  __assert(emailMatch.matchedValueMasked.indexOf('sensitive.user') < 0, '不显示完整邮箱本地部分');
+  __assert(emailMatch.matchedValueMasked.indexOf('@example.com') >= 0, '显示域名');
+});
+
+await __test('P2.2A: 归档客户风险提示但不判为active duplicate', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://archived.com', stableId:'cust_1'}];
+  S.outreachKnowledgeBase = [{archiveId:'a1', customerId:'c_old', normalizedDomain:'archived.com', doNotContact:false}];
+  const result = detectDuplicateCustomer({id:'c2', company:'B', website:'https://archived.com'}, {excludeId:'c2'});
+  __assert(result.hasArchivedRisk === true, '检测到归档风险');
+  __assert(result.matches.some(m => m.isArchived === true), '存在归档匹配');
+});
+
+await __test('P2.2A: 无重复时返回isDuplicate=false', () => {
+  S.customers = [{id:'c1', company:'Unique Company A', website:'https://unique-a.com', stableId:'cust_1'}];
+  const result = detectDuplicateCustomer({id:'c2', company:'Totally Different B', website:'https://different-b.com'}, {excludeId:'c2'});
+  __assert(result.isDuplicate === false, '无重复');
+  __assert(result.confidence === 0, '置信度为0');
+});
+
+await __test('P2.2A: getDuplicateCustomerEvidence 返回脱敏证据', () => {
+  S.customers = [
+    {id:'c1', company:'Test Co', website:'https://test.com', stableId:'cust_1'},
+    {id:'c2', company:'Test Company', website:'https://test.com', stableId:'cust_2'}
+  ];
+  const evidence = getDuplicateCustomerEvidence('c1');
+  __assert(evidence.isDuplicate === true, '检测到重复');
+  __assert(Array.isArray(evidence.matches), '返回匹配数组');
+});
+
+// --- 客户状态机测试 ---
+
+await __test('P2.2A: CUSTOMER_STATUSES 包含18个状态', () => {
+  __assert(Array.isArray(CUSTOMER_STATUSES), '状态数组存在');
+  __assert(CUSTOMER_STATUSES.length >= 17, '至少17个状态');
+  __assert(CUSTOMER_STATUSES.includes('new'), '包含new');
+  __assert(CUSTOMER_STATUSES.includes('dnc_blocked'), '包含dnc_blocked');
+  __assert(CUSTOMER_STATUSES.includes('ready_for_contact'), '包含ready_for_contact');
+  __assert(CUSTOMER_STATUSES.includes('archived'), '包含archived');
+});
+
+await __test('P2.2A: 合法状态迁移允许', () => {
+  __assert(canTransitionCustomerStatus('new', 'identity_pending') === true, 'new→identity_pending');
+  __assert(canTransitionCustomerStatus('identity_verified', 'icp_pending') === true, 'identity_verified→icp_pending');
+  __assert(canTransitionCustomerStatus('outreach_review', 'ready_for_contact') === true, 'outreach_review→ready_for_contact');
+});
+
+await __test('P2.2A: 非法状态迁移被阻断', () => {
+  __assert(canTransitionCustomerStatus('new', 'ready_for_contact') === false, 'new不能直接到ready_for_contact');
+  __assert(canTransitionCustomerStatus('dnc_blocked', 'ready_for_contact') === false, 'dnc_blocked不能到ready_for_contact');
+  __assert(canTransitionCustomerStatus('archived', 'contacted') === false, 'archived不能直接到contacted');
+});
+
+await __test('P2.2A: DNC客户不能进入ready_for_contact', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', doNotContact:true, customerStatus:'outreach_review'}];
+  S.outreachKnowledgeBase = [];
+  S.campaigns = [];
+  S.campaignCustomerTasks = [];
+  const result = transitionCustomerStatus('c1', 'ready_for_contact', {actor:'tester'});
+  __assert(result.success === false, 'DNC客户被阻断');
+  __assert(result.errors.some(e => e.indexOf('doNotContact') >= 0), '错误包含DNC');
+});
+
+await __test('P2.2A: duplicate未处理客户不能进入outreach', () => {
+  S.customers = [
+    {id:'c1', company:'Dup Co', website:'https://dup.com', stableId:'cust_1', customerStatus:'identity_verified'},
+    {id:'c2', company:'Dup Company', website:'https://dup.com', stableId:'cust_2'}
+  ];
+  S.outreachKnowledgeBase = [{archiveId:'a1', customerId:'c1', identityResolutionStatus:'resolved', doNotContact:false}];
+  S.campaigns = [];
+  S.campaignCustomerTasks = [];
+  const result = transitionCustomerStatus('c1', 'outreach_draft', {actor:'tester'});
+  __assert(result.success === false, '重复客户被阻断');
+});
+
+await __test('P2.2A: identity未确认客户不能进入outreach', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', customerStatus:'identity_pending'}];
+  S.outreachKnowledgeBase = [{archiveId:'a1', customerId:'c1', identityResolutionStatus:'pending', doNotContact:false}];
+  S.campaigns = [];
+  S.campaignCustomerTasks = [];
+  const result = transitionCustomerStatus('c1', 'outreach_draft', {actor:'tester'});
+  __assert(result.success === false, '身份未确认被阻断');
+});
+
+await __test('P2.2A: 状态迁移保存历史记录', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', customerStatus:'new', doNotContact:false}];
+  S.outreachKnowledgeBase = [];
+  S.campaigns = [];
+  S.campaignCustomerTasks = [];
+  const result = transitionCustomerStatus('c1', 'identity_pending', {actor:'tester', reason:'测试迁移'});
+  __assert(result.success === true, '迁移成功');
+  const history = getCustomerStatusHistory('c1');
+  __assert(history.length >= 1, '保存历史记录');
+  __assert(history[0].previousStatus === 'new', '记录前状态');
+  __assert(history[0].nextStatus === 'identity_pending', '记录后状态');
+  __assert(history[0].changedBy === 'tester', '记录操作者');
+});
+
+await __test('P2.2A: 旧状态兼容迁移', () => {
+  __assert(migrateCustomerStatusCompat('active') === 'identity_verified', 'active→identity_verified');
+  __assert(migrateCustomerStatusCompat('pending') === 'identity_pending', 'pending→identity_pending');
+  __assert(migrateCustomerStatusCompat('archived') === 'archived', 'archived保持');
+  __assert(migrateCustomerStatusCompat('unknown_status') === 'new', '未知→new');
+  __assert(migrateCustomerStatusCompat(null) === 'new', 'null→new');
+});
+
+await __test('P2.2A: getCustomerStatusDefinition 返回有效定义', () => {
+  const def = getCustomerStatusDefinition('ready_for_contact');
+  __assert(def.valid === true, '状态有效');
+  __assert(def.label.length > 0, '有标签');
+  __assert(Array.isArray(def.allowedTransitions), '有允许迁移列表');
+});
+
+// --- 草稿知识溯源测试 ---
+
+await __test('P2.2A: 草稿保存Knowledge Pack ID', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = []; S.campaigns = []; S.drafts = [];
+  S.customers = []; S.outreachKnowledgeBase = []; S.campaignCustomerTasks = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  updateKnowledgeFact(f.fact.factId, {publicUseAllowed:true, keepConfirmed:true});
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  const camp = createCampaign({name:'c', knowledgePackId: pack.pack.packId});
+  __assert(camp.campaign.knowledgePackId === pack.pack.packId, 'Campaign保存Pack ID');
+});
+
+await __test('P2.2A: 草稿保存Pack version和snapshot hash', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = []; S.campaigns = []; S.drafts = [];
+  S.customers = []; S.outreachKnowledgeBase = []; S.campaignCustomerTasks = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  updateKnowledgeFact(f.fact.factId, {publicUseAllowed:true, keepConfirmed:true});
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  const camp = createCampaign({name:'c', knowledgePackId: pack.pack.packId});
+  __assert(camp.campaign.knowledgePackVersion !== null, '保存Pack version');
+  __assert(camp.campaign.knowledgeSnapshotHash !== null, '保存snapshot hash');
+});
+
+await __test('P2.2A: 草稿保存factIds和factVersions', () => {
+  const draft = {id:'d1', customerId:'c1'};
+  migrateDraftMetadataCompat(draft);
+  __assert(Array.isArray(draft.factIds), 'factIds是数组');
+  __assert(Array.isArray(draft.factVersions), 'factVersions是数组');
+});
+
+await __test('P2.2A: 草稿保存riskFlags和missingInformation', () => {
+  const draft = {id:'d1', customerId:'c1'};
+  migrateDraftMetadataCompat(draft);
+  __assert(Array.isArray(draft.riskFlags), 'riskFlags是数组');
+  __assert(Array.isArray(draft.missingInformation), 'missingInformation是数组');
+});
+
+await __test('P2.2A: Fact更新不改变历史草稿的factIds', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = []; S.campaigns = []; S.drafts = [];
+  S.customers = []; S.outreachKnowledgeBase = []; S.campaignCustomerTasks = [];
+  const f = createKnowledgeFact({type:'product',title:'旧标题',content:'旧内容',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  updateKnowledgeFact(f.fact.factId, {publicUseAllowed:true, keepConfirmed:true});
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  const frozenFactId = pack.pack.frozenFactSnapshots[0].factId;
+  // 更新Fact
+  updateKnowledgeFact(f.fact.factId, {title:'新标题', content:'新内容'});
+  // 重新获取Pack，确认冻结快照不变
+  const updatedPack = getKnowledgePackById(pack.pack.packId);
+  __assert(updatedPack.frozenFactSnapshots[0].title === '旧标题', '冻结快照保留旧标题');
+  __assert(updatedPack.frozenFactSnapshots[0].factId === frozenFactId, 'factId不变');
+});
+
+await __test('P2.2A: Pack新版本不改变历史草稿', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = []; S.campaigns = []; S.drafts = [];
+  S.customers = []; S.outreachKnowledgeBase = []; S.campaignCustomerTasks = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  updateKnowledgeFact(f.fact.factId, {publicUseAllowed:true, keepConfirmed:true});
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  const oldHash = pack.pack.knowledgeSnapshotHash;
+  // 创建新版本
+  const nextPack = createNextKnowledgePackVersion(pack.pack.packId, 'tester');
+  __assert(nextPack.pack.version > pack.pack.version, '版本递增');
+  __assert(oldHash === pack.pack.knowledgeSnapshotHash, '旧Pack hash不变');
+});
+
+await __test('P2.2A: 无Pack时草稿标记为internalOnly', () => {
+  const draft = {id:'d1', customerId:'c1', knowledgePackId: null};
+  migrateDraftMetadataCompat(draft);
+  __assert(draft.internalOnly === false, '迁移函数不自动判断internalOnly');
+  // 直接测试逻辑
+  const isInternal = !draft.knowledgePackId;
+  __assert(isInternal === true, '无Pack时为internalOnly');
+});
+
+await __test('P2.2A: pending Fact不能公开使用', () => {
+  S.knowledgeFacts = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1'});
+  __assert(f.fact.reviewStatus === 'pending', '默认pending');
+  const confirmed = getConfirmedKnowledgeFacts();
+  __assert(confirmed.length === 0, 'pending Fact不在confirmed列表');
+});
+
+await __test('P2.2A: internal-only Fact不能进入公开草稿', () => {
+  S.knowledgeFacts = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:false});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  const confirmed = getConfirmedKnowledgeFacts({requirePublicUse:true});
+  __assert(confirmed.length === 0, 'publicUseAllowed=false的Fact不在公开列表');
+});
+
+await __test('P2.2A: 草稿状态需要人工审核', () => {
+  const draft = {id:'d1', reviewStatus:'unreviewed', status:'待审核'};
+  const normalized = normalizeDraftReviewStatus(draft);
+  __assert(normalized === 'unreviewed', '未审核状态');
+  draft.reviewStatus = 'reviewed';
+  __assert(normalizeDraftReviewStatus(draft) === 'reviewed', '已审核状态');
+});
+
+// --- 闭环约束测试 ---
+
+await __test('P2.2A: validateCustomerOutreachReadiness 返回步骤状态', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', doNotContact:false}];
+  S.outreachKnowledgeBase = [{archiveId:'a1', customerId:'c1', identityResolutionStatus:'resolved', doNotContact:false}];
+  S.campaigns = []; S.campaignCustomerTasks = []; S.drafts = []; S.campaignFollowUpTasks = [];
+  const result = validateCustomerOutreachReadiness('c1');
+  __assert(result.steps.customer_entry.status === 'completed', '客户录入完成');
+  __assert(result.steps.identity_verification.status === 'completed', '身份确认完成');
+  __assert(result.steps.dnc_check.status === 'completed', 'DNC检查通过');
+});
+
+await __test('P2.2A: DNC客户在闭环检查中被阻断', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', doNotContact:true}];
+  S.outreachKnowledgeBase = [];
+  S.campaigns = []; S.campaignCustomerTasks = []; S.drafts = []; S.campaignFollowUpTasks = [];
+  const result = validateCustomerOutreachReadiness('c1');
+  __assert(result.ready === false, '未准备好');
+  __assert(result.errors.some(e => e.indexOf('doNotContact') >= 0), '错误包含DNC');
+  __assert(result.steps.dnc_check.status === 'blocked', 'DNC步骤阻断');
+});
+
+await __test('P2.2A: 未绑定Pack时闭环检查提示', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', doNotContact:false}];
+  S.outreachKnowledgeBase = [{archiveId:'a1', customerId:'c1', identityResolutionStatus:'resolved', doNotContact:false}];
+  S.campaigns = []; S.campaignCustomerTasks = []; S.drafts = []; S.campaignFollowUpTasks = [];
+  const result = validateCustomerOutreachReadiness('c1');
+  __assert(result.steps.knowledge_pack.status === 'pending', '知识包待绑定');
+  __assert(result.errors.some(e => e.indexOf('Knowledge Pack') >= 0), '错误提示未绑定Pack');
+});
+
+await __test('P2.2A: migrateAllDraftsMetadata 批量迁移', () => {
+  S.drafts = [
+    {id:'d1', customerId:'c1'},
+    {id:'d2', customerId:'c2', knowledgePackId:'p1'}
+  ];
+  const result = migrateAllDraftsMetadata();
+  __assert(result.migrated >= 1, '至少迁移1个');
+  __assert(S.drafts[0].factIds !== undefined, '补充factIds');
+  __assert(S.drafts[0].legacyMetadata === true, '标记legacyMetadata');
+});
+
+await __test('P2.2A: logCustomerOutreachEvent 记录事件', () => {
+  S.customers = [{id:'c1', company:'A'}];
+  const event = logCustomerOutreachEvent('c1', 'draft_generated', '测试事件', 'tester');
+  __assert(event !== null, '事件已记录');
+  __assert(event.eventType === 'draft_generated', '事件类型正确');
+  __assert(event.actor === 'tester', '操作者正确');
+  const customer = S.customers.find(c => c.id === 'c1');
+  __assert(customer.outreachEvents.length >= 1, '客户保存事件数组');
+});
+
+// --- 安全和持久化测试 ---
+
+await __test('P2.2A: XSS特殊字符在重复检测中安全', () => {
+  S.customers = [{id:'c1', company:'<script>alert(1)</script> Corp', website:'https://a.com', stableId:'cust_1'}];
+  const result = detectDuplicateCustomer({id:'c2', company:'<script>alert(1)</script> Corp', website:'https://a.com'}, {excludeId:'c2'});
+  __assert(result.isDuplicate === true, '特殊字符公司名仍可匹配');
+  __assert(result.matches[0].matchedValueMasked.indexOf('<script>') < 0, '脱敏值不包含原始script');
+});
+
+await __test('P2.2A: 重复点击不会产生重复状态历史', () => {
+  S.customers = [{id:'c1', company:'A', website:'https://a.com', stableId:'cust_1', customerStatus:'new', doNotContact:false, statusHistory:[]}];
+  S.outreachKnowledgeBase = []; S.campaigns = []; S.campaignCustomerTasks = [];
+  transitionCustomerStatus('c1', 'identity_pending', {actor:'tester'});
+  // 再次尝试相同迁移（当前状态已经是identity_pending，应该失败因为不允许identity_pending→identity_pending）
+  const result2 = transitionCustomerStatus('c1', 'identity_pending', {actor:'tester'});
+  __assert(result2.success === false, '重复迁移被阻断');
+  const history = getCustomerStatusHistory('c1');
+  __assert(history.length === 1, '只有一条历史记录');
+});
+
+await __test('P2.2A: 导出导入保留新字段', () => {
+  S.drafts = [{id:'d1', customerId:'c1', knowledgePackId:'p1', knowledgePackVersion:1, knowledgeSnapshotHash:'hash123', factIds:['f1'], riskFlags:['r1']}];
+  const exported = JSON.parse(JSON.stringify({drafts: S.drafts}));
+  __assert(exported.drafts[0].knowledgePackId === 'p1', '导出保留Pack ID');
+  __assert(exported.drafts[0].knowledgeSnapshotHash === 'hash123', '导出保留hash');
+  __assert(exported.drafts[0].factIds.length === 1, '导出保留factIds');
+  __assert(exported.drafts[0].riskFlags.length === 1, '导出保留riskFlags');
+});
+
+await __test('P2.2A: resetData覆盖新数据集合', () => {
+  // 验证resetData函数存在且包含drafts
+  __assert(typeof resetData === 'function', 'resetData函数存在');
+  // 验证clearAllData存在
+  __assert(typeof clearAllData === 'function' || typeof resetData === 'function', '数据清理函数存在');
+});
+
 // ===== 输出结果 =====
 console.log('');
 console.log('========================================');

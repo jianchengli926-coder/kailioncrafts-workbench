@@ -1,13 +1,34 @@
+# 环境变量与密钥
 .env
+.env.*
+.streamlit/secrets.toml
+
+# API 供应商配置（含真实 Key）
 data/ai_providers.json
+
+# 运行时日志与 Trace
+data/auth_log.json
+data/trace/
+
+# 生成图片
+data/generated_images/
+
+# 客户与业务数据
 data/customers.json
 data/competitor_sites.csv
-__pycache__/
-*.pyc
-.streamlit/secrets.toml
+data/company_profile.json
+data/company_kb_v7/
+company_kb_content.py
 
 # 订单与财务中心
 *.db
 data/workbench.db
-data/company_profile.json
 _backup/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 备份文件
+*.bak_*
+*~

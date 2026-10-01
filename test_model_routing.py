@@ -28,20 +28,20 @@ def _p_preload():
     r = MagicMock(); r.status_code = 200; r.json.return_value = {"message": {"content": "hi"}, "eval_count": 1}; return r
 
 class T1Chain(unittest.TestCase):
-    def test_7models(self): self.assertEqual(len(get_text_chain()), 7)
+    def test_4models(self): self.assertEqual(len(get_text_chain()), 4)
     def test_order(self):
         ids = [m['id'] for m in get_text_chain()]
-        self.assertEqual(ids, ['glm-4.7-flash','glm-4-flash','doubao-seed-2-1-turbo','qwen3.5:9b','deepseek-r1:7b','qwen2.5:7b','qwen2.5vl:7b'])
-    def test_has_doubao(self): self.assertIn('doubao-seed-2-1-turbo', [m['id'] for m in get_text_chain()])
-    def test_has_deepseek(self): self.assertIn('deepseek-r1:7b', [m['id'] for m in get_text_chain()])
-    def test_has_qwen25vl(self): self.assertIn('qwen2.5vl:7b', [m['id'] for m in get_text_chain()])
+        self.assertEqual(ids, ['glm-4.7-flash','glm-4-flash','qwen3.5:9b','qwen2.5:7b'])
+    def test_no_doubao(self): self.assertNotIn('doubao-seed-2-1-turbo', [m['id'] for m in get_text_chain()])
+    def test_no_deepseek(self): self.assertNotIn('deepseek-r1:7b', [m['id'] for m in get_text_chain()])
+    def test_no_qwen25vl(self): self.assertNotIn('qwen2.5vl:7b', [m['id'] for m in get_text_chain()])
     def test_qwen35_first_local(self):
         ids = [m['id'] for m in get_text_chain()]
         local_ids = [m for m in ids if ':' in m]
         self.assertEqual(local_ids[0], 'qwen3.5:9b')
-    def test_local4(self):
+    def test_local2(self):
         ids = [m['id'] for m in get_local_text_chain()]
-        self.assertEqual(ids, ['qwen3.5:9b','deepseek-r1:7b','qwen2.5:7b','qwen2.5vl:7b'])
+        self.assertEqual(ids, ['qwen3.5:9b','qwen2.5:7b'])
 
 class T1RegistryDetail(unittest.TestCase):
     """恢复 f2053c1 的模型注册表详细测试"""
@@ -367,13 +367,13 @@ class T16TraceNoSecrets(unittest.TestCase):
             self.assertIn(key,t['failover_details'][0])
 
 class TP11Chains(unittest.TestCase):
-    def test_text_7(self):
+    def test_text_4(self):
         self.assertEqual([m['id'] for m in get_text_chain()],
-            ['glm-4.7-flash','glm-4-flash','doubao-seed-2-1-turbo','qwen3.5:9b','deepseek-r1:7b','qwen2.5:7b','qwen2.5vl:7b'])
-    def test_local_text_4(self):
+            ['glm-4.7-flash','glm-4-flash','qwen3.5:9b','qwen2.5:7b'])
+    def test_local_text_2(self):
         from model_registry import get_local_text_chain
         self.assertEqual([m['id'] for m in get_local_text_chain()],
-            ['qwen3.5:9b','deepseek-r1:7b','qwen2.5:7b','qwen2.5vl:7b'])
+            ['qwen3.5:9b','qwen2.5:7b'])
     def test_reasoning(self):
         from model_registry import get_reasoning_chain
         self.assertEqual([m['id'] for m in get_reasoning_chain()], ['glm-4.7-flash','qwen3.5:9b','deepseek-r1:7b'])

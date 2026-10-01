@@ -10050,19 +10050,17 @@ elif page == "🤖 模型管理":
                                 continue
                             try:
                                 if m['category'] == 'image':
-                                    # FLUX：只检查模型存在性（不实际生成）
-                                    resp = _hc_req.get("http://localhost:11434/api/tags", timeout=10)
+                                    # FLUX：实际探测图像生成运行时能力，不只用/api/tags存在性
+                                    from model_registry import check_ollama_image_gen_support
+                                    _img_ok, _img_reason = check_ollama_image_gen_support(force=True)
                                     elapsed = _hc_time.time() - t0
-                                    if resp.status_code == 200:
-                                        models = [mm['name'] for mm in resp.json().get('models', [])]
-                                        if m['api_model'] in models:
-                                            _hc_health.set_status(mid, HEALTH_AVAILABLE, elapsed=round(elapsed, 2))
-                                            hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
-                                        else:
-                                            _hc_health.set_status(mid, HEALTH_UNAVAILABLE, elapsed=round(elapsed, 2), error="模型未安装")
-                                            hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': '模型未安装'})
+                                    if _img_ok:
+                                        _hc_health.set_status(mid, HEALTH_AVAILABLE, elapsed=round(elapsed, 2))
+                                        hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
                                     else:
-                                        hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f'Ollama HTTP {resp.status_code}'})
+                                        from model_registry import HEALTH_RUNTIME_UNSUPPORTED
+                                        _hc_health.set_status(mid, HEALTH_RUNTIME_UNSUPPORTED, elapsed=round(elapsed, 2), error=_img_reason)
+                                        hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'runtime_unsupported', 'elapsed': round(elapsed, 2), 'error': _img_reason})
                                 else:
                                     # 本地文本/视觉模型：极简聊天请求（keep_alive:0由release处理）
                                     resp = _hc_req.post(
@@ -10087,11 +10085,12 @@ elif page == "🤖 模型管理":
                         else:
                             # 在线模型
                             if m['category'] == 'image':
+                                # CogView：使用真实 /images/generations 接口，不用 chat/completions 代替
                                 resp = _hc_req.post(
-                                    f"{m['base_url'].rstrip('/')}/chat/completions",
+                                    f"{m['base_url'].rstrip('/')}/images/generations",
                                     headers={"Authorization": f"Bearer {m['api_key']}", "Content-Type": "application/json"},
-                                    json={"model": "glm-4-flash", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 5},
-                                    timeout=15,
+                                    json={"model": m['api_model'], "prompt": "minimal health check image", "size": "1024x1024"},
+                                    timeout=30,
                                 )
                             else:
                                 resp = _hc_req.post(
@@ -10102,14 +10101,34 @@ elif page == "🤖 模型管理":
                                 )
                             elapsed = _hc_time.time() - t0
                             if resp.status_code == 200:
+                                # CogView 需验证 data[0].url 存在
+                                if m['category'] == 'image':
+                                    try:
+                                        _img_data = resp.json()
+                                        _url = _img_data.get('data', [{}])[0].get('url', '')
+                                        if not _url:
+                                            _hc_health.set_status(mid, HEALTH_UNAVAILABLE, elapsed=round(elapsed, 2), error="返回无图片URL")
+                                            hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': '返回无图片URL'})
+                                            continue
+                                    except Exception as _je:
+                                        _hc_health.set_status(mid, HEALTH_UNAVAILABLE, elapsed=round(elapsed, 2), error=f"JSON解析失败: {str(_je)[:40]}")
+                                        hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f'JSON解析失败'})
+                                        continue
                                 _hc_health.set_status(mid, HEALTH_AVAILABLE, elapsed=round(elapsed, 2))
                                 hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
+                            elif resp.status_code == 402 or 'insufficient' in resp.text.lower() or 'balance' in resp.text.lower():
+                                from model_registry import HEALTH_INSUFFICIENT_BALANCE
+                                _hc_health.set_status(mid, HEALTH_INSUFFICIENT_BALANCE, elapsed=round(elapsed, 2), error="余额不足")
+                                hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'insufficient_balance', 'elapsed': round(elapsed, 2), 'error': '余额不足'})
                             elif resp.status_code == 429:
                                 _hc_health.set_status(mid, HEALTH_RATE_LIMITED, elapsed=round(elapsed, 2), error="HTTP 429 限流")
                                 hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'rate_limited', 'elapsed': round(elapsed, 2), 'error': 'HTTP 429 限流'})
                             elif resp.status_code in (401, 403):
                                 _hc_health.set_status(mid, HEALTH_CONFIG_ERROR, elapsed=round(elapsed, 2), error=f"HTTP {resp.status_code}")
                                 hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'config_error', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code} 认证错误"})
+                            elif resp.status_code in (408, 500, 502, 503, 504):
+                                _hc_health.set_status(mid, HEALTH_TIMEOUT, elapsed=round(elapsed, 2), error=f"HTTP {resp.status_code}")
+                                hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'timeout', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code} 可故障转移"})
                             else:
                                 _hc_health.set_status(mid, HEALTH_UNAVAILABLE, elapsed=round(elapsed, 2), error=f"HTTP {resp.status_code}")
                                 hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code}"})

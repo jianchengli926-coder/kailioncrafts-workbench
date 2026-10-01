@@ -16,6 +16,8 @@ HEALTH_UNAVAILABLE = "unavailable"    # 暂时不可用
 HEALTH_CONFIG_ERROR = "config_error"  # 配置错误
 HEALTH_MANUAL_DISABLED = "manual_disabled"  # 手动禁用
 HEALTH_UNKNOWN = "unknown"            # 未检测
+HEALTH_RUNTIME_UNSUPPORTED = "runtime_unsupported"  # 运行时不支持（如Ollama版本不支持图像生成）
+HEALTH_INSUFFICIENT_BALANCE = "insufficient_balance"  # 余额不足
 
 HEALTH_LABELS = {
     HEALTH_AVAILABLE: "可用",
@@ -25,7 +27,13 @@ HEALTH_LABELS = {
     HEALTH_CONFIG_ERROR: "配置错误",
     HEALTH_MANUAL_DISABLED: "手动禁用",
     HEALTH_UNKNOWN: "未检测",
+    HEALTH_RUNTIME_UNSUPPORTED: "运行时不支持",
+    HEALTH_INSUFFICIENT_BALANCE: "余额不足",
 }
+
+# Ollama 图像生成能力缓存（避免每次请求都探测）
+_ollama_image_gen_capable = None
+_ollama_image_gen_checked = False
 
 # ============ 本地模型真实 Ollama ID（来自 ollama list） ============
 # 这些是本机实际安装的模型名称，禁止猜测
@@ -129,8 +137,11 @@ def _get_cred(creds, provider_id, fallback_url="", fallback_key=""):
 TEXT_CHAIN_IDS = [
     "glm-4.7-flash",       # 1. GLM-4.7 Flash
     "glm-4-flash",         # 2. GLM-4 Flash
-    "qwen3.5:9b",          # 3. qwen3.5:9b（默认本地首选）
-    "qwen2.5:7b",          # 4. qwen2.5:7b（本地备用）
+    "doubao-seed-2-1-turbo", # 3. 豆包主模型
+    "qwen3.5:9b",          # 4. qwen3.5:9b（默认本地首选）
+    "deepseek-r1:7b",      # 5. deepseek-r1:7b（本地推理备用）
+    "qwen2.5:7b",          # 6. qwen2.5:7b（本地文本备用）
+    "qwen2.5vl:7b",        # 7. qwen2.5vl:7b（本地视觉备用）
 ]
 
 # 推理任务链（GLM → qwen3.5 → deepseek-r1）
@@ -143,7 +154,9 @@ REASONING_CHAIN_IDS = [
 # 本地模型顺序（文本故障转移）
 LOCAL_TEXT_CHAIN_IDS = [
     "qwen3.5:9b",
+    "deepseek-r1:7b",
     "qwen2.5:7b",
+    "qwen2.5vl:7b",
 ]
 
 # 本地推理链（qwen3.5 → deepseek-r1）
@@ -361,9 +374,9 @@ class HealthManager:
             return s
 
     def is_available(self, model_id):
-        """模型是否当前可用（考虑冷却）"""
+        """模型是否当前可用（考虑冷却和运行时支持）"""
         s = self.get_status(model_id)
-        if s["status"] in (HEALTH_CONFIG_ERROR, HEALTH_MANUAL_DISABLED):
+        if s["status"] in (HEALTH_CONFIG_ERROR, HEALTH_MANUAL_DISABLED, HEALTH_RUNTIME_UNSUPPORTED, HEALTH_INSUFFICIENT_BALANCE):
             return False
         if s["status"] == HEALTH_RATE_LIMITED and s["cooldown_remaining"] > 0:
             return False
@@ -410,13 +423,61 @@ def get_vision_chain():
     return chain
 
 
+def check_ollama_image_gen_support(force=False):
+    """
+    检测当前 Ollama 运行时是否支持图像生成模型。
+    发送最小生成探测，根据返回判断。结果缓存避免重复探测。
+    Returns:
+        tuple: (supported: bool, reason: str)
+    """
+    global _ollama_image_gen_capable, _ollama_image_gen_checked
+    if _ollama_image_gen_checked and not force:
+        return (_ollama_image_gen_capable, "cached")
+    try:
+        import requests as _req
+        # 用 FLUX 模型发送最小生成探测
+        resp = _req.post("http://localhost:11434/api/generate", json={
+            "model": "x/flux2-klein:4b-fp4",
+            "prompt": ".",
+            "stream": False,
+            "keep_alive": 0,
+        }, timeout=15)
+        if resp.status_code == 200:
+            _ollama_image_gen_capable = True
+            _ollama_image_gen_checked = True
+            return (True, "ok")
+        elif "image generation models are not currently supported" in resp.text:
+            _ollama_image_gen_capable = False
+            _ollama_image_gen_checked = True
+            return (False, "Ollama运行时不支持图像生成模型")
+        elif resp.status_code == 404:
+            _ollama_image_gen_capable = False
+            _ollama_image_gen_checked = True
+            return (False, "FLUX模型未安装")
+        else:
+            _ollama_image_gen_capable = False
+            _ollama_image_gen_checked = True
+            return (False, f"HTTP {resp.status_code}: {resp.text[:100]}")
+    except Exception as e:
+        _ollama_image_gen_capable = False
+        _ollama_image_gen_checked = True
+        return (False, f"探测失败: {str(e)[:100]}")
+
+
 def get_image_chain():
-    """获取图像生成模型自动路由链"""
+    """获取图像生成模型自动路由链（过滤运行时不支持的本地模型）"""
     registry = build_model_registry()
     chain = []
     for mid in IMAGE_CHAIN_IDS:
         if mid in registry:
-            chain.append(registry[mid])
+            m = registry[mid]
+            # 本地图像模型需检查运行时支持
+            if m.get("type") == "local" and m.get("category") == "image":
+                supported, reason = check_ollama_image_gen_support()
+                if not supported:
+                    health.set_status(mid, HEALTH_RUNTIME_UNSUPPORTED, error=reason)
+                    continue
+            chain.append(m)
     return chain
 
 

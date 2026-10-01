@@ -54,14 +54,33 @@ _slow_response_tracker = {}
 
 
 def _is_slow_response(model_id, elapsed):
-    """检查是否触发慢响应切换规则：连续两次超过15秒"""
+    """检查是否触发慢响应切换规则：单次>30秒或连续两次>15秒"""
     if model_id not in _slow_response_tracker:
         _slow_response_tracker[model_id] = []
     tracker = _slow_response_tracker[model_id]
     tracker.append(elapsed)
     if len(tracker) > 5:
         tracker.pop(0)
+    # 单次超过30秒
+    if elapsed > GLM_DOUBAO_SLOW_THRESHOLD:
+        return True
     # 连续两次超过阈值
+    if len(tracker) >= 2 and tracker[-1] > SLOW_RESPONSE_THRESHOLD and tracker[-2] > SLOW_RESPONSE_THRESHOLD:
+        return True
+    return False
+
+
+def _is_model_slow_blocked(model_id):
+    """查询模型是否被慢响应规则阻塞（不记录，只查询状态）"""
+    if model_id not in _slow_response_tracker:
+        return False
+    tracker = _slow_response_tracker[model_id]
+    if not tracker:
+        return False
+    # 最近一次超过30秒
+    if tracker[-1] > GLM_DOUBAO_SLOW_THRESHOLD:
+        return True
+    # 最近两次都超过15秒
     if len(tracker) >= 2 and tracker[-1] > SLOW_RESPONSE_THRESHOLD and tracker[-2] > SLOW_RESPONSE_THRESHOLD:
         return True
     return False
@@ -288,7 +307,7 @@ class AIClient:
     def _call_local_chat(self, model_info, messages, temperature=0.7, num_ctx=None):
         """
         调用本地模型（Ollama 原生 /api/chat）。
-        使用 keep_alive: 0 在请求后立即释放模型。
+        keep_alive 设为合理值保持模型加载，由 release() 统一使用 keep_alive:0 卸载。
         控制 num_ctx 避免 16GB 内存溢出。
         """
         if num_ctx is None:
@@ -303,7 +322,7 @@ class AIClient:
                 "model": model_info["api_model"],
                 "messages": messages,
                 "stream": False,
-                "keep_alive": 0,  # 请求后立即卸载
+                "keep_alive": "5m",  # 保持加载，由 release() 统一卸载
                 "options": {
                     "temperature": temperature,
                     "num_ctx": num_ctx,
@@ -428,6 +447,21 @@ class AIClient:
                 })
                 continue
 
+            # 慢响应跳过：仅自动模式、仅在线模型
+            if manual_model is None and mtype == "online" and _is_model_slow_blocked(model_id):
+                failover_log.append(f"{label} 跳过(慢响应)")
+                failover_details.append({
+                    "from": attempt_chain[0]["display_name"] if idx > 0 else None,
+                    "to": label,
+                    "type": mtype,
+                    "status_code": None,
+                    "reason": "slow_response",
+                    "elapsed": 0,
+                    "time": datetime.now().strftime("%H:%M:%S"),
+                    "mode": mode,
+                })
+                continue
+
             req_start = time.time()
             try:
                 if mtype == "local":
@@ -477,11 +511,11 @@ class AIClient:
 
                     # 慢响应检测（仅在线 GLM/豆包）
                     if mtype == "online" and model_info.get("provider") in ("zhipu", "doubao"):
-                        if req_elapsed > GLM_DOUBAO_SLOW_THRESHOLD:
-                            failover_log.append(f"{label} 响应过慢({req_elapsed:.1f}s>30s)")
-                            # 不中断已成功的响应，但记录
-                        elif _is_slow_response(model_id, req_elapsed):
-                            failover_log.append(f"{label} 连续两次慢响应(>{SLOW_RESPONSE_THRESHOLD}s)")
+                        if _is_slow_response(model_id, req_elapsed):
+                            if req_elapsed > GLM_DOUBAO_SLOW_THRESHOLD:
+                                failover_log.append(f"{label} 响应过慢({req_elapsed:.1f}s>30s)，下次自动优先本地模型")
+                            else:
+                                failover_log.append(f"{label} 连续两次慢响应(>{SLOW_RESPONSE_THRESHOLD}s)，下次自动优先本地模型")
 
                     if idx > 0 or manual_model is None:
                         if idx > 0:

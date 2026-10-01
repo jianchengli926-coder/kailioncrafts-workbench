@@ -31,17 +31,20 @@ def _p_preload():
     r.json.return_value = {"message": {"content": "hi"}, "eval_count": 1}; return r
 
 class T1Chain(unittest.TestCase):
-    def test_7models(self): self.assertEqual(len(get_text_chain()), 7)
+    def test_4models(self): self.assertEqual(len(get_text_chain()), 4)
     def test_order(self):
         ids = [m['id'] for m in get_text_chain()]
-        self.assertEqual(ids, ['glm-4.7-flash','glm-4-flash','doubao-seed-2-1-turbo',
-            'qwen3.5:9b','deepseek-r1:7b','qwen2.5:7b','qwen2.5vl:7b'])
-    def test_doubao(self): self.assertIn('doubao-seed-2-1-turbo', [m['id'] for m in get_text_chain()])
-    def test_deepseek(self): self.assertIn('deepseek-r1:7b', [m['id'] for m in get_text_chain()])
-    def test_qwen25vl(self): self.assertIn('qwen2.5vl:7b', [m['id'] for m in get_text_chain()])
-    def test_local4(self):
+        self.assertEqual(ids, ['glm-4.7-flash','glm-4-flash','qwen3.5:9b','qwen2.5:7b'])
+    def test_no_doubao(self): self.assertNotIn('doubao-seed-2-1-turbo', [m['id'] for m in get_text_chain()])
+    def test_no_deepseek(self): self.assertNotIn('deepseek-r1:7b', [m['id'] for m in get_text_chain()])
+    def test_no_qwen25vl(self): self.assertNotIn('qwen2.5vl:7b', [m['id'] for m in get_text_chain()])
+    def test_qwen35_first_local(self):
+        ids = [m['id'] for m in get_text_chain()]
+        local_ids = [m for m in ids if ':' in m]
+        self.assertEqual(local_ids[0], 'qwen3.5:9b')
+    def test_local2(self):
         ids = [m['id'] for m in get_local_text_chain()]
-        self.assertEqual(ids, ['qwen3.5:9b','deepseek-r1:7b','qwen2.5:7b','qwen2.5vl:7b'])
+        self.assertEqual(ids, ['qwen3.5:9b','qwen2.5:7b'])
 
 class T2Glm47to4(unittest.TestCase):
     def setUp(self): health._states={}; self.c=AIClient()
@@ -58,18 +61,21 @@ class T2Glm47to4(unittest.TestCase):
         self.assertIn("GLM4", self.c.chat("hi",task_name="t2"))
         self.assertIn('glm-4.7-flash',ms); self.assertIn('glm-4-flash',ms)
 
-class T3GlmToDoubao(unittest.TestCase):
+class T3GlmToQwen35(unittest.TestCase):
     def setUp(self): health._states={}; self.c=AIClient()
     @patch('ai_client.requests.post')
-    def test(self, mp):
+    @patch('local_model_manager.requests.get')
+    @patch('local_model_manager.requests.post')
+    def test(self, mlp, mlg, map_):
+        mlg.side_effect=MockPs("qwen3.5:9b"); mlp.return_value=_p_ok()
         def se(u,**k):
-            m=k.get('json',{}).get('model',''); r=MagicMock()
-            if 'glm' in m: r.status_code=503; r.text='e'
-            elif 'doubao' in m: r.status_code=200; r.json.return_value={"choices":[{"message":{"content":"doubao"}}],"usage":{}}
-            else: r.status_code=500; r.text='e'
+            r=MagicMock()
+            if 'localhost' in u or '11434' in u:
+                r.status_code=200; r.json.return_value={"message":{"content":"qwen35"},"eval_count":5}
+            else: r.status_code=503; r.text='e'
             return r
-        mp.side_effect=se
-        self.assertIn("doubao", self.c.chat("hi",task_name="t3"))
+        map_.side_effect=se
+        self.assertIn("qwen35", self.c.chat("hi",task_name="t3"))
 
 class T4CloudToQwen35(unittest.TestCase):
     def setUp(self): health._states={}; self.c=AIClient()
@@ -87,25 +93,7 @@ class T4CloudToQwen35(unittest.TestCase):
         map_.side_effect=se
         self.assertIn("qwen35", self.c.chat("hi",task_name="t4"))
 
-class T5Qwen35ToDeepseek(unittest.TestCase):
-    def setUp(self): health._states={}; self.c=AIClient()
-    @patch('ai_client.requests.post')
-    @patch('local_model_manager.requests.get')
-    @patch('local_model_manager.requests.post')
-    def test(self, mlp, mlg, map_):
-        mlg.side_effect=MockPs("deepseek-r1:7b"); mlp.return_value=_p_ok()
-        def se(u,**k):
-            m=k.get('json',{}).get('model',''); r=MagicMock()
-            if 'localhost' in u or '11434' in u:
-                if 'qwen3.5' in m: r.status_code=500; r.text='e'
-                elif 'deepseek' in m: r.status_code=200; r.json.return_value={"message":{"content":"deepseek","thinking":""},"eval_count":5}
-                else: r.status_code=500; r.text='e'
-            else: r.status_code=503; r.text='e'
-            return r
-        map_.side_effect=se
-        self.assertIn("deepseek", self.c.chat("hi",task_name="t5"))
-
-class T6DeepseekToQwen25(unittest.TestCase):
+class T5Qwen35ToQwen25(unittest.TestCase):
     def setUp(self): health._states={}; self.c=AIClient()
     @patch('ai_client.requests.post')
     @patch('local_model_manager.requests.get')
@@ -115,29 +103,13 @@ class T6DeepseekToQwen25(unittest.TestCase):
         def se(u,**k):
             m=k.get('json',{}).get('model',''); r=MagicMock()
             if 'localhost' in u or '11434' in u:
-                if m=='qwen2.5:7b': r.status_code=200; r.json.return_value={"message":{"content":"qwen25"},"eval_count":5}
+                if 'qwen3.5' in m: r.status_code=500; r.text='e'
+                elif m=='qwen2.5:7b': r.status_code=200; r.json.return_value={"message":{"content":"qwen25"},"eval_count":5}
                 else: r.status_code=500; r.text='e'
             else: r.status_code=503; r.text='e'
             return r
         map_.side_effect=se
-        self.assertIn("qwen25", self.c.chat("hi",task_name="t6"))
-
-class T7Qwen25ToVl(unittest.TestCase):
-    def setUp(self): health._states={}; self.c=AIClient()
-    @patch('ai_client.requests.post')
-    @patch('local_model_manager.requests.get')
-    @patch('local_model_manager.requests.post')
-    def test(self, mlp, mlg, map_):
-        mlg.side_effect=MockPs("qwen2.5vl:7b"); mlp.return_value=_p_ok()
-        def se(u,**k):
-            m=k.get('json',{}).get('model',''); r=MagicMock()
-            if 'localhost' in u or '11434' in u:
-                if 'qwen2.5vl' in m: r.status_code=200; r.json.return_value={"message":{"content":"qwen25vl"},"eval_count":5}
-                else: r.status_code=500; r.text='e'
-            else: r.status_code=503; r.text='e'
-            return r
-        map_.side_effect=se
-        self.assertIn("qwen25vl", self.c.chat("hi",task_name="t7"))
+        self.assertIn("qwen25", self.c.chat("hi",task_name="t5"))
 
 class T8NoFailover(unittest.TestCase):
     def setUp(self): health._states={}; self.c=AIClient()
@@ -348,6 +320,56 @@ class T16TraceNoSecrets(unittest.TestCase):
         for key in ['from','to','type','status_code','reason','elapsed','mode']:
             self.assertIn(key,t['failover_details'][0])
 
+class TP11Chains(unittest.TestCase):
+    def test_text_4(self): self.assertEqual([m['id'] for m in get_text_chain()], ['glm-4.7-flash','glm-4-flash','qwen3.5:9b','qwen2.5:7b'])
+    def test_reasoning(self):
+        from model_registry import get_reasoning_chain
+        self.assertEqual([m['id'] for m in get_reasoning_chain()], ['glm-4.7-flash','qwen3.5:9b','deepseek-r1:7b'])
+    def test_vision(self): self.assertEqual([m['id'] for m in get_vision_chain()], ['glm-4.6v-flash','qwen3.5:9b','qwen2.5vl:7b'])
+    def test_image(self): self.assertEqual([m['id'] for m in get_image_chain()], ['cogview-3-flash','x/flux2-klein:4b-fp4'])
+
+class TP11ImageManual(unittest.TestCase):
+    def setUp(self): health._states={}; self.c=AIClient(); self.c.manual_image_model=None
+    @patch('ai_client.requests.post')
+    def test_explicit_auto_overrides(self, mp):
+        self.c.manual_image_model="x/flux2-klein:4b-fp4"
+        mp.return_value=MagicMock(status_code=200,json=lambda:{"data":[{"url":"https://example.com/t.png"}]})
+        r=self.c.generate_image("cat",task_name="p11b",manual_model="auto")
+        self.assertTrue(r['success']); self.assertIn('CogView',r['model'])
+    @patch('ai_client.requests.post')
+    def test_manual_cogview_no_flux(self, mp):
+        cnt=[0]
+        def se(u,**k): cnt[0]+=1; r=MagicMock(); r.status_code=500; r.text='e'; return r
+        mp.side_effect=se
+        r=self.c.generate_image("cat",task_name="p11d",manual_model="cogview-3-flash")
+        self.assertFalse(r['success']); self.assertEqual(cnt[0],1)
+
+class TP11LocalOwnership(unittest.TestCase):
+    def setUp(self):
+        local_model_manager._global_lock=threading.Lock(); local_model_manager._active_model=None
+        local_model_manager._owned_models=set(); local_model_manager._preload_ok=False
+    @patch('local_model_manager.requests.get')
+    @patch('local_model_manager.requests.post')
+    def test_external_not_unloaded(self, mp, mg):
+        mg.return_value=MagicMock(status_code=200,json=lambda:{"models":[{"name":"ext:7b"}]})
+        mp.return_value=_p_ok()
+        with patch('local_model_manager.OLLAMA_EXTERNAL_WAIT_MAX',2):
+            ok=local_model_manager.acquire("qwen3.5:9b",timeout=5)
+        self.assertFalse(ok)
+        uc=[c for c in mp.call_args_list if c.kwargs.get('json',{}).get('keep_alive')==0]
+        self.assertEqual(len(uc),0)
+    @patch('local_model_manager.requests.get')
+    def test_embedding_not_large(self, mg):
+        mg.return_value=MagicMock(status_code=200,json=lambda:{"models":[{"name":"nomic-embed-text:latest"}]})
+        self.assertIsNone(local_model_manager._get_running_large_model())
+
+class TP11SlowResponse(unittest.TestCase):
+    def test_no_failover(self):
+        for c in [401,403,400,422]: self.assertFalse(_classify_error(Exception("t"),c)[0])
+    def test_can_failover(self):
+        for c in [429,408,500,502,503]: self.assertTrue(_classify_error(Exception("t"),c)[0])
+
+
 class TIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -366,10 +388,10 @@ class TIntegration(unittest.TestCase):
 
 def run_all():
     loader=unittest.TestLoader(); suite=unittest.TestSuite()
-    for c in [T1Chain,T2Glm47to4,T3GlmToDoubao,T4CloudToQwen35,T5Qwen35ToDeepseek,
-              T6DeepseekToQwen25,T7Qwen25ToVl,T8NoFailover,T9Vision429,T10CogviewToFlux,
+    for c in [T1Chain,T2Glm47to4,T3GlmToQwen35,T4CloudToQwen35,T5Qwen35ToQwen25,
+              T8NoFailover,T9Vision429,T10CogviewToFlux,
               T11ManualFlux,T12Concurrent,T13OldUnloaded,T14PreloadConfirmed,T15NoResidual,
-              T16TraceNoSecrets,TIntegration]:
+              T16TraceNoSecrets,TIntegration,TP11Chains,TP11ImageManual,TP11LocalOwnership,TP11SlowResponse]:
         suite.addTests(loader.loadTestsFromTestCase(c))
     r=unittest.TextTestRunner(verbosity=2).run(suite)
     print("\n"+"="*60)

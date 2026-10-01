@@ -890,13 +890,14 @@ class AIClient:
                 elif can_failover:
                     health.set_status(model_id, HEALTH_UNAVAILABLE, elapsed=req_elapsed, error=error_msg)
 
-                if idx < len(attempt_chain) - 1 and can_failover and not manual_model:
+                _is_manual = bool(effective_manual and effective_manual != "auto")
+                if idx < len(attempt_chain) - 1 and can_failover and not _is_manual:
                     next_label = attempt_chain[idx + 1]["display_name"]
                     failover_log.append(f"{label} 失败({error_msg}) -> {next_label}")
                 else:
                     failover_log.append(f"{label} 失败({error_msg})")
 
-                if not can_failover or (manual_model and manual_model != "auto"):
+                if not can_failover or _is_manual:
                     break
                 continue
 

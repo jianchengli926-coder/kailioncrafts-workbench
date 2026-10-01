@@ -6847,12 +6847,69 @@ function renderProviderStatus(){
         <div style="color:#a0aec0;font-size:10px;margin-top:2px">${s.lastErrorTime || ''}</div>
       </div>` : ''}
     </div>
+    <div id="modelRouterStatus" style="margin-top:16px"></div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" onclick="detectOllamaModels().then(r=>{alert('检测到 '+r.length+' 个本地模型: '+r.map(m=>m.name).join(', '));renderProviderStatus();})">🔍 检测本地模型</button>
       <button class="btn btn-sm" style="background:#4299e1;color:#fff" onclick="runChainTest()">🧪 模型链路测试</button>
     </div>
     <div id="chainTestResult" style="margin-top:12px"></div>
   `;
+  // P2.2B-2: 加载模型路由状态
+  loadModelRouterStatus();
+}
+
+// P2.2B-2: 加载并渲染模型路由状态
+async function loadModelRouterStatus(){
+  const el = document.getElementById('modelRouterStatus');
+  if(!el) return;
+  try{
+    const res = await fetch('/api/ai/models');
+    if(!res.ok) return;
+    const health = await res.json();
+    const chains = health.chains || {};
+    const lock = health.lockState || {};
+    const slowModels = health.slowModels || [];
+    const traceStats = health.traceStats || {};
+
+    function renderChain(name, chain){
+      return `<div style="margin-bottom:6px">
+        <span style="color:#718096;font-size:11px;font-weight:600">${name}：</span>
+        <span style="font-size:12px;color:#2d3748">${chain.map((m,i)=>`<span style="color:${i===0?'#667eea':'#4a5568'}">${m}</span>${i<chain.length-1?' <span style="color:#a0aec0">→</span> ':''}`).join('')}</span>
+      </div>`;
+    }
+
+    el.innerHTML = `
+      <div style="background:#f7fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0">
+        <div style="font-weight:600;color:#2d3748;font-size:13px;margin-bottom:10px">🔀 模型路由配置（P2.2B-2）</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>${renderChain('普通文本', chains.text || [])}</div>
+          <div>${renderChain('推理', chains.reasoning || [])}</div>
+          <div>${renderChain('视觉', chains.vision || [])}</div>
+          <div>${renderChain('生图', chains.image || [])}</div>
+        </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px">
+          <div>
+            <span style="color:#718096;font-size:11px">本地锁：</span>
+            <span style="font-weight:600;color:${lock.locked?'#d69e2e':'#38a169'}">${lock.locked?'占用中('+lock.currentModel+')':'空闲'}</span>
+          </div>
+          <div>
+            <span style="color:#718096;font-size:11px">等待队列：</span>
+            <span style="font-weight:600;color:#2d3748">${lock.waitingCount || 0} 个</span>
+          </div>
+          <div>
+            <span style="color:#718096;font-size:11px">慢响应模型：</span>
+            <span style="font-weight:600;color:${slowModels.length>0?'#d69e2e':'#38a169'}">${slowModels.length>0?slowModels.map(m=>m.model).join(', '):'无'}</span>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:#a0aec0">
+          Trace统计：成功 ${traceStats.success||0} / 失败 ${traceStats.error||0} / 故障转移 ${traceStats.failover||0} |
+          num_ctx=${health.config?.numCtx||8192} | keep_alive=${health.config?.keepAlive||0}
+        </div>
+      </div>
+    `;
+  }catch(e){
+    // 静默失败，不影响现有UI
+  }
 }
 
 // 运行链路测试并显示结果

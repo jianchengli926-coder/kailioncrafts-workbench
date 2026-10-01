@@ -20,6 +20,8 @@ const crypto = require('crypto');
 const path = require('path');
 const { URL } = require('url');
 const dns = require('dns');
+// P2.2B-2: 模型路由和故障转移
+const ModelRouter = require('./model-router');
 
 // ============ 全局异常保护（防止进程崩溃退出）============
 process.on('uncaughtException', (err) => {
@@ -964,6 +966,81 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({configured:false, error:'配置读取失败'}));
       return;
     }
+  }
+
+  // P2.2B-2: 模型路由健康状态
+  if (pathname === '/api/ai/models' && req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const health = ModelRouter.getModelHealth();
+      res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+      res.end(JSON.stringify(health));
+    } catch(e) {
+      res.writeHead(500, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({error:'获取模型状态失败', message:e.message}));
+    }
+    return;
+  }
+
+  // P2.2B-2: 模型生成（带故障转移）
+  if (pathname === '/api/ai/generate' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const params = JSON.parse(body || '{}');
+        const result = await ModelRouter.generate({
+          taskType: params.taskType || 'text',
+          prompt: params.prompt || '',
+          manualModel: params.manualModel || null,
+          numCtx: params.numCtx,
+          images: params.images
+        });
+        res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+        res.end(JSON.stringify(result));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({success:false, error:'生成失败', message:e.message}));
+      }
+    });
+    return;
+  }
+
+  // P2.2B-2: Trace 列表
+  if (pathname === '/api/ai/traces' && req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const ModelTrace = require('./model-trace.js');
+      const traces = ModelTrace.listTraces({ limit: 50 });
+      res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+      res.end(JSON.stringify({traces, total: traces.length}));
+    } catch(e) {
+      res.writeHead(500, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({error:'获取Trace失败'}));
+    }
+    return;
+  }
+
+  // P2.2B-2: 单个 Trace
+  if (pathname.startsWith('/api/ai/traces/') && req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const ModelTrace = require('./model-trace.js');
+      const traceId = pathname.replace('/api/ai/traces/', '');
+      const trace = ModelTrace.getTrace(traceId);
+      if (!trace) {
+        res.writeHead(404, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({error:'Trace不存在'}));
+        return;
+      }
+      res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+      res.end(JSON.stringify(trace));
+    } catch(e) {
+      res.writeHead(500, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({error:'获取Trace失败'}));
+    }
+    return;
   }
 
   if (pathname === '/api/kb/scope-debug') {

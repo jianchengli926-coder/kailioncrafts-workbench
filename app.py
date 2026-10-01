@@ -7074,6 +7074,24 @@ JPG文件（未匹配）：
                 _img_model_choice = st.selectbox("🎨 图像生成模型", _img_model_opts, key="ais_img_model", index=0,
                                                  help="自动=云端优先，失败自动切FLUX；手动选择只对当前任务生效")
 
+                # 显示当前模型状态
+                try:
+                    from model_registry import health as _img_health, build_model_registry as _img_reg
+                    from local_model_manager import local_model_manager as _img_lmm
+                    _img_reg_data = _img_reg()
+                    _img_cur = "自动" if "自动" in _img_model_choice else ("GLM/CogView" if "GLM" in _img_model_choice else "FLUX.2 Klein 4B")
+                    _img_type = "在线/本地" if _img_cur == "自动" else ("在线" if _img_cur == "GLM/CogView" else "本地")
+                    _img_lmm_st = _img_lmm.get_status()
+                    _img_loading = _img_lmm_st.get('active_model') if _img_lmm_st.get('lock_held') else None
+                    _img_cog_st = _img_health.get_status('cogview-3-flash')
+                    _img_flux_st = _img_health.get_status('x/flux2-klein:4b-fp4')
+                    _img_status_line = f"当前: **{_img_cur}** [{_img_type}] | GLM: {_img_cog_st.get('status_label','未检测')} ({_img_cog_st.get('elapsed','-')}s) | FLUX: {_img_flux_st.get('status_label','未检测')} ({_img_flux_st.get('elapsed','-')}s)"
+                    if _img_loading:
+                        _img_status_line += f" | 🔄 本地加载中: {_img_loading}"
+                    st.caption(_img_status_line)
+                except Exception:
+                    pass
+
                 if st.button("🚀 生成图片", type="primary", use_container_width=True, key="ais_gen"):
                     # 比例映射
                     ratio_map = {
@@ -9964,6 +9982,27 @@ elif page == "🤖 模型管理":
             _ai_singleton.manual_image_model = st.session_state.get('manual_image_model_id')
         except Exception:
             pass
+
+        # 当前选择状态面板
+        try:
+            from local_model_manager import local_model_manager as _sel_lmm
+            _sel_lmm_st = _sel_lmm.get_status()
+            _col_sa, _col_sb, _col_sc, _col_sd = st.columns(4)
+            with _col_sa:
+                _tm = st.session_state.get('manual_text_model_id') or '自动路由'
+                st.metric("文本当前", _tm)
+            with _col_sb:
+                _vm = st.session_state.get('manual_vision_model_id') or '自动路由'
+                st.metric("视觉当前", _vm)
+            with _col_sc:
+                _im = st.session_state.get('manual_image_model_id') or '自动路由'
+                st.metric("图像当前", _im)
+            with _col_sd:
+                _lock_label = "🔒 占用" if _sel_lmm_st.get('lock_held') else "✅ 空闲"
+                _active = _sel_lmm_st.get('active_model') or '无'
+                st.metric("本地锁", f"{_lock_label}\n{_active}")
+        except Exception:
+            pass
     except Exception as _e:
         st.caption(f"选择器加载中... ({_e})")
 
@@ -9980,47 +10019,74 @@ elif page == "🤖 模型管理":
             try:
                 import time as _hc_time
                 import requests as _hc_req
-                from model_registry import build_model_registry, health as _hc_health, HEALTH_AVAILABLE, HEALTH_RATE_LIMITED, HEALTH_TIMEOUT, HEALTH_UNAVAILABLE, HEALTH_CONFIG_ERROR
+                from model_registry import (build_model_registry, get_text_chain, get_vision_chain,
+                    get_image_chain, health as _hc_health, HEALTH_AVAILABLE, HEALTH_RATE_LIMITED,
+                    HEALTH_TIMEOUT, HEALTH_UNAVAILABLE, HEALTH_CONFIG_ERROR)
                 from local_model_manager import local_model_manager as _hc_lmm
 
                 _reg = build_model_registry()
+                # 只检测活动链中的模型（去重），不检测已禁用模型
+                _active_ids = []
+                for _chain in [get_text_chain(), get_vision_chain(), get_image_chain()]:
+                    for _m in _chain:
+                        if _m['id'] not in _active_ids:
+                            _active_ids.append(_m['id'])
+
                 hc_results = []
-                for mid, m in _reg.items():
+                for mid in _active_ids:
+                    m = _reg.get(mid)
+                    if not m:
+                        continue
                     t0 = _hc_time.time()
                     try:
                         if m['type'] == 'local':
-                            # 本地模型：用 Ollama 原生 API 测试（不占用全局锁，用轻量请求）
-                            if m['category'] == 'image':
-                                # FLUX 不做实际生成测试，只检查 Ollama 可达性和模型存在
-                                resp = _hc_req.get("http://localhost:11434/api/tags", timeout=10)
-                                if resp.status_code == 200:
-                                    models = [mm['name'] for mm in resp.json().get('models', [])]
-                                    if m['api_model'] in models:
-                                        _hc_health.set_status(mid, HEALTH_AVAILABLE, elapsed=round(_hc_time.time()-t0, 2))
-                                        hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'ok', 'elapsed': round(_hc_time.time()-t0, 2), 'error': None})
+                            # 本地模型：必须获取全局互斥锁，acquire内部预加载+确认加载
+                            _lock_ok = _hc_lmm.acquire(m['api_model'], timeout=120)
+                            if not _lock_ok:
+                                hc_results.append({'label': m['display_name'], 'type': 'local',
+                                    'category': m.get('category','?'), 'status': 'fail',
+                                    'elapsed': round(_hc_time.time()-t0, 2),
+                                    'error': f"锁获取失败: {_hc_lmm.last_error or '超时'}"})
+                                continue
+                            try:
+                                if m['category'] == 'image':
+                                    # FLUX：只检查模型存在性（不实际生成）
+                                    resp = _hc_req.get("http://localhost:11434/api/tags", timeout=10)
+                                    elapsed = _hc_time.time() - t0
+                                    if resp.status_code == 200:
+                                        models = [mm['name'] for mm in resp.json().get('models', [])]
+                                        if m['api_model'] in models:
+                                            _hc_health.set_status(mid, HEALTH_AVAILABLE, elapsed=round(elapsed, 2))
+                                            hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
+                                        else:
+                                            _hc_health.set_status(mid, HEALTH_UNAVAILABLE, elapsed=round(elapsed, 2), error="模型未安装")
+                                            hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': '模型未安装'})
                                     else:
-                                        _hc_health.set_status(mid, HEALTH_UNAVAILABLE, elapsed=round(_hc_time.time()-t0, 2), error="模型未安装")
-                                        hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'fail', 'elapsed': round(_hc_time.time()-t0, 2), 'error': '模型未安装'})
+                                        hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f'Ollama HTTP {resp.status_code}'})
                                 else:
-                                    hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'fail', 'elapsed': round(_hc_time.time()-t0, 2), 'error': f'Ollama HTTP {resp.status_code}'})
-                            else:
-                                # 本地文本/视觉模型：发送极简聊天请求
-                                resp = _hc_req.post(
-                                    "http://localhost:11434/api/chat",
-                                    json={"model": m['api_model'], "messages": [{"role": "user", "content": "hi"}], "stream": False, "keep_alive": 0, "options": {"num_predict": 5}},
-                                    timeout=60,
-                                )
-                                elapsed = _hc_time.time() - t0
-                                if resp.status_code == 200:
-                                    _hc_health.set_status(mid, HEALTH_AVAILABLE, elapsed=round(elapsed, 2))
-                                    hc_results.append({'label': m['display_name'], 'type': 'local', 'category': m['category'], 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
-                                else:
-                                    _hc_health.set_status(mid, HEALTH_UNAVAILABLE, elapsed=round(elapsed, 2), error=f"HTTP {resp.status_code}")
-                                    hc_results.append({'label': m['display_name'], 'type': 'local', 'category': m['category'], 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code}"})
+                                    # 本地文本/视觉模型：极简聊天请求（keep_alive:0由release处理）
+                                    resp = _hc_req.post(
+                                        "http://localhost:11434/api/chat",
+                                        json={"model": m['api_model'], "messages": [{"role": "user", "content": "hi"}], "stream": False, "options": {"num_predict": 5}},
+                                        timeout=60,
+                                    )
+                                    elapsed = _hc_time.time() - t0
+                                    if resp.status_code == 200:
+                                        _hc_health.set_status(mid, HEALTH_AVAILABLE, elapsed=round(elapsed, 2))
+                                        hc_results.append({'label': m['display_name'], 'type': 'local', 'category': m['category'], 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
+                                    else:
+                                        _hc_health.set_status(mid, HEALTH_UNAVAILABLE, elapsed=round(elapsed, 2), error=f"HTTP {resp.status_code}")
+                                        hc_results.append({'label': m['display_name'], 'type': 'local', 'category': m['category'], 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code}"})
+                            finally:
+                                # 释放锁：release内部发送keep_alive:0并轮询确认卸载
+                                _rel_ok, _rel_err = _hc_lmm.release(m['api_model'])
+                                if not _rel_ok:
+                                    hc_results.append({'label': m['display_name'] + ' [卸载警告]', 'type': 'local',
+                                        'category': m.get('category','?'), 'status': 'fail',
+                                        'elapsed': 0, 'error': f"卸载确认失败: {_rel_err}"})
                         else:
                             # 在线模型
                             if m['category'] == 'image':
-                                # CogView 不做实际生成，用 chat 端点测试连通性
                                 resp = _hc_req.post(
                                     f"{m['base_url'].rstrip('/')}/chat/completions",
                                     headers={"Authorization": f"Bearer {m['api_key']}", "Content-Type": "application/json"},
@@ -10055,7 +10121,7 @@ elif page == "🤖 模型管理":
                         elapsed = _hc_time.time() - t0
                         hc_results.append({'label': m['display_name'], 'type': m['type'], 'category': m.get('category','?'), 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': str(e)[:60]})
 
-                # Embedding 模型单独检测
+                # Embedding 模型单独检测（小模型，不走大模型锁）
                 try:
                     t0 = _hc_time.time()
                     resp = _hc_req.post(
@@ -10070,6 +10136,18 @@ elif page == "🤖 模型管理":
                         hc_results.append({'label': 'nomic-embed-text', 'type': 'local', 'category': 'embedding', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code}"})
                 except Exception as e:
                     hc_results.append({'label': 'nomic-embed-text', 'type': 'local', 'category': 'embedding', 'status': 'fail', 'elapsed': 0, 'error': str(e)[:60]})
+
+                # 最终确认：ollama ps 中无大模型残留
+                try:
+                    _ps_resp = _hc_req.get("http://localhost:11434/api/ps", timeout=10)
+                    if _ps_resp.status_code == 200:
+                        _running = [mm['name'] for mm in _ps_resp.json().get('models', [])
+                                    if any(kw in mm['name'] for kw in ['qwen', 'deepseek', 'flux'])]
+                        if _running:
+                            hc_results.append({'label': '[系统] 残留大模型', 'type': 'local', 'category': 'system',
+                                'status': 'fail', 'elapsed': 0, 'error': f"ollama ps 残留: {', '.join(_running)}"})
+                except Exception:
+                    pass
 
                 st.session_state['_health_results'] = hc_results
             except Exception as e:

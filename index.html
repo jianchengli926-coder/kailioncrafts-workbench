@@ -967,6 +967,8 @@ function diagnoseOrphanData(){
     orphanArchives: [],
     orphanDrafts: [],
     orphanCommunications: [],
+    orphanKnowledgePacks: [],
+    orphanKnowledgePackBindings: [],
     summary: {total: 0}
   };
   const customers = S.customers || [];
@@ -976,12 +978,16 @@ function diagnoseOrphanData(){
   const followUps = S.campaignFollowUpTasks || [];
   const drafts = S.drafts || [];
   const communications = S.communications || [];
+  const knowledgeFacts = S.knowledgeFacts || [];
+  const knowledgePacks = S.knowledgePacks || [];
 
   const customerIds = new Set(customers.map(c=>c.id));
   const customerStableIds = new Set(customers.map(c=>c.stableId).filter(Boolean));
   const campaignIds = new Set(campaigns.map(c=>c.campaignId));
   const taskIds = new Set(tasks.map(t=>t.taskId));
   const archiveIds = new Set(archives.map(a=>a.archiveId));
+  const factIds = new Set(knowledgeFacts.map(f=>f.factId));
+  const packIds = new Set(knowledgePacks.map(p=>p.packId));
 
   // 1. orphan task: customer/campaign/archive 不存在
   for(const t of tasks){
@@ -1026,13 +1032,62 @@ function diagnoseOrphanData(){
     if(issues.length) report.orphanCommunications.push({commId: c.id, customerId: c.customerId, campaignTaskId: c.campaignTaskId, issues});
   }
 
+  // 6. orphan knowledge pack: 引用不存在 fact、frozen snapshot 缺失或 hash 不一致
+  for(const p of knowledgePacks){
+    const issues = [];
+    // a. Pack 引用不存在 fact
+    for(const fid of (p.allowedFactIds || [])){
+      if(!factIds.has(fid)) issues.push('fact_not_found:' + fid);
+    }
+    // b. approved Pack 的 frozen snapshot 缺失或 hash 不一致
+    if(p.status === 'approved'){
+      if(!p.frozenFactSnapshots || !Array.isArray(p.frozenFactSnapshots) || p.frozenFactSnapshots.length === 0){
+        issues.push('frozen_snapshot_missing');
+      }
+      if(!p.knowledgeSnapshotHash){
+        issues.push('snapshot_hash_missing');
+      }
+    }
+    if(issues.length) report.orphanKnowledgePacks.push({packId: p.packId, name: p.name, status: p.status, issues});
+  }
+
+  // 7. orphan knowledge pack binding: Campaign 引用不存在 Pack/version、锁定快照不一致、archived Pack 被新 Campaign 绑定
+  for(const c of campaigns){
+    if(!c.knowledgePackId) continue;
+    const issues = [];
+    const pack = knowledgePacks.find(p => p.packId === c.knowledgePackId);
+    // c. Campaign 引用不存在 Pack
+    if(!pack){ issues.push('pack_not_found:' + c.knowledgePackId); }
+    else {
+      // c. version 不匹配
+      if(c.knowledgePackVersion && pack.version !== c.knowledgePackVersion){
+        issues.push('version_mismatch:campaign=' + c.knowledgePackVersion + ',pack=' + pack.version);
+      }
+      // d. 锁定快照不一致
+      if(c.knowledgeSnapshotHash && pack.knowledgeSnapshotHash && c.knowledgeSnapshotHash !== pack.knowledgeSnapshotHash){
+        issues.push('snapshot_hash_mismatch');
+      }
+      // e. archived Pack 被新 Campaign 绑定（非历史绑定）
+      if(pack.status === 'archived' && c.knowledgeBoundAt){
+        const boundTime = new Date(c.knowledgeBoundAt).getTime();
+        const archivedTime = pack.archivedAt ? new Date(pack.archivedAt).getTime() : 0;
+        if(boundTime > archivedTime){
+          issues.push('archived_pack_bound_after_archive');
+        }
+      }
+    }
+    if(issues.length) report.orphanKnowledgePackBindings.push({campaignId: c.campaignId, packId: c.knowledgePackId, issues});
+  }
+
   report.summary = {
     orphanTasks: report.orphanTasks.length,
     orphanFollowUps: report.orphanFollowUps.length,
     orphanArchives: report.orphanArchives.length,
     orphanDrafts: report.orphanDrafts.length,
     orphanCommunications: report.orphanCommunications.length,
-    total: report.orphanTasks.length + report.orphanFollowUps.length + report.orphanArchives.length + report.orphanDrafts.length + report.orphanCommunications.length
+    orphanKnowledgePacks: report.orphanKnowledgePacks.length,
+    orphanKnowledgePackBindings: report.orphanKnowledgePackBindings.length,
+    total: report.orphanTasks.length + report.orphanFollowUps.length + report.orphanArchives.length + report.orphanDrafts.length + report.orphanCommunications.length + report.orphanKnowledgePacks.length + report.orphanKnowledgePackBindings.length
   };
   return report;
 }
@@ -1072,6 +1127,18 @@ function createCampaign(input){
   const validation = validateCampaignInput(input, null);
   if(!validation.valid){ return {success:false, errors: validation.errors}; }
   const now = new Date().toISOString();
+  // P2.1A: Knowledge Pack 绑定（仅 approved 且未归档）
+  let knowledgePackId = null, knowledgePackVersion = null, knowledgeSnapshotHash = null, knowledgeBoundAt = null, knowledgeBoundBy = null;
+  if(input.knowledgePackId){
+    const pack = (S.knowledgePacks || []).find(p => p.packId === input.knowledgePackId);
+    if(!pack){ return {success:false, errors:['Knowledge Pack 不存在: ' + input.knowledgePackId]}; }
+    if(pack.status !== 'approved'){ return {success:false, errors:['Knowledge Pack 状态为 ' + pack.status + '，仅 approved 可绑定']}; }
+    knowledgePackId = pack.packId;
+    knowledgePackVersion = pack.version;
+    knowledgeSnapshotHash = pack.knowledgeSnapshotHash || null;
+    knowledgeBoundAt = now;
+    knowledgeBoundBy = input.knowledgeBoundBy || input.owner || 'user';
+  }
   const campaign = {
     campaignId: 'camp_' + uid(),
     name: String(input.name).trim(),
@@ -1086,6 +1153,11 @@ function createCampaign(input){
     channels: ['email'],
     providerPolicy: CAMPAIGN_PROVIDER_POLICIES.includes(input.providerPolicy) ? input.providerPolicy : 'online_safe',
     icpVersionId: input.icpVersionId || null,
+    knowledgePackId: knowledgePackId,
+    knowledgePackVersion: knowledgePackVersion,
+    knowledgeSnapshotHash: knowledgeSnapshotHash,
+    knowledgeBoundAt: knowledgeBoundAt,
+    knowledgeBoundBy: knowledgeBoundBy,
     createdAt: now,
     updatedAt: now,
     startedAt: input.status === 'active' ? now : null,
@@ -3622,6 +3694,523 @@ function getCampaignTaskReplyEvidence(taskId){
 }
 
 /* ============================================================
+ * V79.0P2.1A Knowledge Pack 数据域：版本化事实、不可变冻结快照、Campaign 绑定、ICP 评估
+ * 所有写入复用快照+逆序补偿+dirty-write 补偿模式
+ * ============================================================ */
+
+const KNOWLEDGE_FACT_TYPES = ['product','company','market','testimonial','certification','factory_capability','sop'];
+const KNOWLEDGE_FACT_REVIEW_STATUSES = ['pending','confirmed','rejected','conflict'];
+const KNOWLEDGE_PACK_STATUSES = ['draft','approved','archived'];
+const KNOWLEDGE_HIGH_RISK_TYPES = ['certification','testimonial','factory_capability'];
+
+// 简单哈希（用于 snapshot hash，非加密用途）
+function _knowledgeSimpleHash(str){
+  let h = 0;
+  for(let i=0;i<str.length;i++){ h = ((h<<5)-h)+str.charCodeAt(i); h |= 0; }
+  return 'ksh_' + Math.abs(h).toString(36);
+}
+
+// 校验 fact 来源可复核
+function _validateFactSource(fact){
+  if(!fact.sourceDocument && !fact.sourceUrl && !fact.sourceLocator){
+    return {valid:false, error:'事实缺少可复核来源（sourceDocument/sourceUrl/sourceLocator 至少一项）'};
+  }
+  if(KNOWLEDGE_HIGH_RISK_TYPES.includes(fact.type) && !fact.claimSubject){
+    return {valid:false, error:'高风险事实类型 ' + fact.type + ' 必须指定 claimSubject'};
+  }
+  return {valid:true};
+}
+
+// 创建 Knowledge Fact
+function createKnowledgeFact(input){
+  input = input || {};
+  const errors = [];
+  if(!input.type || !KNOWLEDGE_FACT_TYPES.includes(input.type)) errors.push('type 非法');
+  if(!input.title || !String(input.title).trim()) errors.push('title 必填');
+  if(!input.content || !String(input.content).trim()) errors.push('content 必填');
+  if(!input.sourceType) errors.push('sourceType 必填');
+  if(errors.length) return {success:false, errors};
+  const now = new Date().toISOString();
+  // ai_summary 强制 pending
+  let reviewStatus = 'pending';
+  if(input.reviewStatus === 'confirmed' && input.sourceType !== 'ai_summary'){
+    // 允许直接创建 confirmed，但必须来源可复核
+    const srcCheck = _validateFactSource(input);
+    if(!srcCheck.valid) return {success:false, errors:[srcCheck.error]};
+    reviewStatus = 'confirmed';
+  }
+  const fact = {
+    factId: 'fact_' + uid(),
+    type: input.type,
+    title: String(input.title).trim(),
+    content: String(input.content).trim(),
+    sourceType: input.sourceType,
+    sourceDocument: input.sourceDocument || '',
+    sourceLocator: input.sourceLocator || '',
+    sourceExcerpt: input.sourceExcerpt || '',
+    sourceUrl: input.sourceUrl || '',
+    sourceHash: input.sourceHash || _knowledgeSimpleHash(String(input.content||'') + String(input.sourceDocument||'')),
+    sourceCapturedAt: input.sourceCapturedAt || now,
+    reviewStatus: reviewStatus,
+    reviewedBy: reviewStatus === 'confirmed' ? (input.reviewedBy || 'system') : null,
+    reviewedAt: reviewStatus === 'confirmed' ? now : null,
+    version: 1,
+    confidence: typeof input.confidence === 'number' ? Math.max(0, Math.min(100, input.confidence)) : 0,
+    claimSubject: input.claimSubject || '',
+    publicUseAllowed: input.publicUseAllowed === true,
+    tags: Array.isArray(input.tags) ? input.tags : [],
+    linkedProductCategories: Array.isArray(input.linkedProductCategories) ? input.linkedProductCategories : [],
+    createdAt: now,
+    updatedAt: now,
+    schemaVersion: 1
+  };
+  const snapshot = createKnowledgeSnapshot();
+  S.knowledgeFacts.unshift(fact);
+  const persist = safePersistKnowledgeData(snapshot, ['knowledgeFacts']);
+  if(!persist.success) return {success:false, errors:['持久化失败: ' + persist.error], compensationComplete: persist.compensationComplete};
+  return {success:true, fact};
+}
+
+// 审核 Knowledge Fact
+function reviewKnowledgeFact(factId, status, reviewer, note){
+  if(!KNOWLEDGE_FACT_REVIEW_STATUSES.includes(status)) return {success:false, errors:['reviewStatus 非法: ' + status]};
+  const fact = (S.knowledgeFacts || []).find(f => f.factId === factId);
+  if(!fact) return {success:false, errors:['事实不存在']};
+  if(status === 'confirmed'){
+    const srcCheck = _validateFactSource(fact);
+    if(!srcCheck.valid) return {success:false, errors:[srcCheck.error]};
+    if(fact.sourceType === 'ai_summary') return {success:false, errors:['ai_summary 来源不得直接 confirmed，需人工核实后重新创建']};
+  }
+  const snapshot = createKnowledgeSnapshot();
+  const oldStatus = fact.reviewStatus;
+  fact.reviewStatus = status;
+  fact.reviewedBy = reviewer || 'user';
+  fact.reviewedAt = new Date().toISOString();
+  fact.version = (fact.version || 1) + 1;
+  fact.updatedAt = new Date().toISOString();
+  if(note) fact.reviewNote = String(note).slice(0, 500);
+  const persist = safePersistKnowledgeData(snapshot, ['knowledgeFacts']);
+  if(!persist.success) return {success:false, errors:['持久化失败: ' + persist.error], compensationComplete: persist.compensationComplete};
+  return {success:true, fact, oldStatus};
+}
+
+// 更新 Knowledge Fact（confirmed 事实更新后 version+1，不影响已冻结的 pack snapshot）
+function updateKnowledgeFact(factId, patch){
+  const fact = (S.knowledgeFacts || []).find(f => f.factId === factId);
+  if(!fact) return {success:false, errors:['事实不存在']};
+  const snapshot = createKnowledgeSnapshot();
+  if(patch.title !== undefined) fact.title = String(patch.title).trim();
+  if(patch.content !== undefined) fact.content = String(patch.content).trim();
+  if(patch.sourceDocument !== undefined) fact.sourceDocument = patch.sourceDocument;
+  if(patch.sourceUrl !== undefined) fact.sourceUrl = patch.sourceUrl;
+  if(patch.sourceLocator !== undefined) fact.sourceLocator = patch.sourceLocator;
+  if(patch.sourceExcerpt !== undefined) fact.sourceExcerpt = patch.sourceExcerpt;
+  if(patch.claimSubject !== undefined) fact.claimSubject = patch.claimSubject;
+  if(patch.publicUseAllowed !== undefined) fact.publicUseAllowed = patch.publicUseAllowed === true;
+  if(patch.confidence !== undefined) fact.confidence = Math.max(0, Math.min(100, patch.confidence));
+  if(patch.tags !== undefined) fact.tags = Array.isArray(patch.tags) ? patch.tags : fact.tags;
+  if(patch.linkedProductCategories !== undefined) fact.linkedProductCategories = Array.isArray(patch.linkedProductCategories) ? patch.linkedProductCategories : fact.linkedProductCategories;
+  // 更新后重置为 pending（除非明确保持 confirmed 且来源仍可复核）
+  if(patch.keepConfirmed !== true){ fact.reviewStatus = 'pending'; fact.reviewedBy = null; fact.reviewedAt = null; }
+  fact.version = (fact.version || 1) + 1;
+  fact.updatedAt = new Date().toISOString();
+  fact.sourceHash = _knowledgeSimpleHash(String(fact.content||'') + String(fact.sourceDocument||''));
+  const persist = safePersistKnowledgeData(snapshot, ['knowledgeFacts']);
+  if(!persist.success) return {success:false, errors:['持久化失败: ' + persist.error], compensationComplete: persist.compensationComplete};
+  return {success:true, fact};
+}
+
+function getKnowledgeFactById(factId){
+  return (S.knowledgeFacts || []).find(f => f.factId === factId) || null;
+}
+
+function getConfirmedKnowledgeFacts(filters){
+  filters = filters || {};
+  return (S.knowledgeFacts || []).filter(f => {
+    if(f.reviewStatus !== 'confirmed') return false;
+    if(f.publicUseAllowed !== true && filters.requirePublicUse) return false;
+    if(filters.type && f.type !== filters.type) return false;
+    if(filters.productCategory && (!f.linkedProductCategories || !f.linkedProductCategories.includes(filters.productCategory))) return false;
+    return true;
+  });
+}
+
+// 校验 Pack 的 allowedFactIds 全部为 confirmed 且来源可复核
+function validatePackFacts(pack){
+  const errors = [];
+  const factIds = pack.allowedFactIds || [];
+  for(const fid of factIds){
+    const fact = getKnowledgeFactById(fid);
+    if(!fact){ errors.push('事实不存在: ' + fid); continue; }
+    if(fact.reviewStatus !== 'confirmed'){ errors.push('事实未确认: ' + fid + ' (' + fact.reviewStatus + ')'); continue; }
+    const srcCheck = _validateFactSource(fact);
+    if(!srcCheck.valid){ errors.push('事实 ' + fid + ' 来源不可复核: ' + srcCheck.error); }
+    if(fact.publicUseAllowed !== true){ errors.push('事实 ' + fid + ' 未标记 publicUseAllowed'); }
+  }
+  return {valid: errors.length === 0, errors};
+}
+
+// 生成冻结事实快照
+function _freezeFactSnapshots(factIds){
+  const snapshots = [];
+  for(const fid of factIds){
+    const fact = getKnowledgeFactById(fid);
+    if(!fact) continue;
+    snapshots.push({
+      factId: fact.factId,
+      version: fact.version,
+      title: fact.title,
+      content: fact.content,
+      sourceDocument: fact.sourceDocument,
+      sourceLocator: fact.sourceLocator,
+      sourceExcerpt: fact.sourceExcerpt,
+      sourceUrl: fact.sourceUrl,
+      sourceHash: fact.sourceHash,
+      reviewStatus: fact.reviewStatus,
+      capturedAt: fact.sourceCapturedAt || fact.updatedAt
+    });
+  }
+  return snapshots;
+}
+
+// 创建 Knowledge Pack
+function createKnowledgePack(input){
+  input = input || {};
+  const errors = [];
+  if(!input.name || !String(input.name).trim()) errors.push('name 必填');
+  if(errors.length) return {success:false, errors};
+  const now = new Date().toISOString();
+  const pack = {
+    packId: 'kpack_' + uid(),
+    name: String(input.name).trim(),
+    version: 1,
+    status: 'draft',
+    productScope: Array.isArray(input.productScope) ? input.productScope : [],
+    targetMarkets: Array.isArray(input.targetMarkets) ? input.targetMarkets : [],
+    buyerTypes: Array.isArray(input.buyerTypes) ? input.buyerTypes : [],
+    icpConditions: input.icpConditions || {minCompanySize:'', requiredChannels:[], decisionRoles:[]},
+    allowedFactIds: Array.isArray(input.allowedFactIds) ? input.allowedFactIds : [],
+    prohibitedClaimRules: Array.isArray(input.prohibitedClaimRules) ? input.prohibitedClaimRules : [],
+    exclusionRules: Array.isArray(input.exclusionRules) ? input.exclusionRules : [],
+    frozenFactSnapshots: [],
+    knowledgeSnapshotHash: null,
+    rootPackId: null,
+    previousPackVersion: null,
+    clonedFromPackId: null,
+    clonedFromVersion: null,
+    createdAt: now,
+    updatedAt: now,
+    approvedBy: null,
+    approvedAt: null,
+    archivedAt: null,
+    schemaVersion: 1
+  };
+  const snapshot = createKnowledgeSnapshot();
+  S.knowledgePacks.unshift(pack);
+  const persist = safePersistKnowledgeData(snapshot, ['knowledgePacks']);
+  if(!persist.success) return {success:false, errors:['持久化失败: ' + persist.error], compensationComplete: persist.compensationComplete};
+  return {success:true, pack};
+}
+
+// 更新 draft Pack
+function updateKnowledgePack(packId, patch){
+  const pack = (S.knowledgePacks || []).find(p => p.packId === packId);
+  if(!pack) return {success:false, errors:['Pack 不存在']};
+  if(pack.status !== 'draft') return {success:false, errors:['仅 draft 状态可编辑，当前为 ' + pack.status]};
+  const snapshot = createKnowledgeSnapshot();
+  if(patch.name !== undefined) pack.name = String(patch.name).trim();
+  if(patch.productScope !== undefined) pack.productScope = Array.isArray(patch.productScope) ? patch.productScope : [];
+  if(patch.targetMarkets !== undefined) pack.targetMarkets = Array.isArray(patch.targetMarkets) ? patch.targetMarkets : [];
+  if(patch.buyerTypes !== undefined) pack.buyerTypes = Array.isArray(patch.buyerTypes) ? patch.buyerTypes : [];
+  if(patch.icpConditions !== undefined) pack.icpConditions = patch.icpConditions || {};
+  if(patch.allowedFactIds !== undefined) pack.allowedFactIds = Array.isArray(patch.allowedFactIds) ? patch.allowedFactIds : [];
+  if(patch.prohibitedClaimRules !== undefined) pack.prohibitedClaimRules = Array.isArray(patch.prohibitedClaimRules) ? patch.prohibitedClaimRules : [];
+  if(patch.exclusionRules !== undefined) pack.exclusionRules = Array.isArray(patch.exclusionRules) ? patch.exclusionRules : [];
+  pack.updatedAt = new Date().toISOString();
+  const persist = safePersistKnowledgeData(snapshot, ['knowledgePacks']);
+  if(!persist.success) return {success:false, errors:['持久化失败: ' + persist.error], compensationComplete: persist.compensationComplete};
+  return {success:true, pack};
+}
+
+// 批准 Pack：冻结事实快照，计算 hash
+function approveKnowledgePack(packId, approver){
+  const pack = (S.knowledgePacks || []).find(p => p.packId === packId);
+  if(!pack) return {success:false, errors:['Pack 不存在']};
+  if(pack.status !== 'draft') return {success:false, errors:['仅 draft 可批准，当前为 ' + pack.status]};
+  const validation = validatePackFacts(pack);
+  if(!validation.valid) return {success:false, errors:['事实校验失败: ' + validation.errors.join('; ')]};
+  const snapshot = createKnowledgeSnapshot();
+  const now = new Date().toISOString();
+  pack.frozenFactSnapshots = _freezeFactSnapshots(pack.allowedFactIds);
+  pack.knowledgeSnapshotHash = _knowledgeSimpleHash(JSON.stringify(pack.frozenFactSnapshots) + '|v' + pack.version);
+  pack.status = 'approved';
+  pack.approvedBy = approver || 'user';
+  pack.approvedAt = now;
+  pack.updatedAt = now;
+  const persist = safePersistKnowledgeData(snapshot, ['knowledgePacks']);
+  if(!persist.success) return {success:false, errors:['持久化失败: ' + persist.error], compensationComplete: persist.compensationComplete};
+  return {success:true, pack};
+}
+
+// 归档 Pack
+function archiveKnowledgePack(packId){
+  const pack = (S.knowledgePacks || []).find(p => p.packId === packId);
+  if(!pack) return {success:false, errors:['Pack 不存在']};
+  if(pack.status === 'archived') return {success:true, pack};
+  const snapshot = createKnowledgeSnapshot();
+  pack.status = 'archived';
+  pack.archivedAt = new Date().toISOString();
+  pack.updatedAt = new Date().toISOString();
+  const persist = safePersistKnowledgeData(snapshot, ['knowledgePacks']);
+  if(!persist.success) return {success:false, errors:['持久化失败: ' + persist.error], compensationComplete: persist.compensationComplete};
+  return {success:true, pack};
+}
+
+// 创建下一版本（从 approved 复制为新 draft）
+function createNextKnowledgePackVersion(packId, actor){
+  const pack = (S.knowledgePacks || []).find(p => p.packId === packId);
+  if(!pack) return {success:false, errors:['Pack 不存在']};
+  if(pack.status !== 'approved') return {success:false, errors:['仅 approved 可创建下一版本，当前为 ' + pack.status]};
+  const now = new Date().toISOString();
+  const newPack = {
+    packId: 'kpack_' + uid(),
+    name: pack.name,
+    version: pack.version + 1,
+    status: 'draft',
+    productScope: JSON.parse(JSON.stringify(pack.productScope || [])),
+    targetMarkets: JSON.parse(JSON.stringify(pack.targetMarkets || [])),
+    buyerTypes: JSON.parse(JSON.stringify(pack.buyerTypes || [])),
+    icpConditions: JSON.parse(JSON.stringify(pack.icpConditions || {})),
+    allowedFactIds: JSON.parse(JSON.stringify(pack.allowedFactIds || [])),
+    prohibitedClaimRules: JSON.parse(JSON.stringify(pack.prohibitedClaimRules || [])),
+    exclusionRules: JSON.parse(JSON.stringify(pack.exclusionRules || [])),
+    frozenFactSnapshots: [],
+    knowledgeSnapshotHash: null,
+    rootPackId: pack.rootPackId || pack.packId,
+    previousPackVersion: pack.version,
+    clonedFromPackId: pack.packId,
+    clonedFromVersion: pack.version,
+    createdAt: now,
+    updatedAt: now,
+    approvedBy: null,
+    approvedAt: null,
+    archivedAt: null,
+    schemaVersion: 1
+  };
+  const snapshot = createKnowledgeSnapshot();
+  S.knowledgePacks.unshift(newPack);
+  const persist = safePersistKnowledgeData(snapshot, ['knowledgePacks']);
+  if(!persist.success) return {success:false, errors:['持久化失败: ' + persist.error], compensationComplete: persist.compensationComplete};
+  return {success:true, pack: newPack};
+}
+
+function getKnowledgePackById(packId){
+  return (S.knowledgePacks || []).find(p => p.packId === packId) || null;
+}
+
+function getApprovedKnowledgePacks(){
+  return (S.knowledgePacks || []).filter(p => p.status === 'approved');
+}
+
+// Campaign 绑定/换绑 Knowledge Pack（仅 draft Campaign）
+function bindKnowledgePackToCampaign(campaignId, packId, actor){
+  const campaign = getCampaignById(campaignId);
+  if(!campaign) return {success:false, errors:['Campaign 不存在']};
+  if(campaign.status !== 'draft') return {success:false, errors:['仅 draft Campaign 可绑定/换绑知识包，当前为 ' + campaign.status]};
+  if(packId){
+    const pack = getKnowledgePackById(packId);
+    if(!pack) return {success:false, errors:['Knowledge Pack 不存在']};
+    if(pack.status !== 'approved') return {success:false, errors:['仅 approved Pack 可绑定，当前为 ' + pack.status]};
+    if(pack.status === 'archived') return {success:false, errors:['archived Pack 不能被新 Campaign 绑定']};
+  }
+  const snapshot = createCampaignOperationSnapshot();
+  const now = new Date().toISOString();
+  if(packId){
+    const pack = getKnowledgePackById(packId);
+    campaign.knowledgePackId = pack.packId;
+    campaign.knowledgePackVersion = pack.version;
+    campaign.knowledgeSnapshotHash = pack.knowledgeSnapshotHash;
+    campaign.knowledgeBoundAt = now;
+    campaign.knowledgeBoundBy = actor || 'user';
+  } else {
+    campaign.knowledgePackId = null;
+    campaign.knowledgePackVersion = null;
+    campaign.knowledgeSnapshotHash = null;
+    campaign.knowledgeBoundAt = null;
+    campaign.knowledgeBoundBy = null;
+  }
+  campaign.updatedAt = now;
+  const persist = safePersistCampaignData(snapshot);
+  if(!persist.success) return {success:false, errors:['持久化失败: ' + persist.error]};
+  return {success:true, campaign};
+}
+
+// 获取 Campaign 绑定的 Pack 信息
+function getCampaignKnowledgePack(campaignId){
+  const campaign = getCampaignById(campaignId);
+  if(!campaign) return {success:false, errors:['Campaign 不存在']};
+  if(!campaign.knowledgePackId) return {success:true, pack:null, status:'historical_no_pack'};
+  const pack = getKnowledgePackById(campaign.knowledgePackId);
+  if(!pack) return {success:true, pack:null, status:'pack_not_found', boundVersion: campaign.knowledgePackVersion};
+  // 校验锁定快照一致性
+  const hashMatch = pack.knowledgeSnapshotHash === campaign.knowledgeSnapshotHash;
+  const versionMatch = pack.version === campaign.knowledgePackVersion;
+  return {
+    success:true,
+    pack: pack,
+    status: pack.status,
+    boundVersion: campaign.knowledgePackVersion,
+    snapshotHashMatch: hashMatch,
+    versionMatch: versionMatch,
+    boundAt: campaign.knowledgeBoundAt,
+    boundBy: campaign.knowledgeBoundBy
+  };
+}
+
+// ICP 评估（独立函数，不改变 evaluateCustomerForCampaign 合同）
+function evaluateCustomerIcp(customerId, packRef){
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer) return {success:false, errors:['客户不存在']};
+  let pack = null;
+  if(packRef && packRef.packId){
+    pack = getKnowledgePackById(packRef.packId);
+  }
+  const result = {
+    customerId: customerId,
+    packId: pack ? pack.packId : null,
+    packVersion: pack ? pack.version : null,
+    score: 0,
+    matchedRules: [],
+    missingEvidence: [],
+    riskFlags: [],
+    recommendedNextAction: '',
+    hardBlockers: []
+  };
+  if(!pack){
+    result.recommendedNextAction = '未绑定 Knowledge Pack，无法进行 ICP 评估';
+    return {success:true, evaluation: result};
+  }
+  let score = 0;
+  // 国家匹配
+  const customerCountry = (customer.country || '').toUpperCase();
+  if(pack.targetMarkets && pack.targetMarkets.length > 0){
+    const marketMatch = pack.targetMarkets.some(m => (m||'').toUpperCase() === customerCountry);
+    if(marketMatch){ score += 25; result.matchedRules.push({rule:'target_market', evidence:'客户国家 ' + customerCountry + ' 匹配目标市场'}); }
+    else { result.missingEvidence.push({rule:'target_market', reason:'客户国家 ' + customerCountry + ' 不在目标市场 ' + pack.targetMarkets.join(',')}); }
+  }
+  // 买家类型匹配
+  const customerType = customer.customerType || '';
+  if(pack.buyerTypes && pack.buyerTypes.length > 0){
+    const buyerMatch = pack.buyerTypes.some(b => customerType.indexOf(b) >= 0 || b.indexOf(customerType) >= 0);
+    if(buyerMatch){ score += 25; result.matchedRules.push({rule:'buyer_type', evidence:'客户类型 ' + customerType + ' 匹配买家类型'}); }
+    else { result.missingEvidence.push({rule:'buyer_type', reason:'客户类型 ' + customerType + ' 不在目标买家类型'}); }
+  }
+  // 产品品类匹配
+  const customerProducts = customer.products || customer.mainProducts || '';
+  if(pack.productScope && pack.productScope.length > 0){
+    const productMatch = pack.productScope.some(p => customerProducts.indexOf(p) >= 0);
+    if(productMatch){ score += 20; result.matchedRules.push({rule:'product_scope', evidence:'客户产品与目标品类相关'}); }
+    else { result.missingEvidence.push({rule:'product_scope', reason:'未发现客户产品与目标品类匹配'}); }
+  }
+  // 排除规则
+  if(pack.exclusionRules && pack.exclusionRules.length > 0){
+    for(const rule of pack.exclusionRules){
+      if(rule.type === 'country' && (rule.value||'').toUpperCase() === customerCountry){
+        result.riskFlags.push({type:'exclusion_country', severity:'high', reason:'客户国家在排除规则中: ' + rule.value});
+        score = Math.max(0, score - 30);
+      }
+      if(rule.type === 'keyword' && rule.value && (customer.company||'').indexOf(rule.value) >= 0){
+        result.riskFlags.push({type:'exclusion_keyword', severity:'medium', reason:'客户名称包含排除关键词: ' + rule.value});
+      }
+    }
+  }
+  // 公司规模
+  if(pack.icpConditions && pack.icpConditions.minCompanySize){
+    if(!customer.companySize) result.missingEvidence.push({rule:'company_size', reason:'缺少公司规模信息'});
+    else { score += 15; result.matchedRules.push({rule:'company_size', evidence:'客户规模 ' + customer.companySize}); }
+  }
+  // 来源证据
+  if(!customer.source && !customer.leadSource){ result.missingEvidence.push({rule:'source_evidence', reason:'缺少客户来源证据'}); }
+  else { score += 15; result.matchedRules.push({rule:'source_evidence', evidence:'客户来源: ' + (customer.source || customer.leadSource)}); }
+  result.score = Math.min(100, Math.max(0, score));
+  if(result.score >= 70 && result.riskFlags.length === 0) result.recommendedNextAction = '建议加入 Campaign，优先开发';
+  else if(result.score >= 40) result.recommendedNextAction = '补充缺失证据后再评估';
+  else result.recommendedNextAction = 'ICP 匹配度较低，建议优先开发高匹配客户';
+  return {success:true, evaluation: result};
+}
+
+// 组合输出：Campaign eligibility + ICP evaluation（ICP 不绕过 hard blocker）
+function getCampaignCustomerQualification(campaignId, customerId){
+  const eligibility = evaluateCustomerForCampaign(campaignId, customerId);
+  const packInfo = getCampaignKnowledgePack(campaignId);
+  let icpEvaluation = null;
+  if(packInfo.success && packInfo.pack){
+    const icpResult = evaluateCustomerIcp(customerId, {packId: packInfo.pack.packId});
+    if(icpResult.success) icpEvaluation = icpResult.evaluation;
+  }
+  return {
+    success: true,
+    campaignEligibility: eligibility,
+    icpEvaluation: icpEvaluation,
+    hardBlockers: eligibility.blockers || [],
+    eligible: eligibility.eligible === true,
+    note: 'ICP score 仅为建议，hardBlockers 优先级高于 score'
+  };
+}
+
+// Knowledge 快照
+function createKnowledgeSnapshot(){
+  return {
+    knowledgeFacts: JSON.parse(JSON.stringify(S.knowledgeFacts || [])),
+    knowledgePacks: JSON.parse(JSON.stringify(S.knowledgePacks || []))
+  };
+}
+
+// Knowledge 安全持久化（固定顺序，逆序补偿，dirty-write 补偿）
+function safePersistKnowledgeData(snapshot, changedKeys){
+  const allKeys = ['knowledgeFacts','knowledgePacks'];
+  const keysToSave = changedKeys || allKeys;
+  // 记录每个 key 的原始 localStorage 状态
+  const originalStorage = {};
+  for(const key of keysToSave){
+    try {
+      const raw = localStorage.getItem(DB_PREFIX + key);
+      originalStorage[key] = {exists: raw !== null, value: raw};
+    } catch(e){ originalStorage[key] = {exists:false, value:null}; }
+  }
+  const savedKeys = [];
+  for(const key of keysToSave){
+    try {
+      let data;
+      if(key === 'knowledgeFacts') data = S.knowledgeFacts;
+      else if(key === 'knowledgePacks') data = S.knowledgePacks;
+      else continue;
+      DB.save(key, data);
+      savedKeys.push(key);
+    } catch(e){
+      // dirty-write 补偿：先恢复当前失败 key，再逆序补偿已保存 key
+      const compensationErrors = [];
+      try {
+        if(!originalStorage[key].exists) DB.remove(key);
+        else DB.save(key, JSON.parse(originalStorage[key].value));
+      } catch(e3){ compensationErrors.push({key: key, error: e3.message}); }
+      for(let i = savedKeys.length - 1; i >= 0; i--){
+        const savedKey = savedKeys[i];
+        try {
+          if(!originalStorage[savedKey].exists) DB.remove(savedKey);
+          else DB.save(savedKey, JSON.parse(originalStorage[savedKey].value));
+        } catch(e2){ compensationErrors.push({key: savedKey, error: e2.message}); }
+      }
+      // 恢复内存
+      if(Array.isArray(snapshot.knowledgeFacts)) S.knowledgeFacts = JSON.parse(JSON.stringify(snapshot.knowledgeFacts));
+      if(Array.isArray(snapshot.knowledgePacks)) S.knowledgePacks = JSON.parse(JSON.stringify(snapshot.knowledgePacks));
+      return {success:false, error: key + ' 保存失败: ' + e.message, failedAt: key, compensationComplete: compensationErrors.length === 0, compensationErrors};
+    }
+  }
+  return {success:true, compensationComplete:true, compensationErrors:[]};
+}
+
+/* ============================================================
  * V79.0E2 Campaign 跟进任务 UI
  * 只调用 E1 数据层函数，不直接修改 S.* / CampaignTask / communication / follow-up
  * ============================================================ */
@@ -4463,7 +5052,7 @@ window.onunhandledrejection = function(event){
 console.log('%c✅ 全局错误处理已启用', 'color:#0f7b3f;font-weight:bold');
 
 /* ---------- 全局状态 ---------- */
-let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[], outreachKnowledgeBase:[], campaigns:[], campaignCustomerTasks:[], campaignFollowUpTasks:[] };
+let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[], outreachKnowledgeBase:[], campaigns:[], campaignCustomerTasks:[], campaignFollowUpTasks:[], knowledgeFacts:[], knowledgePacks:[] };
 function loadState(){
   S.customers = DB.load('customers') || [];
   S.plans = DB.load('plans') || [];
@@ -4486,6 +5075,8 @@ function loadState(){
   S.mailQueue = DB.load('mailQueue') || [];
   S.dataVersion = DB.load('dataVersion') || 1;
   S.companyFacts = DB.load('companyFacts') || {brandName:'',companyName:'',foundedYear:'',headquarters:'',businessModel:'',categories:[],skuCount:'',certifications:[],capacity:'',moq:'',leadTime:'',factories:[],exportCountries:'',website:'',verified:false};
+  S.knowledgeFacts = DB.load('knowledgeFacts') || [];
+  S.knowledgePacks = DB.load('knowledgePacks') || [];
 
   // 统一公司事实访问层（P1事实源统一）
   // 所有对外AI输出必须通过此入口取得公司事实；未确认的信息返回'待确认'
@@ -13902,7 +14493,7 @@ function saveSettings(){
 }
 function exportData(){
   const data = {};
-  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks'].forEach(k=>{ if(S[k]!==undefined) data[k]=S[k]; });
+  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','knowledgeFacts','knowledgePacks'].forEach(k=>{ if(S[k]!==undefined) data[k]=S[k]; });
   const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'kailion-ark-backup-'+todayStr()+'.json'; a.click();
@@ -13910,7 +14501,7 @@ function exportData(){
 }
 function resetData(){
   confirmDlg('将清空所有本地数据并重新注入演示数据，确定？', ()=>{
-    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','campaignSchemaVersion'].forEach(k=>DB.remove(k));
+    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','campaignSchemaVersion','knowledgeFacts','knowledgePacks'].forEach(k=>DB.remove(k));
     loadState(); seedData(); go('dashboard'); toast('已重置为演示数据');
   });
 }
@@ -24232,7 +24823,7 @@ function importBackup(){
         allKeys.forEach(k=>{ if(S[k] !== undefined) memorySnap[k] = JSON.parse(JSON.stringify(S[k])); });
 
         // 显式设置已知 S 属性
-        const sKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','orders','opportunities','followupTasks','customerIdentityMigration','campaignSchemaVersion'];
+        const sKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','orders','opportunities','followupTasks','customerIdentityMigration','campaignSchemaVersion','knowledgeFacts','knowledgePacks'];
         sKeys.forEach(k=>{ if(d[k] !== undefined) S[k] = d[k]; });
 
         // 恢复辅助
@@ -24289,7 +24880,7 @@ function clearAllData(){
   if(!confirm('再次确认：真的要清空所有数据吗？')) return;
 
   // V79.0P1 修复：快照 + 固定顺序删除 + 失败逆序恢复
-  const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','outreachKnowledgeBase'];
+  const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','outreachKnowledgeBase','knowledgeFacts','knowledgePacks'];
   const objectKeys = ['settings','customerIdentityMigration','campaignSchemaVersion'];
   const allKeys = arrayKeys.concat(objectKeys);
   const specialKeys = ['prospectLeads','prospectProfiles'];

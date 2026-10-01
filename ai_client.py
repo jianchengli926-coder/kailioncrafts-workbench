@@ -18,6 +18,7 @@ v5.0 新增：
 import json
 import time
 import base64
+import threading
 import requests
 from pathlib import Path
 from datetime import datetime
@@ -51,39 +52,43 @@ GLM_DOUBAO_SLOW_THRESHOLD = 30
 SLOW_RESPONSE_THRESHOLD = 15
 # 慢响应跟踪（model_id -> [最近响应时间列表]）
 _slow_response_tracker = {}
+# 保护 _slow_response_tracker 的并发读写
+_slow_tracker_lock = threading.Lock()
 
 
 def _is_slow_response(model_id, elapsed):
     """检查是否触发慢响应切换规则：单次>30秒或连续两次>15秒"""
-    if model_id not in _slow_response_tracker:
-        _slow_response_tracker[model_id] = []
-    tracker = _slow_response_tracker[model_id]
-    tracker.append(elapsed)
-    if len(tracker) > 5:
-        tracker.pop(0)
-    # 单次超过30秒
-    if elapsed > GLM_DOUBAO_SLOW_THRESHOLD:
-        return True
-    # 连续两次超过阈值
-    if len(tracker) >= 2 and tracker[-1] > SLOW_RESPONSE_THRESHOLD and tracker[-2] > SLOW_RESPONSE_THRESHOLD:
-        return True
-    return False
+    with _slow_tracker_lock:
+        if model_id not in _slow_response_tracker:
+            _slow_response_tracker[model_id] = []
+        tracker = _slow_response_tracker[model_id]
+        tracker.append(elapsed)
+        if len(tracker) > 5:
+            tracker.pop(0)
+        # 单次超过30秒
+        if elapsed > GLM_DOUBAO_SLOW_THRESHOLD:
+            return True
+        # 连续两次超过阈值
+        if len(tracker) >= 2 and tracker[-1] > SLOW_RESPONSE_THRESHOLD and tracker[-2] > SLOW_RESPONSE_THRESHOLD:
+            return True
+        return False
 
 
 def _is_model_slow_blocked(model_id):
     """查询模型是否被慢响应规则阻塞（不记录，只查询状态）"""
-    if model_id not in _slow_response_tracker:
+    with _slow_tracker_lock:
+        if model_id not in _slow_response_tracker:
+            return False
+        tracker = _slow_response_tracker[model_id]
+        if not tracker:
+            return False
+        # 最近一次超过30秒
+        if tracker[-1] > GLM_DOUBAO_SLOW_THRESHOLD:
+            return True
+        # 最近两次都超过15秒
+        if len(tracker) >= 2 and tracker[-1] > SLOW_RESPONSE_THRESHOLD and tracker[-2] > SLOW_RESPONSE_THRESHOLD:
+            return True
         return False
-    tracker = _slow_response_tracker[model_id]
-    if not tracker:
-        return False
-    # 最近一次超过30秒
-    if tracker[-1] > GLM_DOUBAO_SLOW_THRESHOLD:
-        return True
-    # 最近两次都超过15秒
-    if len(tracker) >= 2 and tracker[-1] > SLOW_RESPONSE_THRESHOLD and tracker[-2] > SLOW_RESPONSE_THRESHOLD:
-        return True
-    return False
 
 
 def _classify_error(exception, status_code=None):
@@ -661,6 +666,7 @@ class AIClient:
         failover_details = []
         content = None
         used_label = None
+        used_model = None
         last_error = None
         mode = "manual" if manual_model else "auto"
         local_lock_status = None
@@ -736,6 +742,7 @@ class AIClient:
 
                 if content and len(content.strip()) >= 2:
                     used_label = label
+                    used_model = model_info["api_model"]
                     health.set_status(model_id, HEALTH_AVAILABLE, elapsed=req_elapsed)
                     if idx > 0:
                         failover_log.append(f"视觉故障转移: {attempt_chain[0]['display_name']} -> {label}")
@@ -783,7 +790,7 @@ class AIClient:
             content=content,
             usage={},
             start_time=start_time,
-            used_model=model_info["api_model"] if content else None,
+            used_model=used_model,
             used_label=used_label,
             failover_log=failover_log,
             status="success" if content else "failed",

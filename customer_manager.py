@@ -130,7 +130,14 @@ class CustomerManager:
     def _load(self):
         try:
             return json.loads(CUSTOMERS_FILE.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as e:
+            import shutil, time
+            try:
+                backup = CUSTOMERS_FILE.with_suffix(f'.corrupt-{int(time.time())}.json')
+                shutil.copy2(CUSTOMERS_FILE, backup)
+                print(f"[customer_manager] 客户文件损坏，已备份到 {backup}: {e}", file=__import__('sys').stderr)
+            except Exception:
+                pass
             return []
 
     def _save(self, data):
@@ -357,7 +364,7 @@ class CustomerManager:
         today = datetime.now().strftime("%Y-%m-%d")
         data = self._load()
         return [c for c in data if c.get("next_follow_up", "") and c["next_follow_up"] < today
-                and c.get("status") not in ["已成交", "已流失"]]
+                and c.get("status") not in ["closed_won", "dnc", "invalid", "cold_storage", "已成交", "已流失"]]
 
     def get_statistics(self):
         """获取统计数据"""

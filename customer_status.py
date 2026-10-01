@@ -83,10 +83,10 @@ _VALID_TRANSITIONS: Dict[str, List[str]] = {
     "approved_outreach": ["sent", "cold_storage"],
     "sent": ["delivered", "replied", "cold_storage", "dnc", "invalid"],
     "delivered": ["replied", "in_communication", "cold_storage", "dnc", "invalid"],
-    "replied": ["in_communication", "cold_storage"],
-    "in_communication": ["quoted", "cold_storage"],
-    "quoted": ["sampling", "cold_storage"],
-    "sampling": ["closed_won", "cold_storage"],
+    "replied": ["in_communication", "cold_storage", "dnc", "invalid"],
+    "in_communication": ["quoted", "cold_storage", "dnc", "invalid"],
+    "quoted": ["sampling", "cold_storage", "dnc", "invalid"],
+    "sampling": ["closed_won", "cold_storage", "dnc", "invalid"],
     "closed_won": [],  # 终态
     "cold_storage": ["new_lead", "verified"],  # 可复活
     "dnc": [],  # 终态

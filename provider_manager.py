@@ -146,7 +146,14 @@ def delete_provider(provider_id):
     data = load_providers()
     data['providers'] = [p for p in data['providers'] if p['id'] != provider_id]
     if data.get('active_provider') == provider_id:
-        data['active_provider'] = data['providers'][0]['id'] if data['providers'] else None
+        # 优先切换到第一个未被禁用的供应商；若全部禁用则回退到第一个剩余供应商
+        fallback = next(
+            (p['id'] for p in data['providers'] if not p.get('disabled', False)),
+            None,
+        )
+        if fallback is None and data['providers']:
+            fallback = data['providers'][0]['id']
+        data['active_provider'] = fallback
     save_providers(data)
 
 

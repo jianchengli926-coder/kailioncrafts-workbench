@@ -327,6 +327,8 @@ Output format:
 
 def _parse_model_response(response_text: str) -> Dict:
     """解析模型响应，提取 subject, body, confirmed_claims 等"""
+    # 先剥离本地小模型可能内联写出的 <think>...</think> 思考内容
+    response_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL).strip()
     result = {
         'subject': '',
         'body': response_text,
@@ -366,7 +368,7 @@ def generate_content_draft(customer_id: str, draft_type: str,
                            language: str = 'en',
                            mode: str = 'standard',
                            created_by: str = "system",
-                           use_mock: bool = True,
+                           use_mock: bool = False,
                            website_evidence: Optional[Dict] = None,
                            auto_fetch_evidence: bool = False) -> Dict:
     """

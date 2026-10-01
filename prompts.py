@@ -137,7 +137,7 @@ COLD_EMAIL_PROMPT = """请为以下潜在客户写一封个性化的B2B开发信
 6. 语气：专业、自信、简洁，不卑不亢
 7. 字数：120-180词
 8. 不要用"Dear Sir/Madam"，用"Dear {Company} Team"或"Dear [FirstName]"
-9. 签名：Leo Li, Founder & CEO, KaiLionCrafts | WhatsApp: +86 132 5069 1884 | kailioncrafts.com
+9. 签名：Leo Li, Founder & CEO, KaiLionCrafts | WhatsApp: +86 134 2129 5360 | kailioncrafts.com
 
 输出格式：
 **主题行：** ...
@@ -414,8 +414,7 @@ TRANSLATION_PROMPT = """请将以下外贸内容翻译成{target_language}。
 3. 保持原文的语气和格式
 4. 不要直译，要地道表达
 
-输出：
-{translated_text}
+输出：直接给出译文，不要附加解释。
 """
 
 # ============ 独立站询盘回复Prompt ============

@@ -121,8 +121,9 @@ def _load_online_credentials():
                 "api_key": p.get("api_key", ""),
                 "name": p.get("name", pid),
             }
-    except Exception:
-        pass
+    except Exception as e:
+        import sys
+        print(f"[model_registry] 加载在线凭证失败: {e}", file=sys.stderr)
     return creds
 
 

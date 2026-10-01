@@ -1,10 +1,11 @@
 """飞书API连接模块"""
+import os
 import requests
 import json
 from pathlib import Path
 
-APP_ID = "cli_aa2c7e3b30b8dbd8"
-APP_SECRET = "aCf98A3ZoAf16ncmBhy8lbkBxYbUwJU6"
+APP_ID = os.getenv("FEISHU_APP_ID", "")
+APP_SECRET = os.getenv("FEISHU_APP_SECRET", "")
 BASE = "https://open.feishu.cn/open-apis"
 WORKBENCH_FOLDER_TOKEN = "GqPhfXFuwlFg6odSYCGc5oYsntB"
 WORKBENCH_FOLDER_URL = "https://ucnjqdvqgy2x.feishu.cn/drive/folder/GqPhfXFuwlFg6odSYCGc5oYsntB"
@@ -18,7 +19,10 @@ def get_token():
         return _token_cache["token"]
     r = requests.post(f"{BASE}/auth/v3/tenant_access_token/internal",
         json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10)
+    r.raise_for_status()
     data = r.json()
+    if data.get("code") != 0:
+        raise RuntimeError(f"飞书获取tenant_access_token失败: code={data.get('code')}, msg={data.get('msg')}")
     _token_cache["token"] = data["tenant_access_token"]
     _token_cache["expire"] = time.time() + data.get("expire", 7200)
     return _token_cache["token"]

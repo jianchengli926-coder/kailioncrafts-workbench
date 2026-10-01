@@ -505,12 +505,13 @@ DOUBAO_MODEL_LITE={model_lite if provider == "doubao" else "doubao-lite-32k"}
 
     # 更新当前运行时的配置
     global AI_PROVIDER, DOUBAO_API_KEY, DOUBAO_BASE_URL, DOUBAO_MODEL, DOUBAO_MODEL_LITE
-    global OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
+    global OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, OPENAI_MODEL_LITE
 
     AI_PROVIDER = provider
     OPENAI_API_KEY = api_key
     OPENAI_BASE_URL = base_url
     OPENAI_MODEL = model
+    OPENAI_MODEL_LITE = model_lite
 
     if provider == "doubao":
         DOUBAO_API_KEY = api_key

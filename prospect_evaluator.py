@@ -293,7 +293,7 @@ def check_dnc(customer_input: Dict) -> Dict:
                     continue
                 notes = (cust.get('notes', '') or '').lower()
                 status = (cust.get('status', '') or '').lower()
-                is_dnc = any(kw in notes or kw in status for kw in ['dnc', 'do not contact', '不联系', '拒绝', '退订', 'unsubscribe', 'opt-out', 'opt out'])
+                is_dnc = any(kw in notes or kw in status for kw in ['dnc', 'do not contact', '不联系', '拒绝联系', '退订', 'unsubscribe', 'opt-out', 'opt out'])
                 if is_dnc:
                     if (company_norm and _normalize_company_name(cust.get('company_name', '')) == company_norm) or \
                        (website_norm and _normalize_website(cust.get('website', '')) == website_norm):

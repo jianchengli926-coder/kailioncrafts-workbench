@@ -840,7 +840,7 @@ if page == "🏠 仪表盘":
                 (st.success if _ok else st.error)(_msg)
         with col_aibtn2:
             if st.button("⚙️ 进入模型管理", use_container_width=True, key="dash_goto_model"):
-                st.session_state['main_nav'] = "🤖 模型管理"
+                st.session_state["_show_model_mgmt"] = True
                 st.rerun()
     except Exception as _e:
         st.caption(f"AI状态加载中... ({_e})")
@@ -1126,7 +1126,7 @@ elif page == "🖥️ 独立站管理":
         try:
             if path.exists():
                 return _json.loads(path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, IOError):
+        except (_json.JSONDecodeError, IOError, ValueError):
             pass
         return []
 
@@ -3658,10 +3658,10 @@ EN: ...
 
 | 等级 | 客户数 | 占比 | 跟进频率 |
 |------|--------|------|----------|
-| A级（重点） | {grade_counts['A']} | {grade_counts['A']/total*100:.1f}% | 每周跟进 |
-| B级（潜在） | {grade_counts['B']} | {grade_counts['B']/total*100:.1f}% | 每两周跟进 |
-| C级（一般） | {grade_counts['C']} | {grade_counts['C']/total*100:.1f}% | 每月跟进一次 |
-| D级（无效） | {grade_counts['D']} | {grade_counts['D']/total*100:.1f}% | 暂时放弃 |
+| A级（重点） | {grade_counts['A']} | {(grade_counts['A']/total*100) if total else 0:.1f}% | 每周跟进 |
+| B级（潜在） | {grade_counts['B']} | {(grade_counts['B']/total*100) if total else 0:.1f}% | 每两周跟进 |
+| C级（一般） | {grade_counts['C']} | {(grade_counts['C']/total*100) if total else 0:.1f}% | 每月跟进一次 |
+| D级（无效） | {grade_counts['D']} | {(grade_counts['D']/total*100) if total else 0:.1f}% | 暂时放弃 |
 
 ---
 
@@ -3693,10 +3693,10 @@ EN: ...
                             prompt = f"""你是KaiLionCrafts外贸CRM分析师。请根据以下客户分层数据生成分析报告：
 ## 客户分层概览
 - 客户总数: {total}
-- A级（重点）: {grade_counts['A']}个 ({grade_counts['A']/total*100:.1f}%)
-- B级（潜在）: {grade_counts['B']}个 ({grade_counts['B']/total*100:.1f}%)
-- C级（一般）: {grade_counts['C']}个 ({grade_counts['C']/total*100:.1f}%)
-- D级（无效）: {grade_counts['D']}个 ({grade_counts['D']/total*100:.1f}%)
+- A级（重点）: {grade_counts['A']}个 ({(grade_counts['A']/total*100) if total else 0:.1f}%)
+- B级（潜在）: {grade_counts['B']}个 ({(grade_counts['B']/total*100) if total else 0:.1f}%)
+- C级（一般）: {grade_counts['C']}个 ({(grade_counts['C']/total*100) if total else 0:.1f}%)
+- D级（无效）: {grade_counts['D']}个 ({(grade_counts['D']/total*100) if total else 0:.1f}%)
 ## A级客户明细
 {a_text}
 ## 客户阶段分布
@@ -4245,6 +4245,8 @@ EN: ...
                             source_col = st.selectbox("来源列（可选）", ["（无）"] + list(df.columns))
 
                         # 确认导入
+                        success_count = 0
+                        skip_count = 0
                         if st.button("🚀 确认导入", type="primary", key="confirm_import"):
                             success_count = 0
                             skip_count = 0
@@ -4581,7 +4583,14 @@ elif page == "✉️ 开发信生成":
                 terminology=kb.get_terminology(),
             )
             result = ai.chat(prompt)
+            st.session_state['last_email_result'] = result
+            st.session_state['_last_cold_email_prompt'] = prompt
+            st.session_state['_last_cold_email_company'] = company_name
 
+    result = st.session_state.get('last_email_result', '')
+    company_name = st.session_state.get('_last_cold_email_company', company_name)
+
+    if result:
         st.markdown("---")
         st.subheader("📧 生成的开发信")
         st.markdown(f'<div class="email-box">{result}</div>', unsafe_allow_html=True)
@@ -4589,7 +4598,16 @@ elif page == "✉️ 开发信生成":
         col1, col2, col3 = st.columns(3)
         with col1:
             if st.button("🔄 重新生成", use_container_width=True):
-                st.rerun()
+                _p = st.session_state.get('_last_cold_email_prompt', '')
+                if _p:
+                    with st.spinner("AI正在重新撰写开发信..."):
+                        try:
+                            result = ai.chat(_p)
+                        except Exception as e:
+                            st.error(f"重新生成失败: {e}")
+                            result = st.session_state.get('last_email_result', '')
+                        st.session_state['last_email_result'] = result
+                    st.rerun()
         with col2:
             if st.button("📋 复制到剪贴板", use_container_width=True):
                 st.toast("已复制！（请手动选择文本复制）")
@@ -5802,6 +5820,7 @@ SKU格式：KL-品类-材质-款式号
         elif tool_id == 'line_art':
                 from PIL import Image, ImageOps, ImageFilter, ImageDraw, ImageEnhance
                 import numpy as np
+                import zipfile
     
                 # 高级深色头部
                 st.markdown("""
@@ -7747,6 +7766,7 @@ JPG文件（未匹配）：
                         st.warning("请填写产品名称")
                     else:
                         # 转base64
+                        import base64
                         _img_bytes = _style_img.getvalue()
                         _img_b64 = base64.b64encode(_img_bytes).decode()
                         _mime = _style_img.type or "image/png"
@@ -8486,8 +8506,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "t
         else:
             cat_en = category.split()[0]
             cat_cn = category.split()[1] if len(category.split()) > 1 else ""
-
-    prompt = f"""# KaiLionCrafts 产品SEO表格生成任务
+            prompt = f"""# KaiLionCrafts 产品SEO表格生成任务
 
 ## 任务概述
 你是KaiLionCrafts（阳江锴利国际贸易）的产品SEO分析师。请分析上传的产品图片，联网搜索竞品信息，结合公司知识库，生成完整的产品SEO表格。
@@ -8588,15 +8607,14 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "t
 6. 左上角预留产品图片位置
 
 请开始执行，确保信息真实准确。"""
-
-    st.session_state['seo_table_prompt'] = prompt
-    st.success("✅ 完整工作流Prompt已生成！")
+            st.session_state['seo_table_prompt'] = prompt
+            st.success("✅ 完整工作流Prompt已生成！")
 
     # 显示Prompt
     if 'seo_table_prompt' in st.session_state:
         st.markdown("#### 完整工作流Prompt（复制到豆包/Claude专家模式，上传图片执行）")
-    st.code(st.session_state['seo_table_prompt'], language=None)
-    st.info("💡 将此Prompt复制到豆包专家模式或Claude，上传产品图片，AI会自动识别+联网搜索+生成完整SEO表格")
+        st.code(st.session_state['seo_table_prompt'], language=None)
+        st.info("💡 将此Prompt复制到豆包专家模式或Claude，上传产品图片，AI会自动识别+联网搜索+生成完整SEO表格")
 
     st.markdown("---")
 
@@ -10593,7 +10611,7 @@ elif page == "👥 团队工作空间":
         st.markdown(f"📮 Gmail：[{contacts['gmail']}](mailto:{contacts['gmail']})")
     if contacts.get('whatsapp'):
         wa = contacts['whatsapp'].replace('+', '').replace(' ', '')
-    st.markdown(f"💬 WhatsApp：[+{wa}](https://wa.me/{wa})")
+        st.markdown(f"💬 WhatsApp：[+{wa}](https://wa.me/{wa})")
     if contacts.get('wechat'):
         st.markdown(f"💚 微信：{contacts['wechat']}")
     
@@ -10604,16 +10622,16 @@ elif page == "👥 团队工作空间":
     for platform, handle in social.items():
         if handle:
             icon_info = SOCIAL_MEDIA_ICONS.get(platform, {})
-        icon = icon_info.get('icon', '🔗')
-        name = icon_info.get('name', platform)
-        url_template = icon_info.get('url_template', '')
-        if url_template and 'mailto' not in url_template:
-            url = url_template.format(handle.replace('@', '').replace('mailto:', ''))
-            social_icons += f"[{icon}]({url}) "
-        elif 'mailto' in url_template:
-            social_icons += f"[{icon}](mailto:{handle}) "
-        else:
-            social_icons += f"{icon} "
+            icon = icon_info.get('icon', '🔗')
+            name = icon_info.get('name', platform)
+            url_template = icon_info.get('url_template', '')
+            if url_template and 'mailto' not in url_template:
+                url = url_template.format(handle.replace('@', '').replace('mailto:', ''))
+                social_icons += f"[{icon}]({url}) "
+            elif 'mailto' in url_template:
+                social_icons += f"[{icon}](mailto:{handle}) "
+            else:
+                social_icons += f"{icon} "
     st.markdown(social_icons)
     st.caption("点击图标跳转对应社交媒体主页（邮箱类点击直接发邮件）")
     
@@ -11446,33 +11464,38 @@ elif page == "📋 今日待办":
 
 格式：每行一条，用 | 分隔：任务内容 | 优先级 | 分类
 只输出待办列表，不要其他解释。"""
-                result = ai.chat(prompt, task_name="AI智能待办生成")
+                try:
+                    result = ai.chat(prompt, task_name="AI智能待办生成")
+                except Exception as e:
+                    st.error(f"AI生成失败: {e}")
+                    result = ""
                 
                 # 解析AI生成的待办
                 new_count = 0
-                for line in result.strip().split("\n"):
-                    line = line.strip()
-                    if not line or "|" not in line:
-                        continue
-                    parts = [p.strip() for p in line.split("|")]
-                    if len(parts) >= 2:
-                        task = parts[0].lstrip("0123456789.- ")
-                        priority = parts[1] if parts[1] in ["高","中","低"] else "中"
-                        category = parts[2] if len(parts) >= 3 and parts[2] in ["客户跟进","内容创作","订单处理","其他"] else "其他"
-                        todos.append({
-                            "task": task,
-                            "done": False,
-                            "date": today_str,
-                            "priority": priority,
-                            "category": category,
-                            "due_date": "",
-                            "created_at": today_str
-                        })
-                        new_count += 1
-                
-                _atomic_write_json(todo_file, todos)
-                st.success(f"✅ AI已生成 {new_count} 条待办")
-                st.rerun()
+                if result:
+                    for line in result.strip().split("\n"):
+                        line = line.strip()
+                        if not line or "|" not in line:
+                            continue
+                        parts = [p.strip() for p in line.split("|")]
+                        if len(parts) >= 2:
+                            task = parts[0].lstrip("0123456789.- ")
+                            priority = parts[1] if parts[1] in ["高","中","低"] else "中"
+                            category = parts[2] if len(parts) >= 3 and parts[2] in ["客户跟进","内容创作","订单处理","其他"] else "其他"
+                            todos.append({
+                                "task": task,
+                                "done": False,
+                                "date": today_str,
+                                "priority": priority,
+                                "category": category,
+                                "due_date": "",
+                                "created_at": today_str
+                            })
+                            new_count += 1
+
+                    _atomic_write_json(todo_file, todos)
+                    st.success(f"✅ AI已生成 {new_count} 条待办")
+                    st.rerun()
     
     # ===== 添加待办 =====
     st.subheader("➕ 添加待办")
@@ -12846,26 +12869,31 @@ Slug: ...
 （完整文章正文）
 """
         with st.spinner("AI正在读取知识库并生成SEO博客文章..."):
-            result = ai.chat(
-                prompt,
-                task_name=f"博客文章生成 - {g_title}",
-                knowledge_refs=[
-                    "17_博客文章与内容营销知识库",
-                    "公司知识库：KaiLionCrafts",
-                    "产品知识库：四大品类",
-                    "FAQ：客户痛点与卖点",
-                ]
-            )
-        st.markdown("##### ✨ 生成结果")
-        st.markdown(result)
-        st.download_button("📥 下载 .md", result, file_name=f"blog_{g_kw.replace(' ','_') or 'draft'}.md")
-        if ai.last_trace:
-            t = ai.last_trace
-            with st.expander("📜 本次生成Trace"):
-                st.write(f"模型：{t['model']} | 耗时：{t['elapsed_seconds']}s | Token：{t.get('total_tokens','N/A')}")
-                st.write("引用知识库：")
-                for ref in t.get("knowledge_refs", []):
-                    st.write(f"- {ref}")
+            try:
+                result = ai.chat(
+                    prompt,
+                    task_name=f"博客文章生成 - {g_title}",
+                    knowledge_refs=[
+                        "17_博客文章与内容营销知识库",
+                        "公司知识库：KaiLionCrafts",
+                        "产品知识库：四大品类",
+                        "FAQ：客户痛点与卖点",
+                    ]
+                )
+            except Exception as e:
+                st.error(f"AI生成失败: {e}")
+                result = ""
+        if result:
+            st.markdown("##### ✨ 生成结果")
+            st.markdown(result)
+            st.download_button("📥 下载 .md", result, file_name=f"blog_{g_kw.replace(' ','_') or 'draft'}.md")
+            if ai.last_trace:
+                t = ai.last_trace
+                with st.expander("📜 本次生成Trace"):
+                    st.write(f"模型：{t['model']} | 耗时：{t['elapsed_seconds']}s | Token：{t.get('total_tokens','N/A')}")
+                    st.write("引用知识库：")
+                    for ref in t.get("knowledge_refs", []):
+                        st.write(f"- {ref}")
 
 # ============ SEO策略规划（内容集群+技术SEO检查） ============
 elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "strategy":

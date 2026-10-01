@@ -392,15 +392,31 @@ class LocalModelManager:
             }
 
     def force_unload_all(self):
-        """强制卸载所有大模型（紧急清理用，不经过锁）"""
-        running = self._get_running_models()
-        for m in running:
-            if "embed" not in m.lower():
-                self._unload_model(m)
-        with self._lock:
-            self._active_model = None
-            self._active_since = None
-            self._preload_ok = False
+        """
+        强制卸载所有大模型（紧急清理用）。
+        先尝试获取全局锁（短超时）：若锁被占用说明有模型正在使用，
+        记录警告并跳过，避免卸载正在被请求使用的模型。
+        Returns:
+            bool: True=已执行清理；False=锁被占用已跳过
+        """
+        acquired = self._global_lock.acquire(timeout=5)
+        if not acquired:
+            self.last_error = "force_unload_all 跳过：全局锁被占用（有模型正在使用）"
+            print(f"[local_model_manager] {self.last_error}")
+            return False
+        try:
+            running = self._get_running_models()
+            for m in running:
+                if "embed" not in m.lower():
+                    self._unload_model(m)
+            with self._lock:
+                self._active_model = None
+                self._active_since = None
+                self._preload_ok = False
+                self._owned_models.clear()
+            return True
+        finally:
+            self._global_lock.release()
 
 
 # 全局单例

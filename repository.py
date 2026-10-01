@@ -123,6 +123,8 @@ class CustomerRepository:
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA busy_timeout = 5000")
         return conn
 
     # ------------------------------------------------------------------ #
@@ -1400,6 +1402,21 @@ class CustomerRepository:
         """
         conn = self._connect()
         try:
+            conn.execute(
+                "DELETE FROM evaluations WHERE customer_id IN "
+                "(SELECT customer_id FROM prospects WHERE migrated_at=?)",
+                (migrated_at,),
+            )
+            conn.execute(
+                "DELETE FROM outreach_drafts WHERE customer_id IN "
+                "(SELECT customer_id FROM prospects WHERE migrated_at=?)",
+                (migrated_at,),
+            )
+            conn.execute(
+                "DELETE FROM activity_log WHERE customer_id IN "
+                "(SELECT customer_id FROM prospects WHERE migrated_at=?)",
+                (migrated_at,),
+            )
             cur = conn.execute(
                 "DELETE FROM prospects WHERE migrated_at=?", (migrated_at,)
             )

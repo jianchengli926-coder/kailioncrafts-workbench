@@ -729,3 +729,523 @@ def import_selected_kb_files(file_paths: List[str], actor: str = "system") -> Di
         else:
             errors.append({'file': fp, 'errors': result['errors']})
     return {'success': len(errors) == 0, 'imported_fact_ids': imported, 'errors': errors}
+
+
+# ============ P1.2B: 知识库扫描、统计、增强导入和只读检索 ============
+
+KB_ROOT = Path(__file__).parent / "data" / "company_kb_v7"
+
+# 首批允许导入的分类
+ALLOWED_IMPORT_CATEGORIES = ['00', '01', '02', '03']
+
+# 产品品类映射（从目录名推断）
+PRODUCT_CATEGORY_MAP = {
+    '户外刀': 'outdoor_knives',
+    '厨房刀': 'kitchen_knives',
+    '工具刀': 'tool_knives',
+    '剪刀': 'scissors',
+    '刀剪': 'cutting_tools',
+}
+
+# 目标市场关键词映射
+MARKET_KEYWORDS = {
+    '美国': 'US', 'USA': 'US', '北美': 'North_America',
+    '欧洲': 'Europe', '欧盟': 'EU', '德国': 'DE', '英国': 'UK',
+    '日本': 'JP', '澳洲': 'AU', '澳大利亚': 'AU',
+    '东南亚': 'SEA', '中东': 'Middle_East',
+}
+
+# 买家类型关键词映射
+BUYER_TYPE_KEYWORDS = {
+    '批发商': 'wholesaler', 'distributor': 'distributor', '经销商': 'distributor',
+    '零售商': 'retailer', 'retailer': 'retailer',
+    '品牌商': 'brand_owner', 'brand': 'brand_owner',
+    '电商': 'ecommerce', 'Amazon': 'ecommerce', '亚马逊': 'ecommerce',
+    'OEM': 'oem_buyer', 'ODM': 'odm_buyer', '贴牌': 'oem_buyer',
+}
+
+
+def scan_kb_files(categories: Optional[List[str]] = None,
+                  include_subdirs: bool = True) -> Dict:
+    """扫描知识库 Markdown 文件，返回完整清单和分类统计"""
+    if not KB_ROOT.exists():
+        return {'success': False, 'errors': [f'知识库目录不存在: {KB_ROOT}']}
+
+    all_files = []
+    category_stats = {}
+
+    for cat_dir in sorted(KB_ROOT.iterdir()):
+        if not cat_dir.is_dir():
+            continue
+        cat_id = cat_dir.name.split('_')[0]
+        cat_name = cat_dir.name.split('_', 1)[1] if '_' in cat_dir.name else cat_dir.name
+
+        if categories and cat_id not in categories:
+            continue
+
+        files = []
+        if include_subdirs:
+            for f in cat_dir.rglob('*.md'):
+                files.append(f)
+        else:
+            for f in cat_dir.glob('*.md'):
+                files.append(f)
+
+        file_infos = []
+        for f in files:
+            try:
+                stat = f.stat()
+                content = f.read_text(encoding='utf-8', errors='ignore')
+                file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
+                # 提取标题
+                title = f.stem
+                for line in content.split('\n')[:10]:
+                    if line.startswith('#'):
+                        title = line.lstrip('#').strip()
+                        break
+                # 提取摘要（前200字符）
+                excerpt = content[:300].replace('\n', ' ').strip()
+                file_infos.append({
+                    'path': str(f),
+                    'relative_path': str(f.relative_to(KB_ROOT)),
+                    'filename': f.name,
+                    'category_id': cat_id,
+                    'category_name': cat_name,
+                    'title': title,
+                    'size': stat.st_size,
+                    'hash': file_hash,
+                    'excerpt': excerpt,
+                    'modified_at': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                })
+            except Exception as e:
+                file_infos.append({
+                    'path': str(f), 'filename': f.name,
+                    'category_id': cat_id, 'category_name': cat_name,
+                    'error': str(e),
+                })
+
+        all_files.extend(file_infos)
+        category_stats[cat_id] = {
+            'name': cat_name,
+            'file_count': len(file_infos),
+            'total_size': sum(fi.get('size', 0) for fi in file_infos),
+        }
+
+    return {
+        'success': True,
+        'total_files': len(all_files),
+        'categories': category_stats,
+        'files': all_files,
+    }
+
+
+def get_kb_categories_stats() -> Dict:
+    """获取知识库分类统计（只读，不扫描内容）"""
+    if not KB_ROOT.exists():
+        return {'success': False, 'errors': ['知识库目录不存在']}
+
+    stats = {}
+    for cat_dir in sorted(KB_ROOT.iterdir()):
+        if not cat_dir.is_dir():
+            continue
+        cat_id = cat_dir.name.split('_')[0]
+        cat_name = cat_dir.name.split('_', 1)[1] if '_' in cat_dir.name else cat_dir.name
+        md_files = list(cat_dir.rglob('*.md'))
+        stats[cat_id] = {
+            'name': cat_name,
+            'dir': cat_dir.name,
+            'file_count': len(md_files),
+            'allowed_import': cat_id in ALLOWED_IMPORT_CATEGORIES,
+        }
+    return {'success': True, 'categories': stats, 'total_categories': len(stats)}
+
+
+def get_fact_by_source_hash(source_hash: str) -> Optional[Dict]:
+    """按 source_hash 查找事实（用于重复检测）"""
+    init_db()
+    c = _conn()
+    row = c.execute("SELECT * FROM knowledge_facts WHERE source_hash=?", (source_hash,)).fetchone()
+    c.close()
+    return _row_to_fact(row) if row else None
+
+
+def detect_duplicates(file_paths: List[str]) -> Dict:
+    """检测文件内容重复：与已有事实对比，以及文件之间对比"""
+    init_db()
+    results = []
+    file_hashes = {}
+
+    for fp in file_paths:
+        p = Path(fp)
+        if not p.exists():
+            results.append({'file': fp, 'status': 'error', 'reason': '文件不存在'})
+            continue
+        content = p.read_text(encoding='utf-8', errors='ignore')
+        fhash = hashlib.md5(content.encode('utf-8')).hexdigest()
+
+        # 检查与已有事实重复
+        existing = get_fact_by_source_hash(fhash)
+        if existing:
+            results.append({
+                'file': fp, 'hash': fhash, 'status': 'duplicate_existing',
+                'existing_fact_id': existing['fact_id'],
+                'existing_title': existing['title'],
+            })
+        # 检查与本次其他文件重复
+        elif fhash in file_hashes:
+            results.append({
+                'file': fp, 'hash': fhash, 'status': 'duplicate_in_batch',
+                'duplicate_of': file_hashes[fhash],
+            })
+        else:
+            file_hashes[fhash] = fp
+            results.append({'file': fp, 'hash': fhash, 'status': 'new'})
+
+    return {'success': True, 'results': results,
+            'new_count': sum(1 for r in results if r['status'] == 'new'),
+            'duplicate_count': sum(1 for r in results if r['status'] != 'new')}
+
+
+def detect_conflicts(file_paths: List[str]) -> Dict:
+    """检测内容冲突：同标题但内容不同，或同来源但 hash 不同"""
+    init_db()
+    conflicts = []
+    file_titles = {}
+
+    for fp in file_paths:
+        p = Path(fp)
+        if not p.exists():
+            continue
+        content = p.read_text(encoding='utf-8', errors='ignore')
+        title = p.stem
+        for line in content.split('\n')[:10]:
+            if line.startswith('#'):
+                title = line.lstrip('#').strip()
+                break
+
+        # 检查同标题已有事实
+        c = _conn()
+        existing = c.execute("SELECT fact_id, title, source_hash FROM knowledge_facts WHERE title=?", (title,)).fetchall()
+        c.close()
+
+        for row in existing:
+            new_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
+            if row['source_hash'] != new_hash:
+                conflicts.append({
+                    'file': fp, 'title': title, 'type': 'title_content_mismatch',
+                    'existing_fact_id': row['fact_id'],
+                    'existing_hash': row['source_hash'],
+                    'new_hash': new_hash,
+                })
+
+        # 检查本次批次内同标题
+        if title in file_titles:
+            conflicts.append({
+                'file': fp, 'title': title, 'type': 'duplicate_title_in_batch',
+                'duplicate_of': file_titles[title],
+            })
+        else:
+            file_titles[title] = fp
+
+    return {'success': True, 'conflicts': conflicts, 'conflict_count': len(conflicts)}
+
+
+def import_kb_dry_run_enhanced(file_paths: List[str],
+                               detect_dup: bool = True,
+                               detect_conf: bool = True) -> Dict:
+    """增强版 dry-run：包含重复检测、冲突检测、来源元数据"""
+    results = []
+    all_conflicts = []
+
+    # 先做重复和冲突检测
+    if detect_dup:
+        dup_result = detect_duplicates(file_paths)
+        dup_map = {r['file']: r for r in dup_result['results']}
+    else:
+        dup_map = {}
+
+    if detect_conf:
+        conf_result = detect_conflicts(file_paths)
+        conf_map = {}
+        for c in conf_result['conflicts']:
+            conf_map.setdefault(c['file'], []).append(c)
+    else:
+        conf_map = {}
+
+    for fp in file_paths:
+        p = Path(fp)
+        if not p.exists():
+            all_conflicts.append({'file': fp, 'error': '文件不存在'})
+            continue
+
+        try:
+            content = p.read_text(encoding='utf-8', errors='ignore')
+            content_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
+
+            title = p.stem
+            for line in content.split('\n')[:10]:
+                if line.startswith('#'):
+                    title = line.lstrip('#').strip()
+                    break
+
+            excerpt = content[:500].replace('\n', ' ').strip()
+
+            # 推断产品品类
+            product_categories = []
+            for keyword, cat in PRODUCT_CATEGORY_MAP.items():
+                if keyword in title or keyword in content[:1000]:
+                    product_categories.append(cat)
+
+            # 推断目标市场
+            target_markets = []
+            for keyword, market in MARKET_KEYWORDS.items():
+                if keyword in title or keyword in content[:2000]:
+                    if market not in target_markets:
+                        target_markets.append(market)
+
+            # 推断买家类型
+            buyer_types = []
+            for keyword, btype in BUYER_TYPE_KEYWORDS.items():
+                if keyword in title or keyword in content[:2000]:
+                    if btype not in buyer_types:
+                        buyer_types.append(btype)
+
+            fact_preview = {
+                'title': title,
+                'content': content[:2000],
+                'source_type': 'document',
+                'source_document': str(p),
+                'source_locator': p.name,
+                'source_excerpt': excerpt,
+                'source_hash': content_hash,
+                'source_captured_at': _now(),
+                'review_status': 'pending',
+                'public_use_allowed': False,
+                'inferred_product_categories': product_categories,
+                'inferred_target_markets': target_markets,
+                'inferred_buyer_types': buyer_types,
+                'duplicate_status': dup_map.get(fp, {}).get('status', 'not_checked'),
+                'conflict_count': len(conf_map.get(fp, [])),
+            }
+
+            if fp in dup_map and dup_map[fp]['status'] != 'new':
+                fact_preview['duplicate_info'] = dup_map[fp]
+            if fp in conf_map:
+                fact_preview['conflicts'] = conf_map[fp]
+
+            results.append(fact_preview)
+        except Exception as e:
+            all_conflicts.append({'file': fp, 'error': str(e)})
+
+    return {
+        'success': True,
+        'preview': results,
+        'conflicts': all_conflicts,
+        'will_import_count': sum(1 for r in results if r['duplicate_status'] == 'new' and r['conflict_count'] == 0),
+        'duplicate_count': sum(1 for r in results if r['duplicate_status'] != 'new'),
+        'conflict_file_count': sum(1 for r in results if r['conflict_count'] > 0),
+    }
+
+
+def import_selected_kb_files_enhanced(file_paths: List[str],
+                                      actor: str = "system",
+                                      skip_duplicates: bool = True,
+                                      skip_conflicts: bool = True) -> Dict:
+    """增强版导入：保留完整元数据，支持跳过重复和冲突"""
+    # 先做 dry-run 检查
+    dry_run = import_kb_dry_run_enhanced(file_paths)
+    imported = []
+    skipped = []
+    errors = []
+
+    for item in dry_run['preview']:
+        fp = item['source_document']
+
+        if skip_duplicates and item['duplicate_status'] != 'new':
+            skipped.append({'file': fp, 'reason': 'duplicate', 'info': item.get('duplicate_info')})
+            continue
+
+        if skip_conflicts and item['conflict_count'] > 0:
+            skipped.append({'file': fp, 'reason': 'conflict', 'conflicts': item.get('conflicts')})
+            continue
+
+        result = create_knowledge_fact({
+            'title': item['title'],
+            'content': item['content'],
+            'source_type': 'document',
+            'source_document': item['source_document'],
+            'source_locator': item['source_locator'],
+            'source_excerpt': item['source_excerpt'],
+            'source_hash': item['source_hash'],
+            'source_captured_at': item['source_captured_at'],
+            'tags': item.get('inferred_buyer_types', []),
+            'linked_product_categories': item.get('inferred_product_categories', []),
+        })
+        if result['success']:
+            imported.append(result['fact']['fact_id'])
+        else:
+            errors.append({'file': fp, 'errors': result['errors']})
+
+    return {
+        'success': len(errors) == 0,
+        'imported_fact_ids': imported,
+        'imported_count': len(imported),
+        'skipped': skipped,
+        'skipped_count': len(skipped),
+        'errors': errors,
+    }
+
+
+def search_knowledge_facts_enhanced(query: str = "",
+                                    product_category: Optional[str] = None,
+                                    target_market: Optional[str] = None,
+                                    buyer_type: Optional[str] = None,
+                                    status: Optional[str] = None,
+                                    public_only: bool = False,
+                                    fact_type: Optional[str] = None,
+                                    limit: int = 50) -> Dict:
+    """增强检索：按关键词、产品品类、目标市场、买家类型、状态、公开权限筛选"""
+    init_db()
+    c = _conn()
+
+    sql = "SELECT * FROM knowledge_facts WHERE 1=1"
+    params = []
+
+    if query:
+        sql += " AND (title LIKE ? OR content LIKE ? OR tags LIKE ? OR source_document LIKE ?)"
+        params.extend([f"%{query}%"] * 4)
+
+    if product_category:
+        sql += " AND linked_product_categories LIKE ?"
+        params.append(f"%{product_category}%")
+
+    if buyer_type:
+        sql += " AND tags LIKE ?"
+        params.append(f"%{buyer_type}%")
+
+    if status:
+        sql += " AND review_status=?"
+        params.append(status)
+
+    if fact_type:
+        sql += " AND type=?"
+        params.append(fact_type)
+
+    if public_only:
+        sql += " AND public_use_allowed=1 AND review_status='confirmed'"
+
+    sql += " ORDER BY updated_at DESC LIMIT ?"
+    params.append(limit)
+
+    rows = c.execute(sql, params).fetchall()
+    c.close()
+
+    facts = [_row_to_fact(r) for r in rows]
+
+    # 目标市场过滤（在内容中搜索市场关键词）
+    if target_market:
+        filtered = []
+        for f in facts:
+            if target_market.lower() in f.get('content', '').lower() or \
+               target_market.lower() in f.get('title', '').lower():
+                filtered.append(f)
+        facts = filtered
+
+    return {
+        'success': True,
+        'results': facts,
+        'total': len(facts),
+        'filters': {
+            'query': query, 'product_category': product_category,
+            'target_market': target_market, 'buyer_type': buyer_type,
+            'status': status, 'public_only': public_only, 'fact_type': fact_type,
+        },
+    }
+
+
+def get_public_facts(limit: int = 100) -> Dict:
+    """获取所有可对外使用的事实（confirmed + public_use_allowed=true）"""
+    facts = list_knowledge_facts(public_only=True, limit=limit)
+    return {
+        'success': True,
+        'facts': facts,
+        'total': len(facts),
+        'note': '仅返回 confirmed 且 public_use_allowed=true 的事实',
+    }
+
+
+def get_fact_source_trace(fact_id: str) -> Dict:
+    """获取事实的完整来源追溯信息"""
+    fact = get_knowledge_fact(fact_id)
+    if not fact:
+        return {'success': False, 'errors': ['事实不存在']}
+
+    trace = {
+        'fact_id': fact['fact_id'],
+        'title': fact['title'],
+        'review_status': fact['review_status'],
+        'public_use_allowed': fact['public_use_allowed'],
+        'source': {
+            'type': fact.get('source_type'),
+            'document': fact.get('source_document'),
+            'locator': fact.get('source_locator'),
+            'excerpt': fact.get('source_excerpt'),
+            'url': fact.get('source_url'),
+            'hash': fact.get('source_hash'),
+            'captured_at': fact.get('source_captured_at'),
+        },
+        'review': {
+            'reviewed_by': fact.get('reviewed_by'),
+            'reviewed_at': fact.get('reviewed_at'),
+            'notes': fact.get('review_notes'),
+        },
+        'version': fact['version'],
+        'confidence': fact.get('confidence'),
+        'claim_subject': fact.get('claim_subject'),
+    }
+
+    # 验证来源可复核性
+    source_verifiable = (
+        (fact.get('source_url') and _safe_url(fact['source_url'])) or
+        (fact.get('source_document') and fact.get('source_locator')) or
+        fact.get('source_hash')
+    )
+    trace['source_verifiable'] = bool(source_verifiable)
+
+    return {'success': True, 'trace': trace}
+
+
+def get_kb_import_readiness_report() -> Dict:
+    """知识库导入就绪报告：统计可导入、已导入、重复、冲突"""
+    init_db()
+
+    # 扫描所有文件
+    scan_result = scan_kb_files(categories=ALLOWED_IMPORT_CATEGORIES)
+    if not scan_result['success']:
+        return scan_result
+
+    all_files = scan_result['files']
+    total_files = len(all_files)
+
+    # 检查已导入
+    c = _conn()
+    imported_count = c.execute("SELECT COUNT(*) as cnt FROM knowledge_facts WHERE source_type='document'").fetchone()['cnt']
+    c.close()
+
+    # 检测重复（抽样前100个避免太慢）
+    sample_files = [f['path'] for f in all_files[:100]]
+    dup_result = detect_duplicates(sample_files)
+
+    return {
+        'success': True,
+        'allowed_categories': ALLOWED_IMPORT_CATEGORIES,
+        'total_files_in_allowed_categories': total_files,
+        'already_imported': imported_count,
+        'sample_duplicate_check': {
+            'sample_size': len(sample_files),
+            'new': dup_result['new_count'],
+            'duplicates': dup_result['duplicate_count'],
+        },
+        'categories': scan_result['categories'],
+        'recommendation': f'可导入 {total_files} 个文件，建议分批导入并人工审核',
+    }

@@ -28,20 +28,20 @@ def _p_preload():
     r = MagicMock(); r.status_code = 200; r.json.return_value = {"message": {"content": "hi"}, "eval_count": 1}; return r
 
 class T1Chain(unittest.TestCase):
-    def test_4models(self): self.assertEqual(len(get_text_chain()), 4)
+    def test_7models(self): self.assertEqual(len(get_text_chain()), 7)
     def test_order(self):
         ids = [m['id'] for m in get_text_chain()]
-        self.assertEqual(ids, ['glm-4.7-flash','glm-4-flash','qwen3.5:9b','qwen2.5:7b'])
-    def test_no_doubao(self): self.assertNotIn('doubao-seed-2-1-turbo', [m['id'] for m in get_text_chain()])
-    def test_no_deepseek(self): self.assertNotIn('deepseek-r1:7b', [m['id'] for m in get_text_chain()])
-    def test_no_qwen25vl(self): self.assertNotIn('qwen2.5vl:7b', [m['id'] for m in get_text_chain()])
+        self.assertEqual(ids, ['glm-4.7-flash','glm-4-flash','doubao-seed-2-1-turbo','qwen3.5:9b','deepseek-r1:7b','qwen2.5:7b','qwen2.5vl:7b'])
+    def test_has_doubao(self): self.assertIn('doubao-seed-2-1-turbo', [m['id'] for m in get_text_chain()])
+    def test_has_deepseek(self): self.assertIn('deepseek-r1:7b', [m['id'] for m in get_text_chain()])
+    def test_has_qwen25vl(self): self.assertIn('qwen2.5vl:7b', [m['id'] for m in get_text_chain()])
     def test_qwen35_first_local(self):
         ids = [m['id'] for m in get_text_chain()]
         local_ids = [m for m in ids if ':' in m]
         self.assertEqual(local_ids[0], 'qwen3.5:9b')
-    def test_local2(self):
+    def test_local4(self):
         ids = [m['id'] for m in get_local_text_chain()]
-        self.assertEqual(ids, ['qwen3.5:9b','qwen2.5:7b'])
+        self.assertEqual(ids, ['qwen3.5:9b','deepseek-r1:7b','qwen2.5:7b','qwen2.5vl:7b'])
 
 class T1RegistryDetail(unittest.TestCase):
     """恢复 f2053c1 的模型注册表详细测试"""
@@ -623,24 +623,31 @@ class TP14LocalOwnershipExtended(unittest.TestCase):
         local_model_manager._active_model = None
         local_model_manager._owned_models = set()
         local_model_manager._preload_ok = False
+    @patch('local_model_manager.time.sleep')
     @patch('local_model_manager.requests.get')
     @patch('local_model_manager.requests.post')
-    def test_external_other_model_not_unloaded(self, mp, mg):
+    def test_external_other_model_not_unloaded(self, mp, mg, ms):
         """外部程序加载了其他模型，工作台不会卸载它"""
         mg.return_value = MagicMock(status_code=200, json=lambda:{"models":[{"name":"ext-other:7b"}]})
         mp.return_value = _p_ok()
-        with patch('local_model_manager.OLLAMA_EXTERNAL_WAIT_MAX', 2):
+        with patch('local_model_manager.OLLAMA_EXTERNAL_WAIT_MAX', 1):
             ok = local_model_manager.acquire("qwen3.5:9b", timeout=5)
         self.assertFalse(ok)
         # 确认没有发送keep_alive:0卸载外部模型
         unload_calls = [c for c in mp.call_args_list if c.kwargs.get('json',{}).get('keep_alive') == 0]
         self.assertEqual(len(unload_calls), 0)
-    @patch('local_model_manager.requests.get')
     @patch('local_model_manager.requests.post')
-    def test_owned_model_unloaded_on_release(self, mp, mg):
+    @patch('local_model_manager.requests.get')
+    def test_owned_model_unloaded_on_release(self, mg, mp):
         """工作台自己加载的模型，release时正常卸载"""
-        mg.return_value = MagicMock(status_code=200, json=lambda:{"models":[]})
-        mp.return_value = _p_ok()
+        seq = [{"models":[]}, {"models":[]}, {"models":[{"name":"qwen3.5:9b"}]}, {"models":[]}]
+        idx = [0]
+        def pse(u, **k):
+            r = MagicMock(); r.status_code = 200
+            r.json.return_value = seq[idx[0]] if idx[0] < len(seq) else {"models":[]}
+            idx[0] += 1; return r
+        mg.side_effect = pse
+        mp.return_value = _p_preload()
         ok = local_model_manager.acquire("qwen3.5:9b", timeout=10)
         self.assertTrue(ok)
         self.assertIn("qwen3.5:9b", local_model_manager._owned_models)

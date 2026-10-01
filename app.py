@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 import io
 import os
 import base64
+import hashlib
 import json as _json
 
 from config import (
@@ -342,6 +343,7 @@ with st.sidebar:
         # 市场部 -> 已并入公司知识库
         # 知识部
         "📚 公司知识库",
+        "🎯 精准客户开发",
         # 飞书协同已并入公司知识库
         # 管理
         "⚙️ 设置中心",
@@ -9712,6 +9714,231 @@ elif page == "📚 公司知识库":
                             st.warning(f"飞书返回：{r.get('msg')}（可能缺 docx 权限 / folder token）")
                     except Exception as e:
                         st.error(f"创建失败：{e}")
+
+elif page == "🎯 精准客户开发":
+    st.title("🎯 精准客户开发")
+    st.caption("知识库驱动的客户评估与内容草稿生成 · 所有内容需人工审核，禁止自动发送")
+
+    # 导入 P1.2 模块
+    try:
+        import knowledge_facts as kf
+        import prospect_evaluator as pe
+        import content_draft_generator as cdg
+        kf.init_db()
+        pe.init_db()
+        cdg.init_db()
+    except Exception as e:
+        st.error(f"模块加载失败: {e}")
+        st.stop()
+
+    # 子页面 Tab
+    tab_eval, tab_draft, tab_pack = st.tabs(["📊 客户评估", "✉️ 内容草稿", "📦 知识包管理"])
+
+    with tab_eval:
+        st.subheader("客户 ICP 评估")
+        with st.form("customer_eval_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                company_name = st.text_input("公司名称 *", key="eval_company")
+                website = st.text_input("网站 *", key="eval_website")
+                country = st.text_input("国家/地区", key="eval_country")
+                buyer_type = st.selectbox("买家类型", ["wholesaler", "distributor", "retailer", "brand_owner", "ecommerce", "oem_buyer", "odm_buyer", "unknown"], key="eval_buyer")
+            with col2:
+                product_categories = st.text_input("产品类别（逗号分隔）", key="eval_products")
+                main_products = st.text_input("主营产品", key="eval_main_products")
+                source_document = st.text_input("来源文件", key="eval_source_doc")
+                source_url = st.text_input("来源 URL", key="eval_source_url")
+
+            # Knowledge Pack 选择
+            packs = kf.list_knowledge_packs(status='approved')
+            pack_options = {f"{p['name']} v{p['version']}": p['pack_id'] for p in packs}
+            pack_options["（无 Pack - 仅内部评估）"] = None
+            selected_pack = st.selectbox("Knowledge Pack（仅 approved 可选）", list(pack_options.keys()), key="eval_pack")
+
+            submitted = st.form_submit_button("开始评估", use_container_width=True)
+
+        if submitted:
+            if not company_name or not website:
+                st.error("公司名称和网站为必填项")
+            else:
+                customer_id = f"cust_{company_name.lower().replace(' ', '_')[:20]}_{hashlib.md5(company_name.encode()).hexdigest()[:6]}"
+                pack_ref = {'pack_id': pack_options[selected_pack]} if pack_options[selected_pack] else None
+
+                with st.spinner("正在评估客户..."):
+                    result = pe.evaluate_customer_icp({
+                        'customer_id': customer_id,
+                        'company_name': company_name,
+                        'website': website,
+                        'country': country,
+                        'buyer_type': buyer_type,
+                        'product_categories': [p.strip() for p in product_categories.split(',') if p.strip()] if product_categories else [],
+                        'main_products': main_products,
+                        'source_document': source_document,
+                        'source_url': source_url,
+                    }, pack_ref=pack_ref)
+
+                if result['success']:
+                    st.success(f"评估完成 · ICP 分数: {result['icp_score']}/100")
+
+                    # Hard blockers 优先显示
+                    if result['hard_blockers']:
+                        st.error(f"⚠️ 存在 {len(result['hard_blockers'])} 个硬性阻断，禁止对外开发")
+                        for blocker in result['hard_blockers']:
+                            st.markdown(f"- {blocker}")
+                    else:
+                        st.success("✅ 无硬性阻断，可进入对外开发流程")
+
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("身份状态", result['identity_status'])
+                        st.metric("产品匹配", result['product_fit'])
+                    with col2:
+                        st.metric("市场匹配", result['market_fit'])
+                        st.metric("买家类型", result['buyer_type'])
+                    with col3:
+                        st.metric("是否合格", "是" if result['eligible'] else "否")
+                        st.metric("Pack 版本", result.get('knowledge_pack_version') or '无')
+
+                    if result['risk_flags']:
+                        st.warning("风险标记:")
+                        for flag in result['risk_flags']:
+                            st.markdown(f"- {flag}")
+
+                    if result['missing_evidence']:
+                        st.info("缺失证据:")
+                        for missing in result['missing_evidence']:
+                            st.markdown(f"- {missing}")
+
+                    st.info(f"建议下一步: {result['recommended_next_action']}")
+
+                    # 保存到 session 供草稿页面使用
+                    st.session_state['last_eval_customer_id'] = customer_id
+                    st.session_state['last_eval_result'] = result
+                else:
+                    st.error(f"评估失败: {result.get('errors', '未知错误')}")
+
+    with tab_draft:
+        st.subheader("内容草稿生成")
+        st.warning("⚠️ 所有草稿需人工审核，禁止自动发送邮件或消息")
+
+        # 选择客户
+        if 'last_eval_customer_id' in st.session_state:
+            default_customer = st.session_state['last_eval_customer_id']
+        else:
+            default_customer = ""
+
+        customer_id_input = st.text_input("客户 ID（从评估页面自动带入）", value=default_customer, key="draft_customer_id")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            draft_type = st.selectbox("草稿类型", cdg.DRAFT_TYPES, key="draft_type")
+            language = st.selectbox("语言", ["en", "zh"], key="draft_lang")
+        with col2:
+            mode = st.selectbox("模式", ["standard", "reasoning"], key="draft_mode",
+                               format_func=lambda x: "标准（四节点链）" if x == "standard" else "深度推理（三节点链）")
+            use_mock = st.checkbox("使用 Mock 生成（不调用真实 AI）", value=True, key="draft_mock")
+
+        if st.button("生成草稿", use_container_width=True, type="primary"):
+            if not customer_id_input:
+                st.error("请先在评估页面完成客户评估")
+            else:
+                with st.spinner("正在生成草稿..."):
+                    result = cdg.generate_content_draft(
+                        customer_id=customer_id_input,
+                        draft_type=draft_type,
+                        language=language,
+                        mode=mode,
+                        use_mock=use_mock,
+                    )
+
+                if result['success']:
+                    if result['internal_only']:
+                        st.warning("⚠️ 此草稿为内部草稿，不可直接对外发送")
+                    else:
+                        st.success("✅ 草稿生成成功，待人工审核")
+
+                    st.markdown(f"**主题:** {result['subject']}")
+                    st.text_area("正文", result['body'], height=300, key=f"draft_body_{result['draft_id']}")
+
+                    # 元信息
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.caption(f"模型: {result['model']}")
+                        st.caption(f"Attempts: {result['attempts']}")
+                    with col2:
+                        st.caption(f"故障转移: {'是' if result['failover'] else '否'}")
+                        st.caption(f"Trace: {result['trace_id'][:16]}...")
+                    with col3:
+                        st.caption(f"Pack: {result.get('knowledge_pack_id') or '无'}")
+                        st.caption(f"版本: {result.get('knowledge_pack_version') or '无'}")
+
+                    # 事实依据
+                    with st.expander("📚 事实依据与风险"):
+                        if result['confirmed_claims']:
+                            st.markdown("**已确认事实:**")
+                            for claim in result['confirmed_claims']:
+                                st.markdown(f"- {claim}")
+                        if result['inferred_claims']:
+                            st.markdown("**推断内容（需人工核实）:**")
+                            for claim in result['inferred_claims']:
+                                st.markdown(f"- {claim}")
+                        if result['missing_information']:
+                            st.markdown("**缺失信息:**")
+                            for info in result['missing_information']:
+                                st.markdown(f"- {info}")
+                        if result['risk_flags']:
+                            st.markdown("**风险提示:**")
+                            for flag in result['risk_flags']:
+                                st.markdown(f"- {flag}")
+
+                    # 审核操作
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("标记为已审核", key=f"approve_{result['draft_id']}"):
+                            cdg.update_draft_status(result['draft_id'], 'approved')
+                            st.success("已标记为 approved")
+                    with col2:
+                        if st.button("拒绝", key=f"reject_{result['draft_id']}"):
+                            cdg.update_draft_status(result['draft_id'], 'rejected')
+                            st.warning("已标记为 rejected")
+                else:
+                    st.error(f"生成失败: {result.get('errors', '未知错误')}")
+
+        # 历史草稿
+        st.divider()
+        st.markdown("### 历史草稿")
+        if customer_id_input:
+            drafts = cdg.list_content_drafts(customer_id=customer_id_input)
+            if drafts:
+                for draft in drafts[:5]:
+                    with st.expander(f"{draft['draft_type']} · {draft['status']} · {draft['created_at'][:10]}"):
+                        st.markdown(f"**主题:** {draft['subject']}")
+                        st.text(draft['body'][:500] + "..." if len(draft['body']) > 500 else draft['body'])
+                        st.caption(f"模型: {draft['model']} | Pack: {draft.get('knowledge_pack_id') or '无'} | 内部: {'是' if draft['internal_only'] else '否'}")
+            else:
+                st.info("暂无历史草稿")
+
+    with tab_pack:
+        st.subheader("Knowledge Pack 管理")
+        st.caption("仅 approved Pack 可用于对外内容生成")
+
+        packs = kf.list_knowledge_packs()
+        if packs:
+            for pack in packs:
+                with st.expander(f"{pack['name']} v{pack['version']} · {pack['status']}"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.caption(f"Pack ID: {pack['pack_id']}")
+                        st.caption(f"状态: {pack['status']}")
+                        st.caption(f"产品范围: {', '.join(pack.get('product_categories', []))}")
+                    with col2:
+                        st.caption(f"目标市场: {', '.join(pack.get('target_markets', []))}")
+                        st.caption(f"买家类型: {', '.join(pack.get('buyer_types', []))}")
+                        st.caption(f"冻结事实数: {len(pack.get('frozen_fact_snapshots', []))}")
+                    if pack.get('knowledge_snapshot_hash'):
+                        st.caption(f"Snapshot Hash: {pack['knowledge_snapshot_hash'][:16]}...")
+        else:
+            st.info("暂无 Knowledge Pack，请先在知识库中创建并批准")
 
 elif page == "👥 团队工作空间":
     st.title("👥 团队工作空间")

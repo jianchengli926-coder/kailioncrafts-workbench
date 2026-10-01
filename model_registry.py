@@ -7,6 +7,10 @@ KaiLionCrafts AI工作台 - 模型注册表 v1.0
 import time
 import threading
 from datetime import datetime
+try:
+    import requests
+except ImportError:
+    requests = None
 
 # ============ 健康状态常量 ============
 HEALTH_AVAILABLE = "available"        # 可用

@@ -37,12 +37,17 @@ from knowledge_base import kb
 from customer_manager import cm, PIPELINE_STAGES
 from ai_client import ai
 from manual_content import MANUAL_CATEGORIES, search_manual as _search_manual
+import company_kb_content as ckb
 from prompts import (
     CUSTOMER_ANALYSIS_PROMPT, COLD_EMAIL_PROMPT, FOLLOW_UP_PROMPT,
     FAQ_PROMPT, PRODUCT_RECOMMEND_PROMPT, INQUIRY_REPLY_PROMPT,
     DUE_DILIGENCE_PROMPT, MARKET_ANALYSIS_PROMPT, MORNING_BRIEF_PROMPT,
     EMAIL_AIDA_ANALYSIS_PROMPT,
 )
+
+# ============ 会话级手动模型覆盖（每次运行重置并从 session_state 恢复） ============
+ai.manual_text_model = st.session_state.get('manual_text_model_id')
+ai.manual_vision_model = st.session_state.get('manual_vision_model_id')
 
 
 # ============ 通用：两步删除（防误删） ============
@@ -7063,8 +7068,13 @@ JPG文件（未匹配）：
                 st.markdown("#### ✏️ 提示词（可手动编辑）")
                 _prompt_edit = st.text_area("提示词", value=_prompt, height=180, key="ais_prompt")
 
+                # 图像生成模型手动选择器
+                _img_model_opts = ["自动（云端优先，本地FLUX兜底）", "GLM/CogView 云端模型", "FLUX.2 Klein 4B 本地模型"]
+                _img_model_choice = st.selectbox("🎨 图像生成模型", _img_model_opts, key="ais_img_model", index=0,
+                                                 help="自动=云端优先，失败自动切FLUX；手动选择只对当前任务生效")
+
                 if st.button("🚀 生成图片", type="primary", use_container_width=True, key="ais_gen"):
-                    # 比例映射到CogView-3-Flash支持的尺寸
+                    # 比例映射
                     ratio_map = {
                         '1:1 方图': '1024x1024',
                         '3:4 竖版': '1024x1536',
@@ -7074,13 +7084,24 @@ JPG文件（未匹配）：
                         '2:3': '1024x1536',
                     }
                     size = ratio_map.get(_ratio, '1024x1024')
-                    with st.spinner(f"🎨 AI正在生成图片（{_count}张，{size}，CogView-3-Flash免费模型）..."):
+                    # 解析手动模型选择
+                    _manual_img = None
+                    if "GLM/CogView" in _img_model_choice:
+                        _manual_img = "cogview-3-flash"
+                    elif "FLUX" in _img_model_choice:
+                        _manual_img = "x/flux2-klein:4b-fp4"
+                    with st.spinner(f"🎨 AI正在生成图片（{_count}张，{size}，{_img_model_choice}）..."):
                         for gen_idx in range(_count):
-                            result = ai.generate_image(_prompt_edit, size=size, task_name=f"AI作图-{_skill['name']}")
+                            result = ai.generate_image(_prompt_edit, size=size, task_name=f"AI作图-{_skill['name']}", manual_model=_manual_img)
                             if result['success']:
                                 st.markdown(f"**图片 {gen_idx+1}/{_count}**（模型：{result['model']}，{size}）")
-                                st.image(result['url'], use_container_width=True)
-                                st.markdown(f"[🔗 打开原图]({result['url']})")
+                                if result.get('local_path'):
+                                    # FLUX 本地生成的图片
+                                    st.image(result['local_path'], use_container_width=True)
+                                    st.caption(f"本地文件: {result['local_path']}")
+                                elif result.get('url'):
+                                    st.image(result['url'], use_container_width=True)
+                                    st.markdown(f"[🔗 打开原图]({result['url']})")
                             else:
                                 st.error(f"图片 {gen_idx+1} 生成失败：{result['error']}")
                             if gen_idx < _count - 1:
@@ -8993,11 +9014,12 @@ elif page == "📚 公司知识库":
     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
     <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · KNOWLEDGE BASE</div>
     <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">公司知识库</h2>
-    <div style="color:rgba(255,243,224,.6);font-size:13px;">搜索 · 管理统计(含最近更新) · 添加(含对话转知识) · 竞品资源库</div>
+    <div style="color:rgba(255,243,224,.6);font-size:13px;">知识库v7.2(15分类/588文档) · 搜索 · 管理统计 · 添加 · 竞品资源库</div>
     </div>
     """, unsafe_allow_html=True)
 
     kb_sections = {
+        "📚 知识库v7.2": "15分类/588文档 · 分类浏览 · 全文检索",
         "🔍 搜索浏览": "全文搜索 · 分类浏览",
         "📊 管理统计": "统计 · 体积 · 最近更新",
         "➕ 添加知识": "新建文档 / 上传 / 对话转知识",
@@ -9008,7 +9030,7 @@ elif page == "📚 公司知识库":
         st.session_state["kb_sub"] = "🔍 搜索浏览"
     kb_current = st.session_state["kb_sub"]
 
-    kb_cols = st.columns(5)
+    kb_cols = st.columns(6)
     for i, (name, desc) in enumerate(kb_sections.items()):
         with kb_cols[i]:
             is_active = st.session_state["kb_sub"] == name
@@ -9022,7 +9044,134 @@ elif page == "📚 公司知识库":
     st.caption(kb_sections[kb_current])
     st.markdown("---")
 
-    if kb_current == "🔍 搜索浏览":
+    if kb_current == "📚 知识库v7.2":
+        # ===== 公司知识库 v7.2 完整版 =====
+        kb_stats = ckb.get_stats()
+        
+        # 统计概览卡片
+        stat_cols = st.columns(4)
+        with stat_cols[0]:
+            st.metric("📁 知识文档", f"{kb_stats['total_files']} 个")
+        with stat_cols[1]:
+            st.metric("📂 功能分类", f"{kb_stats['total_categories']} 类")
+        with stat_cols[2]:
+            st.metric("💾 知识库体积", f"{kb_stats['total_size_mb']} MB")
+        with stat_cols[3]:
+            st.metric("🏷️ 版本", kb_stats['version'])
+        
+        st.markdown("---")
+        
+        # 快捷模块（必须放在搜索框前面，避免widget实例化后修改session_state报错）
+        st.markdown("##### ⚡ 常用快捷模块")
+        quick_cols = st.columns(4)
+        for i, mod in enumerate(ckb.QUICK_MODULES):
+            with quick_cols[i % 4]:
+                if st.button(f"{mod['icon']} {mod['name']}", key=f"kb7_quick_{i}", use_container_width=True):
+                    st.session_state["kb7_search_input"] = mod['keyword']
+                    st.rerun()
+        
+        st.markdown("---")
+        
+        # 搜索框
+        kb7_search = st.text_input(
+            "🔍 搜索知识库 v7.2",
+            placeholder=f"输入关键词搜索全部{kb_stats['total_files']}个文档，如：MOQ、FDA、OEM、厨房刀、报价...",
+            key="kb7_search_input",
+            label_visibility="collapsed"
+        )
+        
+        if kb7_search:
+            with st.spinner("正在搜索知识库 v7.2..."):
+                results = ckb.search_kb(kb7_search, max_results=20)
+                if results:
+                    st.success(f"找到 {len(results)} 个相关文档")
+                    for i, r in enumerate(results, 1):
+                        with st.expander(f"{i}. {r['file']}  ·  {r['category']}  ·  匹配度 {r['score']}"):
+                            st.caption(f"路径：{r['path']}")
+                            st.markdown(r['snippet'])
+                            if st.button("📖 查看完整内容", key=f"kb7_view_{i}"):
+                                full_content = ckb.get_file_content(r['path'])
+                                st.markdown("---")
+                                st.markdown(full_content)
+                else:
+                    st.info("未找到相关内容，换个关键词试试")
+            st.markdown("---")
+        
+        # 13大分类Tabs浏览
+        st.markdown("##### 📂 按分类浏览")
+        cat_names = [f"{c['icon']} {c['name']}" for c in ckb.get_categories()]
+        cat_tabs = st.tabs(cat_names)
+        
+        file_idx_counter = [0]  # 用列表实现闭包计数器
+        
+        for tab_idx, (tab, cat) in enumerate(zip(cat_tabs, ckb.get_categories())):
+            with tab:
+                # 分类信息
+                st.markdown(f"""
+                <div style="background:{cat['color']}15;border-left:4px solid {cat['color']};
+                padding:12px 16px;border-radius:8px;margin-bottom:16px;">
+                <div style="font-size:15px;font-weight:600;color:{cat['color']};">
+                {cat['icon']} {cat['name']}
+                </div>
+                <div style="font-size:12px;color:#666;margin-top:4px;">{cat['desc']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # 列出该分类下的文件
+                files = ckb.list_files_in_category(cat['id'])
+                st.caption(f"共 {len(files)} 个文档")
+                
+                if files:
+                    # 按子目录分组
+                    subdirs = {}
+                    for f in files:
+                        rel = f['rel_path']
+                        parts = rel.split('/')
+                        subdir = parts[1] if len(parts) > 2 else "根目录"
+                        if subdir not in subdirs:
+                            subdirs[subdir] = []
+                        subdirs[subdir].append(f)
+                    
+                    for subdir, sub_files in sorted(subdirs.items()):
+                        with st.expander(f"📁 {subdir} ({len(sub_files)}个)"):
+                            for f in sub_files:
+                                meta = ckb.get_file_meta(f['path'])
+                                title = meta.get('h1_title', f['name'].replace('.md', ''))
+                                summary = meta.get('summary', '')
+                                f_idx = file_idx_counter[0]
+                                file_idx_counter[0] += 1
+                                
+                                col1, col2 = st.columns([4, 1])
+                                with col1:
+                                    st.markdown(f"**{title}**")
+                                    if summary:
+                                        st.caption(summary[:100])
+                                with col2:
+                                    if st.button("📖 查看", key=f"kb7_file_{f_idx}", use_container_width=True):
+                                        st.session_state['kb7_view_file'] = f['path']
+                                        st.session_state['kb7_view_title'] = title
+                                        st.rerun()
+        
+        # 查看文件内容区域（移到tabs外面，确保任何tab点击都能显示）
+        if 'kb7_view_file' in st.session_state and st.session_state.get('kb7_view_file'):
+            st.markdown("---")
+            view_col1, view_col2 = st.columns([10, 1])
+            with view_col1:
+                st.markdown(f"### 📄 {st.session_state.get('kb7_view_title', '文档内容')}")
+            with view_col2:
+                if st.button("✖ 关闭", key="kb7_close_view"):
+                    st.session_state['kb7_view_file'] = None
+                    st.session_state['kb7_view_title'] = None
+                    st.rerun()
+            file_content = ckb.get_file_content(st.session_state['kb7_view_file'])
+            st.markdown(file_content)
+        
+        # 核心事实速查
+        st.markdown("---")
+        with st.expander("📋 公司核心事实速查表（最高权威来源）"):
+            st.markdown(ckb.get_core_facts())
+
+    elif kb_current == "🔍 搜索浏览":
         # ---- 知识库来源（选搜哪个库）----
         sources_map = kb.get_kb_sources()
         src_keys = ["all"] + list(sources_map.keys())
@@ -9729,84 +9878,247 @@ elif page == "🤖 模型管理":
     
     st.markdown("---")
     
-    # 故障转移链展示
-    st.subheader("🔄 故障转移链（自动兜底顺序）")
+    # ============ 活动模型注册表与路由顺序 ============
+    st.subheader("🔄 活动模型注册表与自动路由顺序")
     try:
-        from ai_client import ai as _ai_client
-        chain = _ai_client.get_failover_chain()
-        if chain:
-            chain_html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">'
-            for i, ep in enumerate(chain):
-                type_color = "#4caf50" if ep['type'] == 'online' else "#ff9800"
-                type_label = "在线" if ep['type'] == 'online' else "本地"
-                chain_html += f'<span style="background:#f5f5f5;padding:6px 12px;border-radius:6px;font-size:13px;border-left:3px solid {type_color};">'
-                chain_html += f'<b>{i+1}.</b> {ep["label"]} <small style="color:{type_color}">[{type_label}]</small>'
-                chain_html += '</span>'
+        from model_registry import get_text_chain, get_vision_chain, get_image_chain, get_embedding_model, health as _health_mgr
+
+        def _render_chain(title, chain, icon):
+            if not chain:
+                return
+            st.markdown(f"**{icon} {title}**")
+            html = '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 12px 0;">'
+            for i, m in enumerate(chain):
+                tc = "#4caf50" if m['type'] == 'online' else "#ff9800"
+                tl = "在线" if m['type'] == 'online' else "本地"
+                st_status = _health_mgr.get_status(m['id'])
+                badge = st_status.get('status_label', '未检测')
+                badge_color = {"可用": "#4caf50", "限流": "#ff9800", "超时": "#f44336",
+                               "暂时不可用": "#9e9e9e", "配置错误": "#f44336", "手动禁用": "#9e9e9e",
+                               "未检测": "#9e9e9e"}.get(badge, "#9e9e9e")
+                html += f'<span style="background:#f5f5f5;padding:5px 10px;border-radius:5px;font-size:12px;border-left:3px solid {tc};">'
+                html += f'<b>{i+1}.</b> {m["display_name"]} <small style="color:{tc}">[{tl}]</small>'
+                html += f' <small style="color:{badge_color};font-weight:bold;">[{badge}]</small>'
+                html += '</span>'
                 if i < len(chain) - 1:
-                    chain_html += '<span style="color:#999;">→</span>'
-            chain_html += '</div>'
-            st.markdown(chain_html, unsafe_allow_html=True)
-            st.caption("规则：在线模型优先，逐个尝试；全部在线模型失败后自动切换到本地模型兜底")
-        else:
-            st.info("未配置故障转移链")
-    except Exception:
-        st.caption("故障转移链加载中...")
-    
+                    html += '<span style="color:#999;font-size:11px;">→</span>'
+            html += '</div>'
+            st.markdown(html, unsafe_allow_html=True)
+
+        _render_chain("文本 / 聊天 / Agent 自动路由", get_text_chain(), "📝")
+        _render_chain("视觉理解自动路由", get_vision_chain(), "🖼️")
+        _render_chain("图像生成自动路由", get_image_chain(), "🎨")
+        emb = get_embedding_model()
+        st.markdown(f"**🔢 Embedding（固定）**: {emb.get('display_name', 'nomic-embed-text')} `{emb.get('ollama_id', 'nomic-embed-text:latest')}`")
+
+        from model_registry import get_disabled_providers
+        disabled = get_disabled_providers()
+        if disabled:
+            st.caption(f"⚠️ 已禁用（保留API Key，不发请求）: {', '.join(disabled)}")
+    except Exception as _e:
+        st.caption(f"注册表加载中... ({_e})")
+
     st.markdown("---")
-    
-    # 一键全模型健康检测
-    st.subheader("🩺 模型健康检测")
+
+    # ============ 手动模型选择器 ============
+    st.subheader("🎛️ 手动模型选择（仅当前任务生效，不改全局默认）")
+    try:
+        from model_registry import build_model_registry, health as _hm
+        _reg = build_model_registry()
+
+        col_sel1, col_sel2, col_sel3 = st.columns(3)
+        with col_sel1:
+            _text_opts = ["自动"] + [m['display_name'] for m in get_text_chain()]
+            _text_sel = st.selectbox("文本模型", _text_opts, key="manual_text_model", index=0)
+            if _text_sel != "自动":
+                _mid = next((m['id'] for m in get_text_chain() if m['display_name'] == _text_sel), None)
+                st.session_state['manual_text_model_id'] = _mid
+            else:
+                st.session_state.pop('manual_text_model_id', None)
+        with col_sel2:
+            _vis_opts = ["自动"] + [m['display_name'] for m in get_vision_chain()]
+            _vis_sel = st.selectbox("视觉模型", _vis_opts, key="manual_vision_model", index=0)
+            if _vis_sel != "自动":
+                _mid = next((m['id'] for m in get_vision_chain() if m['display_name'] == _vis_sel), None)
+                st.session_state['manual_vision_model_id'] = _mid
+            else:
+                st.session_state.pop('manual_vision_model_id', None)
+        with col_sel3:
+            _img_opts = ["自动", "GLM/CogView", "FLUX.2 Klein 4B"]
+            _img_sel = st.selectbox("图像生成模型", _img_opts, key="manual_image_model", index=0)
+            if _img_sel == "GLM/CogView":
+                st.session_state['manual_image_model_id'] = "cogview-3-flash"
+            elif _img_sel == "FLUX.2 Klein 4B":
+                st.session_state['manual_image_model_id'] = "x/flux2-klein:4b-fp4"
+            else:
+                st.session_state.pop('manual_image_model_id', None)
+
+        st.caption("手动选择只对当前会话的后续请求生效，不会修改全局默认路由顺序。")
+
+        # 同步到 ai 单例，使全工作台的 ai.chat() / ai.chat_with_image() 生效
+        try:
+            from ai_client import ai as _ai_singleton
+            _ai_singleton.manual_text_model = st.session_state.get('manual_text_model_id')
+            _ai_singleton.manual_vision_model = st.session_state.get('manual_vision_model_id')
+        except Exception:
+            pass
+    except Exception as _e:
+        st.caption(f"选择器加载中... ({_e})")
+
+    st.markdown("---")
+
+    # ============ 全模型健康检测（含本地模型） ============
+    st.subheader("🩺 模型健康检测（含在线+本地+视觉+图像）")
     col_hc1, col_hc2 = st.columns([3, 1])
     with col_hc1:
-        st.caption("一键测试故障转移链中所有在线模型的可用性和响应速度")
+        st.caption("测试所有活动模型的可用性、响应速度和冷却状态")
     with col_hc2:
         if st.button("🔍 一键检测所有模型", type="primary", use_container_width=True, key="health_check_all"):
             st.session_state['_health_results'] = None
             try:
                 import time as _hc_time
                 import requests as _hc_req
-                from ai_client import ai as _ai_hc
-                chain = _ai_hc.get_failover_chain()
+                from model_registry import build_model_registry, health as _hc_health, HEALTH_AVAILABLE, HEALTH_RATE_LIMITED, HEALTH_TIMEOUT, HEALTH_UNAVAILABLE, HEALTH_CONFIG_ERROR
+                from local_model_manager import local_model_manager as _hc_lmm
+
+                _reg = build_model_registry()
                 hc_results = []
-                for ep in chain:
-                    if ep['type'] != 'online':
-                        hc_results.append({'label': ep['label'], 'type': 'local', 'status': 'skipped', 'elapsed': 0, 'error': '本地模型跳过'})
-                        continue
+                for mid, m in _reg.items():
                     t0 = _hc_time.time()
                     try:
-                        resp = _hc_req.post(
-                            f"{ep['base_url']}/chat/completions",
-                            headers={"Authorization": f"Bearer {ep['api_key']}", "Content-Type": "application/json"},
-                            json={"model": ep['model'], "messages": [{"role": "user", "content": "hi"}], "max_tokens": 5},
-                            timeout=15,
-                        )
-                        elapsed = _hc_time.time() - t0
-                        if resp.status_code == 200:
-                            hc_results.append({'label': ep['label'], 'type': 'online', 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
+                        if m['type'] == 'local':
+                            # 本地模型：用 Ollama 原生 API 测试（不占用全局锁，用轻量请求）
+                            if m['category'] == 'image':
+                                # FLUX 不做实际生成测试，只检查 Ollama 可达性和模型存在
+                                resp = _hc_req.get("http://localhost:11434/api/tags", timeout=10)
+                                if resp.status_code == 200:
+                                    models = [mm['name'] for mm in resp.json().get('models', [])]
+                                    if m['api_model'] in models:
+                                        _hc_health.set_status(mid, HEALTH_AVAILABLE, elapsed=round(_hc_time.time()-t0, 2))
+                                        hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'ok', 'elapsed': round(_hc_time.time()-t0, 2), 'error': None})
+                                    else:
+                                        _hc_health.set_status(mid, HEALTH_UNAVAILABLE, elapsed=round(_hc_time.time()-t0, 2), error="模型未安装")
+                                        hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'fail', 'elapsed': round(_hc_time.time()-t0, 2), 'error': '模型未安装'})
+                                else:
+                                    hc_results.append({'label': m['display_name'], 'type': 'local', 'category': 'image', 'status': 'fail', 'elapsed': round(_hc_time.time()-t0, 2), 'error': f'Ollama HTTP {resp.status_code}'})
+                            else:
+                                # 本地文本/视觉模型：发送极简聊天请求
+                                resp = _hc_req.post(
+                                    "http://localhost:11434/api/chat",
+                                    json={"model": m['api_model'], "messages": [{"role": "user", "content": "hi"}], "stream": False, "keep_alive": 0, "options": {"num_predict": 5}},
+                                    timeout=60,
+                                )
+                                elapsed = _hc_time.time() - t0
+                                if resp.status_code == 200:
+                                    _hc_health.set_status(mid, HEALTH_AVAILABLE, elapsed=round(elapsed, 2))
+                                    hc_results.append({'label': m['display_name'], 'type': 'local', 'category': m['category'], 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
+                                else:
+                                    _hc_health.set_status(mid, HEALTH_UNAVAILABLE, elapsed=round(elapsed, 2), error=f"HTTP {resp.status_code}")
+                                    hc_results.append({'label': m['display_name'], 'type': 'local', 'category': m['category'], 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code}"})
                         else:
-                            hc_results.append({'label': ep['label'], 'type': 'online', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code}"})
+                            # 在线模型
+                            if m['category'] == 'image':
+                                # CogView 不做实际生成，用 chat 端点测试连通性
+                                resp = _hc_req.post(
+                                    f"{m['base_url'].rstrip('/')}/chat/completions",
+                                    headers={"Authorization": f"Bearer {m['api_key']}", "Content-Type": "application/json"},
+                                    json={"model": "glm-4-flash", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 5},
+                                    timeout=15,
+                                )
+                            else:
+                                resp = _hc_req.post(
+                                    f"{m['base_url'].rstrip('/')}/chat/completions",
+                                    headers={"Authorization": f"Bearer {m['api_key']}", "Content-Type": "application/json"},
+                                    json={"model": m['api_model'], "messages": [{"role": "user", "content": "hi"}], "max_tokens": 5},
+                                    timeout=15,
+                                )
+                            elapsed = _hc_time.time() - t0
+                            if resp.status_code == 200:
+                                _hc_health.set_status(mid, HEALTH_AVAILABLE, elapsed=round(elapsed, 2))
+                                hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
+                            elif resp.status_code == 429:
+                                _hc_health.set_status(mid, HEALTH_RATE_LIMITED, elapsed=round(elapsed, 2), error="HTTP 429 限流")
+                                hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'rate_limited', 'elapsed': round(elapsed, 2), 'error': 'HTTP 429 限流'})
+                            elif resp.status_code in (401, 403):
+                                _hc_health.set_status(mid, HEALTH_CONFIG_ERROR, elapsed=round(elapsed, 2), error=f"HTTP {resp.status_code}")
+                                hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'config_error', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code} 认证错误"})
+                            else:
+                                _hc_health.set_status(mid, HEALTH_UNAVAILABLE, elapsed=round(elapsed, 2), error=f"HTTP {resp.status_code}")
+                                hc_results.append({'label': m['display_name'], 'type': 'online', 'category': m['category'], 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code}"})
+                    except _hc_req.exceptions.Timeout:
+                        elapsed = _hc_time.time() - t0
+                        _hc_health.set_status(mid, HEALTH_TIMEOUT, elapsed=round(elapsed, 2), error="超时")
+                        hc_results.append({'label': m['display_name'], 'type': m['type'], 'category': m.get('category','?'), 'status': 'timeout', 'elapsed': round(elapsed, 2), 'error': '请求超时'})
                     except Exception as e:
                         elapsed = _hc_time.time() - t0
-                        hc_results.append({'label': ep['label'], 'type': 'online', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': str(e)[:60]})
+                        hc_results.append({'label': m['display_name'], 'type': m['type'], 'category': m.get('category','?'), 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': str(e)[:60]})
+
+                # Embedding 模型单独检测
+                try:
+                    t0 = _hc_time.time()
+                    resp = _hc_req.post(
+                        "http://localhost:11434/api/embeddings",
+                        json={"model": "nomic-embed-text", "prompt": "test"},
+                        timeout=15,
+                    )
+                    elapsed = _hc_time.time() - t0
+                    if resp.status_code == 200:
+                        hc_results.append({'label': 'nomic-embed-text', 'type': 'local', 'category': 'embedding', 'status': 'ok', 'elapsed': round(elapsed, 2), 'error': None})
+                    else:
+                        hc_results.append({'label': 'nomic-embed-text', 'type': 'local', 'category': 'embedding', 'status': 'fail', 'elapsed': round(elapsed, 2), 'error': f"HTTP {resp.status_code}"})
+                except Exception as e:
+                    hc_results.append({'label': 'nomic-embed-text', 'type': 'local', 'category': 'embedding', 'status': 'fail', 'elapsed': 0, 'error': str(e)[:60]})
+
                 st.session_state['_health_results'] = hc_results
             except Exception as e:
                 st.error(f"检测失败: {e}")
+
     if st.session_state.get('_health_results'):
         hc_results = st.session_state['_health_results']
         ok_c = sum(1 for r in hc_results if r['status'] == 'ok')
-        fail_c = sum(1 for r in hc_results if r['status'] == 'fail')
-        skip_c = sum(1 for r in hc_results if r['status'] == 'skipped')
-        col_ha, col_hb, col_hc = st.columns(3)
-        with col_ha: st.metric("✅ 正常", ok_c)
+        fail_c = sum(1 for r in hc_results if r['status'] in ('fail', 'config_error'))
+        rl_c = sum(1 for r in hc_results if r['status'] == 'rate_limited')
+        to_c = sum(1 for r in hc_results if r['status'] == 'timeout')
+        col_ha, col_hb, col_hc, col_hd = st.columns(4)
+        with col_ha: st.metric("✅ 可用", ok_c)
         with col_hb: st.metric("❌ 异常", fail_c)
-        with col_hc: st.metric("⏭️ 跳过", skip_c)
+        with col_hc: st.metric("⏳ 限流", rl_c)
+        with col_hd: st.metric("⏰ 超时", to_c)
         for r in hc_results:
+            cat_label = {"text": "文本", "vision": "视觉", "image": "图像", "embedding": "Embedding"}.get(r.get('category','?'), r.get('category','?'))
+            type_label = "在线" if r['type'] == 'online' else "本地"
             if r['status'] == 'ok':
-                st.success(f"✅ {r['label']} — {r['elapsed']}s")
-            elif r['status'] == 'fail':
-                st.error(f"❌ {r['label']} — {r['elapsed']}s — {r['error']}")
+                st.success(f"✅ [{cat_label}|{type_label}] {r['label']} — {r['elapsed']}s")
+            elif r['status'] == 'rate_limited':
+                from model_registry import health as _show_h
+                _st = _show_h.get_status(next((m['id'] for m in build_model_registry().values() if m['display_name'] == r['label']), ''))
+                cd = _st.get('cooldown_remaining', 0)
+                st.warning(f"⏳ [{cat_label}|{type_label}] {r['label']} — {r['elapsed']}s — 限流（冷却{cd}秒）")
+            elif r['status'] == 'timeout':
+                st.error(f"⏰ [{cat_label}|{type_label}] {r['label']} — 超时")
+            elif r['status'] == 'config_error':
+                st.error(f"⚙️ [{cat_label}|{type_label}] {r['label']} — 配置错误: {r['error']}")
             else:
-                st.info(f"⏭️ {r['label']} — {r['error']}")
+                st.error(f"❌ [{cat_label}|{type_label}] {r['label']} — {r['elapsed']}s — {r['error']}")
+
+    # 本地模型锁状态
+    st.markdown("---")
+    st.subheader("🔒 本地模型互斥锁状态")
+    try:
+        from local_model_manager import local_model_manager as _lmm
+        _lmm_status = _lmm.get_status()
+        col_l1, col_l2, col_l3, col_l4 = st.columns(4)
+        with col_l1: st.metric("锁状态", "🔒 占用中" if _lmm_status['lock_held'] else "✅ 空闲")
+        with col_l2: st.metric("当前模型", _lmm_status['active_model'] or "无")
+        with col_l3: st.metric("等待任务", _lmm_status['waiting_count'])
+        with col_l4: st.metric("累计任务", _lmm_status['total_tasks'])
+        if _lmm_status['running_models']:
+            st.caption(f"Ollama 运行中: {', '.join(_lmm_status['running_models'])}")
+        else:
+            st.caption("Ollama 当前无大模型运行（embedding 模型除外）")
+    except Exception as _e:
+        st.caption(f"锁状态加载中... ({_e})")
+
     st.markdown("---")
     
     # 调用统计面板

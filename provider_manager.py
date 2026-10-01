@@ -152,18 +152,39 @@ def get_active_provider():
 
 
 def detect_ollama_models():
-    """自动检测Ollama本地模型"""
+    """自动检测Ollama本地模型（含对话、视觉、图像生成模型，排除embedding）"""
     try:
         resp = requests.get("http://localhost:11434/api/tags", timeout=5)
         if resp.status_code == 200:
             data = resp.json()
             models = [m['name'] for m in data.get('models', [])]
-            # 过滤掉嵌入模型，只保留对话模型
+            # 过滤掉嵌入模型，保留对话/视觉/图像生成模型
             chat_models = [m for m in models if 'embed' not in m.lower()]
             return chat_models
     except Exception as e:
         pass
     return []
+
+
+def set_provider_disabled(provider_id, disabled=True):
+    """
+    标记供应商为禁用/启用（不删除API Key和历史配置）。
+    禁用的供应商不会出现在活动模型注册表和自动故障转移中。
+    """
+    data = load_providers()
+    for p in data['providers']:
+        if p['id'] == provider_id:
+            p['disabled'] = disabled
+            p['updated_at'] = datetime.now().isoformat()
+            break
+    save_providers(data)
+    return True
+
+
+def get_active_providers():
+    """获取所有未禁用的供应商"""
+    data = load_providers()
+    return [p for p in data['providers'] if not p.get('disabled', False)]
 
 
 def refresh_ollama_models():

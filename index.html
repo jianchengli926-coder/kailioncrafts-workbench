@@ -4398,6 +4398,7 @@ function submitKnowledgeFactReview(factId, status){
   const errEl = document.getElementById('kfReviewError');
   if(status === 'confirmed'){
     if(!sourceVerified){ errEl.textContent = '确认通过前必须勾选"已核验来源可追溯"'; errEl.style.display = 'block'; return; }
+    if(!publicUse){ errEl.textContent = '确认通过前必须勾选"允许对外使用"，未勾选仅内部使用的事实不能作为可对外公开事实'; errEl.style.display = 'block'; return; }
   }
   _knowledgeUiBusy = true;
   const result = reviewKnowledgeFact(factId, status, 'Leo', note);
@@ -5615,6 +5616,47 @@ console.log('%c✅ 全局错误处理已启用', 'color:#0f7b3f;font-weight:bold
 
 /* ---------- 全局状态 ---------- */
 let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[], outreachKnowledgeBase:[], campaigns:[], campaignCustomerTasks:[], campaignFollowUpTasks:[], knowledgeFacts:[], knowledgePacks:[] };
+
+/* ============================================================
+ * 数据版本管理与迁移（全局作用域，供 DOMContentLoaded 调用）
+ * ============================================================ */
+const CURRENT_DATA_VERSION = 2;
+
+function migrateData(){
+  let migrated = false;
+  const v = S.dataVersion || 1;
+
+  // v1 -> v2: 扩展客户模型字段
+  if(v < 2){
+    S.customers = (S.customers||[]).map(c=>({
+      ...c,
+      tags: c.tags || [],
+      intentCategories: c.intentCategories || (c.products?[c.products]:[]),
+      lastInteraction: c.lastInteraction || c.createdAt || null,
+      timeline: c.timeline || [],
+      quoteHistory: c.quoteHistory || [],
+      sampleHistory: c.sampleHistory || [],
+      orderHistory: c.orderHistory || [],
+      blacklisted: c.blacklisted || false,
+      unsubscribe: c.unsubscribe || false,
+      leadSource: c.leadSource || c.source || 'manual',
+      leadScore: c.leadScore || (c.scores&&c.scores.total) || 50,
+      companySize: c.companySize || '',
+      decisionMaker: c.decisionMaker || '',
+      annualPurchase: c.annualPurchase || ''
+    }));
+    migrated = true;
+    console.log('[Migration] v1->v2: 客户模型字段扩展完成');
+  }
+
+  if(migrated){
+    S.dataVersion = CURRENT_DATA_VERSION;
+    DB.save('dataVersion', CURRENT_DATA_VERSION);
+    if(typeof persist === 'function') persist();
+    console.log('[Migration] 数据迁移完成，当前版本 v' + CURRENT_DATA_VERSION);
+  }
+}
+
 function loadState(){
   S.customers = DB.load('customers') || [];
   S.plans = DB.load('plans') || [];
@@ -5670,46 +5712,6 @@ function loadState(){
     }
     return '与阳江本地多个制造基地深度战略合作、本地供应链协同';
   }
-
-/* ============================================================
- * 数据版本管理与迁移
- * ============================================================ */
-const CURRENT_DATA_VERSION = 2;
-
-function migrateData(){
-  let migrated = false;
-  const v = S.dataVersion || 1;
-
-  // v1 -> v2: 扩展客户模型字段
-  if(v < 2){
-    S.customers = (S.customers||[]).map(c=>({
-      ...c,
-      tags: c.tags || [],
-      intentCategories: c.intentCategories || (c.products?[c.products]:[]),
-      lastInteraction: c.lastInteraction || c.createdAt || null,
-      timeline: c.timeline || [],
-      quoteHistory: c.quoteHistory || [],
-      sampleHistory: c.sampleHistory || [],
-      orderHistory: c.orderHistory || [],
-      blacklisted: c.blacklisted || false,
-      unsubscribe: c.unsubscribe || false,
-      leadSource: c.leadSource || c.source || 'manual',
-      leadScore: c.leadScore || (c.scores&&c.scores.total) || 50,
-      companySize: c.companySize || '',
-      decisionMaker: c.decisionMaker || '',
-      annualPurchase: c.annualPurchase || ''
-    }));
-    migrated = true;
-    console.log('[Migration] v1->v2: 客户模型字段扩展完成');
-  }
-
-  if(migrated){
-    S.dataVersion = CURRENT_DATA_VERSION;
-    DB.save('dataVersion', CURRENT_DATA_VERSION);
-    persist();
-    console.log('[Migration] 数据迁移完成，当前版本 v' + CURRENT_DATA_VERSION);
-  }
-}
 
 /* 客户时间线操作 */
 function addTimelineEvent(cid, type, title, detail='', metadata={}){
@@ -35102,7 +35104,7 @@ if(document.readyState === 'loading'){
 </div>
 
 <!-- V75.3 工作台欢迎引导 -->
-<div id="welcomeGuide" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center">
+<div id="welcomeGuide" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:20px;width:600px;max-width:90%;max-height:85vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
     <!-- 头部 -->
     <div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;text-align:center;position:relative">

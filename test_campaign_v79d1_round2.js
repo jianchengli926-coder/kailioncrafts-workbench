@@ -3704,6 +3704,114 @@ await __test('P2.1B: 重复点击保护 _knowledgeUiBusy 防止重复提交', ()
   __assert(result === undefined, 'busy lock prevents submission');
 });
 
+// P2.1B.1: 审核表单校验测试
+function __withReviewForm(checkboxes, fn){
+  const origGet = document.getElementById;
+  document.getElementById = function(id){
+    if(id === 'kfSourceVerified') return { checked: checkboxes.sourceVerified || false, textContent: '', style: { display: '' } };
+    if(id === 'kfPublicUse') return { checked: checkboxes.publicUse || false, textContent: '', style: { display: '' } };
+    if(id === 'kfReviewNote') return { value: checkboxes.note || '', textContent: '', style: { display: '' } };
+    if(id === 'kfReviewError') return { textContent: '', style: { display: 'none' } };
+    return origGet.call(document, id);
+  };
+  try { return fn(); } finally { document.getElementById = origGet; }
+}
+
+await __test('P2.1B.1: 审核 confirmed 未勾选来源核验被阻断', () => {
+  S.knowledgeFacts = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1'});
+  let errorShown = false;
+  __withReviewForm({sourceVerified:false, publicUse:true}, () => {
+    const origGet = document.getElementById;
+    document.getElementById = function(id){
+      if(id === 'kfReviewError') return { textContent: '', style: { display: 'none' }, set textContent(v){ this._text = v; errorShown = true; } };
+      return origGet.call(document, id);
+    };
+    try { submitKnowledgeFactReview(f.fact.factId, 'confirmed'); } finally { document.getElementById = origGet; }
+  });
+  const fact = getKnowledgeFactById(f.fact.factId);
+  __assert(fact.reviewStatus === 'pending', 'fact remains pending when source not verified');
+});
+
+await __test('P2.1B.1: 审核 confirmed 未勾选允许对外使用被阻断', () => {
+  S.knowledgeFacts = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1'});
+  __withReviewForm({sourceVerified:true, publicUse:false}, () => {
+    submitKnowledgeFactReview(f.fact.factId, 'confirmed');
+  });
+  const fact = getKnowledgeFactById(f.fact.factId);
+  __assert(fact.reviewStatus === 'pending', 'fact remains pending when public use not checked');
+});
+
+await __test('P2.1B.1: 审核 confirmed 两项都勾选成功', () => {
+  S.knowledgeFacts = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1'});
+  __withReviewForm({sourceVerified:true, publicUse:true}, () => {
+    submitKnowledgeFactReview(f.fact.factId, 'confirmed');
+  });
+  const fact = getKnowledgeFactById(f.fact.factId);
+  __assert(fact.reviewStatus === 'confirmed', 'fact becomes confirmed');
+  __assert(fact.publicUseAllowed === true, 'publicUseAllowed set to true');
+});
+
+// P2.1B.1: 引导弹窗测试
+await __test('P2.1B.1: 引导弹窗关闭后持久化且不再显示', () => {
+  const origGetItem = localStorage.getItem;
+  const origSetItem = localStorage.setItem;
+  let welcomeShown = null;
+  localStorage.getItem = function(k){ return k === 'kailion_welcome_shown' ? welcomeShown : origGetItem.call(localStorage, k); };
+  localStorage.setItem = function(k, v){ if(k === 'kailion_welcome_shown') welcomeShown = v; else origSetItem.call(localStorage, k, v); };
+  const origGetEl = document.getElementById;
+  let guideDisplay = 'none';
+  document.getElementById = function(id){
+    if(id === 'welcomeGuide') return { style: { display: guideDisplay, set display(v){ guideDisplay = v; } } };
+    return origGetEl.call(document, id);
+  };
+  try {
+    welcomeShown = null;
+    showWelcomeGuide();
+    __assert(guideDisplay === 'flex', 'guide shown when not dismissed');
+    closeWelcomeGuide();
+    __assert(guideDisplay === 'none', 'guide hidden after close');
+    __assert(welcomeShown === 'true', 'dismissal persisted');
+    // 模拟刷新：检查逻辑
+    const shouldShow = !welcomeShown;
+    __assert(shouldShow === false, 'guide will not show on next load');
+  } finally {
+    localStorage.getItem = origGetItem;
+    localStorage.setItem = origSetItem;
+    document.getElementById = origGetEl;
+  }
+});
+
+// P2.1B.1: migrateData 回归测试
+await __test('P2.1B.1: migrateData 是全局函数且可调用', () => {
+  __assert(typeof migrateData === 'function', 'migrateData is global function');
+  __assert(typeof CURRENT_DATA_VERSION === 'number', 'CURRENT_DATA_VERSION is global');
+  // 调用不应抛出异常
+  S.dataVersion = 2;
+  try {
+    migrateData();
+    __assert(true, 'migrateData executes without error');
+  } catch(e) {
+    __assert(false, 'migrateData should not throw: ' + e.message);
+  }
+});
+
+await __test('P2.1B.1: migrateData v1->v2 迁移只执行一次', () => {
+  S.dataVersion = 1;
+  S.customers = [{company:'Old Co', products:'widgets'}];
+  migrateData();
+  __assert(S.dataVersion === 2, 'version upgraded to 2');
+  __assert(S.customers[0].tags !== undefined, 'tags field added');
+  __assert(S.customers[0].intentCategories !== undefined, 'intentCategories added');
+  // 再次调用不应重复迁移
+  const beforeTags = S.customers[0].tags;
+  migrateData();
+  __assert(S.dataVersion === 2, 'version stays 2');
+  __assert(JSON.stringify(S.customers[0].tags) === JSON.stringify(beforeTags), 'no duplicate migration');
+});
+
 // ===== 输出结果 =====
 console.log('');
 console.log('========================================');

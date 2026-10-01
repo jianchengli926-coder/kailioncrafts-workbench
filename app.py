@@ -1054,6 +1054,63 @@ if page == "🏠 仪表盘":
             </div>
             """, unsafe_allow_html=True)
 
+    # ===== 客户开发闭环概览（SQLite repository 数据源，无数据显示0，不显示示例数据）=====
+    st.markdown("---")
+    st.markdown("##### 🔁 客户开发闭环概览")
+    try:
+        try:
+            import repository as _repo_mod
+            _repo = _repo_mod.CustomerRepository()
+            _repo.init_db()
+        except Exception:
+            _repo = None
+
+        _today_n = 0
+        _overdue_n = 0
+        _needs_review_n = 0
+        _pending_review_n = 0
+        _waiting_reply_n = 0
+        _quoted_n = 0
+        _cold_n = 0
+
+        if _repo is not None:
+            try:
+                _today_n = len(_repo.get_today_tasks())
+            except Exception:
+                _today_n = 0
+            try:
+                _overdue_n = len(_repo.get_overdue_tasks())
+            except Exception:
+                _overdue_n = 0
+            try:
+                _needs_review_n = len(_repo.list_drafts(status='needs_review'))
+            except Exception:
+                _needs_review_n = 0
+            try:
+                _all_pros = _repo.list_prospects(limit=500)
+            except Exception:
+                _all_pros = []
+            for _p in _all_pros:
+                _st_p = _p.get('status', '')
+                if _st_p == 'pending_review':
+                    _pending_review_n += 1
+                elif _st_p in ('sent', 'delivered'):
+                    _waiting_reply_n += 1
+                elif _st_p == 'quoted':
+                    _quoted_n += 1
+                elif _st_p == 'cold_storage':
+                    _cold_n += 1
+
+        _cr1, _cr2, _cr3, _cr4, _cr5, _cr6 = st.columns(6)
+        _cr1.metric("今日跟进", _today_n)
+        _cr2.metric("已逾期", _overdue_n)
+        _cr3.metric("待人工审核", _needs_review_n + _pending_review_n)
+        _cr4.metric("待回复", _waiting_reply_n)
+        _cr5.metric("报价未回复", _quoted_n)
+        _cr6.metric("冷藏待激活", _cold_n)
+    except Exception:
+        st.caption("数据暂不可用")
+
 # ============ 独立站管理 ============
 elif page == "🖥️ 独立站管理":
     import json as _json
@@ -1579,6 +1636,27 @@ elif page == "👥 客户中心":
     <div style="color:rgba(255,243,224,.6);font-size:13px;">客户分析 · 客户开发 · 智能问答 · 客户管理（CRM）</div>
     </div>
     """, unsafe_allow_html=True)
+
+    # ===== 数据迁移工具（旧 customers.json → SQLite）=====
+    with st.expander("🔄 数据迁移工具（旧 customers.json → SQLite）"):
+        st.caption("将旧版 customers.json 客户迁移到 SQLite prospects 表（幂等，可重复执行）。")
+        if st.button("🔄 迁移旧客户数据", key="migrate_json_btn", type="primary"):
+            try:
+                import repository as _mig_repo
+                _mr = _mig_repo.CustomerRepository()
+                _mr.init_db()
+                with st.spinner("正在迁移旧客户数据..."):
+                    _res = _mr.migrate_from_json()
+                _migrated = _res.get("migrated", 0)
+                _skipped = _res.get("skipped", 0)
+                _errors = _res.get("errors", [])
+                st.success(f"✅ 迁移完成：{_migrated} 条迁移，{_skipped} 条跳过，{len(_errors)} 个错误")
+                if _errors:
+                    with st.expander("查看错误详情"):
+                        for _e in _errors[:20]:
+                            st.markdown(f"- {_e}")
+            except Exception as _me:
+                st.error(f"迁移失败：{_me}")
 
     # 跳转CRM工作台（独立站）
     with st.container(border=True):
@@ -2260,8 +2338,8 @@ EN: ...
 
     elif cc_current == "📊 客户管理":
         st.caption("数据总览 · 客户列表 · 客户详情 · 跟进序列 · 线索分层 · 客户公池 · 客户看板 · 待办提醒 · 新增客户")
-        cc_m1, cc_m2, cc_m3, cc_m4, cc_m5, cc_m6, cc_m7, cc_m8, cc_m9 = st.tabs(
-            ["📊 数据总览", "👥 客户列表", "📇 客户详情", "🔄 跟进序列", "🎯 线索分层", "🌊 客户公池", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
+        cc_m1, cc_dash, cc_m2, cc_m3, cc_m4, cc_m5, cc_m6, cc_m7, cc_m8, cc_m9 = st.tabs(
+            ["📊 数据总览", "📊 数据看板", "👥 客户列表", "📇 客户详情", "🔄 跟进序列", "🎯 线索分层", "🌊 客户公池", "🗂️ 客户看板", "⏰ 待办提醒", "➕ 新增客户"])
 
         # 全局函数：获取客户阶段名称（所有tab共用）
         def _stage_name(c):
@@ -2425,6 +2503,101 @@ EN: ...
             except Exception as e:
                 st.error(f"加载失败：{e}")
 
+        # ---------- Tab1.5 数据看板（SQLite repository 聚合统计）----------
+        with cc_dash:
+            st.subheader("📊 数据看板")
+            st.caption("基于 SQLite prospects / outreach_events / follow_up_tasks 的聚合统计 · 无数据时显示0，不显示示例数据")
+            try:
+                try:
+                    import repository as _dash_repo
+                    _dr = _dash_repo.CustomerRepository()
+                    _dr.init_db()
+                    _stats = _dr.get_dashboard_stats()
+                except Exception:
+                    _stats = None
+
+                if _stats is None:
+                    st.warning("数据暂不可用，请先执行数据迁移")
+                else:
+                    # 各来源线索数 + 有效率
+                    st.markdown("**📥 各来源线索数与有效率**")
+                    _by_src = _stats.get("by_source", {}) or {}
+                    _src_rate = _stats.get("source_effective_rate", {}) or {}
+                    if _by_src:
+                        _src_rows = []
+                        for _src, _cnt in sorted(_by_src.items(), key=lambda x: -x[1]):
+                            _rate = _src_rate.get(_src, 0.0)
+                            _src_rows.append({"来源": _src, "线索数": _cnt, "有效率": f"{_rate*100:.1f}%"})
+                        st.dataframe(pd.DataFrame(_src_rows), use_container_width=True, hide_index=True)
+                    else:
+                        st.info("暂无来源数据")
+
+                    # A/B/C/D 数量 + 各销售阶段数量
+                    _dg1, _dg2 = st.columns(2)
+                    with _dg1:
+                        st.markdown("**🏷️ 客户等级分布**")
+                        _bg = _stats.get("by_grade", {}) or {}
+                        if _bg:
+                            st.dataframe(
+                                pd.DataFrame([{"等级": g, "数量": _bg.get(g, 0)} for g in ["A", "B", "C", "D", "unknown"] if _bg.get(g, 0)]),
+                                use_container_width=True, hide_index=True)
+                        else:
+                            st.info("暂无等级数据")
+                    with _dg2:
+                        st.markdown("**🛤️ 各销售阶段数量**")
+                        _bst = _stats.get("by_stage", {}) or {}
+                        if _bst:
+                            st.dataframe(
+                                pd.DataFrame([{"阶段": k, "数量": v} for k, v in _bst.items()]),
+                                use_container_width=True, hide_index=True)
+                        else:
+                            st.info("暂无阶段数据")
+
+                    # 漏斗关键数字
+                    st.markdown("**🎯 漏斗关键指标**")
+                    _fc1, _fc2, _fc3, _fc4, _fc5 = st.columns(5)
+                    _fc1.metric("首次触达", _stats.get("first_outreach_count", 0))
+                    _fc2.metric("回复数", _stats.get("reply_count", 0))
+                    _fc3.metric("正向回复", _stats.get("positive_reply_count", 0))
+                    _fc4.metric("报价数", _stats.get("quote_count", 0))
+                    _fc5.metric("成交数", _stats.get("closed_count", 0))
+
+                    # 转化率
+                    st.markdown("**🔁 各阶段转化率**")
+                    _cr = _stats.get("conversion_rates", {}) or {}
+                    if _cr:
+                        _cr_rows = [
+                            {"转化环节": "线索→已联系", "转化率": f"{_cr.get('lead_to_contacted',0)*100:.1f}%"},
+                            {"转化环节": "已联系→沟通中", "转化率": f"{_cr.get('contacted_to_engaged',0)*100:.1f}%"},
+                            {"转化环节": "沟通中→已报价", "转化率": f"{_cr.get('engaged_to_quoted',0)*100:.1f}%"},
+                            {"转化环节": "已报价→成交", "转化率": f"{_cr.get('quoted_to_closed',0)*100:.1f}%"},
+                            {"转化环节": "线索→成交", "转化率": f"{_cr.get('lead_to_closed',0)*100:.1f}%"},
+                        ]
+                        st.dataframe(pd.DataFrame(_cr_rows), use_container_width=True, hide_index=True)
+                    else:
+                        st.info("暂无转化率数据")
+
+                    # 平均跟进间隔
+                    _avg_int = _stats.get("avg_follow_up_interval")
+                    _avg_txt = f"{_avg_int} 天" if _avg_int is not None else "暂无数据"
+                    st.metric("平均跟进间隔", _avg_txt)
+
+                    # 近30天趋势
+                    st.markdown("**📈 近30天趋势**")
+                    _n1, _n2 = st.columns(2)
+                    _n1.metric("近30天新增客户", _stats.get("last_30_days_new", 0))
+                    _n2.metric("近30天成交", _stats.get("last_30_days_closed", 0))
+                    try:
+                        _trend_df = pd.DataFrame({
+                            "指标": ["近30天新增", "近30天成交"],
+                            "数量": [_stats.get("last_30_days_new", 0), _stats.get("last_30_days_closed", 0)],
+                        }).set_index("指标")
+                        st.bar_chart(_trend_df)
+                    except Exception:
+                        pass
+            except Exception as e:
+                st.error(f"数据暂不可用，请先执行数据迁移：{e}")
+
         # ---------- Tab2 客户列表（表格+高级筛选+详情+跟进记录）----------
         with cc_m2:
             try:
@@ -2457,9 +2630,39 @@ EN: ...
                         key="cl_days"
                     )
 
+                # DNC 快速筛选按钮
+                dnc_only = st.checkbox("🚫 只看 DNC（不联系）客户", key="cl_dnc_only")
+
                 # ===== 应用筛选 =====
                 rows = []
+                _rows_cid = []
+
+                # 全局函数：状态中文名映射（15态新状态机）
+                def _status_cn(raw):
+                    if not raw:
+                        return ""
+                    try:
+                        from customer_status import get_status_info as _gsi, LEGACY_STATUS_MIGRATION as _lsm
+                        _s = str(raw).strip()
+                        if _gsi(_s):
+                            return _gsi(_s)["name"]
+                        if _s in _lsm:
+                            return _gsi(_lsm[_s])["name"]
+                    except Exception:
+                        pass
+                    return str(raw)
+
                 for c in customers:
+                    # DNC 快速筛选
+                    if dnc_only:
+                        try:
+                            _dnc_r = cm.check_dnc(company_name=c.get("company_name"), website=c.get("website"))
+                            if not _dnc_r.get("is_dnc"):
+                                continue
+                        except Exception:
+                            # repository 不可用时，退化为按状态判断
+                            if str(c.get("status", "")).lower() not in ("dnc",) and c.get("status") != "DNC":
+                                continue
                     # 关键词筛选
                     if kw and kw.lower() not in (c.get("company_name", "") + c.get("country", "") + c.get("products", "")).lower():
                         continue
@@ -2499,9 +2702,11 @@ EN: ...
                     rows.append({
                         "公司": c.get("company_name", ""), "国家": c.get("country", ""),
                         "来源": c.get("source", ""), "等级": c.get("grade", "C"),
-                        "阶段": _stage_name(c), "评分": c.get("score", 0),
+                        "阶段": _stage_name(c), "状态": _status_cn(c.get("status", "")),
+                        "评分": c.get("score", 0),
                         "下次跟进": c.get("next_follow_up", ""),
                     })
+                    _rows_cid.append(c["id"])
 
                 # ===== 筛选结果统计 + 导出按钮 =====
                 st.markdown(f"**筛选结果：{len(rows)} 个客户**")
@@ -2607,7 +2812,38 @@ EN: ...
                             st.warning("无数据可导出")
 
                 if rows:
-                    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                    _tbl_sel = st.dataframe(
+                        pd.DataFrame(rows), use_container_width=True, hide_index=True,
+                        on_select="rerun", selection_mode="single-row", key="cl_table_sel")
+                    # ===== 选中行 → 添加跟进任务 =====
+                    _sel_rows = _tbl_sel.selection.get("rows", []) if _tbl_sel and _tbl_sel.selection else []
+                    if _sel_rows:
+                        _idx = _sel_rows[0]
+                        _target_cid = _rows_cid[_idx] if _idx < len(_rows_cid) else None
+                        _target_cust = next((x for x in customers if x["id"] == _target_cid), None)
+                        if _target_cust:
+                            st.markdown(f"**➕ 为「{_target_cust.get('company_name','')}」添加跟进任务**")
+                            with st.form(f"cl_task_form_{_target_cid}"):
+                                _t1, _t2, _t3 = st.columns([3, 1, 1])
+                                with _t1:
+                                    _task_action = st.text_input("动作", placeholder="如：发送报价后跟进邮件")
+                                with _t2:
+                                    _task_due = st.date_input("截止日期")
+                                with _t3:
+                                    _task_pri = st.selectbox("优先级", ["high", "medium", "low"])
+                                if st.form_submit_button("💾 保存跟进任务", use_container_width=True):
+                                    try:
+                                        _res = cm.add_follow_up_task(
+                                            _target_cid, _task_action,
+                                            _task_due.strftime("%Y-%m-%d"),
+                                            priority=_task_pri)
+                                        if _res.get("success"):
+                                            st.success("✅ 跟进任务已保存")
+                                            st.rerun()
+                                        else:
+                                            st.warning(f"未保存：{_res.get('error','未知')}（该客户可能尚未在 SQLite 建档）")
+                                    except Exception as _te:
+                                        st.error(f"保存失败：{_te}")
                 else:
                     st.info("无匹配客户")
 
@@ -2631,6 +2867,222 @@ EN: ...
                     dc3.write(f"**来源**：{cust.get('source','')}　**类型**：{cust.get('customer_type','')}\n**下次跟进**：{cust.get('next_follow_up','未定')}")
                     if cust.get("notes"):
                         st.caption(f"备注：{cust['notes']}")
+
+                    # ===== 解析该客户对应的 SQLite customer_id（新闭环数据）=====
+                    _scid = None
+                    try:
+                        import repository as _det_repo
+                        _dr2 = _det_repo.CustomerRepository()
+                        _dr2.init_db()
+                        if sel.startswith("cust_") and _dr2.get_prospect(sel):
+                            _scid = sel
+                        else:
+                            _pros_list = _dr2.list_prospects(limit=500)
+                            for _p in _pros_list:
+                                if _p.get("legacy_id") == sel:
+                                    _scid = _p["customer_id"]
+                                    break
+                            if not _scid:
+                                _wb = cust.get("website")
+                                _cn = cust.get("company_name")
+                                for _p in _pros_list:
+                                    if _wb and _p.get("website") == _wb:
+                                        _scid = _p["customer_id"]
+                                        break
+                                if not _scid and _cn:
+                                    for _p in _pros_list:
+                                        if _p.get("company_name") == _cn:
+                                            _scid = _p["customer_id"]
+                                            break
+                    except Exception:
+                        _dr2 = None
+
+                    # ===== 1. 跟进任务区域 =====
+                    with st.expander("✅ 跟进任务", expanded=False):
+                        if not _scid:
+                            st.caption("该客户尚未在 SQLite 建档，跟进任务不可用（可先在顶部「数据迁移工具」迁移）。")
+                        else:
+                            try:
+                                _tasks = cm.get_customer_tasks(_scid)
+                            except Exception:
+                                _tasks = []
+                            if _tasks:
+                                from datetime import date as _ddate
+                                _today_s = _ddate.today().strftime("%Y-%m-%d")
+                                for _tk in _tasks:
+                                    _overdue_flag = (_tk.get("status") == "pending"
+                                                     and (_tk.get("due_date") or "") < _today_s)
+                                    _badge = " 🔴逾期" if _overdue_flag else ""
+                                    st.markdown(
+                                        f"- **{_tk.get('action','')}**{_badge}　"
+                                        f"截止:{_tk.get('due_date','')}　优先级:{_tk.get('priority','')}　"
+                                        f"状态:{_tk.get('status','')}"
+                                        + (f"　完成:{(_tk.get('completed_at') or '')[:10]}" if _tk.get("completed_at") else "")
+                                        + (f"　原因:{_tk.get('close_reason')}" if _tk.get("close_reason") else ""))
+                                    if _tk.get("status") == "pending":
+                                        with st.form(f"complete_task_{_tk.get('task_id')}"):
+                                            _close_reason = st.text_input("关闭原因（可选）", key=f"cr_{_tk.get('task_id')}")
+                                            if st.form_submit_button("完成此任务", use_container_width=True):
+                                                try:
+                                                    _dr2.complete_task(_tk.get("task_id"), close_reason=_close_reason)
+                                                    st.success("✅ 任务已完成")
+                                                    st.rerun()
+                                                except Exception as _ce:
+                                                    st.error(f"完成失败：{_ce}")
+                            else:
+                                st.caption("暂无跟进任务")
+                            # 新增任务表单
+                            with st.form("detail_new_task_form"):
+                                st.markdown("**＋ 新增跟进任务**")
+                                _nt1, _nt2, _nt3, _nt4 = st.columns([3, 1, 1, 1])
+                                with _nt1:
+                                    _nt_action = st.text_input("动作", placeholder="如：WhatsApp 跟进报价")
+                                with _nt2:
+                                    _nt_due = st.date_input("截止日期", key="detail_task_due")
+                                with _nt3:
+                                    _nt_owner = st.text_input("负责人", value="")
+                                with _nt4:
+                                    _nt_pri = st.selectbox("优先级", ["high", "medium", "low"])
+                                if st.form_submit_button("💾 新增任务", use_container_width=True):
+                                    try:
+                                        _r = cm.add_follow_up_task(
+                                            _scid, _nt_action, _nt_due.strftime("%Y-%m-%d"),
+                                            owner=_nt_owner, priority=_nt_pri)
+                                        if _r.get("success"):
+                                            st.success("✅ 任务已新增")
+                                            st.rerun()
+                                        else:
+                                            st.warning(f"未保存：{_r.get('error','未知')}")
+                                    except Exception as _ne:
+                                        st.error(f"新增失败：{_ne}")
+
+                    # ===== 2. 活动日志区域 =====
+                    with st.expander("📝 活动日志", expanded=False):
+                        if not _scid:
+                            st.caption("该客户尚未在 SQLite 建档，活动日志不可用。")
+                        else:
+                            try:
+                                _acts_sql = _dr2.list_activities(_scid) if _dr2 else []
+                            except Exception:
+                                _acts_sql = []
+                            if _acts_sql:
+                                for _al in _acts_sql:
+                                    st.markdown(
+                                        f"- `{(_al.get('created_at','') or '')[:16]}` "
+                                        f"**[{_al.get('activity_type','')}]** {_al.get('description','')}")
+                            else:
+                                st.caption("暂无活动日志")
+                            with st.form("detail_new_activity_form"):
+                                st.markdown("**＋ 新增活动记录**")
+                                _at1, _at2 = st.columns([1, 3])
+                                with _at1:
+                                    _new_act_type = st.selectbox("类型", ["note", "email", "whatsapp", "call", "meeting", "quote", "sample"])
+                                with _at2:
+                                    _new_act_desc = st.text_area("描述", height=68)
+                                if st.form_submit_button("💾 记录活动", use_container_width=True):
+                                    try:
+                                        _dr2.add_activity(_scid, _new_act_type, _new_act_desc, created_by="ui")
+                                        st.success("✅ 活动已记录")
+                                        st.rerun()
+                                    except Exception as _ae:
+                                        st.error(f"记录失败：{_ae}")
+
+                    # ===== 3. 网站证据区域 =====
+                    with st.expander("🌐 网站证据", expanded=False):
+                        if not _scid:
+                            st.caption("该客户尚未在 SQLite 建档，网站证据不可用。")
+                        else:
+                            try:
+                                import website_evidence as _we
+                                _ev = _we.get_evidence(_scid)
+                            except Exception:
+                                _ev = None
+                            if _ev:
+                                st.markdown(f"**状态**：`{_ev.get('status','')}`　**抓取时间**：{(_ev.get('fetched_at','') or '')[:19]}")
+                                if _ev.get("title"):
+                                    st.markdown(f"**标题**：{_ev.get('title')}")
+                                if _ev.get("description"):
+                                    st.markdown(f"**描述**：{_ev.get('description')}")
+                                if _ev.get("main_products"):
+                                    st.markdown(f"**主营产品**：{', '.join(_ev.get('main_products', [])[:8])}")
+                                if _ev.get("country"):
+                                    st.markdown(f"**国家**：{_ev.get('country')}")
+                                _cc = _ev.get("contact_clues") or {}
+                                if _cc:
+                                    st.markdown(f"**联系线索**：邮箱{len(_cc.get('emails',[]))} / 电话{len(_cc.get('phones',[]))} / 地址{len(_cc.get('addresses',[]))}")
+                                if _ev.get("error_message"):
+                                    st.warning(f"⚠️ {_ev.get('error_message')}")
+                            else:
+                                st.info("暂无网站证据")
+                            if cust.get("website"):
+                                if st.button("🌐 抓取网站证据", key=f"fetch_ev_{_scid}"):
+                                    try:
+                                        with st.spinner("正在抓取网站证据..."):
+                                            _new_ev = _we.fetch_website_evidence(_scid, cust.get("website"))
+                                        if _new_ev.get("status") == "success":
+                                            st.success("✅ 网站证据抓取成功")
+                                        else:
+                                            st.warning(f"⚠️ 无法验证（状态：{_new_ev.get('status')}），不显示猜测内容")
+                                        st.rerun()
+                                    except Exception as _fe:
+                                        st.error(f"抓取失败：{_fe}")
+                            else:
+                                st.caption("该客户无官网地址，无法抓取证据")
+
+                    # ===== 4. 评估历史区域 =====
+                    with st.expander("📊 评估历史", expanded=False):
+                        if not _scid:
+                            st.caption("该客户尚未在 SQLite 建档，评估历史不可用。")
+                        else:
+                            try:
+                                _evals = _dr2.list_evaluations(customer_id=_scid) if _dr2 else []
+                            except Exception:
+                                _evals = []
+                            if _evals:
+                                for _el in _evals:
+                                    _hb = _el.get("hard_blockers")
+                                    if isinstance(_hb, str):
+                                        try:
+                                            import json as _jj
+                                            _hb = _jj.loads(_hb)
+                                        except Exception:
+                                            _hb = []
+                                    st.markdown(
+                                        f"- `{(_el.get('evaluated_at','') or '')[:16]}` "
+                                        f"ICP **{_el.get('icp_score',0)}**分　"
+                                        f"合格:{'是' if _el.get('eligible') else '否'}　"
+                                        f"阻断:{len(_hb or [])}　"
+                                        f"下一步:{_el.get('recommended_next_action','')}")
+                            else:
+                                st.caption("暂无评估历史")
+
+                    # ===== 5. 草稿历史区域 =====
+                    with st.expander("✉️ 草稿历史", expanded=False):
+                        if not _scid:
+                            st.caption("该客户尚未在 SQLite 建档，草稿历史不可用。")
+                        else:
+                            try:
+                                import content_draft_generator as _cdg
+                                _drafts = _cdg.list_content_drafts(customer_id=_scid)
+                            except Exception:
+                                _drafts = []
+                            _df_filter = st.selectbox("状态筛选", ["全部", "待审核", "已批准", "已拒绝"], key=f"draft_filter_{_scid}")
+                            if _drafts:
+                                for _dr in _drafts:
+                                    _dst = _dr.get("status", "")
+                                    if _df_filter == "待审核" and _dst not in ("draft", "needs_review"):
+                                        continue
+                                    if _df_filter == "已批准" and _dst != "approved":
+                                        continue
+                                    if _df_filter == "已拒绝" and _dst != "rejected":
+                                        continue
+                                    st.markdown(
+                                        f"- `{(_dr.get('created_at','') or '')[:10]}` "
+                                        f"**[{_dr.get('draft_type','')}]** 状态:`{_dst}`　"
+                                        f"主题:{(_dr.get('subject','') or '')[:40]}")
+                            else:
+                                st.caption("暂无草稿历史")
+
                     acts = cust.get("activities", [])
                     if acts:
                         st.markdown("---")
@@ -3678,6 +4130,12 @@ EN: ...
         with cc_m9:
             # ===== 手动新增客户 =====
             st.subheader("➕ 手动新增客户档案")
+            # 15态新状态下拉（中文名 → key）
+            try:
+                from customer_status import CUSTOMER_STATUSES as _CSL
+                _status_opts = {s["name"]: s["key"] for s in _CSL}
+            except Exception:
+                _status_opts = {"新线索": "new_lead"}
             with st.form("new_cust_form"):
                 n1, n2 = st.columns(2)
                 with n1:
@@ -3690,22 +4148,63 @@ EN: ...
                     nc_type = st.selectbox("客户类型", CUSTOMER_TYPES)
                     nc_grade = st.selectbox("等级", ["A", "B", "C", "D"])
                     nc_products = st.text_input("产品需求（可选）")
+                nc_status_name = st.selectbox("初始状态", list(_status_opts.keys()), index=0)
                 nc_stage = st.selectbox("初始阶段", [s["name"] for s in PIPELINE_STAGES])
                 nc_fu = st.number_input("几天后首次跟进提醒（0=不提醒）", 0, 60, 0)
                 if st.form_submit_button("✅ 保存客户", type="primary", use_container_width=True):
                     if not nc_name or not nc_country:
                         st.warning("请填写公司名称和国家")
                     else:
-                        stage_key = next((s["key"] for s in PIPELINE_STAGES if s["name"] == nc_stage), "lead")
-                        _new_c = cm.add_customer({
-                            "company_name": nc_name, "country": nc_country, "city": nc_city,
-                            "website": nc_web, "source": nc_source, "customer_type": nc_type,
-                            "grade": nc_grade, "products": nc_products, "pipeline_stage": stage_key,
-                            "score": 0,
-                        })
-                        if int(nc_fu) > 0 and _new_c:
-                            cm.set_next_follow_up(_new_c["id"], int(nc_fu))
-                        st.success(f"✅ 已添加客户：{nc_name}")
+                        # ---- DNC 检查（命中则禁止添加）----
+                        try:
+                            _dnc_r = cm.check_dnc(company_name=nc_name, website=nc_web or None)
+                        except Exception:
+                            _dnc_r = {"is_dnc": False}
+                        if _dnc_r.get("is_dnc"):
+                            st.error("🚫 该客户命中 DNC / 不联系名单，禁止添加")
+                            for _dm in _dnc_r.get("matches", [])[:5]:
+                                st.markdown(f"- 匹配客户ID: {_dm.get('customer_id')}　原因: {_dm.get('reason','')}")
+                        else:
+                            stage_key = next((s["key"] for s in PIPELINE_STAGES if s["name"] == nc_stage), "lead")
+                            _status_key = _status_opts.get(nc_status_name, "new_lead")
+                            _payload = {
+                                "company_name": nc_name, "country": nc_country, "city": nc_city,
+                                "website": nc_web, "source": nc_source, "customer_type": nc_type,
+                                "grade": nc_grade, "products": nc_products, "pipeline_stage": stage_key,
+                                "status": _status_key, "score": 0,
+                            }
+                            _new_c = cm.add_customer(_payload, check_duplicate=True)
+                            # 重复检测：add_customer 返回 {'success': False, 'error':'duplicate'}
+                            if isinstance(_new_c, dict) and _new_c.get("error") == "duplicate":
+                                st.session_state["_pending_new_cust"] = _payload
+                                st.session_state["_pending_new_cust_fu"] = int(nc_fu)
+                                st.warning("⚠️ 检测到重复客户，请确认是否仍然添加：")
+                                for _m in _new_c.get("matches", [])[:8]:
+                                    st.markdown(f"- 匹配客户ID: {_m.get('customer_id')}　字段: {_m.get('field')}　来源: {_m.get('source')}")
+                            else:
+                                if int(nc_fu) > 0 and _new_c:
+                                    cm.set_next_follow_up(_new_c["id"], int(nc_fu))
+                                st.success(f"✅ 已添加客户：{nc_name}")
+
+            # 重复客户两步确认（仍然添加 / 取消）
+            if st.session_state.get("_pending_new_cust"):
+                st.warning("⚠️ 检测到重复客户，是否仍然添加？")
+                _pc1, _pc2 = st.columns(2)
+                with _pc1:
+                    if st.button("✅ 仍然添加", key="force_add_cust", type="primary"):
+                        _p = st.session_state.pop("_pending_new_cust")
+                        _fu = st.session_state.pop("_pending_new_cust_fu", 0)
+                        _nc = cm.add_customer(_p, check_duplicate=False)
+                        if _fu > 0 and _nc:
+                            cm.set_next_follow_up(_nc["id"], _fu)
+                        st.success(f"✅ 已强制添加客户：{_p.get('company_name')}")
+                        st.rerun()
+                with _pc2:
+                    if st.button("❌ 取消", key="cancel_add_cust"):
+                        st.session_state.pop("_pending_new_cust", None)
+                        st.session_state.pop("_pending_new_cust_fu", None)
+                        st.info("已取消添加")
+                        st.rerun()
 
             st.markdown("---")
 
@@ -9755,6 +10254,9 @@ elif page == "🎯 精准客户开发":
             pack_options["（无 Pack - 仅内部评估）"] = None
             selected_pack = st.selectbox("Knowledge Pack（仅 approved 可选）", list(pack_options.keys()), key="eval_pack")
 
+            # 抓取网站证据复选框（默认勾选）
+            fetch_evidence = st.checkbox("抓取网站证据（自动访问客户官网核实信息）", value=True, key="eval_fetch_evidence")
+
             submitted = st.form_submit_button("开始评估", use_container_width=True)
 
         if submitted:
@@ -9763,6 +10265,39 @@ elif page == "🎯 精准客户开发":
             else:
                 customer_id = f"cust_{company_name.lower().replace(' ', '_')[:20]}_{hashlib.md5(company_name.encode()).hexdigest()[:6]}"
                 pack_ref = {'pack_id': pack_options[selected_pack]} if pack_options[selected_pack] else None
+
+                # ===== 可选：抓取网站证据 =====
+                website_evidence = None
+                if fetch_evidence:
+                    try:
+                        import website_evidence as _we2
+                        _safe, _why = _we2.is_safe_url(website)
+                        if not _safe:
+                            st.error(f"⚠️ 网站 URL 不安全，停止抓取：{_why}")
+                            st.stop()
+                        with st.spinner("正在抓取网站证据..."):
+                            website_evidence = _we2.fetch_website_evidence(customer_id, website)
+                        # 证据展示 expander
+                        with st.expander("🌐 网站证据抓取结果", expanded=True):
+                            st.markdown(f"**状态**：`{website_evidence.get('status','')}`　**抓取时间**：{website_evidence.get('fetched_at','')[:19]}")
+                            if website_evidence.get("title"):
+                                st.markdown(f"**标题**：{website_evidence.get('title')}")
+                            if website_evidence.get("description"):
+                                st.markdown(f"**描述**：{website_evidence.get('description')}")
+                            if website_evidence.get("main_products"):
+                                st.markdown(f"**主营产品**：{', '.join(website_evidence.get('main_products', [])[:8])}")
+                            if website_evidence.get("country"):
+                                st.markdown(f"**国家**：{website_evidence.get('country')}")
+                            _cc = website_evidence.get("contact_clues") or {}
+                            if _cc:
+                                st.markdown(f"**联系线索**：邮箱{len(_cc.get('emails',[]))} / 电话{len(_cc.get('phones',[]))} / 地址{len(_cc.get('addresses',[]))}")
+                            if website_evidence.get("evidence_snippets"):
+                                st.markdown(f"**证据片段**：{len(website_evidence.get('evidence_snippets', []))} 条")
+                            if website_evidence.get("status") not in ("success", "too_large"):
+                                st.warning("⚠️ 网站无法验证，以下信息不可作为事实依据（AI 不会据此猜测）")
+                    except Exception as _we_err:
+                        st.warning(f"网站证据抓取异常：{_we_err}")
+                        website_evidence = None
 
                 with st.spinner("正在评估客户..."):
                     result = pe.evaluate_customer_icp({
@@ -9775,7 +10310,7 @@ elif page == "🎯 精准客户开发":
                         'main_products': main_products,
                         'source_document': source_document,
                         'source_url': source_url,
-                    }, pack_ref=pack_ref)
+                    }, pack_ref=pack_ref, website_evidence=website_evidence)
 
                 if result['success']:
                     st.success(f"评估完成 · ICP 分数: {result['icp_score']}/100")
@@ -9785,6 +10320,15 @@ elif page == "🎯 精准客户开发":
                         st.error(f"⚠️ 存在 {len(result['hard_blockers'])} 个硬性阻断，禁止对外开发")
                         for blocker in result['hard_blockers']:
                             st.markdown(f"- {blocker}")
+                            # 重复客户检测结果：显示匹配 customer_id 和字段
+                            if 'duplicate' in str(blocker).lower():
+                                for _ev_item in result.get('evidence', []):
+                                    if _ev_item.get('type') == 'duplicate_detection':
+                                        for _dm in _ev_item.get('matches', [])[:8]:
+                                            st.markdown(f"  - 匹配客户ID: `{_dm.get('customer_id')}`　字段: {_dm.get('field')}　来源: {_dm.get('source')}")
+                            # DNC 检查结果：红色警告
+                            if 'dnc' in str(blocker).lower() or 'do-not-contact' in str(blocker).lower():
+                                st.error("🚫 DNC / 不联系名单命中，禁止对外触达")
                     else:
                         st.success("✅ 无硬性阻断，可进入对外开发流程")
 
@@ -9805,11 +10349,42 @@ elif page == "🎯 精准客户开发":
                             st.markdown(f"- {flag}")
 
                     if result['missing_evidence']:
-                        st.info("缺失证据:")
+                        st.info("缺失证据（明确列出）:")
                         for missing in result['missing_evidence']:
                             st.markdown(f"- {missing}")
+                    else:
+                        st.caption("无缺失证据")
 
-                    st.info(f"建议下一步: {result['recommended_next_action']}")
+                    # 推荐下一步动作突出显示
+                    st.info(f"👉 **推荐下一步动作**：{result['recommended_next_action']}")
+
+                    # ===== 评估完成后自动保存到 repository prospects 表 =====
+                    try:
+                        import repository as _eval_repo
+                        _er = _eval_repo.CustomerRepository()
+                        _er.init_db()
+                        _has_blocker = len(result.get('hard_blockers', [])) > 0
+                        _auto_status = 'pending_verification' if _has_blocker else ('verified' if result.get('eligible') else 'pending_verification')
+                        if not _er.get_prospect(customer_id):
+                            _er.add_prospect({
+                                'customer_id': customer_id,
+                                'company_name': company_name,
+                                'website': website,
+                                'country': country,
+                                'buyer_type': buyer_type,
+                                'product_categories': [p.strip() for p in product_categories.split(',') if p.strip()] if product_categories else [],
+                                'main_products': main_products,
+                                'status': _auto_status,
+                                'score': result.get('icp_score', 0),
+                            })
+                            st.caption(f"✅ 已自动建档到客户库（状态: {_auto_status}）")
+                        else:
+                            _er.update_prospect(customer_id, {
+                                'company_name': company_name, 'website': website,
+                                'country': country, 'score': result.get('icp_score', 0),
+                            })
+                    except Exception as _save_e:
+                        st.caption(f"自动建档跳过：{_save_e}")
 
                     # 保存到 session 供草稿页面使用
                     st.session_state['last_eval_customer_id'] = customer_id
@@ -9838,7 +10413,23 @@ elif page == "🎯 精准客户开发":
                                format_func=lambda x: "标准（四节点链）" if x == "standard" else "深度推理（三节点链）")
             use_mock = st.checkbox("使用 Mock 生成（不调用真实 AI）", value=True, key="draft_mock")
 
-        if st.button("生成草稿", use_container_width=True, type="primary"):
+        # ===== 触达前置检查：不允许触达则禁用生成按钮 =====
+        _outreach_allowed = True
+        _outreach_reason = ""
+        if customer_id_input:
+            try:
+                _oc = cm.is_outreach_allowed(customer_id_input)
+                _outreach_allowed = bool(_oc.get("allowed"))
+                _outreach_reason = _oc.get("reason", "")
+                if not _outreach_allowed:
+                    st.error(f"🚫 该客户当前禁止触达，无法生成对外草稿：{_outreach_reason}")
+                    for _om in _oc.get("matches", [])[:3]:
+                        st.markdown(f"- 匹配客户ID: {_om.get('customer_id')}　原因: {_om.get('reason','')}")
+            except Exception:
+                _outreach_allowed = True
+
+        if st.button("生成草稿", use_container_width=True, type="primary",
+                     disabled=(not _outreach_allowed)):
             if not customer_id_input:
                 st.error("请先在评估页面完成客户评估")
             else:
@@ -9849,9 +10440,13 @@ elif page == "🎯 精准客户开发":
                         language=language,
                         mode=mode,
                         use_mock=use_mock,
+                        auto_fetch_evidence=True,
                     )
 
                 if result['success']:
+                    # 低证据草稿警告
+                    if result.get('low_evidence'):
+                        st.warning("⚠️ 待核实草稿 - 低证据客户，不可直接对外发送")
                     if result['internal_only']:
                         st.warning("⚠️ 此草稿为内部草稿，不可直接对外发送")
                     else:
@@ -9872,32 +10467,48 @@ elif page == "🎯 精准客户开发":
                         st.caption(f"Pack: {result.get('knowledge_pack_id') or '无'}")
                         st.caption(f"版本: {result.get('knowledge_pack_version') or '无'}")
 
-                    # 事实依据
-                    with st.expander("📚 事实依据与风险"):
-                        if result['confirmed_claims']:
-                            st.markdown("**已确认事实:**")
+                    # ===== 证据来源标注 =====
+                    with st.expander("📚 证据来源与事实依据", expanded=True):
+                        st.markdown("**✅ 已验证事实（来自网站抓取）:**")
+                        if result.get('confirmed_claims'):
                             for claim in result['confirmed_claims']:
                                 st.markdown(f"- {claim}")
-                        if result['inferred_claims']:
-                            st.markdown("**推断内容（需人工核实）:**")
+                        else:
+                            st.caption("（无）")
+                        st.markdown("**👤 客户输入:**")
+                        _csnap = result.get('customer_snapshot') or {}
+                        if _csnap:
+                            st.markdown(f"- 公司: {_csnap.get('company_name','')}　官网: {_csnap.get('website','')}　国家: {_csnap.get('country','')}")
+                        else:
+                            st.caption("（无）")
+                        st.markdown("**🤖 AI 推测（需人工核实）:**")
+                        if result.get('inferred_claims'):
                             for claim in result['inferred_claims']:
                                 st.markdown(f"- {claim}")
-                        if result['missing_information']:
-                            st.markdown("**缺失信息:**")
+                        else:
+                            st.caption("（无）")
+                        st.markdown("**❓ 缺失信息:**")
+                        if result.get('missing_information'):
                             for info in result['missing_information']:
                                 st.markdown(f"- {info}")
-                        if result['risk_flags']:
-                            st.markdown("**风险提示:**")
+                        else:
+                            st.caption("（无）")
+                        if result.get('risk_flags'):
+                            st.markdown("**⚠️ 风险提示:**")
                             for flag in result['risk_flags']:
                                 st.markdown(f"- {flag}")
 
-                    # 审核操作
-                    col1, col2 = st.columns(2)
+                    # 审核操作：已审核 / 待核实 / 拒绝
+                    col1, col2, col3 = st.columns(3)
                     with col1:
                         if st.button("标记为已审核", key=f"approve_{result['draft_id']}"):
                             cdg.update_draft_status(result['draft_id'], 'approved')
                             st.success("已标记为 approved")
                     with col2:
+                        if st.button("标记为待核实", key=f"verify_{result['draft_id']}"):
+                            cdg.update_draft_status(result['draft_id'], 'draft')
+                            st.warning("已标记为待核实（draft）")
+                    with col3:
                         if st.button("拒绝", key=f"reject_{result['draft_id']}"):
                             cdg.update_draft_status(result['draft_id'], 'rejected')
                             st.warning("已标记为 rejected")

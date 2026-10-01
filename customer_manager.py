@@ -11,6 +11,52 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from config import CUSTOMERS_FILE, CUSTOMER_GRADES
 
+# ============ 统一状态机（P1.3）可选导入 ============
+# 新模块不可用时，现有 JSON 功能不受影响：降级为直通/空映射
+try:
+    from customer_status import (
+        CUSTOMER_STATUSES,
+        LEGACY_STATUS_MIGRATION,
+        is_outreach_blocked,
+        validate_transition,
+        STATUS_TO_PIPELINE_V2,
+        migrate_legacy_status,
+    )
+    _UNIFIED_STATUS_AVAILABLE = True
+except Exception:  # pragma: no cover - 降级路径
+    CUSTOMER_STATUSES = []
+    LEGACY_STATUS_MIGRATION = {}
+    STATUS_TO_PIPELINE_V2 = {}
+    _UNIFIED_STATUS_AVAILABLE = False
+
+    def is_outreach_blocked(status_key):  # type: ignore
+        return (False, "")
+
+    def validate_transition(from_status, to_status):  # type: ignore
+        return (True, "")
+
+    def migrate_legacy_status(legacy_status):  # type: ignore
+        return legacy_status or "new_lead"
+
+# ============ repository（SQLite）可选导入 ============
+try:
+    import repository as _repo
+    _REPO_AVAILABLE = True
+except Exception:  # pragma: no cover - 降级路径
+    _repo = None
+    _REPO_AVAILABLE = False
+
+
+def _get_repo():
+    """惰性创建 CustomerRepository；不可用时返回 None。"""
+    if not _REPO_AVAILABLE:
+        return None
+    try:
+        return _repo.CustomerRepository()
+    except Exception:
+        return None
+
+
 # 销售管道5阶段
 PIPELINE_STAGES = [
     {"key": "lead", "name": "线索", "color": "#6c757d", "description": "刚发现，尚未联系"},
@@ -20,7 +66,7 @@ PIPELINE_STAGES = [
     {"key": "closed", "name": "已成交", "color": "#28a745", "description": "已下单成交"},
 ]
 
-# 客户状态映射到管道阶段
+# 客户状态映射到管道阶段（旧中文状态，向后兼容）
 STATUS_TO_PIPELINE = {
     "新客户": "lead",
     "跟进中": "contacted",
@@ -28,6 +74,31 @@ STATUS_TO_PIPELINE = {
     "已成交": "closed",
     "已流失": "lead",
 }
+
+
+def _valid_status_keys():
+    """返回所有合法新状态 key 集合。"""
+    return {s["key"] for s in CUSTOMER_STATUSES}
+
+
+def _normalize_status(raw_status):
+    """将传入状态规范化为新状态 key。
+
+    - 已是合法新状态 key：原样保留
+    - 旧中文状态：用 migrate_legacy_status 迁移
+    - 空/未知：回退 new_lead
+    - 状态机不可用：原样返回（向后兼容）
+    """
+    if not raw_status:
+        return "new_lead"
+    s = str(raw_status).strip()
+    if not _UNIFIED_STATUS_AVAILABLE:
+        return s or "new_lead"
+    if s in _valid_status_keys():
+        return s
+    if s in LEGACY_STATUS_MIGRATION:
+        return migrate_legacy_status(s)
+    return "new_lead"
 
 
 class CustomerManager:
@@ -74,13 +145,52 @@ class CustomerManager:
         # 极端情况：10次都冲突，用更长的ID
         return str(uuid.uuid4())[:12]
 
-    def add_customer(self, customer_data):
-        """添加客户"""
+    def _resolve_pipeline_stage(self, status, default="lead"):
+        """根据状态解析管道阶段：新状态用 V2 映射，旧中文用旧映射。"""
+        if _UNIFIED_STATUS_AVAILABLE and status in STATUS_TO_PIPELINE_V2:
+            return STATUS_TO_PIPELINE_V2.get(status, default)
+        return STATUS_TO_PIPELINE.get(status, default)
+
+    def _primary_email_of(self, customer):
+        """从客户记录中提取主邮箱（兼容 emails 列表与 email 字段）。"""
+        emails = customer.get("emails")
+        if isinstance(emails, list) and emails:
+            for e in emails:
+                if isinstance(e, dict) and e.get("email"):
+                    return e["email"]
+                if isinstance(e, str) and e:
+                    return e
+        return customer.get("email") or None
+
+    def add_customer(self, customer_data, check_duplicate=True):
+        """添加客户。
+
+        check_duplicate=True 时先调用 repository 做重复检测，
+        命中重复则不写入，返回 {'success': False, 'error': 'duplicate', 'matches': [...]}。
+        status 默认 "new_lead"；传入旧中文状态时自动迁移为新状态 key。
+        """
+        # 可选：重复检测（repository 不可用时跳过）
+        if check_duplicate:
+            dup = self.check_duplicate_customer(
+                company_name=customer_data.get("company_name"),
+                website=customer_data.get("website"),
+                email=self._primary_email_of(customer_data) or customer_data.get("email"),
+            )
+            if dup and dup.get("is_duplicate"):
+                return {
+                    "success": False,
+                    "error": "duplicate",
+                    "matches": dup.get("matches", []),
+                }
+
         data = self._load()
         existing_ids = {c.get("id") for c in data}
-        # 确保有pipeline_stage
-        status = customer_data.get("status", "新客户")
-        pipeline_stage = customer_data.get("pipeline_stage", STATUS_TO_PIPELINE.get(status, "lead"))
+        # 状态规范化：默认 new_lead，旧中文状态自动迁移
+        status = _normalize_status(customer_data.get("status", "new_lead"))
+        if "pipeline_stage" in customer_data:
+            pipeline_stage = customer_data.get("pipeline_stage")
+        else:
+            pipeline_stage = self._resolve_pipeline_stage(status, "lead")
         customer = {
             "id": self._gen_unique_id(existing_ids),
             "created_at": datetime.now().isoformat(),
@@ -98,18 +208,54 @@ class CustomerManager:
             "notes": "",
             **customer_data,
         }
+        # **customer_data 可能覆盖 status/pipeline_stage，这里再以规范化结果为准
+        customer["status"] = status
+        customer["pipeline_stage"] = pipeline_stage
         data.append(customer)
         self._save(data)
         return customer
 
-    def update_customer(self, customer_id, updates):
-        """更新客户信息"""
+    def _write_update(self, customer_id, updates):
+        """无状态校验地写入更新（move_stage 等粗粒度操作走此路径）。"""
         data = self._load()
         for c in data:
             if c["id"] == customer_id:
+                if "status" in updates and "pipeline_stage" not in updates:
+                    updates["pipeline_stage"] = self._resolve_pipeline_stage(
+                        updates["status"], c.get("pipeline_stage", "lead"))
+                c.update(updates)
+                c["updated_at"] = datetime.now().isoformat()
+                self._save(data)
+                return c
+        return None
+
+    def update_customer(self, customer_id, updates):
+        """更新客户信息；若更新 status，先校验状态转移合法性。
+
+        转移不合法时不更新，返回 None，并在 notes 中记录拒绝原因。
+        """
+        data = self._load()
+        for c in data:
+            if c["id"] == customer_id:
+                # 状态转移校验
+                if "status" in updates:
+                    old_norm = _normalize_status(c.get("status", "new_lead"))
+                    new_norm = _normalize_status(updates["status"])
+                    if _UNIFIED_STATUS_AVAILABLE and old_norm != new_norm:
+                        ok, reason = validate_transition(old_norm, new_norm)
+                        if not ok:
+                            c["notes"] = (
+                                (c.get("notes", "") or "")
+                                + f" [状态转移被拒绝: {c.get('status')}→{updates['status']} ({reason})]"
+                            ).strip()
+                            c["updated_at"] = datetime.now().isoformat()
+                            self._save(data)
+                            return None
+                    updates["status"] = new_norm
                 # 如果更新了status，同步更新pipeline_stage
                 if "status" in updates and "pipeline_stage" not in updates:
-                    updates["pipeline_stage"] = STATUS_TO_PIPELINE.get(updates["status"], c.get("pipeline_stage", "lead"))
+                    updates["pipeline_stage"] = self._resolve_pipeline_stage(
+                        updates["status"], c.get("pipeline_stage", "lead"))
                 c.update(updates)
                 c["updated_at"] = datetime.now().isoformat()
                 self._save(data)
@@ -117,13 +263,18 @@ class CustomerManager:
         return None
 
     def move_stage(self, customer_id, new_stage):
-        """移动客户到新的管道阶段"""
+        """移动客户到新的管道阶段（保留现有逻辑，支持新状态 key）。
+
+        管道阶段为粗粒度视图，直接写库不经过严格状态机校验，
+        映射到对应新状态 key。
+        """
         stage_map = {s["key"]: s["name"] for s in PIPELINE_STAGES}
-        status_map = {"lead": "新客户", "contacted": "跟进中", "engaged": "跟进中",
-                      "quoted": "已报价", "closed": "已成交"}
-        return self.update_customer(customer_id, {
+        # 新状态 key 映射（旧中文映射保留在 STATUS_TO_PIPELINE 中兼容）
+        status_map = {"lead": "new_lead", "contacted": "sent", "engaged": "in_communication",
+                      "quoted": "quoted", "closed": "closed_won"}
+        return self._write_update(customer_id, {
             "pipeline_stage": new_stage,
-            "status": status_map.get(new_stage, "新客户"),
+            "status": status_map.get(new_stage, "new_lead"),
         })
 
     def delete_customer(self, customer_id):
@@ -259,6 +410,111 @@ class CustomerManager:
             writer.writeheader()
             writer.writerows(data)
         return True
+
+    # ============ DNC / 重复检测（repository） ============
+
+    def check_duplicate_customer(self, company_name=None, website=None, email=None):
+        """重复客户检测，调用 repository.check_duplicate()。"""
+        repo = _get_repo()
+        if repo is None:
+            return {"is_duplicate": False, "matches": [], "error": "repository_unavailable"}
+        try:
+            return repo.check_duplicate(company_name=company_name, website=website, email=email)
+        except Exception as e:
+            return {"is_duplicate": False, "matches": [], "error": str(e)}
+
+    def check_dnc(self, company_name=None, website=None, email=None):
+        """DNC 检测，调用 repository.check_dnc()。"""
+        repo = _get_repo()
+        if repo is None:
+            return {"is_dnc": False, "matches": [], "error": "repository_unavailable"}
+        try:
+            return repo.check_dnc(company_name=company_name, website=website, email=email)
+        except Exception as e:
+            return {"is_dnc": False, "matches": [], "error": str(e)}
+
+    def is_outreach_allowed(self, customer_id):
+        """检查客户是否允许触达：状态阻断 + DNC 名单。
+
+        Returns:
+            {'allowed': bool, 'reason': str, 'source': str}
+        """
+        c = self.get_customer(customer_id)
+        if not c:
+            return {"allowed": False, "reason": "customer_not_found", "source": "customer_manager"}
+
+        status = _normalize_status(c.get("status", "new_lead"))
+        blocked, reason = is_outreach_blocked(status)
+        if blocked:
+            return {"allowed": False, "reason": reason, "source": "customer_status"}
+
+        dnc = self.check_dnc(
+            company_name=c.get("company_name"),
+            website=c.get("website"),
+            email=self._primary_email_of(c),
+        )
+        if dnc.get("is_dnc"):
+            return {
+                "allowed": False,
+                "reason": "客户在 DNC / 不联系名单中",
+                "source": "suppression_list",
+                "matches": dnc.get("matches", []),
+            }
+        return {"allowed": True, "reason": "", "source": ""}
+
+    # ============ 跟进任务（repository follow_up_tasks） ============
+
+    def add_follow_up_task(self, customer_id, action, due_date, owner="", priority="medium"):
+        """新增跟进任务，调用 repository.add_task()。"""
+        repo = _get_repo()
+        if repo is None:
+            return {"success": False, "error": "repository_unavailable"}
+        try:
+            return repo.add_task(customer_id, action, due_date, owner=owner, priority=priority)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def get_customer_tasks(self, customer_id):
+        """获取某客户的全部任务，调用 repository.list_tasks()。"""
+        repo = _get_repo()
+        if repo is None:
+            return []
+        try:
+            return repo.list_tasks(customer_id=customer_id)
+        except Exception:
+            return []
+
+    def get_today_follow_up_tasks(self):
+        """获取今天到期的待办任务，调用 repository.get_today_tasks()。"""
+        repo = _get_repo()
+        if repo is None:
+            return []
+        try:
+            return repo.get_today_tasks()
+        except Exception:
+            return []
+
+    def get_overdue_tasks(self):
+        """获取逾期任务，调用 repository.get_overdue_tasks()。"""
+        repo = _get_repo()
+        if repo is None:
+            return []
+        try:
+            return repo.get_overdue_tasks()
+        except Exception:
+            return []
+
+    # ============ 活动日志（repository activity_log） ============
+
+    def log_activity(self, customer_id, activity_type, description, metadata=None):
+        """写 SQLite activity_log 表（与现有 JSON activities 字段互补）。"""
+        repo = _get_repo()
+        if repo is None:
+            return {"success": False, "error": "repository_unavailable"}
+        try:
+            return repo.add_activity(customer_id, activity_type, description, metadata=metadata)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
 
 # 全局单例

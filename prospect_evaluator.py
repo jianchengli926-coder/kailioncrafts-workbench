@@ -21,6 +21,32 @@ from urllib.parse import urlparse
 
 import knowledge_facts as kf
 
+# ============ repository / website_evidence 可选导入 ============
+# 新模块不可用时，现有评估流程不受影响
+try:
+    import repository as _repo
+    _REPO_AVAILABLE = True
+except Exception:  # pragma: no cover - 降级路径
+    _repo = None
+    _REPO_AVAILABLE = False
+
+try:
+    import website_evidence as _we
+    _WEBSITE_EVIDENCE_AVAILABLE = True
+except Exception:  # pragma: no cover - 降级路径
+    _we = None
+    _WEBSITE_EVIDENCE_AVAILABLE = False
+
+
+def _get_repo():
+    """惰性创建 CustomerRepository；不可用返回 None。"""
+    if not _REPO_AVAILABLE:
+        return None
+    try:
+        return _repo.CustomerRepository()
+    except Exception:
+        return None
+
 DB_PATH = Path(__file__).parent / "data" / "workbench.db"
 
 IDENTITY_STATUSES = ["verified", "partial", "unresolved"]
@@ -212,6 +238,27 @@ def detect_duplicate_customer(customer_input: Dict) -> Dict:
     finally:
         c.close()
 
+    # 检查 repository prospects 表（统一 SQLite 层）
+    repo = _get_repo()
+    if repo is not None:
+        try:
+            dup = repo.check_duplicate(
+                company_name=customer_input.get('company_name'),
+                website=customer_input.get('website'),
+                email=customer_input.get('email'),
+            )
+            for m in dup.get('matches', []):
+                results.append({
+                    'matched_customer_id': m.get('customer_id', 'unknown'),
+                    'matched_field': m.get('field', 'unknown'),
+                    'matched_value_hash': hashlib.md5(
+                        str(m.get('customer_id', '')).encode()).hexdigest()[:16],
+                    'confidence': m.get('confidence', 0.9),
+                    'source': 'repository',
+                })
+        except Exception:
+            pass
+
     # 去重
     seen = set()
     unique_results = []
@@ -255,6 +302,25 @@ def check_dnc(customer_input: Dict) -> Dict:
                             'reason': 'DNC标记',
                             'detected_at': _now(),
                         })
+        except Exception:
+            pass
+
+    # 检查 repository suppression_list + prospects.status=dnc
+    repo = _get_repo()
+    if repo is not None:
+        try:
+            d = repo.check_dnc(
+                company_name=customer_input.get('company_name'),
+                website=customer_input.get('website'),
+                email=customer_input.get('email'),
+            )
+            for m in d.get('matches', []):
+                dnc_matches.append({
+                    'matched_customer_id': m.get('customer_id') or m.get('suppression_id') or 'unknown',
+                    'reason': m.get('reason') or m.get('source') or 'suppression_list',
+                    'detected_at': _now(),
+                    'source': 'repository',
+                })
         except Exception:
             pass
 
@@ -439,10 +505,13 @@ def _check_product_facts_available(pack: Dict, customer_input: Dict) -> Tuple[bo
 
 
 def evaluate_customer_icp(customer_input: Dict, pack_ref: Optional[Dict] = None,
-                          evaluated_by: str = "system") -> Dict:
+                          evaluated_by: str = "system",
+                          website_evidence: Optional[Dict] = None) -> Dict:
     """
     评估客户 ICP，返回完整评估结果。
     pack_ref: {'pack_id': ..., 'pack_version': ...} 或 None
+    website_evidence: 外部已抓取的网站证据（dict），传入则不重复抓取；
+                      若 customer_input.fetch_website=True 且本参数为 None，则自动抓取。
     """
     init_db()
     now = _now()
@@ -452,6 +521,26 @@ def evaluate_customer_icp(customer_input: Dict, pack_ref: Optional[Dict] = None,
     risk_flags = []
     evidence = []
     missing_evidence = []
+
+    # 0. 可选：抓取网站证据（SSRF/robots 安全检查在 website_evidence 内部完成）
+    if website_evidence is None and customer_input.get("fetch_website") and _WEBSITE_EVIDENCE_AVAILABLE:
+        try:
+            _url = customer_input.get("website", "")
+            _cid = customer_input.get("customer_id", "")
+            if _url and _we.is_safe_url(_url)[0]:
+                website_evidence = _we.fetch_website_evidence(_cid, _url)
+        except Exception:
+            website_evidence = None
+    if website_evidence:
+        evidence.append({
+            'type': 'website_evidence',
+            'status': website_evidence.get('status'),
+            'title': website_evidence.get('title', ''),
+            'main_products': website_evidence.get('main_products', []),
+            'country': website_evidence.get('country', ''),
+        })
+        if website_evidence.get('status') not in ('success', 'too_large'):
+            risk_flags.append(f"网站证据抓取失败/受限: {website_evidence.get('status')}")
 
     # 1. 身份验证检查
     identity_status = 'unresolved'
@@ -620,6 +709,33 @@ def evaluate_customer_icp(customer_input: Dict, pack_ref: Optional[Dict] = None,
     finally:
         c.close()
 
+    # 同步保存到统一 evaluations 表（repository），失败不影响主流程
+    repo = _get_repo()
+    if repo is not None:
+        try:
+            repo.save_evaluation({
+                'customer_id': customer_input.get('customer_id', ''),
+                'company_name': customer_input.get('company_name', ''),
+                'website': customer_input.get('website', ''),
+                'country': customer_input.get('country', ''),
+                'buyer_type': buyer_type,
+                'identity_status': identity_status,
+                'product_fit': product_fit,
+                'market_fit': market_fit,
+                'icp_score': score,
+                'eligible': int(eligible),
+                'hard_blockers': hard_blockers,
+                'risk_flags': risk_flags,
+                'missing_evidence': missing_evidence,
+                'evidence': evidence,
+                'recommended_next_action': recommended_next_action,
+                'knowledge_pack_id': pack_id,
+                'knowledge_pack_version': pack_version,
+                'evaluated_by': evaluated_by,
+            })
+        except Exception:
+            pass
+
     return {
         'success': True,
         'evaluation_id': evaluation_id,
@@ -715,3 +831,64 @@ def list_customer_evaluations(customer_id: Optional[str] = None, limit: int = 50
         d['eligible'] = bool(d['eligible'])
         results.append(d)
     return results
+
+
+# ============ 网站证据 + ICP 评估（P1.3 增强） ============
+
+def evaluate_with_website_evidence(customer_input: Dict,
+                                   pack_ref: Optional[Dict] = None) -> Dict:
+    """先抓取网站证据，再执行 ICP 评估，返回合并结果。
+
+    不自动发送任何消息；抓取失败时返回空/失败证据，评估照常进行。
+    """
+    website_evidence = None
+    if _WEBSITE_EVIDENCE_AVAILABLE:
+        _url = customer_input.get('website', '')
+        _cid = customer_input.get('customer_id', '')
+        if _url:
+            try:
+                if _we.is_safe_url(_url)[0]:
+                    website_evidence = _we.fetch_website_evidence(_cid, _url)
+            except Exception:
+                website_evidence = None
+    result = evaluate_customer_icp(customer_input, pack_ref=pack_ref,
+                                   website_evidence=website_evidence)
+    result['website_evidence'] = website_evidence
+    return result
+
+
+def get_customer_evaluation_summary(customer_id: str) -> Dict:
+    """从 repository evaluations 表获取最新评估，返回精简摘要。
+
+    Returns:
+        {success, icp_score, eligible, hard_blockers, product_fit,
+         market_fit, recommended_next_action}
+    """
+    repo = _get_repo()
+    if repo is None:
+        return {'success': False, 'error': 'repository_unavailable'}
+    try:
+        ev = repo.get_latest_evaluation(customer_id)
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    if not ev:
+        return {'success': False, 'error': 'no_evaluation'}
+
+    def _load(v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                return v
+        return v
+
+    return {
+        'success': True,
+        'customer_id': customer_id,
+        'icp_score': ev.get('icp_score', 0),
+        'eligible': bool(ev.get('eligible', 0)),
+        'hard_blockers': _load(ev.get('hard_blockers')) or [],
+        'product_fit': ev.get('product_fit', 'unknown'),
+        'market_fit': ev.get('market_fit', 'unknown'),
+        'recommended_next_action': ev.get('recommended_next_action', ''),
+    }

@@ -2651,6 +2651,12 @@ function confirmCampaignRestore(campaignId){
 
 // 创建 Campaign 表单
 function openCreateCampaignModal(){
+  const approvedPacks = getApprovedPacksForSelect();
+  let packOptions = '<option value="">不绑定（历史模式）</option>';
+  approvedPacks.forEach(p => {
+    const label = p.name + ' · v' + (p.version||1) + (p.productScope ? ' · ' + p.productScope : '');
+    packOptions += '<option value="' + esc(p.packId) + '">' + esc(label) + '</option>';
+  });
   const html = `
     <div class="modal-head"><h3>新建 Campaign</h3><span class="modal-close" onclick="closeModal()">×</span></div>
     <div class="modal-body">
@@ -2694,6 +2700,13 @@ function openCreateCampaignModal(){
             <option value="online_safe">online_safe（仅 public）</option>
             <option value="local_only">local_only（public + internal）</option>
           </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">知识包（Knowledge Pack）</label>
+          <select id="cf_knowledgePackId" style="width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px">
+            ${packOptions}
+          </select>
+          <div style="font-size:10px;color:#8b949e;margin-top:3px">仅显示已批准且未归档的 Pack</div>
         </div>
         <div>
           <label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px;font-weight:600">ICP 版本（可选）</label>
@@ -2743,7 +2756,8 @@ function submitCampaignForm(){
     icpVersionId: document.getElementById('cf_icpVersionId').value.trim() || null,
     owner: document.getElementById('cf_owner').value.trim(),
     tags: parseCsvField(document.getElementById('cf_tags').value),
-    notes: document.getElementById('cf_notes').value.trim()
+    notes: document.getElementById('cf_notes').value.trim(),
+    knowledgePackId: document.getElementById('cf_knowledgePackId').value || null
   };
 
   const result = createCampaign(input);
@@ -2815,6 +2829,9 @@ function viewCampaignDetail(root, campaignId){
       </div>
       ${campaign.description ? `<div style="margin-top:8px;color:#4a5568">${esc(campaign.description)}</div>` : ''}
     </div>
+
+    <!-- 知识依据（P2.1B） -->
+    ${renderCampaignKnowledgeSection(campaign)}
 
     <!-- 概览统计 -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px">
@@ -4203,6 +4220,504 @@ function getCampaignCustomerQualification(campaignId, customerId){
     eligible: eligibility.eligible === true,
     note: 'ICP score 仅为建议，hardBlockers 优先级高于 score'
   };
+}
+
+/* ==================== P2.1B: Knowledge Fact UI ==================== */
+let _kfFilter = 'all';
+let _kpFilter = 'all';
+let _knowledgeUiBusy = false;
+
+function _kfStatusBadge(fact){
+  if(fact.reviewStatus === 'confirmed' && fact.publicUseAllowed === true) return '<span style="background:#d4edda;color:#155724;padding:2px 8px;border-radius:4px;font-size:11px">已确认·可对外</span>';
+  if(fact.reviewStatus === 'confirmed' && fact.publicUseAllowed !== true) return '<span style="background:#fff3cd;color:#856404;padding:2px 8px;border-radius:4px;font-size:11px">已确认·仅内部</span>';
+  if(fact.reviewStatus === 'pending') return '<span style="background:#cce5ff;color:#004085;padding:2px 8px;border-radius:4px;font-size:11px">待审核</span>';
+  if(fact.reviewStatus === 'rejected') return '<span style="background:#f8d7da;color:#721c24;padding:2px 8px;border-radius:4px;font-size:11px">已拒绝</span>';
+  if(fact.reviewStatus === 'conflict') return '<span style="background:#f5c6cb;color:#721c24;padding:2px 8px;border-radius:4px;font-size:11px">存在冲突</span>';
+  return '<span style="background:#e2e3e5;color:#383d41;padding:2px 8px;border-radius:4px;font-size:11px">' + esc(fact.reviewStatus || '未知') + '</span>';
+}
+
+function viewKnowledgeFacts(root){
+  const facts = S.knowledgeFacts || [];
+  const filtered = _kfFilter === 'all' ? facts : facts.filter(f => f.reviewStatus === _kfFilter);
+  let html = '<div style="max-width:1200px;margin:0 auto">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
+  html += '<div><h2 style="margin:0;font-size:20px;color:#1a365d">✅ 精准开发知识事实</h2><p style="margin:4px 0 0;color:#6b7280;font-size:13px">可对外使用的事实依据 · 人工审核 · 来源可追溯 · AI 摘要不得自动确认</p></div>';
+  html += '<button onclick="openKnowledgeFactForm()" style="background:#2c5282;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">+ 新建事实</button>';
+  html += '</div>';
+  // 筛选
+  html += '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">';
+  const filters = [{k:'all',l:'全部'},{k:'pending',l:'待审核'},{k:'confirmed',l:'已确认'},{k:'rejected',l:'已拒绝'},{k:'conflict',l:'冲突'}];
+  filters.forEach(f => {
+    html += '<button onclick="_kfFilter=\'' + f.k + '\';renderView()" style="padding:5px 12px;border-radius:5px;border:1px solid ' + (_kfFilter===f.k?'#2c5282':'#d1d5db') + ';background:' + (_kfFilter===f.k?'#ebf4ff':'#fff') + ';color:' + (_kfFilter===f.k?'#2c5282':'#374151') + ';cursor:pointer;font-size:12px">' + f.l + '</button>';
+  });
+  html += '</div>';
+  // 列表
+  if(filtered.length === 0){
+    html += '<div style="background:#fff;border:1px dashed #d1d5db;border-radius:10px;padding:40px;text-align:center;color:#6b7280">暂无知识事实。点击"新建事实"添加第一条可审核的事实依据。</div>';
+  } else {
+    html += '<div style="background:#fff;border:1px solid #e4e7eb;border-radius:10px;overflow:hidden">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f7fafc;border-bottom:2px solid #e4e7eb">';
+    html += '<th style="padding:10px 12px;text-align:left;color:#4a5568">标题</th><th style="padding:10px 12px;text-align:left;color:#4a5568">类型</th><th style="padding:10px 12px;text-align:left;color:#4a5568">状态</th><th style="padding:10px 12px;text-align:left;color:#4a5568">归属主体</th><th style="padding:10px 12px;text-align:left;color:#4a5568">来源</th><th style="padding:10px 12px;text-align:left;color:#4a5568">版本</th><th style="padding:10px 12px;text-align:left;color:#4a5568">操作</th>';
+    html += '</tr></thead><tbody>';
+    filtered.forEach(f => {
+      html += '<tr style="border-bottom:1px solid #edf2f7">';
+      html += '<td style="padding:10px 12px;max-width:220px"><div style="font-weight:500;color:#1a365d;word-break:break-word">' + esc(f.title) + '</div>';
+      if(f.sourceType === 'ai_summary') html += '<div style="font-size:10px;color:#d97706;margin-top:2px">⚠ AI 摘要 · 未验证</div>';
+      html += '</td>';
+      html += '<td style="padding:10px 12px;color:#4a5568">' + esc(f.type || '') + '</td>';
+      html += '<td style="padding:10px 12px">' + _kfStatusBadge(f) + '</td>';
+      html += '<td style="padding:10px 12px;color:#4a5568;font-size:12px">' + esc(f.claimSubject || '—') + '</td>';
+      html += '<td style="padding:10px 12px;color:#4a5568;font-size:12px;max-width:180px">';
+      if(f.sourceUrl && safeUrl(f.sourceUrl)) html += '<a href="' + safeUrl(f.sourceUrl) + '" target="_blank" rel="noopener" style="color:#2c5282;text-decoration:none;word-break:break-all">' + esc(f.sourceUrl) + '</a>';
+      else if(f.sourceDocument) html += esc(f.sourceDocument) + (f.sourceLocator ? ' · ' + esc(f.sourceLocator) : '');
+      else html += '—';
+      html += '</td>';
+      html += '<td style="padding:10px 12px;color:#6b7280">v' + (f.version || 1) + '</td>';
+      html += '<td style="padding:10px 12px;white-space:nowrap">';
+      if(f.reviewStatus === 'pending') html += '<button onclick="openKnowledgeFactReview(' + jsArg(f.factId) + ')" style="background:#2c5282;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;margin-right:4px">审核</button>';
+      html += '<button onclick="openKnowledgeFactForm(' + jsArg(f.factId) + ')" style="background:#fff;color:#2c5282;border:1px solid #2c5282;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">查看</button>';
+      html += '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+  root.innerHTML = html;
+}
+
+function openKnowledgeFactForm(factId){
+  const fact = factId ? getKnowledgeFactById(factId) : null;
+  const isEdit = !!fact;
+  const isReadOnly = fact && (fact.reviewStatus === 'confirmed' || fact.reviewStatus === 'rejected' || fact.reviewStatus === 'conflict');
+  let html = '<div style="max-width:680px">';
+  html += '<h3 style="margin:0 0 16px;font-size:18px;color:#1a365d">' + (isEdit ? (isReadOnly ? '查看事实' : '编辑事实') : '新建知识事实') + '</h3>';
+  if(isReadOnly && fact.reviewStatus === 'confirmed') html += '<div style="background:#d4edda;color:#155724;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px">该事实已确认，如需修改请创建新版本。</div>';
+  html += '<div id="kfFormError" style="display:none;background:#f8d7da;color:#721c24;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px"></div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+  html += '<div style="grid-column:1/-1"><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">标题 *</label><input id="kfTitle" type="text" value="' + esc(fact ? fact.title : '') + '" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '></div>';
+  html += '<div><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">类型 *</label><select id="kfType" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '>';
+  ['product','certification','testimonial','factory_capability','market','compliance','other'].forEach(t => {
+    html += '<option value="' + t + '"' + (fact && fact.type === t ? ' selected' : '') + '>' + t + '</option>';
+  });
+  html += '</select></div>';
+  html += '<div><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">来源类型</label><select id="kfSourceType" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '>';
+  ['manual','ai_summary','document','web','internal'].forEach(t => {
+    html += '<option value="' + t + '"' + (fact && fact.sourceType === t ? ' selected' : '') + '>' + t + '</option>';
+  });
+  html += '</select></div>';
+  html += '<div style="grid-column:1/-1"><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">正文 *</label><textarea id="kfContent" rows="4" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px;resize:vertical" ' + (isReadOnly?'disabled':'') + '>' + esc(fact ? fact.content : '') + '</textarea></div>';
+  html += '<div><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">来源文件</label><input id="kfSourceDoc" type="text" value="' + esc(fact ? fact.sourceDocument : '') + '" placeholder="如：产品手册v3.pdf" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '></div>';
+  html += '<div><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">来源定位</label><input id="kfSourceLocator" type="text" value="' + esc(fact ? fact.sourceLocator : '') + '" placeholder="如：第3章/p.12/section 2.1" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '></div>';
+  html += '<div style="grid-column:1/-1"><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">来源 URL（仅 http/https）</label><input id="kfSourceUrl" type="text" value="' + esc(fact ? fact.sourceUrl : '') + '" placeholder="https://..." style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '></div>';
+  html += '<div><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">来源哈希（可选）</label><input id="kfSourceHash" type="text" value="' + esc(fact ? fact.sourceHash : '') + '" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '></div>';
+  html += '<div><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">归属主体（高风险类型必填）</label><input id="kfClaimSubject" type="text" value="' + esc(fact ? fact.claimSubject : '') + '" placeholder="如：KaiLionCrafts" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '></div>';
+  html += '<div><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">标签（逗号分隔）</label><input id="kfTags" type="text" value="' + esc(fact && fact.tags ? fact.tags.join(',') : '') + '" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '></div>';
+  html += '<div><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">产品类目（逗号分隔）</label><input id="kfCategories" type="text" value="' + esc(fact && fact.linkedProductCategories ? fact.linkedProductCategories.join(',') : '') + '" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '></div>';
+  html += '<div style="grid-column:1/-1"><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">来源摘录</label><textarea id="kfSourceExcerpt" rows="2" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px;resize:vertical" ' + (isReadOnly?'disabled':'') + '>' + esc(fact ? fact.sourceExcerpt : '') + '</textarea></div>';
+  html += '</div>';
+  if(fact){
+    html += '<div style="margin-top:14px;padding:10px;background:#f7fafc;border-radius:6px;font-size:12px;color:#4a5568">';
+    html += '<div>审核状态：' + _kfStatusBadge(fact) + '</div>';
+    if(fact.reviewedBy) html += '<div style="margin-top:4px">审核人：' + esc(fact.reviewedBy) + ' · 审核时间：' + esc(fact.reviewedAt || '') + '</div>';
+    html += '<div style="margin-top:4px">对外使用：' + (fact.publicUseAllowed === true ? '是' : '否') + ' · 版本：v' + (fact.version || 1) + '</div>';
+    html += '</div>';
+  }
+  html += '<div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">';
+  html += '<button onclick="closeModal()" style="padding:8px 16px;border:1px solid #d1d5db;border-radius:5px;background:#fff;cursor:pointer;font-size:13px">关闭</button>';
+  if(!isReadOnly){
+    html += '<button onclick="saveKnowledgeFact(' + (factId ? jsArg(factId) : 'null') + ')" style="padding:8px 16px;border:none;border-radius:5px;background:#2c5282;color:#fff;cursor:pointer;font-size:13px">' + (isEdit ? '保存修改' : '创建（待审核）') + '</button>';
+  }
+  html += '</div></div>';
+  openModal(html, true);
+}
+
+function saveKnowledgeFact(factId){
+  if(_knowledgeUiBusy) return;
+  const title = document.getElementById('kfTitle').value.trim();
+  const content = document.getElementById('kfContent').value.trim();
+  const type = document.getElementById('kfType').value;
+  const sourceType = document.getElementById('kfSourceType').value;
+  const sourceDocument = document.getElementById('kfSourceDoc').value.trim();
+  const sourceLocator = document.getElementById('kfSourceLocator').value.trim();
+  const sourceUrl = document.getElementById('kfSourceUrl').value.trim();
+  const sourceHash = document.getElementById('kfSourceHash').value.trim();
+  const claimSubject = document.getElementById('kfClaimSubject').value.trim();
+  const tags = document.getElementById('kfTags').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const categories = document.getElementById('kfCategories').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const sourceExcerpt = document.getElementById('kfSourceExcerpt').value.trim();
+  const errEl = document.getElementById('kfFormError');
+  if(!title || !content){ errEl.textContent = '标题和正文必填'; errEl.style.display = 'block'; return; }
+  if(sourceUrl && !safeUrl(sourceUrl)){ errEl.textContent = '来源 URL 仅允许 http/https 协议'; errEl.style.display = 'block'; return; }
+  _knowledgeUiBusy = true;
+  let result;
+  if(factId){
+    result = updateKnowledgeFact(factId, {title, content, type, sourceType, sourceDocument, sourceLocator, sourceUrl, sourceHash, claimSubject, tags, linkedProductCategories: categories, sourceExcerpt});
+  } else {
+    result = createKnowledgeFact({title, content, type, sourceType, sourceDocument, sourceLocator, sourceUrl, sourceHash, claimSubject, tags, linkedProductCategories: categories, sourceExcerpt});
+  }
+  _knowledgeUiBusy = false;
+  if(!result.success){
+    errEl.textContent = result.errors ? result.errors.join('；') : (result.error || '保存失败');
+    errEl.style.display = 'block';
+    return;
+  }
+  closeModal();
+  toast(factId ? '事实已更新（重置为待审核）' : '事实已创建，等待审核', 'ok');
+  renderView();
+}
+
+function openKnowledgeFactReview(factId){
+  const fact = getKnowledgeFactById(factId);
+  if(!fact) return;
+  let html = '<div style="max-width:560px">';
+  html += '<h3 style="margin:0 0 12px;font-size:18px;color:#1a365d">审核事实</h3>';
+  html += '<div style="background:#f7fafc;padding:12px;border-radius:6px;margin-bottom:14px;font-size:13px">';
+  html += '<div style="font-weight:500;color:#1a365d;margin-bottom:4px">' + esc(fact.title) + '</div>';
+  html += '<div style="color:#4a5568;font-size:12px;margin-bottom:6px">类型：' + esc(fact.type) + ' · 来源类型：' + esc(fact.sourceType || '') + '</div>';
+  if(fact.sourceUrl && safeUrl(fact.sourceUrl)) html += '<div style="color:#2c5282;font-size:12px;word-break:break-all">URL: <a href="' + safeUrl(fact.sourceUrl) + '" target="_blank" rel="noopener">' + esc(fact.sourceUrl) + '</a></div>';
+  if(fact.sourceDocument) html += '<div style="color:#4a5568;font-size:12px">来源文件：' + esc(fact.sourceDocument) + (fact.sourceLocator ? ' · ' + esc(fact.sourceLocator) : '') + '</div>';
+  html += '<div style="color:#4a5568;font-size:12px;margin-top:6px;white-space:pre-wrap;max-height:100px;overflow:auto">' + esc(fact.content) + '</div>';
+  html += '</div>';
+  html += '<div id="kfReviewError" style="display:none;background:#f8d7da;color:#721c24;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px"></div>';
+  html += '<div style="margin-bottom:12px"><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#4a5568;cursor:pointer"><input type="checkbox" id="kfSourceVerified"> 我已核验来源可追溯（URL/文件+定位/来源哈希）</label></div>';
+  html += '<div style="margin-bottom:12px"><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#4a5568;cursor:pointer"><input type="checkbox" id="kfPublicUse"> 允许对外使用（未勾选则仅内部使用）</label></div>';
+  html += '<div style="margin-bottom:14px"><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">审核备注（可选）</label><input id="kfReviewNote" type="text" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px"></div>';
+  html += '<div style="display:flex;gap:8px;justify-content:flex-end">';
+  html += '<button onclick="closeModal()" style="padding:8px 14px;border:1px solid #d1d5db;border-radius:5px;background:#fff;cursor:pointer;font-size:13px">取消</button>';
+  html += '<button onclick="submitKnowledgeFactReview(' + jsArg(factId) + ',\'rejected\')" style="padding:8px 14px;border:none;border-radius:5px;background:#dc3545;color:#fff;cursor:pointer;font-size:13px">拒绝</button>';
+  html += '<button onclick="submitKnowledgeFactReview(' + jsArg(factId) + ',\'conflict\')" style="padding:8px 14px;border:none;border-radius:5px;background:#ffc107;color:#000;cursor:pointer;font-size:13px">标记冲突</button>';
+  html += '<button onclick="submitKnowledgeFactReview(' + jsArg(factId) + ',\'confirmed\')" style="padding:8px 14px;border:none;border-radius:5px;background:#28a745;color:#fff;cursor:pointer;font-size:13px">确认通过</button>';
+  html += '</div></div>';
+  openModal(html, false);
+}
+
+function submitKnowledgeFactReview(factId, status){
+  if(_knowledgeUiBusy) return;
+  const sourceVerified = document.getElementById('kfSourceVerified').checked;
+  const publicUse = document.getElementById('kfPublicUse').checked;
+  const note = document.getElementById('kfReviewNote').value.trim();
+  const errEl = document.getElementById('kfReviewError');
+  if(status === 'confirmed'){
+    if(!sourceVerified){ errEl.textContent = '确认通过前必须勾选"已核验来源可追溯"'; errEl.style.display = 'block'; return; }
+  }
+  _knowledgeUiBusy = true;
+  const result = reviewKnowledgeFact(factId, status, 'Leo', note);
+  if(result.success && status === 'confirmed'){
+    updateKnowledgeFact(factId, {publicUseAllowed: publicUse, keepConfirmed: true});
+  }
+  _knowledgeUiBusy = false;
+  if(!result.success){
+    errEl.textContent = result.errors ? result.errors.join('；') : '审核失败';
+    errEl.style.display = 'block';
+    return;
+  }
+  closeModal();
+  toast('事实已审核为 ' + status, 'ok');
+  renderView();
+}
+
+/* ==================== P2.1B: Knowledge Pack UI ==================== */
+function _kpStatusBadge(pack){
+  if(pack.status === 'approved') return '<span style="background:#d4edda;color:#155724;padding:2px 8px;border-radius:4px;font-size:11px">已批准</span>';
+  if(pack.status === 'archived') return '<span style="background:#e2e3e5;color:#383d41;padding:2px 8px;border-radius:4px;font-size:11px">已归档</span>';
+  return '<span style="background:#cce5ff;color:#004085;padding:2px 8px;border-radius:4px;font-size:11px">草稿</span>';
+}
+
+function viewKnowledgePacks(root){
+  const packs = S.knowledgePacks || [];
+  const filtered = _kpFilter === 'all' ? packs : packs.filter(p => p.status === _kpFilter);
+  let html = '<div style="max-width:1200px;margin:0 auto">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
+  html += '<div><h2 style="margin:0;font-size:20px;color:#1a365d">📦 精准开发配置（Knowledge Pack）</h2><p style="margin:4px 0 0;color:#6b7280;font-size:13px">版本化知识包 · 批准后不可变 · Campaign 锁定依据</p></div>';
+  html += '<button onclick="openKnowledgePackForm()" style="background:#2c5282;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">+ 新建 Pack</button>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">';
+  [{k:'all',l:'全部'},{k:'draft',l:'草稿'},{k:'approved',l:'已批准'},{k:'archived',l:'已归档'}].forEach(f => {
+    html += '<button onclick="_kpFilter=\'' + f.k + '\';renderView()" style="padding:5px 12px;border-radius:5px;border:1px solid ' + (_kpFilter===f.k?'#2c5282':'#d1d5db') + ';background:' + (_kpFilter===f.k?'#ebf4ff':'#fff') + ';color:' + (_kpFilter===f.k?'#2c5282':'#374151') + ';cursor:pointer;font-size:12px">' + f.l + '</button>';
+  });
+  html += '</div>';
+  if(filtered.length === 0){
+    html += '<div style="background:#fff;border:1px dashed #d1d5db;border-radius:10px;padding:40px;text-align:center;color:#6b7280">暂无 Knowledge Pack。点击"新建 Pack"创建第一个版本化知识包。</div>';
+  } else {
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">';
+    filtered.forEach(p => {
+      const factCount = (p.frozenFactSnapshots || p.allowedFactIds || []).length;
+      html += '<div style="background:#fff;border:1px solid #e4e7eb;border-radius:10px;padding:16px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">';
+      html += '<div style="font-weight:600;color:#1a365d;font-size:15px">' + esc(p.name) + '</div>';
+      html += _kpStatusBadge(p);
+      html += '</div>';
+      html += '<div style="font-size:12px;color:#6b7280;margin-bottom:8px">版本 v' + (p.version || 1) + ' · ' + factCount + ' 条冻结事实</div>';
+      if(p.productScope) html += '<div style="font-size:12px;color:#4a5568;margin-bottom:4px">产品范围：' + esc(p.productScope) + '</div>';
+      if(p.targetMarkets && p.targetMarkets.length) html += '<div style="font-size:12px;color:#4a5568;margin-bottom:4px">目标市场：' + esc(p.targetMarkets.join(', ')) + '</div>';
+      if(p.approvedBy) html += '<div style="font-size:11px;color:#6b7280;margin-top:8px">批准人：' + esc(p.approvedBy) + ' · ' + esc(p.approvedAt || '') + '</div>';
+      if(p.knowledgeSnapshotHash) html += '<div style="font-size:10px;color:#9ca3af;margin-top:4px;word-break:break-all">hash: ' + esc(p.knowledgeSnapshotHash.substring(0,16)) + '...</div>';
+      html += '<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">';
+      html += '<button onclick="openKnowledgePackDetail(' + jsArg(p.packId) + ')" style="padding:5px 10px;border:1px solid #2c5282;border-radius:4px;background:#fff;color:#2c5282;cursor:pointer;font-size:12px">查看</button>';
+      if(p.status === 'draft'){
+        html += '<button onclick="openKnowledgePackForm(' + jsArg(p.packId) + ')" style="padding:5px 10px;border:1px solid #2c5282;border-radius:4px;background:#fff;color:#2c5282;cursor:pointer;font-size:12px">编辑</button>';
+        html += '<button onclick="openKnowledgePackApprove(' + jsArg(p.packId) + ')" style="padding:5px 10px;border:none;border-radius:4px;background:#28a745;color:#fff;cursor:pointer;font-size:12px">批准</button>';
+      }
+      if(p.status === 'approved'){
+        html += '<button onclick="createNextPackVersion(' + jsArg(p.packId) + ')" style="padding:5px 10px;border:1px solid #2c5282;border-radius:4px;background:#fff;color:#2c5282;cursor:pointer;font-size:12px">创建下一版本</button>';
+        html += '<button onclick="archivePack(' + jsArg(p.packId) + ')" style="padding:5px 10px;border:1px solid #6b7280;border-radius:4px;background:#fff;color:#6b7280;cursor:pointer;font-size:12px">归档</button>';
+      }
+      html += '</div></div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  root.innerHTML = html;
+}
+
+function openKnowledgePackForm(packId){
+  const pack = packId ? getKnowledgePackById(packId) : null;
+  const isEdit = !!pack;
+  const isReadOnly = pack && pack.status !== 'draft';
+  const availableFacts = getConfirmedKnowledgeFacts({requirePublicUse: true});
+  let html = '<div style="max-width:720px">';
+  html += '<h3 style="margin:0 0 16px;font-size:18px;color:#1a365d">' + (isEdit ? (isReadOnly ? '查看 Pack' : '编辑 Pack') : '新建 Knowledge Pack') + '</h3>';
+  if(isReadOnly) html += '<div style="background:#fff3cd;color:#856404;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px">该 Pack 已' + (pack.status === 'approved' ? '批准' : '归档') + '，不可编辑。如需修改请创建下一版本。</div>';
+  html += '<div id="kpFormError" style="display:none;background:#f8d7da;color:#721c24;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px"></div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+  html += '<div style="grid-column:1/-1"><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">Pack 名称 *</label><input id="kpName" type="text" value="' + esc(pack ? pack.name : '') + '" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '></div>';
+  html += '<div><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">产品范围</label><input id="kpProductScope" type="text" value="' + esc(pack ? pack.productScope : '') + '" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '></div>';
+  html += '<div><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">目标市场（逗号分隔）</label><input id="kpMarkets" type="text" value="' + esc(pack && pack.targetMarkets ? pack.targetMarkets.join(',') : '') + '" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px" ' + (isReadOnly?'disabled':'') + '></div>';
+  html += '<div style="grid-column:1/-1"><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">买家类型/ICP 条件</label><textarea id="kpBuyerTypes" rows="2" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px;resize:vertical" ' + (isReadOnly?'disabled':'') + '>' + esc(pack && pack.buyerTypes ? pack.buyerTypes.join('\n') : '') + '</textarea></div>';
+  html += '<div style="grid-column:1/-1"><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">禁止主张规则（prohibitedClaimRules）</label><textarea id="kpProhibited" rows="2" placeholder="如：不得声称100%环保；不得使用"最佳"等绝对化用语" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px;resize:vertical" ' + (isReadOnly?'disabled':'') + '>' + esc(pack && pack.prohibitedClaimRules ? pack.prohibitedClaimRules.join('\n') : '') + '</textarea></div>';
+  html += '<div style="grid-column:1/-1"><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:4px">排除规则（exclusionRules）</label><textarea id="kpExclusion" rows="2" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px;resize:vertical" ' + (isReadOnly?'disabled':'') + '>' + esc(pack && pack.exclusionRules ? pack.exclusionRules.join('\n') : '') + '</textarea></div>';
+  html += '</div>';
+  // 事实选择
+  html += '<div style="margin-top:14px"><label style="display:block;font-size:12px;color:#4a5568;margin-bottom:6px;font-weight:500">选择事实（仅显示已确认 + 允许对外使用 + 来源可复核）</label>';
+  if(availableFacts.length === 0){
+    html += '<div style="background:#fff3cd;color:#856404;padding:10px;border-radius:5px;font-size:12px">暂无可用事实。请先在"知识事实"页面创建并审核确认事实。</div>';
+  } else {
+    html += '<div style="max-height:200px;overflow-y:auto;border:1px solid #e4e7eb;border-radius:5px">';
+    availableFacts.forEach(f => {
+      const checked = pack && pack.allowedFactIds && pack.allowedFactIds.includes(f.factId);
+      html += '<label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-bottom:1px solid #edf2f7;cursor:pointer;font-size:12px">';
+      html += '<input type="checkbox" class="kpFactCheck" value="' + esc(f.factId) + '"' + (checked ? ' checked' : '') + (isReadOnly ? ' disabled' : '') + ' style="margin-top:2px">';
+      html += '<div><div style="color:#1a365d;font-weight:500">' + esc(f.title) + '</div><div style="color:#6b7280;font-size:11px">' + esc(f.type) + ' · ' + esc(f.claimSubject || '无归属') + ' · v' + (f.version||1) + '</div></div></label>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  if(pack && pack.frozenFactSnapshots){
+    html += '<div style="margin-top:12px;padding:10px;background:#f7fafc;border-radius:5px;font-size:12px;color:#4a5568">冻结事实数：' + pack.frozenFactSnapshots.length + ' · snapshot hash: ' + esc((pack.knowledgeSnapshotHash||'').substring(0,20)) + '...</div>';
+  }
+  html += '<div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">';
+  html += '<button onclick="closeModal()" style="padding:8px 16px;border:1px solid #d1d5db;border-radius:5px;background:#fff;cursor:pointer;font-size:13px">关闭</button>';
+  if(!isReadOnly){
+    html += '<button onclick="saveKnowledgePack(' + (packId ? jsArg(packId) : 'null') + ')" style="padding:8px 16px;border:none;border-radius:5px;background:#2c5282;color:#fff;cursor:pointer;font-size:13px">保存草稿</button>';
+  }
+  html += '</div></div>';
+  openModal(html, true);
+}
+
+function saveKnowledgePack(packId){
+  if(_knowledgeUiBusy) return;
+  const name = document.getElementById('kpName').value.trim();
+  const productScope = document.getElementById('kpProductScope').value.trim();
+  const targetMarkets = document.getElementById('kpMarkets').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const buyerTypes = document.getElementById('kpBuyerTypes').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const prohibitedClaimRules = document.getElementById('kpProhibited').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const exclusionRules = document.getElementById('kpExclusion').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const factIds = Array.from(document.querySelectorAll('.kpFactCheck:checked')).map(cb => cb.value);
+  const errEl = document.getElementById('kpFormError');
+  if(!name){ errEl.textContent = 'Pack 名称必填'; errEl.style.display = 'block'; return; }
+  _knowledgeUiBusy = true;
+  let result;
+  if(packId){
+    result = updateKnowledgePack(packId, {name, productScope, targetMarkets, buyerTypes, prohibitedClaimRules, exclusionRules, allowedFactIds: factIds});
+  } else {
+    result = createKnowledgePack({name, productScope, targetMarkets, buyerTypes, prohibitedClaimRules, exclusionRules, allowedFactIds: factIds});
+  }
+  _knowledgeUiBusy = false;
+  if(!result.success){
+    errEl.textContent = result.errors ? result.errors.join('；') : '保存失败';
+    errEl.style.display = 'block';
+    return;
+  }
+  closeModal();
+  toast('Pack 已保存为草稿', 'ok');
+  renderView();
+}
+
+function openKnowledgePackApprove(packId){
+  const pack = getKnowledgePackById(packId);
+  if(!pack) return;
+  const validation = validatePackFacts(pack);
+  let html = '<div style="max-width:560px">';
+  html += '<h3 style="margin:0 0 12px;font-size:18px;color:#1a365d">批准 Knowledge Pack</h3>';
+  html += '<div style="background:#f7fafc;padding:12px;border-radius:6px;margin-bottom:14px;font-size:13px">';
+  html += '<div style="font-weight:500;color:#1a365d;margin-bottom:4px">' + esc(pack.name) + '</div>';
+  html += '<div style="color:#4a5568;font-size:12px">将批准版本：v' + ((pack.version || 1)) + ' · 冻结事实数：' + (pack.allowedFactIds || []).length + '</div>';
+  if(pack.prohibitedClaimRules && pack.prohibitedClaimRules.length) html += '<div style="color:#856404;font-size:12px;margin-top:4px">禁止主张规则：' + pack.prohibitedClaimRules.length + ' 条</div>';
+  html += '</div>';
+  if(!validation.valid){
+    html += '<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:5px;font-size:12px;margin-bottom:12px"><b>无法批准：</b><ul style="margin:4px 0 0 16px;padding:0">';
+    validation.errors.forEach(e => { html += '<li>' + esc(e) + '</li>'; });
+    html += '</ul></div>';
+    html += '<div style="display:flex;justify-content:flex-end"><button onclick="closeModal()" style="padding:8px 16px;border:1px solid #d1d5db;border-radius:5px;background:#fff;cursor:pointer;font-size:13px">关闭</button></div>';
+  } else {
+    html += '<div style="background:#d4edda;color:#155724;padding:10px;border-radius:5px;font-size:12px;margin-bottom:12px">所有事实均已确认、允许对外使用且来源可复核。批准后 Pack 将不可修改，已绑定 Campaign 的历史版本不受影响。</div>';
+    html += '<div style="display:flex;gap:8px;justify-content:flex-end">';
+    html += '<button onclick="closeModal()" style="padding:8px 16px;border:1px solid #d1d5db;border-radius:5px;background:#fff;cursor:pointer;font-size:13px">取消</button>';
+    html += '<button onclick="doApprovePack(' + jsArg(packId) + ')" style="padding:8px 16px;border:none;border-radius:5px;background:#28a745;color:#fff;cursor:pointer;font-size:13px">确认批准</button>';
+    html += '</div>';
+  }
+  html += '</div>';
+  openModal(html, false);
+}
+
+function doApprovePack(packId){
+  if(_knowledgeUiBusy) return;
+  _knowledgeUiBusy = true;
+  const result = approveKnowledgePack(packId, 'Leo');
+  _knowledgeUiBusy = false;
+  if(!result.success){
+    toast(result.errors ? result.errors.join('；') : '批准失败', 'err');
+    return;
+  }
+  closeModal();
+  toast('Pack 已批准，冻结快照已生成', 'ok');
+  renderView();
+}
+
+function createNextPackVersion(packId){
+  if(_knowledgeUiBusy) return;
+  confirmDlg('创建下一版本？新版本不会改变已绑定 Campaign 的历史知识依据。', () => {
+    _knowledgeUiBusy = true;
+    const result = createNextKnowledgePackVersion(packId, 'Leo');
+    _knowledgeUiBusy = false;
+    if(!result.success){ toast(result.errors ? result.errors.join('；') : '创建失败', 'err'); return; }
+    toast('已创建新版本草稿 v' + result.pack.version, 'ok');
+    renderView();
+  });
+}
+
+function archivePack(packId){
+  if(_knowledgeUiBusy) return;
+  confirmDlg('归档此 Pack？归档后不可被新 Campaign 绑定，但历史 Campaign 仍可查看。', () => {
+    _knowledgeUiBusy = true;
+    const result = archiveKnowledgePack(packId);
+    _knowledgeUiBusy = false;
+    if(!result.success){ toast('归档失败', 'err'); return; }
+    toast('Pack 已归档', 'ok');
+    renderView();
+  });
+}
+
+function openKnowledgePackDetail(packId){
+  const pack = getKnowledgePackById(packId);
+  if(!pack) return;
+  let html = '<div style="max-width:720px">';
+  html += '<h3 style="margin:0 0 12px;font-size:18px;color:#1a365d">' + esc(pack.name) + ' · v' + (pack.version||1) + ' ' + _kpStatusBadge(pack) + '</h3>';
+  if(pack.productScope) html += '<div style="font-size:13px;color:#4a5568;margin-bottom:4px">产品范围：' + esc(pack.productScope) + '</div>';
+  if(pack.targetMarkets) html += '<div style="font-size:13px;color:#4a5568;margin-bottom:4px">目标市场：' + esc(pack.targetMarkets.join(', ')) + '</div>';
+  if(pack.approvedBy) html += '<div style="font-size:12px;color:#6b7280;margin-bottom:10px">批准人：' + esc(pack.approvedBy) + ' · ' + esc(pack.approvedAt||'') + ' · hash: ' + esc((pack.knowledgeSnapshotHash||'').substring(0,24)) + '</div>';
+  const snapshots = pack.frozenFactSnapshots || [];
+  html += '<div style="font-weight:500;color:#1a365d;font-size:14px;margin:12px 0 8px">冻结事实（' + snapshots.length + ' 条）</div>';
+  if(snapshots.length === 0){
+    html += '<div style="color:#6b7280;font-size:13px">草稿 Pack 尚未冻结事实。</div>';
+  } else {
+    html += '<div style="max-height:300px;overflow-y:auto;border:1px solid #e4e7eb;border-radius:5px">';
+    snapshots.forEach(fs => {
+      html += '<div style="padding:10px 12px;border-bottom:1px solid #edf2f7">';
+      html += '<div style="font-weight:500;color:#1a365d;font-size:13px">' + esc(fs.title) + ' <span style="font-size:10px;color:#6b7280">v' + (fs.version||1) + ' · ' + esc(fs.type||'') + '</span></div>';
+      html += '<div style="font-size:12px;color:#4a5568;margin-top:2px;white-space:pre-wrap">' + esc(fs.content) + '</div>';
+      if(fs.sourceUrl && safeUrl(fs.sourceUrl)) html += '<div style="font-size:11px;color:#2c5282;margin-top:2px;word-break:break-all">来源: <a href="' + safeUrl(fs.sourceUrl) + '" target="_blank" rel="noopener">' + esc(fs.sourceUrl) + '</a></div>';
+      else if(fs.sourceDocument) html += '<div style="font-size:11px;color:#6b7280;margin-top:2px">来源: ' + esc(fs.sourceDocument) + (fs.sourceLocator ? ' · ' + esc(fs.sourceLocator) : '') + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  html += '<div style="margin-top:14px;display:flex;justify-content:flex-end"><button onclick="closeModal()" style="padding:8px 16px;border:1px solid #d1d5db;border-radius:5px;background:#fff;cursor:pointer;font-size:13px">关闭</button></div>';
+  html += '</div>';
+  openModal(html, true);
+}
+
+/* ==================== P2.1B: Campaign Pack 绑定 UI ==================== */
+function getApprovedPacksForSelect(){
+  return (S.knowledgePacks || []).filter(p => p.status === 'approved');
+}
+
+function renderCampaignPackSelect(selectedPackId){
+  const packs = getApprovedPacksForSelect();
+  let html = '<select id="campaignPackSelect" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px">';
+  html += '<option value="">不绑定知识包（历史模式）</option>';
+  packs.forEach(p => {
+    const label = p.name + ' · v' + (p.version||1) + (p.productScope ? ' · ' + p.productScope : '');
+    html += '<option value="' + esc(p.packId) + '"' + (selectedPackId === p.packId ? ' selected' : '') + '>' + esc(label) + '</option>';
+  });
+  html += '</select>';
+  return html;
+}
+
+function renderCampaignKnowledgeSection(campaign){
+  const packInfo = getCampaignKnowledgePack(campaign.campaignId);
+  let html = '<div style="background:#fff;border:1px solid #e4e7eb;border-radius:10px;padding:16px;margin-bottom:16px">';
+  html += '<h4 style="margin:0 0 10px;font-size:15px;color:#1a365d">📦 知识依据</h4>';
+  if(!packInfo.success || !packInfo.pack){
+    if(packInfo.status === 'historical_no_pack'){
+      html += '<div style="background:#fff3cd;color:#856404;padding:10px;border-radius:5px;font-size:13px">历史 Campaign：未锁定知识包版本。</div>';
+    } else if(packInfo.status === 'pack_not_found'){
+      html += '<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:5px;font-size:13px">绑定的知识包不存在（ID: ' + esc(campaign.knowledgePackId||'') + '）</div>';
+    } else {
+      html += '<div style="color:#6b7280;font-size:13px">未绑定知识包。</div>';
+    }
+  } else {
+    const p = packInfo.pack;
+    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">';
+    html += '<div><div style="font-weight:600;color:#1a365d;font-size:14px">' + esc(p.name) + ' · v' + (p.version||1) + ' ' + _kpStatusBadge(p) + '</div>';
+    if(p.productScope) html += '<div style="font-size:12px;color:#4a5568;margin-top:2px">' + esc(p.productScope) + '</div>';
+    html += '<div style="font-size:11px;color:#6b7280;margin-top:4px">绑定时间：' + esc(packInfo.boundAt||'') + ' · 绑定人：' + esc(packInfo.boundBy||'') + '</div>';
+    html += '<div style="font-size:10px;color:#9ca3af;margin-top:2px;word-break:break-all">snapshot hash: ' + esc((campaign.knowledgeSnapshotHash||'').substring(0,28)) + '</div>';
+    html += '</div>';
+    html += '<button onclick="openKnowledgePackDetail(' + jsArg(p.packId) + ')" style="padding:5px 10px;border:1px solid #2c5282;border-radius:4px;background:#fff;color:#2c5282;cursor:pointer;font-size:12px;flex-shrink:0">查看冻结事实</button>';
+    html += '</div>';
+    if(packInfo.info && packInfo.info.length){
+      html += '<div style="margin-top:8px;font-size:11px;color:#856404">' + packInfo.info.map(i=>esc(i)).join('；') + '</div>';
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+/* ==================== P2.1B: ICP 评估展示 ==================== */
+function renderIcpEvaluationHtml(qualification){
+  if(!qualification || !qualification.success) return '';
+  const icp = qualification.icpEvaluation;
+  const blockers = qualification.hardBlockers || [];
+  let html = '<div style="background:#fff;border:1px solid #e4e7eb;border-radius:10px;padding:14px;margin-bottom:12px">';
+  html += '<h4 style="margin:0 0 8px;font-size:14px;color:#1a365d">🎯 ICP 匹配评估</h4>';
+  // hard blockers 优先显示
+  if(blockers.length > 0){
+    html += '<div style="background:#f8d7da;color:#721c24;padding:8px 10px;border-radius:5px;font-size:12px;margin-bottom:8px"><b>⚠ 硬性阻断（优先级高于 ICP 分数）：</b><ul style="margin:4px 0 0 16px;padding:0">';
+    blockers.forEach(b => { html += '<li>' + esc(b) + '</li>'; });
+    html += '</ul></div>';
+  }
+  if(icp){
+    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">';
+    html += '<div style="font-size:28px;font-weight:700;color:' + (icp.score >= 70 ? '#28a745' : icp.score >= 40 ? '#ffc107' : '#dc3545') + '">' + (icp.score||0) + '</div>';
+    html += '<div style="font-size:11px;color:#6b7280">ICP 分数（仅建议，不绕过硬性阻断）</div>';
+    html += '</div>';
+    if(icp.riskFlags && icp.riskFlags.length){
+      html += '<div style="font-size:12px;color:#856404;margin-bottom:6px"><b>风险标记：</b>' + icp.riskFlags.map(r=>esc(r)).join('；') + '</div>';
+    }
+    if(icp.missingEvidence && icp.missingEvidence.length){
+      html += '<div style="font-size:12px;color:#856404;margin-bottom:6px"><b>缺失证据：</b>' + icp.missingEvidence.map(m=>esc(m)).join('；') + '</div>';
+    }
+    if(icp.matchedRules && icp.matchedRules.length){
+      html += '<div style="font-size:12px;color:#155724;margin-bottom:6px"><b>匹配规则：</b>' + icp.matchedRules.map(r=>esc(r)).join('；') + '</div>';
+    }
+    if(icp.recommendedNextAction){
+      html += '<div style="font-size:12px;color:#2c5282"><b>建议下一步：</b>' + esc(icp.recommendedNextAction) + '</div>';
+    }
+  } else {
+    html += '<div style="font-size:12px;color:#6b7280">该 Campaign 未绑定知识包，无法进行 ICP 评估。</div>';
+  }
+  html += '</div>';
+  return html;
 }
 
 // Knowledge 快照
@@ -7553,6 +8068,8 @@ const NAV = [
   {key:'drafts',icon:'✉️',label:'开发信',title:'开发信管理',crumb:'AI 草稿 · 人工发送'},
   {key:'outreachKB',icon:'🗂️',label:'客户开发知识库',title:'客户开发知识库',crumb:'Outreach Knowledge Base · 搜索去重 · 历史归档'},
   {key:'campaigns',icon:'🚀',label:'客户开发Campaign',title:'客户开发 Campaign',crumb:'Campaign Management · 任务分组 · 阶段跟踪'},
+  {key:'knowledgeFacts',icon:'✅',label:'知识事实',title:'精准开发知识事实',crumb:'可对外使用的事实依据 · 人工审核 · 来源可追溯'},
+  {key:'knowledgePacks',icon:'📦',label:'精准开发配置',title:'Knowledge Pack 配置',crumb:'版本化知识包 · Campaign 锁定依据'},
   {group:'沟通与跟进'},
   {key:'inbox',icon:'📥',label:'AI 收件箱',title:'AI 收件箱',crumb:'客户回复 · AI 提炼重点'},
   {key:'schedule',icon:'📅',label:'跟进日程',title:'跟进日程',crumb:'今天/明天/本周要联系谁'},
@@ -8303,7 +8820,7 @@ function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, prospect:viewProspectDev, devplans:viewDevPlans, planDetail:viewPlanDetail,
-    customers:viewCustomers, drafts:viewDrafts, outreachKB:viewOutreachKB, campaigns:viewCampaigns, campaignDetail:viewCampaignDetail, inbox:viewInbox, schedule:viewSchedule,
+    customers:viewCustomers, drafts:viewDrafts, outreachKB:viewOutreachKB, campaigns:viewCampaigns, campaignDetail:viewCampaignDetail, knowledgeFacts:viewKnowledgeFacts, knowledgePacks:viewKnowledgePacks, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
     seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach};
   (map[currentView]||viewDashboard)(c);

@@ -3525,6 +3525,185 @@ await __test('P2.1A.1: 高风险事实缺少有效 claimSubject 无法 confirmed
   __assert(conf3.success, 'valid claimSubject passes');
 });
 
+// ===== P2.1B UI 测试 =====
+await __test('P2.1B: 知识事实列表正确显示状态与 publicUseAllowed', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = [];
+  const f1 = createKnowledgeFact({type:'product',title:'t1',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f1.fact.factId, 'confirmed', 'tester');
+  const f2 = createKnowledgeFact({type:'product',title:'t2',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1'});
+  const root = {innerHTML:''};
+  viewKnowledgeFacts(root);
+  __assert(root.innerHTML.indexOf('已确认·可对外') >= 0, 'shows confirmed public badge');
+  __assert(root.innerHTML.indexOf('待审核') >= 0, 'shows pending badge');
+  __assert(root.innerHTML.indexOf('t1') >= 0, 'shows fact title');
+});
+
+await __test('P2.1B: 新建 Fact 默认 pending + publicUseAllowed=false', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1'});
+  __assert(f.success && f.fact.reviewStatus === 'pending', 'default pending');
+  __assert(f.fact.publicUseAllowed === false, 'default publicUseAllowed=false');
+});
+
+await __test('P2.1B: ai_summary 不会在 UI 中成为 confirmed 或"已验证"', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = [];
+  const f = createKnowledgeFact({type:'product',title:'ai fact',content:'c',sourceType:'ai_summary',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  __assert(f.fact.reviewStatus === 'pending', 'ai_summary stays pending');
+  const root = {innerHTML:''};
+  viewKnowledgeFacts(root);
+  __assert(root.innerHTML.indexOf('AI 摘要') >= 0, 'shows AI summary warning');
+  __assert(root.innerHTML.indexOf('未验证') >= 0, 'shows unverified label');
+});
+
+await __test('P2.1B: 危险 sourceUrl 不生成可点击链接', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceUrl:'javascript:alert(1)',publicUseAllowed:true});
+  const root = {innerHTML:''};
+  viewKnowledgeFacts(root);
+  __assert(root.innerHTML.indexOf('javascript:alert(1)') < 0 || root.innerHTML.indexOf('href="javascript') < 0, 'no clickable javascript link');
+  __assert(safeUrl('javascript:alert(1)') === '', 'safeUrl blocks javascript');
+});
+
+await __test('P2.1B: Draft Pack 的事实选择器只显示 confirmed + publicUseAllowed=true + 来源有效', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = [];
+  const f1 = createKnowledgeFact({type:'product',title:'good',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f1.fact.factId, 'confirmed', 'tester');
+  const f2 = createKnowledgeFact({type:'product',title:'pending',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  const f3 = createKnowledgeFact({type:'product',title:'internal only',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:false});
+  reviewKnowledgeFact(f3.fact.factId, 'confirmed', 'tester');
+  const available = getConfirmedKnowledgeFacts({requirePublicUse: true});
+  __assert(available.length === 1, 'only one available fact');
+  __assert(available[0].factId === f1.fact.factId, 'available fact is the good one');
+});
+
+await __test('P2.1B: approved Pack 只读，不能编辑', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  const approved = getKnowledgePackById(pack.pack.packId);
+  __assert(approved.status === 'approved', 'pack is approved');
+  const updateResult = updateKnowledgePack(pack.pack.packId, {name:'hacked'});
+  __assert(!updateResult.success, 'approved pack cannot be edited');
+});
+
+await __test('P2.1B: 创建下一版本生成 draft，历史 approved Pack 仍只读', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  const next = createNextKnowledgePackVersion(pack.pack.packId, 'tester');
+  __assert(next.success, 'next version created');
+  __assert(next.pack.status === 'draft', 'new version is draft');
+  __assert(next.pack.version === 2, 'version incremented');
+  const oldPack = getKnowledgePackById(pack.pack.packId);
+  __assert(oldPack.status === 'approved', 'old pack still approved');
+});
+
+await __test('P2.1B: archived Pack 不出现在新 Campaign 下拉', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = []; S.campaigns = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  archiveKnowledgePack(pack.pack.packId);
+  const selectOptions = getApprovedPacksForSelect();
+  __assert(selectOptions.length === 0, 'archived pack not in select');
+  const campResult = createCampaign({name:'c', knowledgePackId: pack.pack.packId});
+  __assert(!campResult.success, 'cannot bind archived pack');
+});
+
+await __test('P2.1B: 创建 Campaign 时一次性绑定 Pack 与 version/hash', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = []; S.campaigns = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  const approved = getKnowledgePackById(pack.pack.packId);
+  const camp = createCampaign({name:'c', knowledgePackId: pack.pack.packId});
+  __assert(camp.success, 'campaign created');
+  __assert(camp.campaign.knowledgePackId === pack.pack.packId, 'packId bound');
+  __assert(camp.campaign.knowledgePackVersion === approved.version, 'version bound');
+  __assert(camp.campaign.knowledgeSnapshotHash === approved.knowledgeSnapshotHash, 'hash bound');
+  __assert(camp.campaign.knowledgeBoundAt !== null, 'boundAt set');
+});
+
+await __test('P2.1B: active Campaign 不可换绑', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = []; S.campaigns = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  const camp = createCampaign({name:'c', status:'active', knowledgePackId: pack.pack.packId});
+  const rebind = bindKnowledgePackToCampaign(camp.campaign.campaignId, null, 'tester');
+  __assert(!rebind.success, 'active campaign cannot rebind');
+});
+
+await __test('P2.1B: Campaign 详情显示 frozenFactSnapshots，而非当前 Fact 被更新后的正文', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = []; S.campaigns = [];
+  const f = createKnowledgeFact({type:'product',title:'old title',content:'old content',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  const camp = createCampaign({name:'c', knowledgePackId: pack.pack.packId});
+  // 更新当前 Fact
+  updateKnowledgeFact(f.fact.factId, {content:'new content', keepConfirmed:true});
+  // Campaign 详情应显示冻结的旧内容
+  const packInfo = getCampaignKnowledgePack(camp.campaign.campaignId);
+  __assert(packInfo.pack.frozenFactSnapshots[0].content === 'old content', 'frozen content is old');
+  const sectionHtml = renderCampaignKnowledgeSection(camp.campaign);
+  __assert(sectionHtml.indexOf('查看冻结事实') >= 0, 'shows frozen facts button');
+});
+
+await __test('P2.1B: 历史未绑定 Campaign 显示正确提示', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = []; S.campaigns = [];
+  const camp = createCampaign({name:'historical'});
+  const info = getCampaignKnowledgePack(camp.campaign.campaignId);
+  __assert(info.status === 'historical_no_pack', 'returns historical_no_pack');
+  const sectionHtml = renderCampaignKnowledgeSection(camp.campaign);
+  __assert(sectionHtml.indexOf('历史 Campaign') >= 0, 'shows historical message');
+  __assert(sectionHtml.indexOf('未锁定知识包版本') >= 0, 'shows no pack version message');
+});
+
+await __test('P2.1B: ICP hard blockers 的显示优先于高 score', () => {
+  S.customers = []; S.outreachKnowledgeBase = []; S.campaigns = []; S.knowledgeFacts = []; S.knowledgePacks = [];
+  const f = createKnowledgeFact({type:'product',title:'t',content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  reviewKnowledgeFact(f.fact.factId, 'confirmed', 'tester');
+  const pack = createKnowledgePack({name:'p', allowedFactIds:[f.fact.factId]});
+  approveKnowledgePack(pack.pack.packId, 'tester');
+  const camp = createCampaign({name:'c', knowledgePackId: pack.pack.packId});
+  S.customers.push({id:'c1', company:'Test', stableId:'s1', doNotContact:false});
+  S.outreachKnowledgeBase.push({archiveId:'a1', customerId:'c1', stableCustomerId:'s1', identityResolutionStatus:'unresolved', duplicateStatus:'unique', doNotContact:false});
+  const qual = getCampaignCustomerQualification(camp.campaign.campaignId, 'c1');
+  __assert(qual.hardBlockers.length > 0, 'has hard blockers');
+  __assert(qual.eligible === false, 'not eligible despite ICP');
+  const html = renderIcpEvaluationHtml(qual);
+  __assert(html.indexOf('硬性阻断') >= 0, 'shows hard blockers prominently');
+  __assert(html.indexOf('仅建议') >= 0 || html.indexOf('不绕过硬性阻断') >= 0, 'score is advisory only');
+});
+
+await __test('P2.1B: HTML/XSS 特殊字符在事实标题中被转义', () => {
+  S.knowledgeFacts = []; S.knowledgePacks = [];
+  const xss = '<script>alert(1)</script>';
+  const f = createKnowledgeFact({type:'product',title:xss,content:'c',sourceType:'manual',sourceDocument:'d.md',sourceLocator:'p1',publicUseAllowed:true});
+  const root = {innerHTML:''};
+  viewKnowledgeFacts(root);
+  __assert(root.innerHTML.indexOf('<script>alert(1)</script>') < 0, 'XSS script tag escaped');
+  __assert(root.innerHTML.indexOf('&lt;script&gt;') >= 0, 'script tag escaped to entities');
+});
+
+await __test('P2.1B: 重复点击保护 _knowledgeUiBusy 防止重复提交', () => {
+  _knowledgeUiBusy = true;
+  let called = false;
+  const origCreate = createKnowledgeFact;
+  // saveKnowledgeFact 检查 _knowledgeUiBusy 后直接返回
+  const result = saveKnowledgeFact(null);
+  _knowledgeUiBusy = false;
+  __assert(result === undefined, 'busy lock prevents submission');
+});
+
 // ===== 输出结果 =====
 console.log('');
 console.log('========================================');

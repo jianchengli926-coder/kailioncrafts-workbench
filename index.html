@@ -1032,40 +1032,59 @@ function diagnoseOrphanData(){
     if(issues.length) report.orphanCommunications.push({commId: c.id, customerId: c.customerId, campaignTaskId: c.campaignTaskId, issues});
   }
 
-  // 6. orphan knowledge pack: 引用不存在 fact、frozen snapshot 缺失或 hash 不一致
+  // 6. orphan knowledge pack: 引用不存在 fact、frozen snapshot 缺失、frozen snapshot 自身 hash 损坏
   for(const p of knowledgePacks){
     const issues = [];
+    const info = []; // 非阻断信息
     // a. Pack 引用不存在 fact
     for(const fid of (p.allowedFactIds || [])){
       if(!factIds.has(fid)) issues.push('fact_not_found:' + fid);
     }
-    // b. approved Pack 的 frozen snapshot 缺失或 hash 不一致
+    // b. approved Pack 的 frozen snapshot 校验（以 frozenFactSnapshots 自身为准）
     if(p.status === 'approved'){
       if(!p.frozenFactSnapshots || !Array.isArray(p.frozenFactSnapshots) || p.frozenFactSnapshots.length === 0){
         issues.push('frozen_snapshot_missing');
-      }
-      if(!p.knowledgeSnapshotHash){
+      } else if(!p.knowledgeSnapshotHash){
         issues.push('snapshot_hash_missing');
+      } else {
+        // 重新计算 frozen snapshot 的 hash，与保存的 hash 比较
+        const recomputedHash = _knowledgeSimpleHash(JSON.stringify(p.frozenFactSnapshots) + '|v' + p.version);
+        if(recomputedHash !== p.knowledgeSnapshotHash){
+          issues.push('frozen_snapshot_hash_corrupted');
+        }
+      }
+      // 非阻断：检查当前 Fact 是否有更新版本（不影响旧 Pack 冻结快照）
+      for(const fs of (p.frozenFactSnapshots || [])){
+        const currentFact = getKnowledgeFactById(fs.factId);
+        if(currentFact && currentFact.version > fs.version){
+          info.push('current_fact_has_newer_version:' + fs.factId);
+        }
       }
     }
-    if(issues.length) report.orphanKnowledgePacks.push({packId: p.packId, name: p.name, status: p.status, issues});
+    if(issues.length) report.orphanKnowledgePacks.push({packId: p.packId, name: p.name, status: p.status, issues, info: info});
   }
 
-  // 7. orphan knowledge pack binding: Campaign 引用不存在 Pack/version、锁定快照不一致、archived Pack 被新 Campaign 绑定
+  // 7. orphan knowledge pack binding: Campaign 引用不存在 Pack/version、锁定 snapshot hash 损坏、archived Pack 被新 Campaign 绑定
   for(const c of campaigns){
     if(!c.knowledgePackId) continue;
     const issues = [];
+    const info = [];
     const pack = knowledgePacks.find(p => p.packId === c.knowledgePackId);
     // c. Campaign 引用不存在 Pack
     if(!pack){ issues.push('pack_not_found:' + c.knowledgePackId); }
     else {
-      // c. version 不匹配
+      // c. version 不匹配（Campaign 锁定的版本与 Pack 当前版本不同，非阻断但需记录）
       if(c.knowledgePackVersion && pack.version !== c.knowledgePackVersion){
-        issues.push('version_mismatch:campaign=' + c.knowledgePackVersion + ',pack=' + pack.version);
+        info.push('pack_has_newer_version:campaign=' + c.knowledgePackVersion + ',pack=' + pack.version);
       }
-      // d. 锁定快照不一致
-      if(c.knowledgeSnapshotHash && pack.knowledgeSnapshotHash && c.knowledgeSnapshotHash !== pack.knowledgeSnapshotHash){
-        issues.push('snapshot_hash_mismatch');
+      // d. Campaign 锁定 snapshot hash 校验：与 Pack 冻结快照重新计算的 hash 比较
+      if(c.knowledgeSnapshotHash && pack.frozenFactSnapshots && pack.frozenFactSnapshots.length > 0){
+        const packFrozenHash = _knowledgeSimpleHash(JSON.stringify(pack.frozenFactSnapshots) + '|v' + (c.knowledgePackVersion || pack.version));
+        if(c.knowledgeSnapshotHash !== packFrozenHash && c.knowledgeSnapshotHash !== pack.knowledgeSnapshotHash){
+          issues.push('campaign_snapshot_hash_corrupted');
+        }
+      } else if(c.knowledgeSnapshotHash && (!pack.frozenFactSnapshots || pack.frozenFactSnapshots.length === 0)){
+        issues.push('pack_frozen_snapshot_missing');
       }
       // e. archived Pack 被新 Campaign 绑定（非历史绑定）
       if(pack.status === 'archived' && c.knowledgeBoundAt){
@@ -1076,7 +1095,7 @@ function diagnoseOrphanData(){
         }
       }
     }
-    if(issues.length) report.orphanKnowledgePackBindings.push({campaignId: c.campaignId, packId: c.knowledgePackId, issues});
+    if(issues.length) report.orphanKnowledgePackBindings.push({campaignId: c.campaignId, packId: c.knowledgePackId, issues, info: info});
   }
 
   report.summary = {
@@ -3712,13 +3731,36 @@ function _knowledgeSimpleHash(str){
 
 // 校验 fact 来源可复核
 function _validateFactSource(fact){
-  if(!fact.sourceDocument && !fact.sourceUrl && !fact.sourceLocator){
-    return {valid:false, error:'事实缺少可复核来源（sourceDocument/sourceUrl/sourceLocator 至少一项）'};
+  // P2.1A.1: confirmed 来源可复核规则（三选一）
+  // a. 安全的 http/https sourceUrl
+  // b. sourceDocument 与 sourceLocator 同时存在
+  // c. 内部来源 ID（sourceDocument 作为 ID）与 sourceHash 同时存在
+  let hasVerifiableSource = false;
+  let sourceDetail = '';
+  if(fact.sourceUrl && safeUrl(fact.sourceUrl)){
+    hasVerifiableSource = true;
+    sourceDetail = 'sourceUrl';
+  } else if(fact.sourceDocument && fact.sourceLocator){
+    hasVerifiableSource = true;
+    sourceDetail = 'sourceDocument+sourceLocator';
+  } else if(fact.sourceDocument && fact.sourceHash){
+    hasVerifiableSource = true;
+    sourceDetail = 'sourceDocument+sourceHash';
   }
-  if(KNOWLEDGE_HIGH_RISK_TYPES.includes(fact.type) && !fact.claimSubject){
-    return {valid:false, error:'高风险事实类型 ' + fact.type + ' 必须指定 claimSubject'};
+  if(!hasVerifiableSource){
+    return {valid:false, error:'事实缺少可复核来源（需安全 http/https sourceUrl，或 sourceDocument+sourceLocator，或 sourceDocument+sourceHash）'};
   }
-  return {valid:true};
+  if(KNOWLEDGE_HIGH_RISK_TYPES.includes(fact.type)){
+    if(!fact.claimSubject || !String(fact.claimSubject).trim()){
+      return {valid:false, error:'高风险事实类型 ' + fact.type + ' 必须指定有效 claimSubject'};
+    }
+    // 不得把合作工厂、未知主体、敏感内部事实当作 KaiLionCrafts 可公开事实
+    const subject = String(fact.claimSubject).toLowerCase();
+    if(subject === 'unknown' || subject === '未知' || subject === '' || subject === 'internal'){
+      return {valid:false, error:'高风险事实 claimSubject 不得为 unknown/未知/internal，必须明确归属'};
+    }
+  }
+  return {valid:true, sourceDetail: sourceDetail};
 }
 
 // 创建 Knowledge Fact
@@ -3749,7 +3791,7 @@ function createKnowledgeFact(input){
     sourceLocator: input.sourceLocator || '',
     sourceExcerpt: input.sourceExcerpt || '',
     sourceUrl: input.sourceUrl || '',
-    sourceHash: input.sourceHash || _knowledgeSimpleHash(String(input.content||'') + String(input.sourceDocument||'')),
+    sourceHash: input.sourceHash || '',  // P2.1A.1: 不自动生成，必须显式提供来源哈希才可作为可审计来源
     sourceCapturedAt: input.sourceCapturedAt || now,
     reviewStatus: reviewStatus,
     reviewedBy: reviewStatus === 'confirmed' ? (input.reviewedBy || 'system') : null,
@@ -3812,9 +3854,9 @@ function updateKnowledgeFact(factId, patch){
   if(patch.linkedProductCategories !== undefined) fact.linkedProductCategories = Array.isArray(patch.linkedProductCategories) ? patch.linkedProductCategories : fact.linkedProductCategories;
   // 更新后重置为 pending（除非明确保持 confirmed 且来源仍可复核）
   if(patch.keepConfirmed !== true){ fact.reviewStatus = 'pending'; fact.reviewedBy = null; fact.reviewedAt = null; }
+  if(patch.sourceHash !== undefined) fact.sourceHash = patch.sourceHash;  // P2.1A.1: 仅显式提供时更新，不自动生成
   fact.version = (fact.version || 1) + 1;
   fact.updatedAt = new Date().toISOString();
-  fact.sourceHash = _knowledgeSimpleHash(String(fact.content||'') + String(fact.sourceDocument||''));
   const persist = safePersistKnowledgeData(snapshot, ['knowledgeFacts']);
   if(!persist.success) return {success:false, errors:['持久化失败: ' + persist.error], compensationComplete: persist.compensationComplete};
   return {success:true, fact};
@@ -3850,7 +3892,7 @@ function validatePackFacts(pack){
   return {valid: errors.length === 0, errors};
 }
 
-// 生成冻结事实快照
+// 生成冻结事实快照（P2.1A.1: 完整冻结边界）
 function _freezeFactSnapshots(factIds){
   const snapshots = [];
   for(const fid of factIds){
@@ -3859,14 +3901,19 @@ function _freezeFactSnapshots(factIds){
     snapshots.push({
       factId: fact.factId,
       version: fact.version,
+      type: fact.type,
       title: fact.title,
       content: fact.content,
+      claimSubject: fact.claimSubject || '',
+      publicUseAllowed: fact.publicUseAllowed === true,
       sourceDocument: fact.sourceDocument,
       sourceLocator: fact.sourceLocator,
       sourceExcerpt: fact.sourceExcerpt,
       sourceUrl: fact.sourceUrl,
       sourceHash: fact.sourceHash,
       reviewStatus: fact.reviewStatus,
+      linkedProductCategories: Array.isArray(fact.linkedProductCategories) ? fact.linkedProductCategories.slice() : [],
+      tags: Array.isArray(fact.tags) ? fact.tags.slice() : [],
       capturedAt: fact.sourceCapturedAt || fact.updatedAt
     });
   }

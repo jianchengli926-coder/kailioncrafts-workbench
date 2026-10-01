@@ -146,8 +146,7 @@ class TestThinkingHandling(unittest.TestCase):
         # 这里验证标记正确
 
     def test_keep_alive_zero_still_works(self):
-        """keep_alive=0 仍然生效（在 release 中处理）"""
-        # _call_local_chat 使用 keep_alive="5m"，由 release() 统一卸载
+        """keep_alive=0 仍然生效（请求结束后立即释放模型）"""
         with patch('ai_client.requests.post') as mock_post:
             mock_resp = MagicMock()
             mock_resp.status_code = 200
@@ -156,8 +155,8 @@ class TestThinkingHandling(unittest.TestCase):
 
             self.ai._call_local_chat(self.model_info, [{"role": "user", "content": "hi"}])
             call_args = mock_post.call_args
-            # 请求中 keep_alive 为 "5m"，由 release() 统一使用 keep_alive:0 卸载
-            self.assertEqual(call_args[1]['json']['keep_alive'], "5m")
+            # 请求中 keep_alive=0，请求结束后立即释放模型
+            self.assertEqual(call_args[1]['json']['keep_alive'], 0)
 
     def test_num_ctx_8192_default(self):
         """num_ctx 默认 8192"""

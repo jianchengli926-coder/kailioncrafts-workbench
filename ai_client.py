@@ -307,7 +307,7 @@ class AIClient:
     def _call_local_chat(self, model_info, messages, temperature=0.7, num_ctx=None, thinking=False):
         """
         调用本地模型（Ollama 原生 /api/chat）。
-        keep_alive 设为合理值保持模型加载，由 release() 统一使用 keep_alive:0 卸载。
+        keep_alive=0：请求结束后立即释放模型，由 LocalModelManager 统一管理生命周期。
         控制 num_ctx 避免 16GB 内存溢出。
         thinking: 是否启用推理模型的思考模式。标准模式默认关闭。
         """
@@ -330,7 +330,7 @@ class AIClient:
                 "model": model_info["api_model"],
                 "messages": messages,
                 "stream": False,
-                "keep_alive": "5m",  # 保持加载，由 release() 统一卸载
+                "keep_alive": 0,  # 请求结束后立即释放模型
                 "options": options,
             },
             timeout=self.timeout,

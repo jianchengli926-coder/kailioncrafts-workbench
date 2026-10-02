@@ -22,6 +22,8 @@ const { URL } = require('url');
 const dns = require('dns');
 // P2.2B-2: 模型路由和故障转移
 const ModelRouter = require('./model-router');
+// P2.3A: 网站证据采集
+const WebsiteEvidence = require('./website-evidence');
 
 // ============ 全局异常保护（防止进程崩溃退出）============
 process.on('uncaughtException', (err) => {
@@ -1061,6 +1063,52 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, {'Content-Type':'application/json'});
       res.end(JSON.stringify({error:'获取模型状态失败', message:e.message}));
     }
+    return;
+  }
+
+  // P2.3A: 网站证据采集（只读，SSRF防护）
+  if (pathname === '/api/evidence/collect' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const params = JSON.parse(body || '{}');
+        const { customerId, url } = params;
+        if (!customerId || !url) {
+          res.writeHead(400, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({success:false, error:'customerId 和 url 必填'}));
+          return;
+        }
+        console.log(`[网站证据采集] customer=${customerId} url=${url}`);
+        const result = await WebsiteEvidence.collectWebsiteEvidence(customerId, url);
+        res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+        res.end(JSON.stringify(result));
+      } catch(e) {
+        console.error('[网站证据采集] 错误:', e.message);
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({success:false, error:'采集失败: ' + e.message}));
+      }
+    });
+    return;
+  }
+
+  // P2.3A: URL 安全校验（前端预检）
+  if (pathname === '/api/evidence/validate' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const params = JSON.parse(body || '{}');
+        const result = WebsiteEvidence.validateUrl(params.url || '');
+        res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+        res.end(JSON.stringify(result));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({valid:false, error:e.message}));
+      }
+    });
     return;
   }
 

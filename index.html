@@ -3934,6 +3934,188 @@ function reviewKnowledgeFact(factId, status, reviewer, note){
   return {success:true, fact, oldStatus};
 }
 
+/* P2.3A: 网站证据采集与人工核验 */
+
+// 采集客户网站证据（调用后端 API，只读，SSRF防护）
+async function collectWebsiteEvidence(customerId, url){
+  if(!customerId || !url){
+    toast('客户ID和URL必填','err'); return null;
+  }
+  try{
+    toast('正在采集网站证据（只读，不联系客户）...');
+    const resp = await fetch('/api/evidence/collect', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({customerId, url})
+    });
+    const result = await resp.json();
+    if(result.evidence){
+      // 保存证据到本地
+      if(!S.websiteEvidences) S.websiteEvidences = [];
+      S.websiteEvidences.unshift(result.evidence);
+      persist();
+      if(result.success){
+        toast('采集完成，待人工核验');
+      } else {
+        toast('采集失败: ' + (result.error || '未知错误'), 'err');
+      }
+    }
+    renderView();
+    return result;
+  }catch(e){
+    toast('采集请求失败: ' + e.message, 'err');
+    return null;
+  }
+}
+
+// 审核网站证据
+function reviewWebsiteEvidence(evidenceId, status, note){
+  const evidence = (S.websiteEvidences || []).find(e => e.evidenceId === evidenceId);
+  if(!evidence){ toast('证据不存在','err'); return; }
+  const validStatuses = ['pending','reviewed','rejected','conflict'];
+  if(!validStatuses.includes(status)){ toast('无效的审核状态','err'); return; }
+  evidence.reviewStatus = status;
+  evidence.reviewedBy = 'Leo';
+  evidence.reviewedAt = new Date().toISOString();
+  evidence.reviewNote = note || '';
+  evidence.publicUseAllowed = (status === 'reviewed');
+  evidence.updatedAt = new Date().toISOString();
+  persist();
+  toast('证据已标记为: ' + status);
+  renderView();
+}
+
+// 获取客户的网站证据列表
+function getCustomerWebsiteEvidences(customerId){
+  return (S.websiteEvidences || []).filter(e => e.customerId === customerId);
+}
+
+// 检查证据是否可用于公开内容
+function isEvidencePublicUsable(evidence){
+  return evidence && evidence.reviewStatus === 'reviewed' && evidence.publicUseAllowed === true && !evidence.error;
+}
+
+// 渲染网站证据面板（客户详情页）
+function renderWebsiteEvidencePanel(customerId){
+  const evidences = getCustomerWebsiteEvidences(customerId);
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  const defaultUrl = customer ? (customer.website || customer.url || '') : '';
+
+  let html = `
+  <div class="card card-pad mb16" id="website-evidence-panel">
+    <div class="card-title">🌐 网站证据采集
+      <span class="text-sm text-muted">只读公开页面，不联系客户，结果需人工核验</span>
+    </div>
+    <div class="form-group">
+      <label>客户官网 URL</label>
+      <div class="flex gap8">
+        <input type="text" class="form-control" id="evidence_url_input"
+          placeholder="https://example.com" value="${esc(defaultUrl)}">
+        <button class="btn btn-primary" onclick="doCollectWebsiteEvidence('${customerId}')">
+          只读采集
+        </button>
+      </div>
+      <div class="text-xs text-muted mt4">
+        仅允许 http/https，自动阻断 localhost、私有 IP、内网域名。连接超时10秒，总超时30秒。
+      </div>
+    </div>`;
+
+  if(evidences.length === 0){
+    html += `<div class="text-muted text-sm py16">暂无网站证据。输入客户官网后点击"只读采集"。</div>`;
+  } else {
+    evidences.forEach(ev => {
+      const statusColors = {
+        pending: 'var(--orange)',
+        reviewed: 'var(--green)',
+        rejected: 'var(--red)',
+        conflict: 'var(--red)'
+      };
+      const statusLabels = {
+        pending: '待核验',
+        reviewed: '已核验',
+        rejected: '已拒绝',
+        conflict: '有冲突'
+      };
+      const color = statusColors[ev.reviewStatus] || 'var(--gray)';
+      const label = statusLabels[ev.reviewStatus] || ev.reviewStatus;
+
+      html += `
+      <div class="card card-pad mb8" style="border-left: 3px solid ${color}">
+        <div class="flex justify-between align-center mb8">
+          <div>
+            <span class="badge" style="background:${color};color:#fff">${label}</span>
+            <span class="text-sm ml8">${esc(ev.pageTitle || '无标题')}</span>
+          </div>
+          <span class="text-xs text-muted">${fmtDay(ev.fetchedAt)}</span>
+        </div>
+        <div class="text-xs text-muted mb4">
+          <b>来源:</b> <a href="${esc(ev.finalUrl || ev.sourceUrl)}" target="_blank" rel="noopener">${esc(ev.finalUrl || ev.sourceUrl)}</a>
+          | <b>HTTP:</b> ${ev.httpStatus || 'N/A'}
+          | <b>Hash:</b> <code class="mono">${esc(ev.contentHash || 'N/A')}</code>
+        </div>`;
+
+      if(ev.error){
+        html += `<div class="text-sm" style="color:var(--red)"><b>采集失败:</b> ${esc(ev.error)}</div>`;
+      } else {
+        if(ev.detectedCompanyName){
+          html += `<div class="text-sm mb4"><b>公司名:</b> ${esc(ev.detectedCompanyName)}</div>`;
+        }
+        if(ev.detectedProducts && ev.detectedProducts.length){
+          html += `<div class="text-sm mb4"><b>产品线索:</b> ${ev.detectedProducts.map(p => esc(p)).join(', ')}</div>`;
+        }
+        if(ev.detectedMarkets && ev.detectedMarkets.length){
+          html += `<div class="text-sm mb4"><b>市场线索:</b> ${ev.detectedMarkets.map(m => esc(m)).join(', ')}</div>`;
+        }
+        if(ev.detectedBuyerTypes && ev.detectedBuyerTypes.length){
+          html += `<div class="text-sm mb4"><b>买家类型:</b> ${ev.detectedBuyerTypes.map(b => esc(b)).join(', ')}</div>`;
+        }
+        if(ev.contactHints && ev.contactHints.length){
+          html += `<div class="text-sm mb4"><b>联系方式线索（已脱敏）:</b> `;
+          ev.contactHints.forEach(c => {
+            html += `<span class="badge mr4">${esc(c.type)}: ${esc(c.value)}</span>`;
+          });
+          html += `</div>`;
+        }
+        if(ev.excerpt){
+          html += `<div class="text-sm mb4"><b>摘要:</b> ${esc(ev.excerpt.substring(0, 300))}${ev.excerpt.length > 300 ? '...' : ''}</div>`;
+        }
+        if(ev.extractionWarnings && ev.extractionWarnings.length){
+          html += `<div class="text-xs" style="color:var(--orange)"><b>警告:</b><ul>`;
+          ev.extractionWarnings.forEach(w => { html += `<li>${esc(w)}</li>`; });
+          html += `</ul></div>`;
+        }
+      }
+
+      // 人工核验按钮
+      if(ev.reviewStatus === 'pending'){
+        html += `
+        <div class="flex gap8 mt8">
+          <button class="btn btn-sm btn-success" onclick="reviewWebsiteEvidence('${ev.evidenceId}','reviewed')">确认可用</button>
+          <button class="btn btn-sm btn-outline" onclick="reviewWebsiteEvidence('${ev.evidenceId}','rejected')">拒绝</button>
+          <button class="btn btn-sm btn-outline" onclick="reviewWebsiteEvidence('${ev.evidenceId}','conflict')">标记冲突</button>
+        </div>`;
+      } else if(ev.reviewStatus === 'reviewed'){
+        html += `<div class="text-xs mt4" style="color:var(--green)">✓ 已核验，可用于 ICP 评估和开发草稿</div>`;
+      } else {
+        html += `<div class="text-xs mt4" style="color:var(--red)">✗ ${esc(ev.reviewNote || '不可用')}</div>`;
+      }
+
+      html += `</div>`;
+    });
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// 执行网站证据采集（从输入框读取 URL）
+function doCollectWebsiteEvidence(customerId){
+  const urlInput = document.getElementById('evidence_url_input');
+  const url = urlInput ? urlInput.value.trim() : '';
+  if(!url){ toast('请输入客户官网 URL','err'); return; }
+  collectWebsiteEvidence(customerId, url);
+}
+
 // 更新 Knowledge Fact（confirmed 事实更新后 version+1，不影响已冻结的 pack snapshot）
 function updateKnowledgeFact(factId, patch){
   const fact = (S.knowledgeFacts || []).find(f => f.factId === factId);
@@ -5766,6 +5948,8 @@ function loadState(){
   S.companyFacts = DB.load('companyFacts') || {brandName:'',companyName:'',foundedYear:'',headquarters:'',businessModel:'',categories:[],skuCount:'',certifications:[],capacity:'',moq:'',leadTime:'',factories:[],exportCountries:'',website:'',verified:false};
   S.knowledgeFacts = DB.load('knowledgeFacts') || [];
   S.knowledgePacks = DB.load('knowledgePacks') || [];
+  // P2.3A: 网站证据采集
+  S.websiteEvidences = DB.load('websiteEvidences') || [];
 
   // 统一公司事实访问层（P1事实源统一）
   // 所有对外AI输出必须通过此入口取得公司事实；未确认的信息返回'待确认'
@@ -11995,6 +12179,9 @@ function openCustomerDetail(cid){
         </div>
         <div style="margin-top:12px">
           ${renderIcpHardBlockerPanel(c, null)}
+        </div>
+        <div style="margin-top:12px">
+          ${renderWebsiteEvidencePanel(c.id)}
         </div>
       </div>
 

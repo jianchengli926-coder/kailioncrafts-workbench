@@ -71,34 +71,40 @@ def init_db():
     c.close()
 
 
-def _next_no(cur, table, prefix, date_col="order_date"):
+def _next_no(cur, table, prefix, date_col="order_date", no_col="order_no"):
+    # P2-3 修复：删除中间记录后 COUNT(*)+1 会撞唯一键，改为取该前缀下已有最大序号+1
     year = datetime.now().strftime("%Y")
-    cur.execute(f"SELECT COUNT(*) n FROM {table} WHERE {date_col} LIKE ?", (f"{year}%",))
-    n = (cur.fetchone()["n"] or 0) + 1
-    return f"{prefix}-{year}-{n:03d}"
+    like = f"{prefix}-{year}-%"
+    cur.execute(f"SELECT {no_col} AS no FROM {table} WHERE {no_col} LIKE ?", (like,))
+    max_n = 0
+    for r in cur.fetchall():
+        no = r["no"]
+        try:
+            seq = int(str(no).rsplit("-", 1)[-1])
+            if seq > max_n:
+                max_n = seq
+        except Exception:
+            continue
+    return f"{prefix}-{year}-{max_n + 1:03d}"
 
 
 # ---------- 销售订单 ----------
 def add_sales_order(**kw):
     init_db()
     c = _conn(); cur = c.cursor()
-    order_no = _next_no(cur, "sales_orders", "KL", "order_date")
+    order_no = _next_no(cur, "sales_orders", "KL", "order_date", "order_no")
+    # P2-4 修复：trade_extra 合并进同一条 INSERT，避免 INSERT 提交后再 UPDATE 留下半成品
     cur.execute("""INSERT INTO sales_orders
         (order_no,owner,customer,country,product_summary,qty,total_amount,currency,status,
-         order_date,delivery_date,logistics_fee,other_fee,notes)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+         order_date,delivery_date,logistics_fee,other_fee,notes,trade_extra)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (order_no, kw.get("owner"), kw.get("customer"), kw.get("country"),
          kw.get("product_summary"), kw.get("qty", 0), kw.get("total_amount", 0),
          kw.get("currency", "USD"), kw.get("status", "待生产"),
          kw.get("order_date") or datetime.now().strftime("%Y-%m-%d"),
          kw.get("delivery_date"), kw.get("logistics_fee", 0),
-         kw.get("other_fee", 0), kw.get("notes")))
-    c.commit();
-    if kw.get("trade_extra"):
-        c.execute("UPDATE sales_orders SET trade_extra=? WHERE order_no=?",
-                  (kw["trade_extra"], order_no))
-        c.commit()
-    c.close()
+         kw.get("other_fee", 0), kw.get("notes"), kw.get("trade_extra")))
+    c.commit(); c.close()
     return order_no
 
 
@@ -117,7 +123,7 @@ def update_sales_status(order_no, status):
 def add_purchase_order(**kw):
     init_db()
     c = _conn(); cur = c.cursor()
-    po_no = _next_no(cur, "purchase_orders", "PO", "po_date")
+    po_no = _next_no(cur, "purchase_orders", "PO", "po_date", "po_no")
     cur.execute("""INSERT INTO purchase_orders
         (po_no,sales_order_no,factory,cost_amount,currency,pay_status,delivery_status,po_date,notes)
         VALUES (?,?,?,?,?,?,?,?,?)""",

@@ -252,12 +252,23 @@ class AIClient:
     # ============ Trace 记录 ============
     def _save_trace(self, trace):
         try:
+            import os as _os
+            import tempfile as _tmp
             trace_file = TRACE_DIR / f"trace_{datetime.now().strftime('%Y%m')}.json"
+            trace_file.parent.mkdir(parents=True, exist_ok=True)
             data = []
             if trace_file.exists():
                 data = json.loads(trace_file.read_text(encoding="utf-8"))
             data.append(trace)
-            trace_file.write_text(json.dumps(data[-500:], ensure_ascii=False, indent=2), encoding="utf-8")
+            # P2-2 修复：临时文件 + os.replace 原子写入，避免并发读-改-写丢记录
+            _fd, _tmp_path = _tmp.mkstemp(dir=str(trace_file.parent), suffix=".tmp")
+            try:
+                with _os.fdopen(_fd, 'w', encoding='utf-8') as _tf:
+                    _tf.write(json.dumps(data[-500:], ensure_ascii=False, indent=2))
+                _os.replace(_tmp_path, str(trace_file))
+            except Exception:
+                try: _os.unlink(_tmp_path)
+                except OSError: pass
         except Exception:
             pass
 

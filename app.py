@@ -164,8 +164,30 @@ st.set_page_config(
 # ============ 密码门 ============
 if "authed" not in st.session_state:
     st.session_state["authed"] = False
+# 已知限制（本地演示可接受）：失败计数/锁定截止时间存于 st.session_state，
+# 刷新页面或重开会话会重置——暴力破解防护仅对同一会话连续尝试生效，非持久化。
+# 密码本身只从环境变量 WORKBENCH_ACCESS_PASSWORD 读取，绝不写入页面HTML/日志/Trace。
 
 if not st.session_state["authed"]:
+    # 密码门美化：微妙背景渐变 + 卡片阴影 + 输入框聚焦效果（不改变整体居中布局）
+    st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(160deg, #f5f6fa 0%, #eef1f6 55%, #e9edf3 100%);
+    }
+    [data-testid="stHorizontalBlock"] > div:has(input[type="password"]) {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 28px 24px;
+        box-shadow: 0 12px 40px rgba(26,26,46,.10), 0 2px 8px rgba(26,26,46,.06);
+        border: 1px solid #ececec;
+    }
+    input[type="password"]:focus {
+        border-color: #D4AF37 !important;
+        box-shadow: 0 0 0 2px rgba(212,175,55,.25) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     logo_path = Path(__file__).parent / "assets" / "logo.png"
     # 垂直居中：顶部留白
     for _ in range(3):
@@ -188,15 +210,19 @@ if not st.session_state["authed"]:
         if not _access_pwd:
             st.error("⚠️ 访问密码未配置。请设置环境变量 WORKBENCH_ACCESS_PASSWORD 后重启工作台。")
             st.stop()
-        pwd = st.text_input("", type="password", label_visibility="collapsed", placeholder="输入访问密码")
-        if st.button("进 入", use_container_width=True, type="primary"):
+        # P2密码门增强：用 st.form 包裹输入框与提交按钮，支持回车键提交（form_submit_button 在输入框回车时触发）
+        with st.form("__login_form", clear_on_submit=False):
+            pwd = st.text_input("", type="password", label_visibility="collapsed", placeholder="输入访问密码")
+            _submitted = st.form_submit_button("进 入", use_container_width=True, type="primary")
+        if _submitted:
             # P1修复：真正的登录锁定——5次失败后冷却60秒，拒绝所有尝试
             _fail_count = st.session_state.get("_login_fail_count", 0)
             _lock_until = st.session_state.get("_login_lock_until", 0)
             _now_ts = __import__("time").time()
             if _fail_count >= 5 and _now_ts < _lock_until:
                 _remain = int(_lock_until - _now_ts)
-                st.error(f"🔒 已连续失败5次，账户已锁定。请{_remain}秒后再试。")
+                # 安全：锁定时仅显示剩余锁定时间，不暴露失败次数/阈值
+                st.error(f"🔒 账户已临时锁定，请{_remain}秒后再试。")
                 st.stop()
             # P2修复：常量时间比较，防止时序攻击
             import hmac as _hmac
@@ -259,9 +285,11 @@ if not st.session_state["authed"]:
                 if fail_count >= 5:
                     # 设置锁定截止时间：60秒冷却
                     st.session_state["_login_lock_until"] = __import__("time").time() + 60
-                    st.error(f"🔒 密码错误（已连续失败{fail_count}次，账户已锁定60秒）")
+                    # 安全：统一文案，不暴露已失败次数，仅告知已锁定及时长
+                    st.error("🔒 密码错误，请重试。账户已临时锁定60秒。")
                 else:
-                    st.error("密码错误")
+                    # 通用错误提示：不暴露剩余尝试次数
+                    st.error("密码错误，请重试")
     st.stop()
 
 # ============ 回到顶部浮动按钮 ============
@@ -1075,7 +1103,8 @@ if page == "🏠 仪表盘":
         if customers:
             for c in customers:
                 grade = c.get("grade", "C")
-                color = CUSTOMER_GRADES[grade]["color"]
+                # P2-6 修复：grade 不在配置中时回退到 C，避免 KeyError
+                color = CUSTOMER_GRADES.get(grade, CUSTOMER_GRADES["C"])["color"]
                 st.markdown(f"""
                 <div style="background:#fafafa;border-left:4px solid {color};padding:10px 14px;margin-bottom:8px;border-radius:0 8px 8px 0;">
                     <strong>{c.get('company_name','')}</strong>
@@ -1252,7 +1281,7 @@ elif page == "🖥️ 独立站管理":
 
             st.caption(f"共 {len(display)} 条询盘")
             for inq in reversed(display):
-                with st.expander(f"{'🟡' if inq['status']=='待回复' else '🟢' if inq['status']=='已回复' else '⚪'} {inq.get('customer_name','未知')} | {inq.get('email','')[:40]} | {inq.get('date','')}", expanded=False):
+                with st.expander(f"{'🟡' if inq.get('status','待回复')=='待回复' else '🟢' if inq.get('status','待回复')=='已回复' else '⚪'} {inq.get('customer_name','未知')} | {inq.get('email','')[:40]} | {inq.get('date','')}", expanded=False):
                     c1, c2 = st.columns([2,1])
                     with c1:
                         st.markdown(f"**客户：** {inq.get('customer_name','')}")
@@ -1272,15 +1301,19 @@ elif page == "🖥️ 独立站管理":
                     # 操作按钮
                     b1, b2, b3 = st.columns(3)
                     with b1:
-                        if st.button("🔍 客户背调", key=f"bg_{inq['id']}"):
-                            st.session_state["_bg_target"] = inq
-                            st.info("请在下方「客户背调」区域查看结果（需联网）")
+                        # P1-7 修复：原"客户背调"按钮只写session_state并提示"下方查看结果"，但无结果渲染代码，属误导桩按钮。
+                        # 改为诚实提示：深度背调请前往「客户中心 → 深度背调」。
+                        st.caption("🔍 深度背调：请到「客户中心 → 深度背调」页面对该客户做联网调查")
                     with b2:
                         if st.button("✉️ 智能生成回复", key=f"reply_{inq['id']}"):
                             st.session_state["_reply_target"] = inq
                     with b3:
-                        new_status = st.selectbox("更新状态", ["待回复","已回复","已成交","已归档"],
-                                                  index=["待回复","已回复","已成交","已归档"].index(inq.get("status","待回复")),
+                        _inq_status_opts = ["待回复","已回复","已成交","已归档"]
+                        _inq_cur = inq.get("status","待回复")
+                        # P2-6 修复：状态值不在列表内时回退到0，避免 .index() 崩溃
+                        _inq_idx = _inq_status_opts.index(_inq_cur) if _inq_cur in _inq_status_opts else 0
+                        new_status = st.selectbox("更新状态", _inq_status_opts,
+                                                  index=_inq_idx,
                                                   key=f"st_{inq['id']}")
                         if new_status != inq.get("status"):
                             for i in inquiries:
@@ -1955,7 +1988,7 @@ elif page == "👥 客户中心":
                     with cc2:
                         case_rows.append({
                             "做什么": st.text_input("用我们的产品做什么", cs.get("做什么", ""), key=f"cs_use_{i}"),
-                            "解决/结果": st.text_input("解决问题 / 客户反馈", cs.get("解决问题", "") + "；" + cs.get("结果", ""), key=f"cs_res_{i}"),
+                            "解决/结果": st.text_input("解决问题 / 客户反馈", cs.get("解决问题", "") + ("；" + cs.get("结果", "") if cs.get("结果") else ""), key=f"cs_res_{i}"),
                         })
                 ca_col1, ca_col2 = st.columns(2)
                 with ca_col1:
@@ -1985,6 +2018,9 @@ elif page == "👥 客户中心":
                 if st.button("💾 保存企业信息与案例", type="primary", key="ep_save", use_container_width=True):
                     saved_cases = []
                     for i, cs in enumerate(cases):
+                        # P1-6 修复：UI将"解决问题"与"结果"合并为一个输入框，
+                        # 保存时统一把该合并文本存入"解决问题"字段（不再硬编码丢失用户编辑），
+                        # "结果"字段留空，实现单字段统一。
                         saved_cases.append({
                             "行业": st.session_state.get(f"cs_ind_{i}", ""),
                             "地区": st.session_state.get(f"cs_reg_{i}", ""),
@@ -2078,14 +2114,18 @@ EN: ...
                             if st.button("💾 存档为客户（自动进客户管理，阶段=已发开发信）",
                                          use_container_width=True, type="primary"):
                                 _name = (cust_extra or cust_url or "未命名客户").split("\n")[0][:40]
-                                cm.add_customer({
+                                # P2-12 修复：检查 add_customer 返回值，重复客户/仓库不可用时不再静默假成功
+                                _arc = cm.add_customer({
                                     "company_name": _name, "country": cust_country or "未填",
                                     "website": cust_url, "status": "已联系",
                                     "source": "AI开发信",
                                     "analysis": result[:800],
                                     "notes": f"网址:{cust_url}｜{cust_extra or ''}",
                                 })
-                                st.success(f"✅ 已存档客户「{_name}」，请到客户中心→客户管理查看")
+                                if isinstance(_arc, dict) and _arc.get("success") is False:
+                                    st.warning(f"⚠️ 存档未执行：{_arc.get('error')}（该客户可能已存在，请勿重复存档）")
+                                else:
+                                    st.success(f"✅ 已存档客户「{_name}」，请到客户中心→客户管理查看")
                         except Exception as e:
                             st.error(f"AI错误：{e}")
 
@@ -2866,8 +2906,9 @@ EN: ...
                             _w = _csv_mod.DictWriter(_buf, fieldnames=_keys, extrasaction="ignore")
                             _w.writeheader()
                             _w.writerows(rows)
-                            # utf-8-sig 确保Excel正确显示中文
-                            _csv_content = _buf.getvalue().encode("utf-8-sig").decode("utf-8-sig")
+                            # P2-5 修复：原 .encode("utf-8-sig").decode("utf-8-sig") 会把BOM又去掉。
+                            # save_to_kb_button 用 utf-8 写文本，这里显式前置 BOM 字符(U+FEFF)，写入后即为 EF BB BF，Excel 可正确识别中文。
+                            _csv_content = "﻿" + _buf.getvalue()
                             save_to_kb_button(
                                 _csv_content,
                                 "客户管理/导出报表",
@@ -2904,7 +2945,10 @@ EN: ...
                                             _target_cid, _task_action,
                                             _task_due.strftime("%Y-%m-%d"),
                                             priority=_task_pri)
-                                        if _res.get("success"):
+                                        # BUG-001 修复：add_follow_up_task 成功时返回任务记录dict（无 success 键），
+                                        # 失败时返回 {"success":False,"error":...}。原判断 _res.get("success") 恒为假，
+                                        # 导致任务实际已创建却误报"未保存：未知"。改为以"无 error 键"判定成功。
+                                        if not _res.get("error"):
                                             st.success("✅ 跟进任务已保存")
                                             st.rerun()
                                         else:
@@ -3015,7 +3059,8 @@ EN: ...
                                         _r = cm.add_follow_up_task(
                                             _scid, _nt_action, _nt_due.strftime("%Y-%m-%d"),
                                             owner=_nt_owner, priority=_nt_pri)
-                                        if _r.get("success"):
+                                        # BUG-001 修复：同上方，以"无 error 键"判定成功，避免任务已建却误报"未保存：未知"
+                                        if not _r.get("error"):
                                             st.success("✅ 任务已新增")
                                             st.rerun()
                                         else:
@@ -4926,8 +4971,8 @@ elif page == "📦 产品库":
     if unified_json_path.exists():
         import json as _json
         products_list = _json.loads(unified_json_path.read_text(encoding='utf-8'))
-        # 按SKU排序
-        products_list.sort(key=lambda x: x['sku'])
+        # 按SKU排序（P2-6 修复：缺 sku 字段时回退空串，避免 KeyError）
+        products_list.sort(key=lambda x: x.get('sku', ''))
     else:
         # 回退到旧索引
         products_json_path = KB_DIR / "15_产品图片与SEO知识库" / "products_index.json"
@@ -5659,13 +5704,9 @@ SKU格式：KL-品类-材质-款式号
                         st.markdown("**SEO主图名：**")
                         st.code(f"yangjiang-{sku.lower()}-01.jpg")
     
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.button("📋 复制全部图片名", key="copy_all_names")
-                        with col2:
-                            st.button("📋 复制SKU", key="copy_sku")
-                        with col3:
-                            st.button("📋 复制SEO主图名", key="copy_seo_name")
+                        # P2-7 修复：原3个"复制"按钮无任何复制逻辑（纯桩）。
+                        # 上方 st.code 代码块右上角已自带一键复制按钮，这里仅加说明，移除无效按钮。
+                        st.caption("💡 上方每个代码块右上角的 📋 按钮可直接复制对应内容")
     
                 # ========== Tab2: 自定义生成 ==========
                 with tab2:
@@ -7490,11 +7531,12 @@ JPG文件（未匹配）：
                     key="vr_url"
                 )
                 st.caption("⚠️ 小红书/部分抖音有登录墙，链接解析可能失败，请改用上传文件方式")
-                if st.button("🔍 联网解析", type="primary", key="vr_parse_url"):
+                # P1-5 修复：视频解析服务未接入，原"联网解析"按钮只置位vr_parsed=True属误导。
+                # 改为仅诚实记录链接，不假装解析成功。
+                if st.button("📝 记录视频链接（不解析）", type="primary", key="vr_parse_url"):
                     if video_url:
-                        st.info("⏳ 正在解析视频...（实际使用时会调用视频解析服务）")
-                        st.session_state['vr_parsed'] = True
                         st.session_state['vr_video_source'] = f"链接：{video_url}"
+                        st.info("已记录视频链接作为参考（视频解析服务未接入，仅留存链接，未做内容解析）。建议改用上方「上传视频文件」进行分析。")
                     else:
                         st.warning("请先粘贴视频链接")
 
@@ -8445,43 +8487,45 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "l
             st.session_state['seo_prompt'] = seo_prompt
             st.success("✅ SEO内容生成Prompt已生成！")
 
-        if 'seo_prompt' in st.session_state:
-            st.markdown("#### SEO内容生成Prompt（复制到豆包专家模式）")
-            st.code(st.session_state['seo_prompt'], language=None)
-            
-            # AI直接生成SEO内容
+    # P1-3 修复：Prompt展示块与"AI直接生成"按钮移到外层按钮 if 之外，
+    # 改为由 session_state['seo_prompt'] 驱动的常驻块，避免点击外层按钮后内层按钮在下次run被跳过。
+    if st.session_state.get('seo_prompt'):
+        st.markdown("#### SEO内容生成Prompt（复制到豆包专家模式）")
+        st.code(st.session_state['seo_prompt'], language=None)
+
+        # AI直接生成SEO内容
+        st.markdown("---")
+        st.markdown("#### 🚀 或直接用工作台AI生成完整SEO内容")
+        st.caption("直接调用当前AI模型生成22模块完整SEO内容，无需复制到其他工具")
+        if st.button("🤖 AI直接生成SEO内容", use_container_width=True, type="primary", key="ai_gen_seo_content"):
+            if not sku:
+                st.warning("请先填写产品SKU")
+            else:
+                with st.spinner("AI正在生成完整SEO内容（约30-60秒）..."):
+                    try:
+                        seo_result = ai.chat(st.session_state['seo_prompt'],
+                                            task_name=f"SEO内容生成-{sku}")
+                        st.session_state['seo_result'] = seo_result
+                        st.success("✅ SEO内容已生成！")
+                    except Exception as e:
+                        st.error(f"AI生成失败：{e}")
+
+        if st.session_state.get('seo_result'):
             st.markdown("---")
-            st.markdown("#### 🚀 或直接用工作台AI生成完整SEO内容")
-            st.caption("直接调用当前AI模型生成22模块完整SEO内容，无需复制到其他工具")
-            if st.button("🤖 AI直接生成SEO内容", use_container_width=True, type="primary", key="ai_gen_seo_content"):
-                if not sku:
-                    st.warning("请先填写产品SKU")
-                else:
-                    with st.spinner("AI正在生成完整SEO内容（约30-60秒）..."):
-                        try:
-                            seo_result = ai.chat(st.session_state['seo_prompt'], 
-                                                task_name=f"SEO内容生成-{sku}")
-                            st.session_state['seo_result'] = seo_result
-                            st.success("✅ SEO内容已生成！")
-                        except Exception as e:
-                            st.error(f"AI生成失败：{e}")
-            
-            if st.session_state.get('seo_result'):
-                st.markdown("---")
-                st.markdown("#### 📄 AI生成的完整SEO内容")
-                st.markdown(st.session_state['seo_result'])
-                st.download_button("📋 下载SEO内容.txt", 
-                    st.session_state['seo_result'], 
-                    file_name=f"SEO_{sku}_{datetime.now().strftime('%Y%m%d')}.txt",
-                    use_container_width=True)
-                # Trace显示
-                if ai.last_trace:
-                    t = ai.last_trace
-                    with st.expander("📜 AI调用Trace"):
-                        tc1, tc2, tc3 = st.columns(3)
-                        tc1.metric("模型", t["model"][:20])
-                        tc2.metric("耗时", f"{t['elapsed_seconds']}s")
-                        tc3.metric("故障转移", f"{t.get('failover_count', 0)}次")
+            st.markdown("#### 📄 AI生成的完整SEO内容")
+            st.markdown(st.session_state['seo_result'])
+            st.download_button("📋 下载SEO内容.txt",
+                st.session_state['seo_result'],
+                file_name=f"SEO_{sku}_{datetime.now().strftime('%Y%m%d')}.txt",
+                use_container_width=True)
+            # Trace显示
+            if ai.last_trace:
+                t = ai.last_trace
+                with st.expander("📜 AI调用Trace"):
+                    tc1, tc2, tc3 = st.columns(3)
+                    tc1.metric("模型", t["model"][:20])
+                    tc2.metric("耗时", f"{t['elapsed_seconds']}s")
+                    tc3.metric("故障转移", f"{t.get('failover_count', 0)}次")
     
     st.markdown("---")
     
@@ -9140,9 +9184,13 @@ elif page == "👥 客户管理":
                 with info_col2:
                     st.markdown("**⚙️ 操作**")
                     # 状态更新
+                    _status_opts = ["新客户", "跟进中", "已报价", "已成交", "已流失"]
+                    _cur_status = c.get("status", "新客户")
+                    # P1-4 修复：状态值不在列表内时回退到0，避免 .index() 抛 ValueError
+                    _status_idx = _status_opts.index(_cur_status) if _cur_status in _status_opts else 0
                     new_status = st.selectbox("更新状态",
-                        ["新客户", "跟进中", "已报价", "已成交", "已流失"],
-                        index=["新客户", "跟进中", "已报价", "已成交", "已流失"].index(c.get("status", "新客户")),
+                        _status_opts,
+                        index=_status_idx,
                         key=f"status_{c['id']}")
                     if st.button("💾 更新状态", key=f"update_{c['id']}", use_container_width=True):
                         cm.update_customer(c["id"], {"status": new_status})
@@ -10236,8 +10284,8 @@ elif page == "📚 公司知识库":
                                 st.session_state["main_nav"] = "🎯 精准客户开发"
                                 st.toast(f"已加入客户分析：{domain}")
                                 st.rerun()
-                        if st.button("📋 复制域名", key=f"copy_{row['域名']}"):
-                            st.toast(f"已复制: {row['域名']}")
+                        # P2-7 修复：原"复制域名"按钮只toast不真正复制。改为 st.code 展示（Streamlit代码块右上角自带复制按钮）。
+                        st.code(str(row['域名']), language=None)
 
             st.markdown("---")
             c1, c2 = st.columns(2)
@@ -10561,8 +10609,10 @@ elif page == "🎯 精准客户开发":
                     st.error(f"🚫 该客户当前禁止触达，无法生成对外草稿：{_outreach_reason}")
                     for _om in _oc.get("matches", [])[:3]:
                         st.markdown(f"- 匹配客户ID: {_om.get('customer_id')}　原因: {_om.get('reason','')}")
-            except Exception:
-                _outreach_allowed = True
+            except Exception as _oc_e:
+                # P1-2 修复：fail-close——触达检查抛错时默认阻止生成，避免绕过DNC/重复客户
+                _outreach_allowed = False
+                st.error(f"🚫 触达检查不可用，已阻止生成：{_oc_e}")
 
         if st.button("生成草稿", use_container_width=True, type="primary",
                      disabled=(not _outreach_allowed)):
@@ -11026,8 +11076,9 @@ elif page == "🤖 模型管理":
             _ai_singleton.manual_text_model = st.session_state.get('manual_text_model_id')
             _ai_singleton.manual_vision_model = st.session_state.get('manual_vision_model_id')
             _ai_singleton.manual_image_model = st.session_state.get('manual_image_model_id')
-        except Exception:
-            pass
+        except Exception as _sync_e:
+            # P2-9 修复：原 except:pass 静默吞掉同步失败，这里至少给用户可见提示
+            st.caption(f"⚠️ 手动模型同步到AI单例失败：{_sync_e}")
 
         # 当前选择状态面板
         try:
@@ -13925,7 +13976,11 @@ elif page == "⚙️ 设置":
         col1, col2 = st.columns(2)
         with col1:
             if model_presets:
-                model_index = model_names.index(current_model) if current_model in model_names else len(model_names)
+                # P2-8 修复：快速选择按钮用 session_state 存选中值，并在 selectbox 的 index 中读取，
+                # 否则重跑后 selectbox 按 current_model 重建，局部变量赋值丢失。
+                _quick_sel = st.session_state.get("_quick_model_override")
+                _ref_model = _quick_sel if _quick_sel in model_names else current_model
+                model_index = model_names.index(_ref_model) if _ref_model in model_names else len(model_names)
                 model = st.selectbox(
                     "主力模型（复杂任务）*",
                     options=model_names + ["自定义模型..."],
@@ -13959,7 +14014,8 @@ elif page == "⚙️ 设置":
             for i, m in enumerate(model_presets[:4]):
                 with quick_cols[i]:
                     if st.button(m["name"][:15], key=f"quick_{m['name']}", use_container_width=True):
-                        model = m["name"]
+                        # P2-8 修复：写入 session_state 并由 selectbox index 读取，使选择在重跑后生效
+                        st.session_state["_quick_model_override"] = m["name"]
                         st.rerun()
 
         st.markdown("---")

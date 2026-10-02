@@ -437,10 +437,13 @@ def generate_content_draft(customer_id: str, draft_type: str,
             ai = ai_client.AIClient()
             # 传递 mode 参数：standard 关闭 thinking，reasoning 允许内部诊断
             response = ai.chat(user_prompt, system_prompt=system_prompt, temperature=0.7, mode=mode)
-            model_used = response.get('model', chain[0])
-            failover = 1 if response.get('failover') else 0
-            attempts = response.get('attempts', 1)
-            parsed = _parse_model_response(response.get('content', ''))
+            # P1-1 修复：ai_client.chat() 返回纯字符串（正文内容），不是 dict。
+            # 模型名 / 故障转移次数等元信息存在 ai.last_trace 中。
+            _trace = getattr(ai, 'last_trace', None) or {}
+            model_used = _trace.get('model', chain[0])
+            failover = int(_trace.get('failover_count', 0) or 0)
+            attempts = failover + 1
+            parsed = _parse_model_response(response if isinstance(response, str) else '')
         except Exception as e:
             return {'success': False, 'errors': [f'AI 调用失败: {str(e)}']}
 

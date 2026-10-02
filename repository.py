@@ -491,6 +491,10 @@ class CustomerRepository:
             "analysis": data.get("analysis"),
             "due_diligence": data.get("due_diligence"),
         }
+        # BUG-002 修复：SQLite TEXT 列不接受 list，product_categories 等列表字段需序列化为 JSON 字符串
+        for _list_field in ("product_categories",):
+            if isinstance(record.get(_list_field), (list, tuple)):
+                record[_list_field] = json.dumps(record[_list_field], ensure_ascii=False)
 
         conn = self._connect()
         try:

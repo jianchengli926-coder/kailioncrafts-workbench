@@ -87,9 +87,18 @@ def delete_account(aid):
 
 # ---------- 内容 ----------
 def _next_content_no(cur):
-    cur.execute("SELECT COUNT(*) n FROM content_records")
-    n = (cur.fetchone()["n"] or 0) + 1
-    return f"VID-{n:03d}"
+    # P2-3 修复：删除中间记录后 COUNT(*)+1 会撞唯一键，改为取最大序号+1
+    cur.execute("SELECT content_no AS no FROM content_records WHERE content_no LIKE 'VID-%'")
+    max_n = 0
+    for r in cur.fetchall():
+        no = r["no"]
+        try:
+            seq = int(str(no).rsplit("-", 1)[-1])
+            if seq > max_n:
+                max_n = seq
+        except Exception:
+            continue
+    return f"VID-{max_n + 1:03d}"
 
 
 def add_content(**kw):

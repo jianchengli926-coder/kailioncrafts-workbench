@@ -13379,14 +13379,17 @@ function saveCustomer(cid){
   };
   if(cid){ Object.assign(S.customers.find(x=>x.id===cid), data); toast('已更新客户'); }
   else {
-    S.customers.push(Object.assign({id:uid(), source:'手动添加', leadSource:'manual',
+    const newCustomer = Object.assign({id:uid(), source:'手动添加', leadSource:'manual',
       scores:{industry:60,product:60,companyType:60,purchaseSignal:50,contactQuality:70,total:60,grade:'B'},
       leadScore:60, profile:{business:'',productLine:'',needs:'',painPoints:'',angle:''}, matchReasons:[],
       status:'待跟进', nextFollowUp:daysLater(3), createdAt:now(), lastInteraction:now(),
       followUpHistory:[], timeline:[], tags:[], intentCategories:[],
       quoteHistory:[], sampleHistory:[], orderHistory:[],
-      blacklisted:false, unsubscribe:false, companySize:'', decisionMaker:'', annualPurchase:''}, data));
-    addTimelineEvent(S.customers[S.customers.filter(c=>!c.isDemo).length-1].id, 'system', '客户创建', '通过手动添加创建客户记录');
+      blacklisted:false, unsubscribe:false, companySize:'', decisionMaker:'', annualPurchase:''}, data);
+    S.customers.push(newCustomer);
+    addTimelineEvent(newCustomer.id, 'system', '客户创建', '通过手动添加创建客户记录');
+    // P2.2D-3: 新建客户自动同步到客户开发知识库，确保客户选择器可见
+    try { if(typeof syncCustomerToOutreachKB === 'function') syncCustomerToOutreachKB(newCustomer.id); } catch(e) { console.warn('同步客户到知识库失败:', e); }
     toast('客户已添加');
   }
   persist(); closeModal(); renderView();
@@ -14211,6 +14214,10 @@ function openDraftEditor(did, isNew){
       <!-- P2.2B-1.5 草稿知识溯源面板 -->
       <div style="margin-bottom:16px">
         ${renderDraftTraceabilityPanel(d)}
+      </div>
+      <!-- P2.2D-3 人工发送交接包 -->
+      <div style="margin-bottom:16px">
+        ${renderOutreachHandoffPack(d)}
       </div>
       <div id="draftKbContextBox" style="display:none"></div>
       <div class="divider"></div>
@@ -23671,6 +23678,220 @@ function renderDraftTraceabilityPanel(draft){
 
   html += '</div>';
   return html;
+}
+
+/* P2.2D-3: 人工发送交接包（Outreach Handoff Pack） */
+function renderOutreachHandoffPack(draft){
+  if(!draft) return '<div class="panel-empty">草稿不存在</div>';
+  draft = migrateDraftMetadataCompat(draft);
+  const customer = S.customers.find(c => c.id === draft.customerId);
+  const archive = customer ? getOutreachArchiveByCustomerId(customer.id) : null;
+
+  let html = '<div class="handoff-pack" style="padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:16px;word-break:break-word;">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+  html += '<h4 style="margin:0;font-size:15px;color:#166534;">📦 人工发送交接包</h4>';
+  html += '<span style="padding:4px 10px;border-radius:12px;background:#166534;color:#fff;font-size:10px;font-weight:600;">仅人工发送</span>';
+  html += '</div>';
+
+  // 明确提示
+  html += '<div style="padding:10px 12px;background:#fef3c7;border-radius:6px;margin-bottom:14px;font-size:12px;color:#92400e;font-weight:600;">';
+  html += '⚠️ 请 Leo 审核并在外部邮箱或社交平台人工发送。本工作台不会发送任何消息。';
+  html += '</div>';
+
+  // 客户资料
+  html += '<div style="margin-bottom:14px;">';
+  html += '<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px;">【客户资料】</div>';
+  html += '<div style="font-size:12px;color:#374151;line-height:1.9;">';
+  html += '<div>公司: <b>' + esc(customer ? (customer.company || '未知') : '未知') + '</b></div>';
+  if(customer && customer.website) html += '<div>网站: ' + esc(customer.website) + '</div>';
+  if(customer && customer.country) html += '<div>国家/地区: ' + esc(customer.country) + '</div>';
+  if(customer && customer.customerType) html += '<div>买家类型: ' + esc(customer.customerType) + '</div>';
+  if(customer && customer.products) html += '<div>主营产品: ' + esc(customer.products) + '</div>';
+  if(customer && customer.scores) html += '<div>ICP 分数: ' + esc(customer.scores.total || 0) + ' / 100</div>';
+  if(customer && customer.status) html += '<div>当前状态: ' + esc(customer.status) + '</div>';
+  html += '</div></div>';
+
+  // 联系信息
+  html += '<div style="margin-bottom:14px;">';
+  html += '<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px;">【联系信息】</div>';
+  html += '<div style="font-size:12px;color:#374151;line-height:1.9;">';
+  const contact = customer ? (customer.contact || {}) : {};
+  if(contact.name) html += '<div>联系人: ' + esc(contact.name) + '</div>';
+  if(contact.title) html += '<div>职位: ' + esc(contact.title) + '</div>';
+  if(contact.email) html += '<div>邮箱: <code style="background:#d1fae5;padding:1px 6px;border-radius:3px;font-size:11px;">' + esc(contact.email) + '</code></div>';
+  if(contact.linkedin) html += '<div>LinkedIn: ' + esc(contact.linkedin) + '</div>';
+  if(contact.phone || contact.whatsapp) html += '<div>电话/WhatsApp: ' + esc(contact.phone || contact.whatsapp) + '</div>';
+  if(!contact.name && !contact.email && !contact.phone && !contact.whatsapp){
+    html += '<div style="color:#dc2626;">⚠️ 联系信息缺失，请补充后再发送</div>';
+  }
+  html += '</div></div>';
+
+  // 合规与风险
+  html += '<div style="margin-bottom:14px;">';
+  html += '<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px;">【合规与风险】</div>';
+  html += '<div style="font-size:12px;line-height:1.9;">';
+  if(customer && customer.blacklisted) html += '<div style="color:#dc2626;">🚫 DNC / 黑名单</div>';
+  if(archive && archive.duplicateStatus && archive.duplicateStatus !== 'unique'){
+    html += '<div style="color:#d97706;">⚠️ 重复状态: ' + esc(archive.duplicateStatus) + '</div>';
+  }
+  if(draft.riskFlags && draft.riskFlags.length > 0){
+    html += '<div style="color:#991b1b;">风险: ' + draft.riskFlags.map(r => esc(String(r))).join(', ') + '</div>';
+  }
+  if(draft.missingInformation && draft.missingInformation.length > 0){
+    html += '<div style="color:#64748b;">缺失信息: ' + draft.missingInformation.map(m => esc(String(m))).join(', ') + '</div>';
+  }
+  if(!customer || customer.blacklisted || (archive && archive.duplicateStatus === 'duplicate')){
+    html += '<div style="color:#dc2626;font-weight:600;">⛔ 存在阻断项，不建议发送</div>';
+  } else {
+    html += '<div style="color:#166534;">✅ 无硬性阻断，可人工审核后发送</div>';
+  }
+  html += '</div></div>';
+
+  // 知识依据
+  html += '<div style="margin-bottom:14px;">';
+  html += '<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px;">【知识依据】</div>';
+  html += '<div style="font-size:12px;color:#374151;line-height:1.9;">';
+  if(draft.knowledgePackId){
+    html += '<div>Knowledge Pack: <code style="background:#d1fae5;padding:1px 6px;border-radius:3px;font-size:11px;">' + esc(draft.knowledgePackId) + '</code></div>';
+    if(draft.knowledgePackVersion) html += '<div>版本: v' + esc(draft.knowledgePackVersion) + '</div>';
+    if(draft.knowledgeSnapshotHash) html += '<div>Hash: <code style="background:#e2e8f0;padding:1px 6px;border-radius:3px;font-size:10px;word-break:break-all;">' + esc(draft.knowledgeSnapshotHash) + '</code></div>';
+  }
+  if(draft.factIds && draft.factIds.length > 0){
+    html += '<div>使用事实: ' + draft.factIds.length + ' 条</div>';
+  }
+  if(draft.confirmedClaims && draft.confirmedClaims.length > 0){
+    html += '<div style="color:#166534;">已确认: ' + draft.confirmedClaims.slice(0,3).map(c => esc(String(c))).join('; ') + (draft.confirmedClaims.length > 3 ? '...' : '') + '</div>';
+  }
+  html += '</div></div>';
+
+  // 个性化草稿
+  html += '<div style="margin-bottom:14px;">';
+  html += '<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px;">【个性化草稿】</div>';
+  html += '<div style="font-size:12px;color:#374151;line-height:1.9;">';
+  html += '<div>类型: ' + esc(draft.draftType || 'first_email') + '</div>';
+  html += '<div>语言: ' + esc(draft.language || 'English') + '</div>';
+  html += '<div>主题: <b>' + esc(draft.subject || '(无主题)') + '</b></div>';
+  if(draft.model) html += '<div>AI 模型: <code style="background:#e0e7ff;padding:1px 6px;border-radius:3px;font-size:11px;">' + esc(draft.model) + '</code> (' + (draft.manual ? '手动' : '自动') + ')</div>';
+  if(draft.failover) html += '<div>故障转移: 是（' + (draft.attempts || 2) + ' 次尝试）</div>';
+  if(draft.traceId) html += '<div>Trace: ' + esc(draft.traceId) + '</div>';
+  html += '</div></div>';
+
+  // 操作按钮
+  html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;">';
+  html += '<button onclick="copyHandoffContact(\'' + esc(draft.id) + '\')" style="padding:6px 12px;background:#fff;border:1px solid #86efac;color:#166534;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">📋 复制联系方式</button>';
+  html += '<button onclick="copyHandoffSubject(\'' + esc(draft.id) + '\')" style="padding:6px 12px;background:#fff;border:1px solid #86efac;color:#166534;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">📋 复制主题</button>';
+  html += '<button onclick="copyHandoffBody(\'' + esc(draft.id) + '\')" style="padding:6px 12px;background:#fff;border:1px solid #86efac;color:#166534;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">📋 复制正文</button>';
+  html += '<button onclick="copyHandoffFull(\'' + esc(draft.id) + '\')" style="padding:6px 12px;background:#166534;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">📦 复制完整交接包</button>';
+  html += '<button onclick="exportHandoffPack(\'' + esc(draft.id) + '\')" style="padding:6px 12px;background:#fff;border:1px solid #86efac;color:#166534;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">💾 导出 TXT</button>';
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+// 交接包复制函数
+function copyHandoffContact(draftId){
+  const draft = S.drafts.find(d => d.id === draftId);
+  if(!draft) return;
+  const customer = S.customers.find(c => c.id === draft.customerId);
+  const contact = customer ? (customer.contact || {}) : {};
+  let text = '【联系方式】\n';
+  text += '公司: ' + (customer ? (customer.company || '') : '') + '\n';
+  if(contact.name) text += '联系人: ' + contact.name + '\n';
+  if(contact.title) text += '职位: ' + contact.title + '\n';
+  if(contact.email) text += '邮箱: ' + contact.email + '\n';
+  if(contact.linkedin) text += 'LinkedIn: ' + contact.linkedin + '\n';
+  if(contact.phone || contact.whatsapp) text += '电话/WhatsApp: ' + (contact.phone || contact.whatsapp) + '\n';
+  copyToClipboard(text);
+  toast('联系方式已复制');
+}
+
+function copyHandoffSubject(draftId){
+  const draft = S.drafts.find(d => d.id === draftId);
+  if(!draft) return;
+  copyToClipboard(draft.subject || '');
+  toast('邮件主题已复制');
+}
+
+function copyHandoffBody(draftId){
+  const draft = S.drafts.find(d => d.id === draftId);
+  if(!draft) return;
+  copyToClipboard(draft.body || draft.content || '');
+  toast('邮件正文已复制');
+}
+
+function copyHandoffFull(draftId){
+  const draft = S.drafts.find(d => d.id === draftId);
+  if(!draft) return;
+  const customer = S.customers.find(c => c.id === draft.customerId);
+  const contact = customer ? (customer.contact || {}) : {};
+  let text = '========== 人工发送交接包 ==========\n\n';
+  text += '【客户资料】\n';
+  text += '公司: ' + (customer ? (customer.company || '') : '') + '\n';
+  if(customer && customer.website) text += '网站: ' + customer.website + '\n';
+  if(customer && customer.country) text += '国家: ' + customer.country + '\n';
+  if(customer && customer.customerType) text += '买家类型: ' + customer.customerType + '\n';
+  text += '\n【联系信息】\n';
+  if(contact.name) text += '联系人: ' + contact.name + '\n';
+  if(contact.email) text += '邮箱: ' + contact.email + '\n';
+  if(contact.linkedin) text += 'LinkedIn: ' + contact.linkedin + '\n';
+  text += '\n【邮件主题】\n' + (draft.subject || '') + '\n';
+  text += '\n【邮件正文】\n' + (draft.body || draft.content || '') + '\n';
+  text += '\n【知识依据】\n';
+  if(draft.knowledgePackId) text += 'Pack: ' + draft.knowledgePackId + ' v' + (draft.knowledgePackVersion || 1) + '\n';
+  if(draft.model) text += 'AI 模型: ' + draft.model + '\n';
+  text += '\n⚠️ 本工作台不会发送任何消息，请在外部渠道人工发送。\n';
+  text += '====================================\n';
+  copyToClipboard(text);
+  toast('完整交接包已复制');
+}
+
+function exportHandoffPack(draftId){
+  const draft = S.drafts.find(d => d.id === draftId);
+  if(!draft) return;
+  const customer = S.customers.find(c => c.id === draft.customerId);
+  const contact = customer ? (customer.contact || {}) : {};
+  let text = '========== 人工发送交接包 ==========\n\n';
+  text += '导出时间: ' + new Date().toLocaleString('zh-CN') + '\n\n';
+  text += '【客户资料】\n';
+  text += '公司: ' + (customer ? (customer.company || '') : '') + '\n';
+  if(customer && customer.website) text += '网站: ' + customer.website + '\n';
+  if(customer && customer.country) text += '国家: ' + customer.country + '\n';
+  text += '\n【联系信息】\n';
+  if(contact.name) text += '联系人: ' + contact.name + '\n';
+  if(contact.email) text += '邮箱: ' + contact.email + '\n';
+  text += '\n【邮件主题】\n' + (draft.subject || '') + '\n';
+  text += '\n【邮件正文】\n' + (draft.body || draft.content || '') + '\n';
+  text += '\n⚠️ 本工作台不会发送任何消息，请在外部渠道人工发送。\n';
+  const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'handoff_' + (draft.id || 'draft') + '.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('交接包已导出为 TXT');
+}
+
+// 通用复制函数（兼容）
+function copyToClipboard(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
 }
 
 /* P2.2D-1: Trace 详情查看（脱敏） */

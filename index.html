@@ -3995,6 +3995,52 @@ function isEvidencePublicUsable(evidence){
   return evidence && evidence.reviewStatus === 'reviewed' && evidence.publicUseAllowed === true && !evidence.error;
 }
 
+// P2.3B: 渲染客户开发优先级面板
+function renderProspectPriorityPanel(customer){
+  const result = calculateProspectPriority(customer.id);
+  if(!result.success){
+    return `<div class="card card-pad mb16"><div class="card-title">🎯 开发优先级</div><div class="text-muted">计算失败: ${esc(result.error || '')}</div></div>`;
+  }
+  const p = result.priority;
+  const tierColors = {A:'var(--green)', B:'var(--orange)', C:'var(--gray)', blocked:'var(--red)'};
+  const tierColor = tierColors[p.priorityTier] || 'var(--gray)';
+  const tierLabels = {A:'A 类 - 优先开发', B:'B 类 - 补充资料', C:'C 类 - 暂缓', blocked:'阻断 - 不可开发'};
+
+  // 检查是否已在名单中
+  const inQueue = (S.outreachQueues || []).find(q => q.customerId === customer.id && q.status !== 'completed');
+
+  return `
+  <div class="card card-pad mb16" id="prospect-priority-panel">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🎯 开发优先级</span>
+      <span class="badge" style="background:${tierColor};color:#fff;font-weight:700">${tierLabels[p.priorityTier] || p.priorityTier}</span>
+    </div>
+    <div class="stat-grid" style="margin-bottom:12px">
+      <div class="stat-card"><div class="stat-label">总分</div><div class="stat-value" style="color:${tierColor}">${p.priorityScore}</div></div>
+      <div class="stat-card"><div class="stat-label">ICP匹配</div><div class="stat-value">${p.scoreBreakdown.icpMatch}/30</div></div>
+      <div class="stat-card"><div class="stat-label">身份证据</div><div class="stat-value">${p.scoreBreakdown.identityAndEvidence}/20</div></div>
+      <div class="stat-card"><div class="stat-label">产品市场</div><div class="stat-value">${p.scoreBreakdown.productMarketFit}/20</div></div>
+      <div class="stat-card"><div class="stat-label">联系信息</div><div class="stat-value">${p.scoreBreakdown.contactCompleteness}/15</div></div>
+      <div class="stat-card"><div class="stat-label">开发准备</div><div class="stat-value">${p.scoreBreakdown.outreachReadiness}/15</div></div>
+    </div>
+    ${p.positiveReasons.length > 0 ? `
+      <div class="text-sm mb8"><b style="color:var(--green)">✓ 优势:</b> ${p.positiveReasons.slice(0,3).map(r => esc(r.reason)).join('； ')}</div>
+    ` : ''}
+    ${p.missingEvidence.length > 0 ? `
+      <div class="text-sm mb8"><b style="color:var(--orange)">⚠ 缺失:</b> ${p.missingEvidence.slice(0,3).map(m => esc(m.reason)).join('； ')}</div>
+    ` : ''}
+    ${p.hardBlockers.length > 0 ? `
+      <div class="text-sm mb8" style="color:var(--red)"><b>🚫 阻断:</b> ${p.hardBlockers.map(b => esc(b.reason)).join('； ')}</div>
+    ` : ''}
+    <div class="text-sm mb8"><b>下一步:</b> ${esc(p.recommendedNextAction)}</div>
+    <div class="flex gap8">
+      ${!inQueue ? `<button class="btn btn-primary btn-sm" onclick="addToOutreachQueue('${customer.id}')">加入开发名单</button>` : `<span class="badge badge-success">已在开发名单中</span>`}
+      ${p.priorityTier !== 'blocked' ? `<button class="btn btn-outline btn-sm" onclick="currentView='outreachQueue';renderView()">查看开发名单</button>` : ''}
+    </div>
+    <div class="text-xs text-muted mt4">评分版本: ${esc(p.calculationVersion)} | 计算时间: ${fmtDay(p.calculatedAt)}</div>
+  </div>`;
+}
+
 // 渲染网站证据面板（客户详情页）
 function renderWebsiteEvidencePanel(customerId){
   const evidences = getCustomerWebsiteEvidences(customerId);
@@ -4095,7 +4141,8 @@ function renderWebsiteEvidencePanel(customerId){
           <button class="btn btn-sm btn-outline" onclick="reviewWebsiteEvidence('${ev.evidenceId}','conflict')">标记冲突</button>
         </div>`;
       } else if(ev.reviewStatus === 'reviewed'){
-        html += `<div class="text-xs mt4" style="color:var(--green)">✓ 已核验，可用于 ICP 评估和开发草稿</div>`;
+        html += `<div class="text-xs mt4" style="color:var(--green)">✓ 已核验，可用于 ICP 评估和开发草稿</div>
+        <button class="btn btn-sm btn-outline mt4" onclick="createFactFromWebsiteEvidence('${ev.evidenceId}')">创建 pending Fact（需人工审核）</button>`;
       } else {
         html += `<div class="text-xs mt4" style="color:var(--red)">✗ ${esc(ev.reviewNote || '不可用')}</div>`;
       }
@@ -4114,6 +4161,381 @@ function doCollectWebsiteEvidence(customerId){
   const url = urlInput ? urlInput.value.trim() : '';
   if(!url){ toast('请输入客户官网 URL','err'); return; }
   collectWebsiteEvidence(customerId, url);
+}
+
+/* P2.3B: 客户优先级排序和人工开发名单 */
+
+const PRIORITY_VERSION = 'P2.3B-v1';
+
+// 计算客户优先级（前端实现，与 prospect-priority.js 保持一致）
+function calculateProspectPriority(customerId){
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer) return {success:false, error:'客户不存在'};
+
+  const evidences = getCustomerWebsiteEvidences(customerId);
+  const drafts = (S.drafts || []).filter(d => d.customerId === customerId);
+  const campaigns = (S.campaigns || []).filter(c =>
+    (c.customerIds || []).includes(customerId) ||
+    (c.customers || []).some(x => x.customerId === customerId)
+  );
+  const pack = campaigns.length > 0 ? getKnowledgePackById(campaigns[0].knowledgePackId) : null;
+
+  const context = {
+    pack: pack,
+    evidences: evidences,
+    drafts: drafts,
+    campaigns: campaigns,
+    facts: S.knowledgeFacts || [],
+    hasApprovedPack: pack && (pack.status === 'approved' || pack.reviewStatus === 'approved')
+  };
+
+  const result = {
+    customerId: customerId,
+    priorityScore: 0,
+    priorityTier: 'blocked',
+    scoreBreakdown: {icpMatch:0, identityAndEvidence:0, productMarketFit:0, contactCompleteness:0, outreachReadiness:0},
+    positiveReasons: [],
+    missingEvidence: [],
+    riskFlags: [],
+    hardBlockers: [],
+    recommendedNextAction: '',
+    calculatedAt: new Date().toISOString(),
+    calculationVersion: PRIORITY_VERSION
+  };
+
+  // 硬性阻断检查
+  const blockers = _detectPriorityBlockers(customer, context);
+  result.hardBlockers = blockers;
+  if(blockers.length > 0){
+    result.priorityTier = 'blocked';
+    result.priorityScore = 0;
+    result.recommendedNextAction = blockers[0].action || '解决硬性阻断后再评估';
+    result.riskFlags = blockers.map(b => ({type:b.type, severity:'high', reason:b.reason}));
+    return {success:true, priority:result};
+  }
+
+  // 1. ICP 匹配（0-30）
+  const icp = _calcIcpMatchScore(customer, context);
+  result.scoreBreakdown.icpMatch = icp.score;
+  result.positiveReasons.push(...icp.positiveReasons);
+  result.missingEvidence.push(...icp.missingEvidence);
+
+  // 2. 身份和网站证据（0-20）
+  const identity = _calcIdentityEvidenceScore(customer, context);
+  result.scoreBreakdown.identityAndEvidence = identity.score;
+  result.positiveReasons.push(...identity.positiveReasons);
+  result.missingEvidence.push(...identity.missingEvidence);
+
+  // 3. 产品和市场匹配（0-20）
+  const product = _calcProductMarketScore(customer, context);
+  result.scoreBreakdown.productMarketFit = product.score;
+  result.positiveReasons.push(...product.positiveReasons);
+  result.missingEvidence.push(...product.missingEvidence);
+
+  // 4. 联系信息完整度（0-15）
+  const contact = _calcContactCompletenessScore(customer);
+  result.scoreBreakdown.contactCompleteness = contact.score;
+  result.positiveReasons.push(...contact.positiveReasons);
+  result.missingEvidence.push(...contact.missingEvidence);
+
+  // 5. 开发准备度（0-15）
+  const readiness = _calcOutreachReadinessScore(customer, context);
+  result.scoreBreakdown.outreachReadiness = readiness.score;
+  result.positiveReasons.push(...readiness.positiveReasons);
+  result.missingEvidence.push(...readiness.missingEvidence);
+
+  result.priorityScore = Math.min(100,
+    result.scoreBreakdown.icpMatch +
+    result.scoreBreakdown.identityAndEvidence +
+    result.scoreBreakdown.productMarketFit +
+    result.scoreBreakdown.contactCompleteness +
+    result.scoreBreakdown.outreachReadiness
+  );
+
+  if(result.priorityScore >= 80){
+    result.priorityTier = 'A';
+    result.recommendedNextAction = '优先人工开发：生成个性化草稿并审核';
+  } else if(result.priorityScore >= 60){
+    result.priorityTier = 'B';
+    result.recommendedNextAction = '补充资料后开发：' + (result.missingEvidence[0]?.reason || '完善客户信息');
+  } else {
+    result.priorityTier = 'C';
+    result.recommendedNextAction = '暂缓开发：优先处理高优先级客户';
+  }
+
+  if(customer.riskFlags && Array.isArray(customer.riskFlags)){
+    result.riskFlags.push(...customer.riskFlags);
+  }
+
+  return {success:true, priority:result};
+}
+
+function _detectPriorityBlockers(customer, context){
+  const blockers = [];
+  if(customer.dnc === true || customer.doNotContact === true || customer.status === 'dnc_blocked'){
+    blockers.push({type:'dnc', reason:'客户已标记 DNC', action:'DNC 客户不得进入外联名单'});
+  }
+  if(customer.identityStatus === 'unverified' || customer.identityStatus === 'pending' ||
+     customer.customerStatus === 'identity_pending' || customer.identityVerified === false){
+    blockers.push({type:'identity_unresolved', reason:'客户身份未确认', action:'完成客户身份确认后再开发'});
+  }
+  if(customer.duplicateStatus === 'pending' || customer.duplicateStatus === 'confirmed' ||
+     customer.customerStatus === 'duplicate_review'){
+    blockers.push({type:'duplicate_unresolved', reason:'存在未处理的重复客户', action:'处理重复客户后再开发'});
+  }
+  if(customer.hardBlockers && Array.isArray(customer.hardBlockers)){
+    const unresolved = customer.hardBlockers.filter(b => !b.resolved);
+    if(unresolved.length > 0){
+      blockers.push({type:'hard_blocker', reason:'存在 '+unresolved.length+' 个未解决的硬性阻断', action:'解决 hard blockers 后再开发'});
+    }
+  }
+  if(context.pack){
+    if(context.pack.status !== 'approved' && context.pack.reviewStatus !== 'approved'){
+      blockers.push({type:'pack_not_approved', reason:'Knowledge Pack 未批准', action:'创建并批准 Knowledge Pack 后再开发'});
+    }
+    if(context.pack.archived === true){
+      blockers.push({type:'pack_archived', reason:'Knowledge Pack 已归档', action:'使用未归档的 approved Pack'});
+    }
+  } else if(!context.hasApprovedPack){
+    blockers.push({type:'no_approved_pack', reason:'未绑定 approved Knowledge Pack', action:'绑定 approved Knowledge Pack 后再开发'});
+  }
+  if(customer.rejectedOutreach === true || customer.optOut === true){
+    blockers.push({type:'rejected_contact', reason:'客户明确拒绝联系', action:'不得联系该客户'});
+  }
+  return blockers;
+}
+
+function _calcIcpMatchScore(customer, context){
+  const r = {score:0, positiveReasons:[], missingEvidence:[]};
+  const pack = context.pack;
+  if(!pack){ r.missingEvidence.push({rule:'icp_pack', reason:'未绑定 Knowledge Pack'}); return r; }
+  const customerProducts = (customer.products || customer.mainProducts || '').toLowerCase();
+  if(pack.productScope && pack.productScope.length > 0){
+    const matched = pack.productScope.filter(p => customerProducts.includes((p||'').toLowerCase()));
+    if(matched.length > 0){ r.score += Math.min(12, matched.length*4); r.positiveReasons.push({category:'icp', reason:'产品匹配: '+matched.join(', ')}); }
+    else r.missingEvidence.push({rule:'product_fit', reason:'未发现产品品类匹配'});
+  }
+  const customerCountry = (customer.country || '').toUpperCase();
+  if(pack.targetMarkets && pack.targetMarkets.length > 0){
+    if(pack.targetMarkets.some(m => (m||'').toUpperCase() === customerCountry)){
+      r.score += 10; r.positiveReasons.push({category:'icp', reason:'市场匹配: '+customer.country});
+    } else r.missingEvidence.push({rule:'market_fit', reason:'客户国家不在目标市场'});
+  }
+  const customerType = (customer.customerType || customer.buyerType || '').toLowerCase();
+  if(pack.buyerTypes && pack.buyerTypes.length > 0){
+    if(pack.buyerTypes.some(b => customerType.includes((b||'').toLowerCase()))){
+      r.score += 8; r.positiveReasons.push({category:'icp', reason:'买家类型匹配: '+customer.customerType});
+    } else r.missingEvidence.push({rule:'buyer_type', reason:'买家类型不匹配'});
+  }
+  return r;
+}
+
+function _calcIdentityEvidenceScore(customer, context){
+  const r = {score:0, positiveReasons:[], missingEvidence:[]};
+  if(customer.identityStatus === 'verified' || customer.identityVerified === true || customer.customerStatus === 'identity_verified'){
+    r.score += 8; r.positiveReasons.push({category:'identity', reason:'客户身份已确认'});
+  } else r.missingEvidence.push({rule:'identity', reason:'客户身份未确认'});
+  if(customer.website || customer.url){ r.score += 4; r.positiveReasons.push({category:'evidence', reason:'有客户官网'}); }
+  else r.missingEvidence.push({rule:'website', reason:'缺少客户官网'});
+  const reviewed = (context.evidences || []).filter(e => e.reviewStatus === 'reviewed' && e.publicUseAllowed === true && !e.error);
+  if(reviewed.length > 0){ r.score += Math.min(8, reviewed.length*4); r.positiveReasons.push({category:'evidence', reason:reviewed.length+' 条已核验网站证据'}); }
+  else {
+    const pending = (context.evidences || []).filter(e => e.reviewStatus === 'pending');
+    if(pending.length > 0) r.missingEvidence.push({rule:'evidence_review', reason:pending.length+' 条网站证据待人工核验'});
+    else r.missingEvidence.push({rule:'evidence', reason:'缺少已核验的网站证据'});
+  }
+  return r;
+}
+
+function _calcProductMarketScore(customer, context){
+  const r = {score:0, positiveReasons:[], missingEvidence:[]};
+  const reviewed = (context.evidences || []).filter(e => e.reviewStatus === 'reviewed' && e.publicUseAllowed === true);
+  const pack = context.pack;
+  if(pack && pack.targetMarkets && pack.targetMarkets.length > 0){
+    const evidenceMarkets = new Set();
+    reviewed.forEach(e => (e.detectedMarkets || []).forEach(m => evidenceMarkets.add(m.toLowerCase())));
+    const matched = pack.targetMarkets.filter(m => evidenceMarkets.has((m||'').toLowerCase()));
+    if(matched.length > 0){ r.score += Math.min(10, matched.length*5); r.positiveReasons.push({category:'market', reason:'网站证据显示目标市场: '+matched.join(', ')}); }
+  }
+  if(pack && pack.buyerTypes && pack.buyerTypes.length > 0){
+    const evidenceBuyers = new Set();
+    reviewed.forEach(e => (e.detectedBuyerTypes || []).forEach(b => evidenceBuyers.add(b.toLowerCase())));
+    const matched = pack.buyerTypes.filter(b => evidenceBuyers.has((b||'').toLowerCase()));
+    if(matched.length > 0){ r.score += Math.min(10, matched.length*5); r.positiveReasons.push({category:'buyer', reason:'网站证据显示买家类型: '+matched.join(', ')}); }
+  }
+  if(r.score === 0 && reviewed.length === 0) r.missingEvidence.push({rule:'product_market_evidence', reason:'缺少已核验的产品/市场证据'});
+  return r;
+}
+
+function _calcContactCompletenessScore(customer){
+  const r = {score:0, positiveReasons:[], missingEvidence:[]};
+  if(customer.website || customer.url){ r.score += 3; r.positiveReasons.push({category:'contact', reason:'有公司网站'}); }
+  else r.missingEvidence.push({rule:'contact_website', reason:'缺少公司网站'});
+  if(customer.contactName || customer.contactPerson || customer.primaryContact){ r.score += 4; r.positiveReasons.push({category:'contact', reason:'有联系人'}); }
+  else r.missingEvidence.push({rule:'contact_person', reason:'缺少联系人'});
+  if(customer.email || customer.contactEmail || customer.linkedin){ r.score += 5; r.positiveReasons.push({category:'contact', reason:'有邮箱或 LinkedIn'}); }
+  else r.missingEvidence.push({rule:'contact_email', reason:'缺少邮箱或 LinkedIn'});
+  if(customer.country || customer.region){ r.score += 3; r.positiveReasons.push({category:'contact', reason:'有国家/地区信息'}); }
+  else r.missingEvidence.push({rule:'contact_country', reason:'缺少国家/地区'});
+  return r;
+}
+
+function _calcOutreachReadinessScore(customer, context){
+  const r = {score:0, positiveReasons:[], missingEvidence:[]};
+  if(context.pack && (context.pack.status === 'approved' || context.pack.reviewStatus === 'approved')){
+    r.score += 5; r.positiveReasons.push({category:'readiness', reason:'已绑定 approved Knowledge Pack'});
+  } else r.missingEvidence.push({rule:'readiness_pack', reason:'缺少 approved Knowledge Pack'});
+  r.score += 3; r.positiveReasons.push({category:'readiness', reason:'无未解决 hard blockers'});
+  r.score += 2; r.positiveReasons.push({category:'readiness', reason:'非 DNC 客户'});
+  r.score += 2; r.positiveReasons.push({category:'readiness', reason:'无未处理重复客户'});
+  const usable = (context.drafts || []).filter(d =>
+    d.reviewStatus === 'needs_review' || d.reviewStatus === 'draft_pending_review' ||
+    d.reviewStatus === 'reviewed' || d.reviewStatus === 'approved'
+  );
+  if(usable.length > 0){ r.score += 3; r.positiveReasons.push({category:'readiness', reason:usable.length+' 份可用草稿'}); }
+  else r.missingEvidence.push({rule:'readiness_draft', reason:'暂无可用草稿，可生成'});
+  return r;
+}
+
+// 加入人工开发名单
+function addToOutreachQueue(customerId, note){
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer){ toast('客户不存在','err'); return null; }
+  const priorityResult = calculateProspectPriority(customerId);
+  if(!priorityResult.success){ toast('优先级计算失败','err'); return null; }
+  const priority = priorityResult.priority;
+
+  // 检查是否已在名单中
+  const existing = (S.outreachQueues || []).find(q => q.customerId === customerId && q.status !== 'completed');
+  if(existing){
+    existing.priorityScore = priority.priorityScore;
+    existing.priorityTier = priority.priorityTier;
+    existing.scoreBreakdown = priority.scoreBreakdown;
+    existing.hardBlockers = priority.hardBlockers;
+    existing.riskFlags = priority.riskFlags;
+    existing.missingEvidence = priority.missingEvidence;
+    existing.recommendedNextAction = priority.recommendedNextAction;
+    existing.calculationVersion = priority.calculationVersion;
+    existing.updatedAt = new Date().toISOString();
+    if(note) existing.manualNote = note;
+    persist();
+    toast('已更新客户在开发名单中的优先级');
+    return existing;
+  }
+
+  const queueItem = {
+    queueId: 'oq_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2,8),
+    customerId: customerId,
+    priorityScore: priority.priorityScore,
+    priorityTier: priority.priorityTier,
+    scoreBreakdown: priority.scoreBreakdown,
+    hardBlockers: priority.hardBlockers,
+    riskFlags: priority.riskFlags,
+    missingEvidence: priority.missingEvidence,
+    recommendedNextAction: priority.recommendedNextAction,
+    knowledgePackId: priority.pack ? priority.pack.packId : null,
+    sourceEvidenceIds: (getCustomerWebsiteEvidences(customerId) || []).filter(e => e.reviewStatus === 'reviewed').map(e => e.evidenceId),
+    status: priority.priorityTier === 'blocked' ? 'blocked' : 'queued',
+    assignedTo: 'Leo',
+    manualNote: note || '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    calculationVersion: priority.calculationVersion
+  };
+
+  if(!S.outreachQueues) S.outreachQueues = [];
+  S.outreachQueues.unshift(queueItem);
+  persist();
+  toast('已加入人工开发名单（' + priority.priorityTier + ' 类）');
+  return queueItem;
+}
+
+// 更新名单状态
+function updateOutreachQueueStatus(queueId, status, note){
+  const item = (S.outreachQueues || []).find(q => q.queueId === queueId);
+  if(!item){ toast('名单项不存在','err'); return; }
+  const validStatuses = ['queued','in_review','ready_for_draft','drafted','reviewed','paused','blocked','completed'];
+  if(!validStatuses.includes(status)){ toast('无效状态','err'); return; }
+  item.status = status;
+  if(note) item.statusNote = note;
+  item.updatedAt = new Date().toISOString();
+  persist();
+  toast('名单状态已更新为: ' + status);
+  renderView();
+}
+
+// 从 reviewed 证据创建 pending Knowledge Fact（不自动 confirmed）
+function createFactFromWebsiteEvidence(evidenceId){
+  const evidence = (S.websiteEvidences || []).find(e => e.evidenceId === evidenceId);
+  if(!evidence){ toast('证据不存在','err'); return null; }
+  if(evidence.reviewStatus !== 'reviewed'){ toast('只有 reviewed 证据才能创建 Fact','err'); return null; }
+  if(evidence.publicUseAllowed !== true){ toast('证据 publicUseAllowed 不为 true','err'); return null; }
+
+  const now = new Date().toISOString();
+  const factTitle = (evidence.detectedCompanyName ? evidence.detectedCompanyName + ' - ' : '') + '网站证据';
+  const factContent = [
+    evidence.excerpt ? evidence.excerpt.substring(0, 500) : '',
+    evidence.detectedProducts && evidence.detectedProducts.length > 0 ? '检测到产品: ' + evidence.detectedProducts.join(', ') : '',
+    evidence.detectedMarkets && evidence.detectedMarkets.length > 0 ? '检测到市场: ' + evidence.detectedMarkets.join(', ') : '',
+    evidence.detectedBuyerTypes && evidence.detectedBuyerTypes.length > 0 ? '检测到买家类型: ' + evidence.detectedBuyerTypes.join(', ') : ''
+  ].filter(Boolean).join('\n\n');
+
+  const fact = {
+    factId: 'fact_' + uid(),
+    type: 'customer_evidence',
+    title: factTitle.substring(0, 200),
+    content: factContent,
+    sourceType: 'website_evidence',
+    sourceDocument: evidence.pageTitle || '客户官网',
+    sourceLocator: evidence.finalUrl || evidence.sourceUrl,
+    sourceExcerpt: evidence.excerpt ? evidence.excerpt.substring(0, 300) : '',
+    sourceUrl: evidence.finalUrl || evidence.sourceUrl,
+    sourceHash: evidence.contentHash || '',
+    sourceCapturedAt: evidence.fetchedAt || now,
+    sourceEvidenceId: evidence.evidenceId,
+    reviewStatus: 'pending',
+    reviewedBy: null,
+    reviewedAt: null,
+    version: 1,
+    confidence: 50,
+    claimSubject: evidence.detectedCompanyName || '',
+    publicUseAllowed: false,
+    tags: ['website_evidence', 'customer_research'],
+    linkedProductCategories: evidence.detectedProducts || [],
+    createdAt: now,
+    updatedAt: now,
+    createdBy: 'Leo',
+    schemaVersion: 'P2.3B',
+    warnings: ['此 Fact 由网站证据自动创建，默认 pending，需人工审核后才能 confirmed', '高风险内容必须人工确认', '不得将客户官网内容写成 KaiLionCrafts 自有事实']
+  };
+
+  const result = createKnowledgeFact(fact);
+  if(result.success){
+    toast('已创建 pending Fact，需人工审核后才能 confirmed');
+    renderView();
+  } else {
+    toast('创建 Fact 失败: ' + (result.errors || []).join(', '), 'err');
+  }
+  return result;
+}
+
+// 检查客户是否可以生成公开草稿
+function canGeneratePublicDraft(customerId){
+  const priorityResult = calculateProspectPriority(customerId);
+  if(!priorityResult.success) return {allowed:false, reason:'优先级计算失败'};
+  const priority = priorityResult.priority;
+  if(priority.priorityTier === 'blocked'){
+    return {allowed:false, reason:priority.hardBlockers[0]?.reason || '存在硬性阻断'};
+  }
+  const usableFacts = (S.knowledgeFacts || []).filter(f => f.reviewStatus === 'confirmed' && f.publicUseAllowed === true);
+  if(usableFacts.length === 0){
+    return {allowed:false, reason:'缺少 confirmed + publicUseAllowed=true 的公司/产品事实'};
+  }
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer.email && !customer.contactEmail && !customer.linkedin){
+    return {allowed:false, reason:'缺少邮箱或 LinkedIn，无法生成公开草稿'};
+  }
+  return {allowed:true, reason:'可以生成公开草稿'};
 }
 
 // 更新 Knowledge Fact（confirmed 事实更新后 version+1，不影响已冻结的 pack snapshot）
@@ -5950,6 +6372,9 @@ function loadState(){
   S.knowledgePacks = DB.load('knowledgePacks') || [];
   // P2.3A: 网站证据采集
   S.websiteEvidences = DB.load('websiteEvidences') || [];
+  // P2.3B: 客户开发名单
+  S.outreachQueues = DB.load('outreachQueues') || [];
+  S.prospectPriorities = DB.load('prospectPriorities') || [];
 
   // 统一公司事实访问层（P1事实源统一）
   // 所有对外AI输出必须通过此入口取得公司事实；未确认的信息返回'待确认'
@@ -8550,6 +8975,7 @@ const NAV = [
   {key:'activity',icon:'📋',label:'操作日志',title:'操作日志与审计',crumb:'记录所有重要操作 · 可追溯可审计'},
   {key:'linkedin',icon:'💼',label:'领英拓客',title:'领英智能拓客',crumb:'4步拓客法 · AI站内信 · 智能互动'},
   {key:'socialmonitor',icon:'📡',label:'社媒监控',title:'社媒关键词监控',crumb:'监控行业痛点 · 发现潜在客户'},
+  {key:'outreachQueue',icon:'🎯',label:'开发名单',title:'客户开发名单',crumb:'优先级排序 · 逐个生成草稿 · 人工审核发送'},
   {key:'outreach',icon:'📤',label:'触达中心',title:'多渠道触达中心',crumb:'邮件·WhatsApp·领英·电话统一管理'},
   {group:'系统'},
   {key:'tools',icon:'🧰',label:'工具箱',title:'工具箱',crumb:'14类·100+工具'},
@@ -9283,7 +9709,7 @@ function renderView(){
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, prospect:viewProspectDev, devplans:viewDevPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, outreachKB:viewOutreachKB, campaigns:viewCampaigns, campaignDetail:viewCampaignDetail, knowledgeFacts:viewKnowledgeFacts, knowledgePacks:viewKnowledgePacks, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
-    seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach};
+    seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach, outreachQueue:viewOutreachQueue};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
@@ -12179,6 +12605,9 @@ function openCustomerDetail(cid){
         </div>
         <div style="margin-top:12px">
           ${renderIcpHardBlockerPanel(c, null)}
+        </div>
+        <div style="margin-top:12px">
+          ${renderProspectPriorityPanel(c)}
         </div>
         <div style="margin-top:12px">
           ${renderWebsiteEvidencePanel(c.id)}
@@ -20113,6 +20542,154 @@ function viewOutreach(root){
   `;
 }
 
+/* P2.3B: 客户开发名单页面 */
+function viewOutreachQueue(root){
+  const queueItems = S.outreachQueues || [];
+  const customers = S.customers || [];
+
+  // 统计
+  const tierA = queueItems.filter(q => q.priorityTier === 'A').length;
+  const tierB = queueItems.filter(q => q.priorityTier === 'B').length;
+  const tierC = queueItems.filter(q => q.priorityTier === 'C').length;
+  const blocked = queueItems.filter(q => q.priorityTier === 'blocked' || q.status === 'blocked').length;
+
+  root.innerHTML = `
+    <div style="background:linear-gradient(120deg,var(--primary),#2c5282);color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:17px">🎯 客户开发名单</div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:4px">按优先级排序，逐个生成草稿，Leo 人工审核后外部发送。工作台不自动发送任何消息。</div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stat-grid" style="margin-bottom:16px">
+      <div class="stat-card"><span class="stat-icon">⭐</span>
+        <div class="stat-label">A 类（优先开发）</div><div class="stat-value" style="color:var(--green)">${tierA}</div></div>
+      <div class="stat-card"><span class="stat-icon">📋</span>
+        <div class="stat-label">B 类（补充资料）</div><div class="stat-value" style="color:var(--orange)">${tierB}</div></div>
+      <div class="stat-card"><span class="stat-icon">⏸️</span>
+        <div class="stat-label">C 类（暂缓）</div><div class="stat-value" style="color:var(--gray)">${tierC}</div></div>
+      <div class="stat-card gold"><span class="stat-icon">🚫</span>
+        <div class="stat-label">阻断</div><div class="stat-value" style="color:var(--red)">${blocked}</div></div>
+    </div>
+
+    <!-- 操作提示 -->
+    <div class="card card-pad mb16" style="background:#f0f7ff;border-left:3px solid var(--primary)">
+      <div style="font-size:13px">
+        <b>使用流程：</b>
+        ① 在客户详情页点击"加入开发名单" →
+        ② 系统自动计算优先级（ICP/证据/联系信息/准备度） →
+        ③ A 类客户优先生成草稿 →
+        ④ 人工审核草稿 →
+        ⑤ Leo 复制并在外部邮箱/LinkedIn 人工发送 →
+        ⑥ 记录发送结果
+      </div>
+    </div>
+
+    <!-- 名单列表 -->
+    <div class="card card-pad">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>开发名单（${queueItems.length} 个客户）</span>
+        <button class="btn btn-sm btn-outline" onclick="refreshAllPriorities()">重新计算全部优先级</button>
+      </div>
+      ${queueItems.length === 0 ? `
+        <div class="text-muted text-center py24">
+          暂无开发名单。请在客户详情页点击"加入开发名单"。
+        </div>
+      ` : `
+        <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>优先级</th>
+              <th>公司</th>
+              <th>国家</th>
+              <th>买家类型</th>
+              <th>ICP分</th>
+              <th>证据</th>
+              <th>联系完整度</th>
+              <th>Pack状态</th>
+              <th>阻断</th>
+              <th>下一步</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${queueItems.map(item => {
+              const customer = customers.find(c => c.id === item.customerId);
+              if(!customer) return '';
+              const tierColors = {A:'var(--green)', B:'var(--orange)', C:'var(--gray)', blocked:'var(--red)'};
+              const tierColor = tierColors[item.priorityTier] || 'var(--gray)';
+              const evidences = getCustomerWebsiteEvidences(customer.id);
+              const reviewedCount = evidences.filter(e => e.reviewStatus === 'reviewed').length;
+              const contactScore = item.scoreBreakdown?.contactCompleteness || 0;
+              const hasBlocker = item.hardBlockers && item.hardBlockers.length > 0;
+              const pack = item.knowledgePackId ? getKnowledgePackById(item.knowledgePackId) : null;
+              const packStatus = pack ? (pack.status || pack.reviewStatus || 'unknown') : '未绑定';
+              return `
+                <tr>
+                  <td><span class="badge" style="background:${tierColor};color:#fff;font-weight:700">${item.priorityTier}</span> <span class="text-sm">${item.priorityScore}</span></td>
+                  <td><a href="#" onclick="currentCustomer='${customer.id}';currentView='customers';renderView();return false">${esc(customer.company || customer.name || '未知')}</a></td>
+                  <td>${esc(customer.country || '-')}</td>
+                  <td>${esc(customer.customerType || '-')}</td>
+                  <td>${item.scoreBreakdown?.icpMatch || 0}/30</td>
+                  <td>${reviewedCount}/${evidences.length} 已核验</td>
+                  <td>${contactScore}/15</td>
+                  <td><span class="badge ${packStatus==='approved'?'badge-success':'badge-warning'}">${esc(packStatus)}</span></td>
+                  <td>${hasBlocker ? '<span style="color:var(--red)">'+item.hardBlockers.length+' 项</span>' : '-'}</td>
+                  <td class="text-sm">${esc(item.recommendedNextAction || '-')}</td>
+                  <td><span class="badge">${esc(item.status || 'queued')}</span></td>
+                  <td>
+                    <div class="flex gap4 flex-wrap">
+                      <button class="btn btn-xs btn-outline" onclick="currentCustomer='${customer.id}';currentView='customers';renderView()">详情</button>
+                      ${!hasBlocker ? `<button class="btn btn-xs btn-primary" onclick="openDraftForCustomer('${customer.id}')">生成草稿</button>` : ''}
+                      <button class="btn btn-xs btn-outline" onclick="updateOutreachQueueStatus('${item.queueId}','paused')">暂停</button>
+                      <button class="btn btn-xs btn-outline" onclick="updateOutreachQueueStatus('${item.queueId}','completed')">完成</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+// 重新计算全部优先级
+function refreshAllPriorities(){
+  const queueItems = S.outreachQueues || [];
+  let updated = 0;
+  queueItems.forEach(item => {
+    const result = calculateProspectPriority(item.customerId);
+    if(result.success){
+      const p = result.priority;
+      item.priorityScore = p.priorityScore;
+      item.priorityTier = p.priorityTier;
+      item.scoreBreakdown = p.scoreBreakdown;
+      item.hardBlockers = p.hardBlockers;
+      item.riskFlags = p.riskFlags;
+      item.missingEvidence = p.missingEvidence;
+      item.recommendedNextAction = p.recommendedNextAction;
+      item.calculationVersion = p.calculationVersion;
+      item.updatedAt = new Date().toISOString();
+      if(p.priorityTier === 'blocked') item.status = 'blocked';
+      updated++;
+    }
+  });
+  persist();
+  toast('已重新计算 ' + updated + ' 个客户优先级');
+  renderView();
+}
+
+// 打开客户草稿生成
+function openDraftForCustomer(customerId){
+  currentCustomer = customerId;
+  currentView = 'customers';
+  renderView();
+  toast('请在客户详情页找到开发任务并生成草稿');
+}
 
 function viewPipeline(root){
   const stages=[

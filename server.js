@@ -24,6 +24,8 @@ const dns = require('dns');
 const ModelRouter = require('./model-router');
 // P2.3A: 网站证据采集
 const WebsiteEvidence = require('./website-evidence');
+// P2.3B: 客户优先级排序
+const ProspectPriority = require('./prospect-priority');
 
 // ============ 全局异常保护（防止进程崩溃退出）============
 process.on('uncaughtException', (err) => {

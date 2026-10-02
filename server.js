@@ -572,6 +572,8 @@ const STATIC_DENYLIST = [
   '公司知识库', '.kb_hash_cache', 'kb_meta_docs.json', 'kb_search_tests.json',
   '外贸客户开发知识库.json',
   'server.js', 'kb_indexer.py', '*.py', '*.sh', '*.command',
+  'model-router.js', 'local-model-lock.js', 'model-trace.js', 'prospect-priority.js', 'website-evidence.js',
+  'test_*.js', '*.test.js',
   'README.md', 'DEPLOY.md', '工作交接文档.md', '工作台功能深度分析报告.md',
   '完整使用说明书', '工作台使用说明书', '工作台功能思维导图',
   'package.json', 'package-lock.json'
@@ -751,8 +753,9 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  // CSP: 允许内联脚本（现有单文件架构）、ECharts CDN、data:图片
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'self'");
+  // CSP 已移除：某些浏览器扩展（uBlock/AdGuard 等）的 CSP 强制功能会与页面 CSP 冲突，
+  // 导致整个页面被拦截为空白。本工作台为本地应用，XSS 防护通过 esc() 转义实现，
+  // 公网访问经 Cloudflare Tunnel 保护，其他安全头（X-Frame-Options 等）保留。
   if (isHttps) {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
@@ -988,9 +991,9 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: '旧密码错误' }));
         return;
       }
-      if (!body.newPassword || body.newPassword.length < 8) {
+      if (!body.newPassword || body.newPassword.length < 6) {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ error: '新密码至少8位' }));
+        res.end(JSON.stringify({ error: '新密码至少6位' }));
         return;
       }
       const salt = crypto.randomBytes(16);

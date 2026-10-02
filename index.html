@@ -5768,8 +5768,8 @@ function loadState(){
     return '与阳江本地多个制造基地深度战略合作、本地供应链协同';
   }
 
-/* 客户时间线操作 */
-function addTimelineEvent(cid, type, title, detail='', metadata={}){
+/* 客户时间线操作 - 全局作用域，供saveCustomer等函数调用 */
+window.addTimelineEvent = function(cid, type, title, detail='', metadata={}){
   const c = S.customers.find(x=>x.id===cid);
   if(!c) return;
   if(!c.timeline) c.timeline = [];
@@ -5782,13 +5782,19 @@ function addTimelineEvent(cid, type, title, detail='', metadata={}){
     timestamp: Date.now()
   });
   c.lastInteraction = Date.now();
-  persist();
+  if(typeof persist === 'function') persist();
+}
+function addTimelineEvent(cid, type, title, detail='', metadata={}){
+  return window.addTimelineEvent(cid, type, title, detail, metadata);
 }
 
-function getTimelineEvents(cid, limit=50){
+window.getTimelineEvents = function(cid, limit=50){
   const c = S.customers.find(x=>x.id===cid);
   if(!c || !c.timeline) return [];
   return c.timeline.slice(0, limit);
+}
+function getTimelineEvents(cid, limit=50){
+  return window.getTimelineEvents(cid, limit);
 }
   S.mailLogs = DB.load('mailLogs') || [];
   S.smtpConfig = DB.load('smtpConfig') || null;
@@ -14349,12 +14355,81 @@ function markSent(did){
     return;
   }
 
+  // V79.0D1 修复：幂等——已人工标记发送则不覆盖
+  if(d.status === '已发送' && d.sentAt){
+    toast('该草稿已人工标记发送');
+    closeDrawer(); renderView();
+    return;
+  }
+
+  // P2.2D-2：二次确认弹窗，要求填写发送渠道、实际发送时间、备注
+  const nowLocal = new Date();
+  const localISO = nowLocal.getFullYear() + '-' +
+    String(nowLocal.getMonth()+1).padStart(2,'0') + '-' +
+    String(nowLocal.getDate()).padStart(2,'0') + 'T' +
+    String(nowLocal.getHours()).padStart(2,'0') + ':' +
+    String(nowLocal.getMinutes()).padStart(2,'0');
+
+  showModal(`
+    <div class="modal-title">📤 确认人工发送记录</div>
+    <div style="background:#fff3cd;padding:12px 14px;border-radius:8px;margin-bottom:16px;border-left:4px solid #ffc107;font-size:13px;line-height:1.7">
+      <b>⚠️ 重要提示：</b>此操作<b>不会</b>发送任何邮件或消息，也不会调用 SMTP、LinkedIn、Webhook 或其他外部接口。仅记录您已在外部渠道手动发送此草稿。
+    </div>
+    <div class="form-group">
+      <label>发送渠道 <span style="color:#e53e3e">*</span></label>
+      <select id="manual_send_channel" class="form-control">
+        <option value="email">Email</option>
+        <option value="linkedin">LinkedIn</option>
+        <option value="whatsapp">WhatsApp</option>
+        <option value="other">其他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>实际发送时间 <span style="color:#e53e3e">*</span></label>
+      <input type="datetime-local" id="manual_send_time" class="form-control" value="${localISO}">
+    </div>
+    <div class="form-group">
+      <label>备注（可选）</label>
+      <textarea id="manual_send_note" class="form-control" rows="2" placeholder="例如：通过公司邮箱 sales@kailioncrafts.com 手动发送"></textarea>
+    </div>
+    <div class="btn-row mt16">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-success" onclick="confirmMarkSent('${did}')">✅ 确认记录人工发送</button>
+    </div>
+  `);
+}
+
+function confirmMarkSent(did){
+  const channel = document.getElementById('manual_send_channel').value;
+  const sendTimeVal = document.getElementById('manual_send_time').value;
+  const note = document.getElementById('manual_send_note').value.trim();
+
+  if(!channel){ toast('请选择发送渠道','err'); return; }
+  if(!sendTimeVal){ toast('请填写实际发送时间','err'); return; }
+
+  closeModal();
+
+  const d = S.drafts.find(x=>x.id===did); if(!d) return;
+
+  // 保存人工发送记录元数据
+  d.manualSendChannel = channel;
+  d.manualSendTime = new Date(sendTimeVal).toISOString();
+  d.manualSendNote = note;
+
   // V79.0D1 修复：如果 Draft 明确关联 CampaignTask，必须复用共享安全函数
+  const linkCheck = getExclusiveCampaignTaskByDraftId(did);
   if(linkCheck.task){
     const result = markCampaignTaskManuallySent(linkCheck.task.taskId);
     if(!result.success){
       toast('标记发送失败: ' + (result.errors||[]).join('; '), 'err');
       return;
+    }
+    // 补充渠道/时间/备注到草稿（markCampaignTaskManuallySent 已设置 status/sentAt）
+    const taskDraft = S.drafts.find(x=>x.id===did);
+    if(taskDraft){
+      taskDraft.manualSendChannel = channel;
+      taskDraft.manualSendTime = d.manualSendTime;
+      taskDraft.manualSendNote = note;
     }
     if(result.alreadySent){
       toast('该草稿已人工标记发送');
@@ -14366,41 +14441,30 @@ function markSent(did){
   }
 
   // 无关联 CampaignTask：普通草稿原行为
-  // V79.0D1 第二轮修复：幂等——已人工标记发送则不覆盖 sentAt、不重复同步 archive、不执行 DB.save
-  if(d.status === '已发送' && d.sentAt){
-    toast('该草稿已人工标记发送');
-    closeDrawer(); renderView();
-    return;
-  }
-
-  // V79.0D1：创建跨集合快照
+  // 创建跨集合快照
   const snapshot = createOutreachWorkflowSnapshot();
   const changedKeys = ['drafts'];
 
-  d.subject = document.getElementById('dr_subject').value;
-  d.body = document.getElementById('dr_body').value;
+  d.subject = document.getElementById('dr_subject') ? document.getElementById('dr_subject').value : d.subject;
+  d.body = document.getElementById('dr_body') ? document.getElementById('dr_body').value : d.body;
   d.content = d.body;
-  d.reviewNotes = document.getElementById('dr_review_notes').value.trim();
+  d.reviewNotes = document.getElementById('dr_review_notes') ? document.getElementById('dr_review_notes').value.trim() : d.reviewNotes;
   d.status = '已发送'; d.sentAt = now();
-  // V79.0D1：明确标记人工发送，不声称真实投递
+  // 明确标记人工发送，不声称真实投递
   d.manualSendSource = 'manual_mark';
   d.deliveryStatus = 'unknown';
   d.evidenceType = 'manual';
 
-  // V79.0D1 修复：不再把 customer.status 错误设置为"已回复"
-  // 回复状态只能来自明确 inbound communication 或人工确认的回复记录
-
-  // V79.0D1：同步 archive（在持久化前，纳入同一原子事务）
+  // 同步 archive（在持久化前，纳入同一原子事务）
   syncCustomerToOutreachKB(d.customerId);
   changedKeys.push('outreachKnowledgeBase');
 
-  // V79.0D1：统一安全持久化
+  // 统一安全持久化
   const persistResult = safePersistOutreachWorkflowData(snapshot, changedKeys);
   if(!persistResult.success){
     toast('标记发送失败: ' + persistResult.error, 'err');
     return;
   }
-  // 成功后不再调用 syncCustomerToOutreachKB（已在事务内完成）
   toast('已人工标记发送（无真实投递证据）');
   closeDrawer(); renderView();
 }

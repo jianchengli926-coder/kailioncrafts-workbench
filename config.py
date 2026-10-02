@@ -103,7 +103,8 @@ KB_SEARCH_CONFIG = {
     "max_results": 20,
     "max_content_length": 3000,
     "supported_extensions": [".md", ".txt", ".csv"],
-    "skip_dirs": ["node_modules", ".git", "__pycache__", "99_技术缓存", "98_待人工确认", "08_财务对账"],
+    "skip_dirs": ["node_modules", ".git", "__pycache__", "99_技术缓存", "98_待人工确认", "08_财务对账",
+                  "备份", "_backup", "AI客户开发工作台_", "工作台完整备份", "bak", "old"],
 }
 
 # ============ AI模型配置 ============

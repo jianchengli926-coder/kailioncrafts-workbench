@@ -20,9 +20,11 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import io
 import os
+import time
 import base64
 import hashlib
 import json as _json
+import json
 
 from config import (
     COMPANY, CUSTOMER_GRADES, EMAIL_CONFIG,
@@ -162,11 +164,48 @@ st.set_page_config(
 )
 
 # ============ 密码门 ============
+import hmac as _hmac_mod
+
+_AUTH_LOCK_FILE = "data/auth_lock.json"
+
+def _read_auth_lock():
+    """读取登录锁定状态文件，不存在或损坏时返回初始值。"""
+    try:
+        if os.path.exists(_AUTH_LOCK_FILE):
+            with open(_AUTH_LOCK_FILE, encoding="utf-8") as _f:
+                d = json.load(_f)
+                return {
+                    "fail_count": int(d.get("fail_count", 0)),
+                    "lock_until": float(d.get("lock_until", 0)),
+                    "last_attempt": float(d.get("last_attempt", 0)),
+                }
+    except (json.JSONDecodeError, IOError, ValueError, TypeError):
+        pass
+    return {"fail_count": 0, "lock_until": 0.0, "last_attempt": 0.0}
+
+def _write_auth_lock(data):
+    """原子写入登录锁定状态文件。"""
+    try:
+        os.makedirs("data", exist_ok=True)
+        _fd, _tmp = _tempfile.mkstemp(dir="data", suffix=".tmp")
+        with os.fdopen(_fd, "w", encoding="utf-8") as _tf:
+            json.dump(data, _tf, ensure_ascii=False, indent=2)
+        os.replace(_tmp, _AUTH_LOCK_FILE)
+    except Exception:
+        pass
+
 if "authed" not in st.session_state:
     st.session_state["authed"] = False
-# 已知限制（本地演示可接受）：失败计数/锁定截止时间存于 st.session_state，
-# 刷新页面或重开会话会重置——暴力破解防护仅对同一会话连续尝试生效，非持久化。
-# 密码本身只从环境变量 WORKBENCH_ACCESS_PASSWORD 读取，绝不写入页面HTML/日志/Trace。
+
+# 会话超时检查：登录后超过1小时自动登出
+if st.session_state.get("authed"):
+    _login_ts = st.session_state.get("login_time", 0)
+    if _login_ts and (time.time() - _login_ts) > 3600:
+        # 会话超时，清除认证状态
+        for _k in ("authed", "login_time", "just_logged_in"):
+            st.session_state.pop(_k, None)
+        st.warning("⏰ 会话已超时，请重新登录。")
+        st.rerun()
 
 if not st.session_state["authed"]:
     # 密码门美化：微妙背景渐变 + 卡片阴影 + 输入框聚焦效果（不改变整体居中布局）
@@ -195,12 +234,13 @@ if not st.session_state["authed"]:
     _, col_c, _ = st.columns([1, 2, 1])
     with col_c:
         if logo_path.exists():
-            st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{__import__("base64").b64encode(open(logo_path,"rb").read()).decode()}" width="320"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{base64.b64encode(open(logo_path,"rb").read()).decode()}" width="320"></div>', unsafe_allow_html=True)
         st.markdown("""
         <div style="text-align:center;margin-top:16px;">
         <div style="font-size:32px;font-weight:900;color:#1a1a2e;letter-spacing:-1px;">KaiLion<span style="color:#D4AF37;">Crafts</span></div>
         <div style="color:#D4AF37;font-size:13px;letter-spacing:4px;margin-top:6px;">锴 利 匠 心</div>
-        <div style="color:#888;font-size:14px;margin-top:20px;">企业级AI工作台 · 请输入密码进入</div>
+        <div style="font-size:20px;font-weight:700;color:#1a1a2e;margin-top:14px;">AI客户开发工作台</div>
+        <div style="color:#888;font-size:14px;margin-top:6px;">企业级客户开发与知识库管理平台</div>
         </div>
         """, unsafe_allow_html=True)
     # 密码输入框也居中
@@ -210,87 +250,92 @@ if not st.session_state["authed"]:
         if not _access_pwd:
             st.error("⚠️ 访问密码未配置。请设置环境变量 WORKBENCH_ACCESS_PASSWORD 后重启工作台。")
             st.stop()
-        # P2密码门增强：用 st.form 包裹输入框与提交按钮，支持回车键提交（form_submit_button 在输入框回车时触发）
-        with st.form("__login_form", clear_on_submit=False):
-            pwd = st.text_input("", type="password", label_visibility="collapsed", placeholder="输入访问密码")
-            _submitted = st.form_submit_button("进 入", use_container_width=True, type="primary")
-        if _submitted:
-            # P1修复：真正的登录锁定——5次失败后冷却60秒，拒绝所有尝试
-            _fail_count = st.session_state.get("_login_fail_count", 0)
-            _lock_until = st.session_state.get("_login_lock_until", 0)
-            _now_ts = __import__("time").time()
-            if _fail_count >= 5 and _now_ts < _lock_until:
-                _remain = int(_lock_until - _now_ts)
-                # 安全：锁定时仅显示剩余锁定时间，不暴露失败次数/阈值
-                st.error(f"🔒 账户已临时锁定，请{_remain}秒后再试。")
-                st.stop()
-            # P2修复：常量时间比较，防止时序攻击
-            import hmac as _hmac
-            if _hmac.compare_digest(pwd, _access_pwd):
-                st.session_state["authed"] = True
-                st.session_state["_login_fail_count"] = 0
-                st.session_state["_login_lock_until"] = 0
-                try:
-                    import json, os, tempfile
-                    from datetime import datetime
-                    log_file = "data/auth_log.json"
-                    os.makedirs("data", exist_ok=True)
-                    logs = []
-                    if os.path.exists(log_file):
-                        try:
-                            with open(log_file, encoding="utf-8") as _lf:
-                                logs = json.load(_lf)
-                        except (json.JSONDecodeError, IOError):
-                            logs = []
-                    logs.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "登录成功", "ip": "local"})
-                    # 原子写入：临时文件+replace
-                    _fd, _tmp = tempfile.mkstemp(dir="data", suffix=".tmp")
+        # 登录前检查持久化锁定状态
+        _lock_state = _read_auth_lock()
+        _now_ts = time.time()
+        if _lock_state["lock_until"] > _now_ts:
+            _remain = int(_lock_state["lock_until"] - _now_ts)
+            st.error(f"🔒 账户已临时锁定，请{_remain}秒后再试。")
+        else:
+            # P2密码门增强：用 st.form 包裹输入框与提交按钮，支持回车键提交
+            with st.form("__login_form", clear_on_submit=False):
+                pwd = st.text_input("", type="password", label_visibility="collapsed", placeholder="输入访问密码")
+                _submitted = st.form_submit_button("进 入", use_container_width=True, type="primary")
+            if _submitted:
+                # 重新读取锁定状态（防止并发绕过）
+                _lock_state = _read_auth_lock()
+                _now_ts = time.time()
+                if _lock_state["lock_until"] > _now_ts:
+                    _remain = int(_lock_state["lock_until"] - _now_ts)
+                    st.error(f"🔒 账户已临时锁定，请{_remain}秒后再试。")
+                    st.stop()
+                # P2修复：常量时间比较，防止时序攻击
+                if _hmac_mod.compare_digest(pwd, _access_pwd):
+                    # 登录成功：重置锁定状态
+                    _write_auth_lock({"fail_count": 0, "lock_until": 0.0, "last_attempt": _now_ts})
+                    st.session_state["authed"] = True
+                    st.session_state["login_time"] = _now_ts
+                    st.session_state["just_logged_in"] = True
                     try:
-                        with os.fdopen(_fd, 'w', encoding='utf-8') as _tf:
-                            json.dump(logs[-100:], _tf, ensure_ascii=False, indent=2)
-                        os.replace(_tmp, log_file)
-                    except Exception:
-                        try: os.unlink(_tmp)
-                        except OSError: pass
-                except Exception:
-                    pass
-                st.rerun()
-            else:
-                # P2修复：登录失败计数+冷却，防止暴力破解
-                fail_count = st.session_state.get("_login_fail_count", 0) + 1
-                st.session_state["_login_fail_count"] = fail_count
-                try:
-                    import json, os, tempfile
-                    from datetime import datetime
-                    log_file = "data/auth_log.json"
-                    os.makedirs("data", exist_ok=True)
-                    logs = []
-                    if os.path.exists(log_file):
+                        log_file = "data/auth_log.json"
+                        os.makedirs("data", exist_ok=True)
+                        logs = []
+                        if os.path.exists(log_file):
+                            try:
+                                with open(log_file, encoding="utf-8") as _lf:
+                                    logs = json.load(_lf)
+                            except (json.JSONDecodeError, IOError):
+                                logs = []
+                        logs.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": "登录成功", "ip": "local"})
+                        _fd, _tmp = _tempfile.mkstemp(dir="data", suffix=".tmp")
                         try:
-                            with open(log_file, encoding="utf-8") as _lf:
-                                logs = json.load(_lf)
-                        except (json.JSONDecodeError, IOError):
-                            logs = []
-                    logs.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": f"登录失败(第{fail_count}次)", "ip": "local"})
-                    _fd, _tmp = tempfile.mkstemp(dir="data", suffix=".tmp")
-                    try:
-                        with os.fdopen(_fd, 'w', encoding='utf-8') as _tf:
-                            json.dump(logs[-100:], _tf, ensure_ascii=False, indent=2)
-                        os.replace(_tmp, log_file)
+                            with os.fdopen(_fd, 'w', encoding='utf-8') as _tf:
+                                json.dump(logs[-100:], _tf, ensure_ascii=False, indent=2)
+                            os.replace(_tmp, log_file)
+                        except Exception:
+                            try: os.unlink(_tmp)
+                            except OSError: pass
                     except Exception:
-                        try: os.unlink(_tmp)
-                        except OSError: pass
-                except Exception:
-                    pass
-                if fail_count >= 5:
-                    # 设置锁定截止时间：60秒冷却
-                    st.session_state["_login_lock_until"] = __import__("time").time() + 60
-                    # 安全：统一文案，不暴露已失败次数，仅告知已锁定及时长
-                    st.error("🔒 密码错误，请重试。账户已临时锁定60秒。")
+                        pass
+                    st.rerun()
                 else:
-                    # 通用错误提示：不暴露剩余尝试次数
-                    st.error("密码错误，请重试")
+                    # 登录失败：持久化计数+冷却
+                    _new_count = _lock_state["fail_count"] + 1
+                    _new_lock = _lock_state["lock_until"]
+                    if _new_count >= 5:
+                        _new_lock = _now_ts + 60
+                    _write_auth_lock({"fail_count": _new_count, "lock_until": _new_lock, "last_attempt": _now_ts})
+                    try:
+                        log_file = "data/auth_log.json"
+                        os.makedirs("data", exist_ok=True)
+                        logs = []
+                        if os.path.exists(log_file):
+                            try:
+                                with open(log_file, encoding="utf-8") as _lf:
+                                    logs = json.load(_lf)
+                            except (json.JSONDecodeError, IOError):
+                                logs = []
+                        logs.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": f"登录失败(第{_new_count}次)", "ip": "local"})
+                        _fd, _tmp = _tempfile.mkstemp(dir="data", suffix=".tmp")
+                        try:
+                            with os.fdopen(_fd, 'w', encoding='utf-8') as _tf:
+                                json.dump(logs[-100:], _tf, ensure_ascii=False, indent=2)
+                            os.replace(_tmp, log_file)
+                        except Exception:
+                            try: os.unlink(_tmp)
+                            except OSError: pass
+                    except Exception:
+                        pass
+                    if _new_count >= 5:
+                        st.error("🔒 密码错误，请重试。账户已临时锁定60秒。")
+                    else:
+                        st.error("密码错误，请重试")
+        st.caption("忘记密码？请检查环境变量 WORKBENCH_ACCESS_PASSWORD 或配置文件 ~/.config/kailioncrafts/workbench.env")
     st.stop()
+
+# 登录成功反馈
+if st.session_state.pop("just_logged_in", False):
+    st.success("登录成功，正在进入工作台...")
 
 # ============ 回到顶部浮动按钮 ============
 st.markdown("""
@@ -992,7 +1037,7 @@ if page == "🏠 仪表盘":
                 with col_cb:
                     _cb = st.checkbox(t["task"], value=t.get("done", False), key=f"dash_todo_{i}")
                 with col_del:
-                    if st.button("🗑", key=f"del_todo_{i}", help="删除此待办"):
+                    if two_step_delete("🗑", f"del_todo_{i}", "删除此待办") == "yes":
                         todos.pop(i)
                         _atomic_write_json(todo_file, todos)
                         st.rerun()
@@ -2897,27 +2942,34 @@ EN: ...
                 # ===== 导出按钮 =====
                 exp_col1, exp_col2 = st.columns([3, 1])
                 with exp_col2:
-                    if st.button("📤 导出筛选结果CSV", key="export_filtered"):
-                        if rows:
-                            import csv as _csv_mod
-                            from io import StringIO
-                            _buf = StringIO()
-                            _keys = list(rows[0].keys())
-                            _w = _csv_mod.DictWriter(_buf, fieldnames=_keys, extrasaction="ignore")
-                            _w.writeheader()
-                            _w.writerows(rows)
-                            # P2-5 修复：原 .encode("utf-8-sig").decode("utf-8-sig") 会把BOM又去掉。
-                            # save_to_kb_button 用 utf-8 写文本，这里显式前置 BOM 字符(U+FEFF)，写入后即为 EF BB BF，Excel 可正确识别中文。
+                    if rows:
+                        import csv as _csv_mod
+                        from io import StringIO
+                        _buf = StringIO()
+                        _keys = list(rows[0].keys())
+                        _w = _csv_mod.DictWriter(_buf, fieldnames=_keys, extrasaction="ignore")
+                        _w.writeheader()
+                        _w.writerows(rows)
+                        _csv_bytes = _buf.getvalue().encode("utf-8-sig")
+                        _export_date = datetime.now().strftime("%Y%m%d_%H%M")
+                        st.download_button(
+                            "📥 下载CSV",
+                            data=_csv_bytes,
+                            file_name=f"customers_export_{_export_date}.csv",
+                            mime="text/csv",
+                            key="export_filtered_dl",
+                            use_container_width=True,
+                        )
+                        with st.expander("💾 保存到知识库"):
                             _csv_content = "﻿" + _buf.getvalue()
                             save_to_kb_button(
                                 _csv_content,
                                 "客户管理/导出报表",
-                                f"筛选客户_{__import__('datetime').datetime.now().strftime('%Y%m%d_%H%M')}",
+                                f"筛选客户_{_export_date}",
                                 "csv"
                             )
-                            st.success("✅ 导出按钮已生成，点击保存到知识库")
-                        else:
-                            st.warning("无数据可导出")
+                    else:
+                        st.warning("无数据可导出")
 
                 if rows:
                     _tbl_sel = st.dataframe(
@@ -3433,7 +3485,7 @@ EN: ...
                                     step_title = st.text_input("步骤标题", step["title"], key=f"seq_title_{selected_seq}_{i}")
                                     step_template = st.text_area("邮件内容模板", step["template"], height=100, key=f"seq_template_{selected_seq}_{i}")
 
-                                if st.button(f"🗑️ 删除此步骤", key=f"seq_del_step_{selected_seq}_{i}"):
+                                if two_step_delete(f"🗑️ 删除此步骤", f"seq_del_step_{selected_seq}_{i}", "删除此跟进步骤") == "yes":
                                     sequences[selected_seq]["steps"].pop(i)
                                     _save_sequences(sequences)
                                     st.rerun()
@@ -3479,7 +3531,7 @@ EN: ...
                             st.success("✅ 序列已保存")
 
                         # 删除序列
-                        if st.button("🗑️ 删除此序列", key=f"del_seq_{selected_seq}"):
+                        if two_step_delete("🗑️ 删除此序列", f"del_seq_{selected_seq}", "删除整个跟进序列，不可恢复") == "yes":
                             del sequences[selected_seq]
                             _save_sequences(sequences)
                             st.success("✅ 序列已删除")
@@ -4354,6 +4406,16 @@ EN: ...
             # ===== Excel批量导入客户 =====
             st.subheader("📤 Excel批量导入客户")
             st.caption("上传Excel/CSV文件，自动导入客户档案，自动去重（按公司名）")
+
+            # 下载导入模板
+            _template_csv = "company_name,contact_name,email,website,country,grade,status,source,notes\nAcme Trading Co.,John Smith,john@acme.com,https://acme.com,US,B,new_lead,展会,示例客户\n"
+            st.download_button(
+                "📥 下载导入模板（CSV）",
+                data=_template_csv.encode("utf-8-sig"),
+                file_name="customer_import_template.csv",
+                mime="text/csv",
+                key="dl_import_template",
+            )
 
             uploaded_file = st.file_uploader("选择文件", type=["xlsx", "csv"], key="import_cust_file")
             if uploaded_file is not None:
@@ -5533,7 +5595,7 @@ elif page == "🤖 锴利自研AI工具库":
                     with ai_col2:
                         sku_ai_style = st.text_input("款式号（可选）", placeholder="如：001", key="sku_ai_style")
                         sku_ai_count = st.number_input("生成图片数", 1, 20, 5, key="sku_ai_count")
-                    if st.button("✨ AI智能生成SKU", key="sku_ai_gen", use_container_width=True, type="primary"):
+                    if st.button("✨ AI智能生成SKU", key="sku_ai_gen", use_container_width=True, type="primary", disabled=not ai.is_configured()):
                         if not sku_ai_desc:
                             st.warning("请先填写产品描述")
                         else:
@@ -6678,7 +6740,7 @@ SKU格式：KL-品类-材质-款式号
                         pl_style = st.selectbox("风格", ["商业摄影", "生活方式", "极简白底", "户外露营", "工业风", "高端杂志"], key="pl_ai_style")
                         pl_ratio = st.selectbox("比例", ["1:1", "16:9", "4:3", "3:4", "9:16"], key="pl_ai_ratio")
                     pl_extra = st.text_area("补充要求（可选）", placeholder="如：突出刀刃细节，浅景深，暖色调...", height=60, key="pl_ai_extra")
-                    if st.button("✨ AI生成提示词", key="pl_ai_gen", use_container_width=True, type="primary"):
+                    if st.button("✨ AI生成提示词", key="pl_ai_gen", use_container_width=True, type="primary", disabled=not ai.is_configured()):
                         if not pl_product:
                             st.warning("请先填写产品描述")
                         else:
@@ -7027,15 +7089,16 @@ SKU格式：KL-品类-材质-款式号
                 # 顶部工具栏
                 tc1, tc2, tc3, tc4, tc5 = st.columns(5)
                 with tc1:
-                    st.button("+ 批量导入照片", key="wb_import_btn", use_container_width=True, type="primary")
+                    st.button("+ 批量导入照片", key="wb_import_btn", use_container_width=True, type="primary", disabled=True, help="批量功能暂未开放")
                 with tc2:
-                    st.button("⚡ 批量自动校正", key="wb_batch_auto", use_container_width=True)
+                    st.button("⚡ 批量自动校正", key="wb_batch_auto", use_container_width=True, disabled=True, help="批量功能暂未开放")
                 with tc3:
-                    st.button("💾 导出当前", key="wb_export_cur", use_container_width=True, disabled=True)
+                    st.button("💾 导出当前", key="wb_export_cur", use_container_width=True, disabled=True, help="该功能开发中")
                 with tc4:
-                    st.button("📦 导出全部(多文件)", key="wb_export_all", use_container_width=True, disabled=True)
+                    st.button("📦 导出全部(多文件)", key="wb_export_all", use_container_width=True, disabled=True, help="该功能开发中")
                 with tc5:
-                    st.button("🗜️ 批量打包(ZIP)", key="wb_zip_btn", use_container_width=True, disabled=True)
+                    st.button("🗜️ 批量打包(ZIP)", key="wb_zip_btn", use_container_width=True, disabled=True, help="该功能开发中")
+                st.caption("📦 批量导入/校正/导出功能待开放")
     
                 # 左右布局：左主舞台，右控制面板
                 main_col, side_col = st.columns([3, 1.2])
@@ -7095,7 +7158,7 @@ SKU格式：KL-品类-材质-款式号
                                     st.error(f"AI分析失败：{e}")
                     if "wb_ai_reason" in st.session_state:
                         st.caption(f"💡 AI推荐理由：{st.session_state['wb_ai_reason']}")
-                    st.button("🎯 吸管手动取色校准", key="wb_picker", use_container_width=True, disabled=True)
+                    st.button("🎯 吸管手动取色校准", key="wb_picker", use_container_width=True, disabled=True, help="该功能开发中")
     
                     # 专业色彩预设
                     st.markdown("""
@@ -8320,7 +8383,10 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "i
                 result = ai.chat(prompt)
             st.markdown("---")
             st.subheader("🎯 SEO命名结果")
-            st.markdown(result)
+            if result and (result.startswith("[AI") or result.startswith("[错误]") or result.startswith("[Error]")):
+                st.error(result)
+            else:
+                st.markdown(result)
 
 elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "listing":
     # 返回SEO中心按钮
@@ -8513,7 +8579,11 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "l
         if st.session_state.get('seo_result'):
             st.markdown("---")
             st.markdown("#### 📄 AI生成的完整SEO内容")
-            st.markdown(st.session_state['seo_result'])
+            _seo_res = st.session_state['seo_result']
+            if _seo_res and (_seo_res.startswith("[AI") or _seo_res.startswith("[错误]") or _seo_res.startswith("[Error]")):
+                st.error(_seo_res)
+            else:
+                st.markdown(_seo_res)
             st.download_button("📋 下载SEO内容.txt",
                 st.session_state['seo_result'],
                 file_name=f"SEO_{sku}_{datetime.now().strftime('%Y%m%d')}.txt",
@@ -9343,7 +9413,10 @@ elif page == "📈 市场与产品分析":
                 with st.spinner("AI分析中..."):
                     prompt = MARKET_ANALYSIS_PROMPT.format(target_market=target_market, product_category=product_category, company_profile=kb.get_company_brief())
                     result = ai.chat(prompt)
-                    st.markdown(result)
+                    if result and (result.startswith("[AI") or result.startswith("[错误]") or result.startswith("[Error]")):
+                        st.error(result)
+                    else:
+                        st.markdown(result)
                     save_to_kb_button(result, "市场分析", f"入市分析_{target_market}")
 
         with m2:
@@ -10538,13 +10611,14 @@ elif page == "🎯 精准客户开发":
                         _has_blocker = len(result.get('hard_blockers', [])) > 0
                         _auto_status = 'pending_verification' if _has_blocker else ('verified' if result.get('eligible') else 'pending_verification')
                         if not _er.get_prospect(customer_id):
+                            _pc_list = [p.strip() for p in product_categories.split(',') if p.strip()] if product_categories else []
                             _er.add_prospect({
                                 'customer_id': customer_id,
                                 'company_name': company_name,
                                 'website': website,
                                 'country': country,
                                 'buyer_type': buyer_type,
-                                'product_categories': [p.strip() for p in product_categories.split(',') if p.strip()] if product_categories else [],
+                                'product_categories': json.dumps(_pc_list, ensure_ascii=False),
                                 'main_products': main_products,
                                 'status': _auto_status,
                                 'score': result.get('icp_score', 0),
@@ -10827,7 +10901,7 @@ elif page == "👥 团队工作空间":
                             target_file.write_text(content, encoding='utf-8')
                             st.success(f"已推送到公司知识库：{target_file.name}")
                     with col_b:
-                        if st.button("🗑️ 删除", key=f"del_email_{ef.name}"):
+                        if two_step_delete("🗑️ 删除", f"del_email_{ef.name}", "删除此开发信文件，不可恢复") == "yes":
                             ef.unlink()
                             st.rerun()
         else:
@@ -11480,7 +11554,7 @@ elif page == "🤖 模型管理":
                 st.success("当前使用中")
 
         with col3:
-            if st.button("🔗 测试连接", key=f"test_{p['id']}", use_container_width=True):
+            if st.button("🔗 测试连接", key=f"test_{p['id']}", use_container_width=True, disabled=not p.get('api_key', '')):
                 result = test_provider(p['id'])
                 if result['success']:
                     st.success(f"✅ {result['message']}")
@@ -13391,7 +13465,7 @@ elif page == "⚙️ 设置中心":
                     st.success("当前使用中")
 
             with col3:
-                if st.button("🔗 测试连接", key=f"sc_test_{p['id']}", use_container_width=True):
+                if st.button("🔗 测试连接", key=f"sc_test_{p['id']}", use_container_width=True, disabled=not p.get('api_key', '')):
                     result = test_provider(p['id'])
                     if result['success']:
                         st.success(f"✅ {result['message']}")

@@ -128,22 +128,24 @@ def test_provider_manager_corruption_recovery():
 
 
 def test_customer_manager_corruption_recovery():
-    """customer_manager _load 在JSON损坏时返回空列表"""
+    """customer_manager _load 在JSON损坏时保护现有数据（P0修复：文件存在但损坏时raise，不返回空列表）"""
     with open("customer_manager.py", "r", encoding="utf-8") as f:
         content = f.read()
     assert "except Exception" in content, "customer_manager._load 无异常处理"
-    # 验证实际运行时损坏恢复
+    # 验证实际运行时损坏恢复：文件存在但损坏时应raise，防止后续写入清空客户
     import customer_manager as cm_mod
     mgr = cm_mod.CustomerManager()
-    # 模拟损坏文件
     with tempfile.TemporaryDirectory() as td:
         bad_file = Path(td) / "bad_customers.json"
         bad_file.write_text("{invalid json!!!", encoding="utf-8")
         original = cm_mod.CUSTOMERS_FILE
         cm_mod.CUSTOMERS_FILE = bad_file
         try:
-            result = mgr._load()
-            assert result == [], f"损坏文件应返回空列表，实际返回: {result}"
+            try:
+                result = mgr._load()
+                assert False, f"损坏文件应raise RuntimeError以保护数据，实际返回: {result}"
+            except RuntimeError:
+                pass  # 预期行为：文件存在但损坏时拒绝返回空数据
         finally:
             cm_mod.CUSTOMERS_FILE = original
 

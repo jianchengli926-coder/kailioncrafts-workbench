@@ -13,6 +13,7 @@ P1.2C: 知识驱动的客户资格评估
 import sqlite3
 import json
 import hashlib
+import os
 import re
 from pathlib import Path
 from datetime import datetime
@@ -47,7 +48,8 @@ def _get_repo():
     except Exception:
         return None
 
-DB_PATH = Path(__file__).parent / "data" / "workbench.db"
+DB_PATH = Path(os.environ.get("WORKBENCH_DB_PATH",
+    str(Path(__file__).parent / "data" / "workbench.db")))
 
 IDENTITY_STATUSES = ["verified", "partial", "unresolved"]
 PRODUCT_FIT_LEVELS = ["strong", "possible", "weak", "unknown"]
@@ -180,13 +182,21 @@ def init_db():
 
 # ============ 重复客户与 DNC 检测 ============
 
-def detect_duplicate_customer(customer_input: Dict) -> Dict:
-    """检测重复客户，返回证据（不泄露完整联系方式）"""
+def detect_duplicate_customer(customer_input: Dict, exclude_customer_id: Optional[str] = None) -> Dict:
+    """检测重复客户，返回证据（不泄露完整联系方式）。
+    P1修复：增加exclude_customer_id参数，重新评估已有客户时排除自身匹配。
+    """
     init_db()
     results = []
 
     company_norm = _normalize_company_name(customer_input.get('company_name', ''))
     website_norm = _normalize_website(customer_input.get('website', ''))
+
+    def _is_excluded(cid):
+        """判断是否为需要排除的自身记录"""
+        if not exclude_customer_id:
+            return False
+        return cid == exclude_customer_id
 
     # 检查现有 customers.json
     customers_file = Path(__file__).parent / "data" / "customers.json"
@@ -197,10 +207,13 @@ def detect_duplicate_customer(customer_input: Dict) -> Dict:
             for cust in existing:
                 if not isinstance(cust, dict):
                     continue
+                cid = cust.get('id', 'unknown')
+                if _is_excluded(cid):
+                    continue
                 # 公司名称匹配
                 if company_norm and _normalize_company_name(cust.get('company_name', '')) == company_norm:
                     results.append({
-                        'matched_customer_id': cust.get('id', 'unknown'),
+                        'matched_customer_id': cid,
                         'matched_field': 'company_name',
                         'matched_value_hash': hashlib.md5(company_norm.encode()).hexdigest()[:16],
                         'confidence': 0.9,
@@ -208,7 +221,7 @@ def detect_duplicate_customer(customer_input: Dict) -> Dict:
                 # 网站匹配
                 if website_norm and _normalize_website(cust.get('website', '')) == website_norm:
                     results.append({
-                        'matched_customer_id': cust.get('id', 'unknown'),
+                        'matched_customer_id': cid,
                         'matched_field': 'website',
                         'matched_value_hash': hashlib.md5(website_norm.encode()).hexdigest()[:16],
                         'confidence': 0.95,
@@ -221,16 +234,19 @@ def detect_duplicate_customer(customer_input: Dict) -> Dict:
     try:
         rows = c.execute("SELECT DISTINCT customer_id, company_name, website FROM prospect_evaluations").fetchall()
         for row in rows:
+            cid = row['customer_id']
+            if _is_excluded(cid):
+                continue
             if company_norm and _normalize_company_name(row['company_name'] or '') == company_norm:
                 results.append({
-                    'matched_customer_id': row['customer_id'],
+                    'matched_customer_id': cid,
                     'matched_field': 'company_name',
                     'matched_value_hash': hashlib.md5(company_norm.encode()).hexdigest()[:16],
                     'confidence': 0.85,
                 })
             if website_norm and _normalize_website(row['website'] or '') == website_norm:
                 results.append({
-                    'matched_customer_id': row['customer_id'],
+                    'matched_customer_id': cid,
                     'matched_field': 'website',
                     'matched_value_hash': hashlib.md5(website_norm.encode()).hexdigest()[:16],
                     'confidence': 0.9,
@@ -248,11 +264,14 @@ def detect_duplicate_customer(customer_input: Dict) -> Dict:
                 email=customer_input.get('email'),
             )
             for m in dup.get('matches', []):
+                cid = m.get('customer_id', 'unknown')
+                if _is_excluded(cid):
+                    continue
                 results.append({
-                    'matched_customer_id': m.get('customer_id', 'unknown'),
+                    'matched_customer_id': cid,
                     'matched_field': m.get('field', 'unknown'),
                     'matched_value_hash': hashlib.md5(
-                        str(m.get('customer_id', '')).encode()).hexdigest()[:16],
+                        str(cid).encode()).hexdigest()[:16],
                     'confidence': m.get('confidence', 0.9),
                     'source': 'repository',
                 })
@@ -572,8 +591,9 @@ def evaluate_customer_icp(customer_input: Dict, pack_ref: Optional[Dict] = None,
     if not has_source:
         hard_blockers.append('资料来源不可验证（缺少 source_document 或 source_url）')
 
-    # 5. 重复客户检测
-    dup_result = detect_duplicate_customer(customer_input)
+    # 5. 重复客户检测（P1修复：排除当前客户自身，避免重新评估时被判为重复）
+    dup_result = detect_duplicate_customer(customer_input,
+        exclude_customer_id=customer_input.get('customer_id') or customer_input.get('id'))
     if dup_result['is_duplicate']:
         hard_blockers.append(f'duplicate customer：检测到 {dup_result["detection_count"]} 个匹配记录')
         evidence.append({

@@ -12,6 +12,7 @@ repository.py — 客户开发闭环一期 SQLite 数据访问层
 import sqlite3
 import json
 import hashlib
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -20,7 +21,8 @@ from typing import Optional, List, Dict, Any
 # 常量
 # ---------------------------------------------------------------------------
 
-DB_PATH = Path(__file__).parent / "data" / "workbench.db"
+DB_PATH = Path(os.environ.get("WORKBENCH_DB_PATH",
+    str(Path(__file__).parent / "data" / "workbench.db")))
 
 # 旧中文状态 -> 新英文状态映射
 # 优先从 customer_status.py 导入，导入失败则使用内置映射
@@ -706,8 +708,19 @@ class CustomerRepository:
             field = ""
             if website and cust.get("website") == website:
                 hit, field = True, "website"
-            elif email and email in (cust.get("emails") or []):
-                hit, field = True, "email"
+            elif email:
+                # P1修复：emails是dict列表[{email:..., type:...}]，不是字符串列表
+                emails_raw = cust.get("emails") or []
+                email_strings = []
+                for e in emails_raw:
+                    if isinstance(e, dict):
+                        email_strings.append(e.get("email", ""))
+                    elif isinstance(e, str):
+                        email_strings.append(e)
+                if cust.get("email"):
+                    email_strings.append(cust["email"])
+                if email in email_strings:
+                    hit, field = True, "email"
             elif company_name and cust.get("company_name") == company_name:
                 hit, field = True, "company_name"
             if hit:
@@ -736,21 +749,24 @@ class CustomerRepository:
         matches: List[Dict[str, Any]] = []
         conn = self._connect()
         try:
-            # suppression_list
+            # suppression_list - P1修复：字段间用OR而非AND，否则只存website的记录永远不命中
             conditions = ["is_active=1"]
             params: List[Any] = []
+            field_conditions = []
             if website:
-                conditions.append("website=?")
+                field_conditions.append("website=?")
                 params.append(website)
             if email:
-                conditions.append("email=?")
+                field_conditions.append("email=?")
                 params.append(email)
             if phone:
-                conditions.append("phone=?")
+                field_conditions.append("phone=?")
                 params.append(phone)
             if company_name:
-                conditions.append("company_name=?")
+                field_conditions.append("company_name=?")
                 params.append(company_name)
+            if field_conditions:
+                conditions.append(f"({' OR '.join(field_conditions)})")
             cur = conn.execute(
                 f"SELECT suppression_id, customer_id, company_name, website, email, phone, reason "
                 f"FROM suppression_list WHERE {' AND '.join(conditions)}",
@@ -765,18 +781,21 @@ class CustomerRepository:
                     "source": "suppression_list",
                 })
 
-            # prospects.status=dnc
+            # prospects.status=dnc - P1修复：字段间用OR
             dnc_cond = ["status='dnc'"]
             dnc_params: List[Any] = []
+            dnc_field_conditions = []
             if website:
-                dnc_cond.append("website=?")
+                dnc_field_conditions.append("website=?")
                 dnc_params.append(website)
             if email:
-                dnc_cond.append("email=?")
+                dnc_field_conditions.append("email=?")
                 dnc_params.append(email)
             if company_name:
-                dnc_cond.append("company_name=?")
+                dnc_field_conditions.append("company_name=?")
                 dnc_params.append(company_name)
+            if dnc_field_conditions:
+                dnc_cond.append(f"({' OR '.join(dnc_field_conditions)})")
             cur = conn.execute(
                 f"SELECT customer_id, company_name, website, email FROM prospects "
                 f"WHERE {' AND '.join(dnc_cond)}",

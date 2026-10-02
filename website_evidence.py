@@ -309,16 +309,21 @@ def _check_robots(url: str) -> Tuple[bool, str]:
     try:
         parsed = urllib.parse.urlparse(url)
         robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
+        # P0修复：rp.read()无超时可永久阻塞，改用带timeout的手动抓取
         rp = urllib.robotparser.RobotFileParser()
-        rp.set_url(robots_url)
-        # robots.txt 自身抓取也限制超时
-        rp.read()
+        try:
+            opener = urllib.request.build_opener()
+            opener.addheaders = [("User-agent", USER_AGENT)]
+            with opener.open(robots_url, timeout=CONNECT_TIMEOUT) as r:
+                rp.parse(r.read().decode("utf-8", "ignore").splitlines())
+        except Exception:
+            # robots.txt 抓取失败时，保守允许（fail-open，与原策略一致）
+            return True, ""
         allowed = rp.is_allowed(USER_AGENT, url)
         if not allowed:
             return False, f"robots.txt 禁止抓取: {url}"
         return True, ""
     except Exception as e:
-        # robots.txt 抓取失败时，保守允许（避免因 robots 不可达而完全无法采集）
         return True, ""
 
 
@@ -492,6 +497,9 @@ def save_evidence(evidence: Dict[str, Any], db_path: Optional[Path] = None) -> s
     init_evidence_db(db_path)
     c = _conn(db_path)
     try:
+        # P1修复：先生成确定的eid，入库和返回用同一个值
+        eid = evidence.get("evidence_id") or _gen_evidence_id()
+        evidence = {**evidence, "evidence_id": eid}
         c.execute(
             """INSERT OR REPLACE INTO evidence
                (evidence_id, customer_id, url, fetched_at, status, title, description,
@@ -499,7 +507,7 @@ def save_evidence(evidence: Dict[str, Any], db_path: Optional[Path] = None) -> s
                 error_message, response_size, pages_fetched_count, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                evidence.get("evidence_id", _gen_evidence_id()),
+                eid,
                 evidence.get("customer_id", ""),
                 evidence.get("url", ""),
                 evidence.get("fetched_at", _now_iso()),
@@ -518,7 +526,7 @@ def save_evidence(evidence: Dict[str, Any], db_path: Optional[Path] = None) -> s
             ),
         )
         c.commit()
-        return evidence.get("evidence_id", "")
+        return eid
     finally:
         c.close()
 

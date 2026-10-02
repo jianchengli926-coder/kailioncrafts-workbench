@@ -11,8 +11,22 @@ try:
     env_path = Path(__file__).parent / ".env"
     if env_path.exists():
         load_dotenv(env_path)
+    # P1修复：加载访问密码文件（权限600，不纳入Git）
+    pwd_file = Path.home() / ".config" / "kailioncrafts" / "workbench.env"
+    if pwd_file.exists():
+        load_dotenv(pwd_file, override=False)
 except ImportError:
-    pass
+    # dotenv不可用时，手动解析workbench.env
+    try:
+        pwd_file = Path.home() / ".config" / "kailioncrafts" / "workbench.env"
+        if pwd_file.exists():
+            for line in pwd_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+    except Exception:
+        pass
 
 # ============ 路径配置 ============
 BASE_DIR = Path(__file__).parent
@@ -114,7 +128,7 @@ COMPANY = {
     "name_en": "Yangjiang Kaili International Trading Co., Ltd.",
     "brand": "KaiLionCrafts",
     "brand_cn": "锴利匠心",
-    "founder": "李建成 (Leo Li)",
+    "founder": "利建成 (Leo Li)",
     "location": "广东省阳江市阳东区",
     "website": "https://kailioncrafts.com",
     "email": "sales@kailioncrafts.com",

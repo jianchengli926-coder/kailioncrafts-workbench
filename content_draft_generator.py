@@ -13,6 +13,7 @@ P1.2D: 内容草稿生成器
 """
 import sqlite3
 import json
+import os
 import hashlib
 import re
 from pathlib import Path
@@ -33,7 +34,8 @@ except Exception:  # pragma: no cover - 降级路径
     _we = None
     _WE_AVAILABLE = False
 
-DB_PATH = Path(__file__).parent / "data" / "workbench.db"
+DB_PATH = Path(os.environ.get("WORKBENCH_DB_PATH",
+    str(Path(__file__).parent / "data" / "workbench.db")))
 
 # 模型链统一从 model_registry 读取，避免重复硬编码
 DRAFT_TEXT_CHAIN = TEXT_CHAIN_IDS

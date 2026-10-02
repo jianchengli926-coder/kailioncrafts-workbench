@@ -212,8 +212,12 @@ class LocalModelManager:
                 self._lock_holder = None
                 self._preload_ok = False
                 self._owned_models.discard(model_id)
-            # 无论卸载是否成功，都释放全局锁（避免死锁）
-            self._global_lock.release()
+            # P0修复：仅当全局锁确实被持有时才释放，避免RuntimeError
+            try:
+                if self._global_lock.locked():
+                    self._global_lock.release()
+            except RuntimeError:
+                pass  # 锁未被当前线程持有，忽略
 
         return (error is None, error)
 

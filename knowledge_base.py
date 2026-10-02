@@ -116,8 +116,8 @@ class KnowledgeBase:
 - 品牌：{COMPANY['brand']}
 - 创始人：{COMPANY['founder']}
 - 四大品类：{', '.join(COMPANY['categories'])}
-- 核心优势：阳江源头工厂、MOQ 50把起、OEM/ODM定制、免费4K产品摄影、创始人直接对接
-- 认证：CE/FDA/LFGB/RoHS/ISO9001
+- 核心优势：阳江36家合作工厂网络（含4家家族深度绑定）、OEM/ODM/Private Label定制、免费4K产品摄影、创始人直接对接
+- 认证：CE/FDA/LFGB/RoHS/FSC/amfori BSCI（以具体产品和目标市场为准）
 - 官网：{COMPANY['website']}"""
 
     def build_context(self, modules=None):

@@ -190,8 +190,11 @@ if not st.session_state["authed"]:
             st.stop()
         pwd = st.text_input("", type="password", label_visibility="collapsed", placeholder="输入访问密码")
         if st.button("进 入", use_container_width=True, type="primary"):
-            if pwd == _access_pwd:
+            # P2修复：常量时间比较，防止时序攻击
+            import hmac as _hmac
+            if _hmac.compare_digest(pwd, _access_pwd):
                 st.session_state["authed"] = True
+                st.session_state["_login_fail_count"] = 0
                 try:
                     import json, os, tempfile
                     from datetime import datetime
@@ -218,7 +221,36 @@ if not st.session_state["authed"]:
                     pass
                 st.rerun()
             else:
-                st.error("密码错误")
+                # P2修复：登录失败计数+冷却，防止暴力破解
+                fail_count = st.session_state.get("_login_fail_count", 0) + 1
+                st.session_state["_login_fail_count"] = fail_count
+                try:
+                    import json, os, tempfile
+                    from datetime import datetime
+                    log_file = "data/auth_log.json"
+                    os.makedirs("data", exist_ok=True)
+                    logs = []
+                    if os.path.exists(log_file):
+                        try:
+                            with open(log_file, encoding="utf-8") as _lf:
+                                logs = json.load(_lf)
+                        except (json.JSONDecodeError, IOError):
+                            logs = []
+                    logs.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": f"登录失败(第{fail_count}次)", "ip": "local"})
+                    _fd, _tmp = tempfile.mkstemp(dir="data", suffix=".tmp")
+                    try:
+                        with os.fdopen(_fd, 'w', encoding='utf-8') as _tf:
+                            json.dump(logs[-100:], _tf, ensure_ascii=False, indent=2)
+                        os.replace(_tmp, log_file)
+                    except Exception:
+                        try: os.unlink(_tmp)
+                        except OSError: pass
+                except Exception:
+                    pass
+                if fail_count >= 5:
+                    st.error(f"密码错误（已连续失败{fail_count}次，请稍后再试）")
+                else:
+                    st.error("密码错误")
     st.stop()
 
 # ============ 回到顶部浮动按钮 ============
@@ -10134,7 +10166,15 @@ elif page == "📚 公司知识库":
                     with c2:
                         if "潜在客户" in str(row['分类']):
                             if st.button("🎯 加入客户分析", key=f"comp_{row['域名']}"):
-                                st.session_state['potential_customer'] = row['域名']
+                                # P2修复：真正跳转到精准客户开发并预填表单
+                                domain = str(row['域名'])
+                                company_guess = domain.split('.')[0].replace('-', ' ').title()
+                                st.session_state['eval_website'] = f"https://{domain}"
+                                st.session_state['eval_company'] = company_guess
+                                st.session_state.pop("main_nav", None)
+                                st.session_state["main_nav"] = "🎯 精准客户开发"
+                                st.toast(f"已加入客户分析：{domain}")
+                                st.rerun()
                         if st.button("📋 复制域名", key=f"copy_{row['域名']}"):
                             st.toast(f"已复制: {row['域名']}")
 

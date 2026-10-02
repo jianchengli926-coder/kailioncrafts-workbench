@@ -129,7 +129,10 @@ class CustomerManager:
 
     def _load(self):
         try:
-            return json.loads(CUSTOMERS_FILE.read_text(encoding="utf-8"))
+            data = json.loads(CUSTOMERS_FILE.read_text(encoding="utf-8"))
+            if not isinstance(data, list):
+                raise ValueError(f"客户文件格式错误：期望 list，实际 {type(data).__name__}")
+            return data
         except Exception as e:
             import shutil, time
             try:
@@ -138,6 +141,10 @@ class CustomerManager:
                 print(f"[customer_manager] 客户文件损坏，已备份到 {backup}: {e}", file=__import__('sys').stderr)
             except Exception:
                 pass
+            # P0修复：文件存在但读取失败时，绝不返回空列表（防止后续写入清空28条客户）
+            # 仅当文件不存在时才返回空列表（首次运行）
+            if CUSTOMERS_FILE.exists():
+                raise RuntimeError(f"客户文件读取失败，已备份但拒绝返回空数据以保护现有客户: {e}")
             return []
 
     def _save(self, data):
@@ -274,7 +281,21 @@ class CustomerManager:
 
         管道阶段为粗粒度视图，直接写库不经过严格状态机校验，
         映射到对应新状态 key。
+        P1修复：终态(dnc/invalid/closed_won)客户不允许被拖拽复活。
         """
+        # 终态保护：DNC/无效/已成交客户不允许通过拖拽改变状态
+        data = self._load()
+        current = None
+        for c in data:
+            if c.get("id") == customer_id:
+                current = c
+                break
+        if current:
+            current_status = _normalize_status(current.get("status", ""))
+            if current_status in {"dnc", "invalid", "closed_won"}:
+                print(f"[customer_manager] 拒绝移动终态客户 {customer_id} (status={current_status})",
+                      file=__import__('sys').stderr)
+                return None
         stage_map = {s["key"]: s["name"] for s in PIPELINE_STAGES}
         # 新状态 key 映射（旧中文映射保留在 STATUS_TO_PIPELINE 中兼容）
         status_map = {"lead": "new_lead", "contacted": "sent", "engaged": "in_communication",

@@ -14,9 +14,12 @@ P1.3: 安全的公开网站证据采集（SSRF 防护 / robots 合规 / 无 JS �
 import ipaddress
 import json
 import hashlib
+import http.client
 import re
 import socket
 import sqlite3
+import ssl
+import time
 import urllib.request
 import urllib.parse
 import urllib.robotparser
@@ -30,10 +33,12 @@ DB_PATH = Path(__file__).parent / "data" / "workbench.db"
 
 # ============ 抓取控制常量 ============
 USER_AGENT = "KaiLionCrafts-Bot/1.0 (+https://kailioncrafts.com)"
-CONNECT_TIMEOUT = 5  # 秒
-READ_TIMEOUT = 15     # 秒
-MAX_RESPONSE_BYTES = 5 * 1024 * 1024  # 5MB
+CONNECT_TIMEOUT = 10   # 秒（TCP 连接阶段）
+READ_TIMEOUT = 30      # 秒（每次 recv 阶段）
+TOTAL_TIMEOUT = 60     # 秒（单次请求整体上限）
+MAX_RESPONSE_BYTES = 10 * 1024 * 1024  # 10MB
 MAX_SUBPAGES = 3      # 首页之外最多再抓 3 个同域链接
+MAX_REDIRECTS = 5     # 最大重定向次数
 
 # ============ 关键词表（刀剪/厨具/户外） ============
 PRODUCT_KEYWORDS = [
@@ -163,13 +168,213 @@ def is_safe_url(url: str) -> Tuple[bool, str]:
     return True, ""
 
 
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    """TCP 连接钉住到已校验 IP 的 HTTP 连接。
+
+    - connect() 始终连到 self._pinned_ip（已是 IP 字面量，不再走 DNS）
+    - putrequest() 时临时把 host 换成原域名，保证发出的 Host 头正确
+    - connect 阶段用 CONNECT_TIMEOUT，连接建立后切换到 READ_TIMEOUT
+    """
+
+    def __init__(self, pinned_ip: str, original_host: str,
+                 port: int, connect_timeout: float, read_timeout: float):
+        # 注意：super().__init__ 的 host 参数只是占位，真正连接走我们自己的 connect()
+        super().__init__(pinned_ip, port=port, timeout=read_timeout)
+        self._pinned_ip = pinned_ip
+        self._original_host = original_host
+        self._connect_timeout = connect_timeout
+        self._read_timeout = read_timeout
+
+    def connect(self):
+        """重写：直接连到已校验 IP，不再做 getaddrinfo。"""
+        if self.sock is not None:
+            return
+        err = OSError("getaddrinfo failed")
+        # pinned_ip 已是 IP 字面量，getaddrinfo 不会触发真实 DNS 查询
+        for res in socket.getaddrinfo(self._pinned_ip, self.port,
+                                      proto=socket.IPPROTO_TCP):
+            af, socktype, proto, _canon, sa = res
+            try:
+                self.sock = socket.socket(af, socktype, proto)
+                self.sock.settimeout(self._connect_timeout)
+                if self.source_address:
+                    self.sock.bind(self.source_address)
+                self.sock.connect(sa)
+                # 连接成功，切到读超时
+                self.sock.settimeout(self._read_timeout)
+                break
+            except OSError as e:
+                err = e
+                if self.sock:
+                    self.sock.close()
+                    self.sock = None
+                continue
+        if self.sock is None:
+            raise err
+
+    def putrequest(self, method, url, skip_host=False, skip_accept_encoding=False):
+        """重写：让发出的 Host 头使用原域名，而不是已校验 IP。"""
+        saved = self.host
+        self.host = self._original_host
+        try:
+            return super().putrequest(
+                method, url,
+                skip_host=skip_host,
+                skip_accept_encoding=skip_accept_encoding,
+            )
+        finally:
+            self.host = saved
+
+
+class _PinnedHTTPSConnection(_PinnedHTTPConnection):
+    """TLS 版本：在 TCP 连接建立后用原域名做 SNI 包装 socket。"""
+
+    def __init__(self, pinned_ip: str, original_host: str, port: int,
+                 connect_timeout: float, read_timeout: float,
+                 ssl_context: Optional[ssl.SSLContext] = None):
+        # 跳过 _PinnedHTTPConnection 的 __init__，直接走 HTTPConnection
+        http.client.HTTPConnection.__init__(
+            self, pinned_ip, port=port, timeout=read_timeout)
+        self._pinned_ip = pinned_ip
+        self._original_host = original_host
+        self._connect_timeout = connect_timeout
+        self._read_timeout = read_timeout
+        self._context = ssl_context or ssl.create_default_context()
+
+    def connect(self):
+        # 1) 建立到 pinned IP 的 TCP 连接（复用 _PinnedHTTPConnection.connect）
+        _PinnedHTTPConnection.connect(self)
+        # 2) 用原域名做 SNI 做 TLS 握手；证书校验也基于原域名
+        self.sock = self._context.wrap_socket(
+            self.sock, server_hostname=self._original_host)
+
+
+def _resolve_and_pin(hostname: str) -> str:
+    """解析 hostname 并返回一个已校验为公网的 IP 字面量。
+
+    任一解析结果是私网/回环/保留地址即拒绝；全部失败则抛 URLError。
+    此函数必须在每次发起连接前调用——它返回的 IP 就是将要被连接的 IP，
+    之后不再有任何 DNS 解析，从而消除 TOCTOU 窗口。
+    """
+    lowered = hostname.lower()
+    if lowered in ("localhost", "localhost.localdomain"):
+        raise urllib.error.URLError(f"Blocked: localhost not allowed ({hostname})")
+    # hostname 本身是 IP 字面量
+    try:
+        ip_obj = ipaddress.ip_address(lowered)
+        if _is_private_ip(str(ip_obj)):
+            raise urllib.error.URLError(
+                f"Blocked: private/loopback literal IP ({hostname})")
+        return str(ip_obj)
+    except ValueError:
+        pass  # 域名，继续 DNS 解析
+
+    ips = _dns_resolve_host(hostname)
+    if not ips:
+        raise urllib.error.URLError(f"DNS resolution failed: {hostname}")
+    for ip in ips:
+        if not _is_private_ip(ip):
+            return ip
+    raise urllib.error.URLError(
+        f"Blocked: all resolved IPs for {hostname} are private/loopback")
+
+
+class _PinnedHTTPMixin:
+    """共享逻辑：把 hostname 解析+校验+钉住 IP 后真正发请求。"""
+
+    def _pinned_open(self, req: urllib.request.Request, use_ssl: bool):
+        host = req.host
+        if not host:
+            raise urllib.error.URLError("no host given")
+
+        # 拆分 host:port（兼容 IPv6 [::1]:443）
+        if host.startswith("["):
+            end = host.index("]")
+            hostname = host[1:end]
+            rest = host[end:]
+            port = int(rest[1:]) if rest.startswith(":") else (443 if use_ssl else 80)
+        elif ":" in host:
+            hostname, port_str = host.rsplit(":", 1)
+            port = int(port_str)
+        else:
+            hostname = host
+            port = 443 if use_ssl else 80
+
+        # 关键：在这里解析+校验，拿到 pinned_ip；之后 connect() 直接用它
+        pinned_ip = _resolve_and_pin(hostname)
+
+        if use_ssl:
+            ctx = ssl.create_default_context()
+            conn: http.client.HTTPConnection = _PinnedHTTPSConnection(
+                pinned_ip, hostname, port,
+                CONNECT_TIMEOUT, READ_TIMEOUT, ssl_context=ctx)
+        else:
+            conn = _PinnedHTTPConnection(
+                pinned_ip, hostname, port,
+                CONNECT_TIMEOUT, READ_TIMEOUT)
+        conn.set_debuglevel(self._debuglevel)
+
+        headers = dict(req.unredirected_hdrs)
+        headers.update(req.header_items())
+        # 与标准 do_open 一致：强制短连接，避免 HTTP/1.1 keep-alive 歧义
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+        body = req.data
+        encode_chunked = req.has_header("Transfer-encoding")
+
+        try:
+            conn.request(req.get_method(), req.selector, body, headers,
+                         encode_chunked=encode_chunked)
+        except (socket.timeout, TimeoutError) as e:
+            conn.close()
+            raise urllib.error.URLError(f"Connection timeout: {e}")
+        except OSError as e:
+            conn.close()
+            raise urllib.error.URLError(e)
+
+        try:
+            resp = conn.getresponse()
+        except (socket.timeout, TimeoutError) as e:
+            conn.close()
+            raise urllib.error.URLError(f"Read timeout: {e}")
+        except OSError as e:
+            conn.close()
+            raise urllib.error.URLError(e)
+
+        # 与标准 do_open 一致：返回 HTTPResponse；3xx/4xx/5xx 由 opener 链里的
+        # HTTPErrorProcessor.http_response 统一触发 parent.error → 重定向处理器。
+        resp.url = req.get_full_url()
+        resp.status = resp.code
+        resp.msg = resp.reason  # urllib 客户端习惯用 .msg 读 reason
+        return resp
+
+
+class _PinnedHTTPHandler(_PinnedHTTPMixin, urllib.request.HTTPHandler):
+    def http_open(self, req):
+        return self._pinned_open(req, use_ssl=False)
+
+
+class _PinnedHTTPSHandler(_PinnedHTTPMixin, urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self._pinned_open(req, use_ssl=True)
+
+
 class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
-    """安全重定向处理器：每个 redirect target 都经过 SSRF 校验"""
+    """安全重定向处理器：每个 redirect target 都经过完整 SSRF 校验。
+
+    重定向次数上限 MAX_REDIRECTS；新 URL 会再次走 _pinned_open（重新解析+钉住 IP），
+    不允许任何未经校验的跳转。
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.max_redir = MAX_REDIRECTS
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         safe, reason = is_safe_url(newurl)
         if not safe:
-            raise urllib.error.URLError(f"Blocked redirect to unsafe URL: {newurl} ({reason})")
+            raise urllib.error.URLError(
+                f"Blocked redirect to unsafe URL: {newurl} ({reason})")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
@@ -241,8 +446,18 @@ class _PageParser(HTMLParser):
 # ============ 抓取底层 ============
 
 def _build_opener() -> urllib.request.OpenerDirector:
-    """构建带安全重定向处理的 opener"""
-    opener = urllib.request.build_opener(_SafeRedirectHandler)
+    """构建带 IP 钉住 SSRF 防护 + 安全重定向的 opener。
+
+    关键点：使用 _PinnedHTTPHandler/_PinnedHTTPSHandler，
+    连接时一次性解析+校验+钉住 IP，之后不再走 DNS，
+    从而消除 TOCTOU（DNS rebinding）窗口。
+    """
+    opener = urllib.request.OpenerDirector()
+    opener.add_handler(_SafeRedirectHandler())
+    opener.add_handler(_PinnedHTTPHandler())
+    opener.add_handler(_PinnedHTTPSHandler())
+    # HTTPErrorProcessor 负责把 2xx 响应包装成 addinfourl、对 >=400 抛 HTTPError
+    opener.add_handler(urllib.request.HTTPErrorProcessor())
     return opener
 
 
@@ -258,13 +473,20 @@ def _fetch(url: str) -> Dict[str, Any]:
     }
     opener = _build_opener()
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    deadline = time.monotonic() + TOTAL_TIMEOUT
     try:
-        resp = opener.open(req, timeout=CONNECT_TIMEOUT)
+        # 注意：不再向 opener.open 传 timeout——超时由连接层控制（connect=10s/read=30s）
+        resp = opener.open(req)
         result["final_url"] = resp.geturl()
-        # 分块读取，限制最大大小
+        # 分块读取，限制最大大小 + 整体 deadline
         chunks = []
         total = 0
         while True:
+            if time.monotonic() > deadline:
+                result["truncated"] = True
+                result["status"] = "timeout"
+                result["error"] = f"总超时（{TOTAL_TIMEOUT}s）"
+                break
             chunk = resp.read(65536)
             if not chunk:
                 break
@@ -293,7 +515,7 @@ def _fetch(url: str) -> Dict[str, Any]:
         result["error"] = f"HTTP {e.code}: {e.reason}"
     except urllib.error.URLError as e:
         reason = str(e.reason)
-        if "timed out" in reason.lower():
+        if "timed out" in reason.lower() or "timeout" in reason.lower():
             result["status"] = "timeout"
         else:
             result["status"] = "failed"
@@ -309,13 +531,14 @@ def _check_robots(url: str) -> Tuple[bool, str]:
     try:
         parsed = urllib.parse.urlparse(url)
         robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
-        # P0修复：rp.read()无超时可永久阻塞，改用带timeout的手动抓取
+        # 用带 IP 钉住 SSRF 防护的 opener，避免 robots.txt 检查本身被 TOCTOU 绕过
         rp = urllib.robotparser.RobotFileParser()
         try:
-            opener = urllib.request.build_opener()
-            opener.addheaders = [("User-agent", USER_AGENT)]
-            with opener.open(robots_url, timeout=CONNECT_TIMEOUT) as r:
-                rp.parse(r.read().decode("utf-8", "ignore").splitlines())
+            opener = _build_opener()
+            req = urllib.request.Request(robots_url,
+                                         headers={"User-agent": USER_AGENT})
+            with opener.open(req) as r:
+                rp.parse(r.read(MAX_RESPONSE_BYTES).decode("utf-8", "ignore").splitlines())
         except Exception:
             # robots.txt 抓取失败时，保守允许（fail-open，与原策略一致）
             return True, ""

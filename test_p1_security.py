@@ -99,12 +99,13 @@ def test_atomic_write_provider_manager():
 
 
 def test_atomic_write_customer_manager():
-    """customer_manager.py 使用原子写入"""
+    """customer_manager.py 客户数据写入 SQLite（事务+回滚），不再直接写 JSON"""
     with open("customer_manager.py", "r", encoding="utf-8") as f:
         content = f.read()
-    assert "_atomic_write" in content or "atomic_write" in content, "customer_manager 无原子写入"
-    assert "os.replace" in content, "customer_manager 未使用 os.replace"
-    # 不应有直接 write_text 保存客户数据
+    # 新架构：客户写操作走 SQLite repository，应有事务/回滚/验证逻辑
+    assert "transaction" in content or "rollback" in content or "verify_prospect" in content, \
+        "customer_manager 无 SQLite 事务/回滚/写入验证"
+    # 不应有直接 write_text 保存客户数据到 customers.json
     assert 'CUSTOMERS_FILE.write_text(json.dumps' not in content, "customer_manager 仍使用非原子写入"
 
 
@@ -128,26 +129,36 @@ def test_provider_manager_corruption_recovery():
 
 
 def test_customer_manager_corruption_recovery():
-    """customer_manager _load 在JSON损坏时保护现有数据（P0修复：文件存在但损坏时raise，不返回空列表）"""
+    """customer_manager _load 在 JSON 损坏时优雅降级到 SQLite，不崩溃不返回空数据"""
     with open("customer_manager.py", "r", encoding="utf-8") as f:
         content = f.read()
     assert "except Exception" in content, "customer_manager._load 无异常处理"
-    # 验证实际运行时损坏恢复：文件存在但损坏时应raise，防止后续写入清空客户
+    # 新架构：JSON 损坏时降级到 SQLite 读取，不 raise RuntimeError
     import customer_manager as cm_mod
-    mgr = cm_mod.CustomerManager()
+    import importlib
     with tempfile.TemporaryDirectory() as td:
+        # 隔离 SQLite 数据库
+        db_path = str(Path(td) / "test.db")
+        old_db = os.environ.get("WORKBENCH_DB_PATH")
+        os.environ["WORKBENCH_DB_PATH"] = db_path
+        if "repository" in sys.modules:
+            importlib.reload(sys.modules["repository"])
         bad_file = Path(td) / "bad_customers.json"
         bad_file.write_text("{invalid json!!!", encoding="utf-8")
         original = cm_mod.CUSTOMERS_FILE
         cm_mod.CUSTOMERS_FILE = bad_file
         try:
-            try:
-                result = mgr._load()
-                assert False, f"损坏文件应raise RuntimeError以保护数据，实际返回: {result}"
-            except RuntimeError:
-                pass  # 预期行为：文件存在但损坏时拒绝返回空数据
+            mgr = cm_mod.CustomerManager()
+            result = mgr._load()
+            # JSON 损坏时应降级到 SQLite（空库返回空列表），不应崩溃
+            assert isinstance(result, list), f"损坏 JSON 应降级返回 list，实际 {type(result)}"
+            # 不应因为 JSON 损坏而丢失 SQLite 中的客户
         finally:
             cm_mod.CUSTOMERS_FILE = original
+            if old_db:
+                os.environ["WORKBENCH_DB_PATH"] = old_db
+            else:
+                os.environ.pop("WORKBENCH_DB_PATH", None)
 
 
 def test_inbox_load_json_corruption_recovery():
@@ -169,22 +180,33 @@ def test_customer_id_uniqueness_check():
 
 
 def test_customer_id_uniqueness_runtime():
-    """运行时验证：添加多个客户ID不重复"""
+    """运行时验证：添加多个客户ID不重复（使用隔离SQLite数据库）"""
     import customer_manager as cm_mod
+    import importlib
     with tempfile.TemporaryDirectory() as td:
         test_file = Path(td) / "test_customers.json"
+        db_path = str(Path(td) / "test.db")
         original = cm_mod.CUSTOMERS_FILE
+        old_db = os.environ.get("WORKBENCH_DB_PATH")
+        os.environ["WORKBENCH_DB_PATH"] = db_path
+        if "repository" in sys.modules:
+            importlib.reload(sys.modules["repository"])
         cm_mod.CUSTOMERS_FILE = test_file
         try:
             mgr = cm_mod.CustomerManager()
             ids = set()
             for i in range(20):
                 c = mgr.add_customer({"company_name": f"Test {i}", "country": "US"})
-                assert c["id"] not in ids, f"重复ID: {c['id']}"
-                ids.add(c["id"])
+                cid = c.get("id") or c.get("customer_id")
+                assert cid not in ids, f"重复ID: {cid}"
+                ids.add(cid)
             assert len(ids) == 20, f"20个客户应有20个唯一ID，实际{len(ids)}"
         finally:
             cm_mod.CUSTOMERS_FILE = original
+            if old_db:
+                os.environ["WORKBENCH_DB_PATH"] = old_db
+            else:
+                os.environ.pop("WORKBENCH_DB_PATH", None)
 
 
 # ============ 5. 删除确认逻辑测试 ============
@@ -222,11 +244,18 @@ def test_customer_export_csv_utf8_sig():
 
 
 def test_customer_export_csv_runtime():
-    """运行时验证：导出含中文的CSV正确处理"""
+    """运行时验证：导出含中文的CSV正确处理（使用隔离SQLite数据库）"""
     import customer_manager as cm_mod
+    import importlib
     with tempfile.TemporaryDirectory() as td:
         test_file = Path(td) / "test_customers.json"
+        db_path = str(Path(td) / "test.db")
         original = cm_mod.CUSTOMERS_FILE
+        old_db = os.environ.get("WORKBENCH_DB_PATH")
+        os.environ["WORKBENCH_DB_PATH"] = db_path
+        # 重新加载 repository 模块使新 DB_PATH 生效
+        if "repository" in sys.modules:
+            importlib.reload(sys.modules["repository"])
         cm_mod.CUSTOMERS_FILE = test_file
         try:
             mgr = cm_mod.CustomerManager()
@@ -249,6 +278,10 @@ def test_customer_export_csv_runtime():
             assert "中国" in rows[0]["country"], "中文未正确导出"
         finally:
             cm_mod.CUSTOMERS_FILE = original
+            if old_db:
+                os.environ["WORKBENCH_DB_PATH"] = old_db
+            else:
+                os.environ.pop("WORKBENCH_DB_PATH", None)
 
 
 def test_filtered_csv_export_uses_csv_module():

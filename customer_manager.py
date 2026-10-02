@@ -102,53 +102,143 @@ def _normalize_status(raw_status):
 
 
 class CustomerManager:
-    """轻量CRM - 基于JSON文件存储"""
+    """轻量CRM - P1-9：SQLite 为写权威，customers.json 只读合并。
+
+    - 所有写操作（add/update/delete/move_stage/add_email/add_activity）写入 SQLite prospects/activity_log
+    - 读取时合并：SQLite 活跃客户 + JSON legacy 客户（按 id 去重，SQLite 优先）
+    - customers.json 文件本身不被修改（MD5 保持不变）
+    """
 
     def __init__(self):
-        self._ensure_file()
-
-    def _ensure_file(self):
+        # P1-9：不再创建/写入 customers.json；确保目录存在即可
         CUSTOMERS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        if not CUSTOMERS_FILE.exists():
-            self._atomic_write([])
 
-    def _atomic_write(self, data):
-        """原子写入：临时文件+os.replace，失败保留原文件"""
-        content = json.dumps(data, ensure_ascii=False, indent=2)
-        fd, tmp = tempfile.mkstemp(dir=str(CUSTOMERS_FILE.parent), suffix='.tmp')
+    # ------------------------------------------------------------------ #
+    # P1-9：SQLite ↔ JSON 字段映射辅助
+    # ------------------------------------------------------------------ #
+
+    def _row_to_customer_dict(self, row):
+        """将 SQLite prospects 行转换为与 customers.json 兼容的客户 dict。
+
+        - id：优先 legacy_id（迁移客户保持原 JSON id），否则用 customer_id
+        - emails/activities：从 activity_log 加载（get_customer 时才加载，list 视图为空列表）
+        """
+        cid = row.get("legacy_id") or row.get("customer_id")
+        customer = {
+            "id": cid,
+            "customer_id": row.get("customer_id"),  # SQLite 主键（额外字段，向后兼容不影响）
+            "company_name": row.get("company_name") or "",
+            "website": row.get("website") or "",
+            "country": row.get("country") or "",
+            "source": row.get("source") or "",
+            "status": row.get("status") or "new_lead",
+            "pipeline_stage": row.get("pipeline_stage") or "lead",
+            "grade": row.get("grade") or "C",
+            "score": row.get("score") or 0,
+            "notes": row.get("notes") or "",
+            "created_at": row.get("created_at") or "",
+            "updated_at": row.get("updated_at") or "",
+            "last_contact": row.get("last_contact") or "",
+            "next_follow_up": row.get("next_follow_up") or "",
+            "analysis": row.get("analysis") or "",
+            "due_diligence": row.get("due_diligence") or "",
+            "contact_person": row.get("contact_person") or "",
+            "email": row.get("email") or "",
+            "phone": row.get("phone") or "",
+            "emails": [],
+            "activities": [],
+        }
+        return customer
+
+    def _resolve_customer_id(self, identifier):
+        """将外部 id（可能是 legacy_id 或 customer_id）解析为 SQLite 主键 customer_id。
+
+        Returns:
+            (actual_customer_id, row_dict) 或 (None, None)
+        """
+        repo = _get_repo()
+        if repo is None:
+            return None, None
+        # 先直接按 customer_id 查
+        row = repo.get_prospect(identifier)
+        if row:
+            return row["customer_id"], row
+        # 再按 legacy_id 查
+        conn = repo._connect()
         try:
-            with os.fdopen(fd, 'w', encoding='utf-8') as f:
-                f.write(content)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp, str(CUSTOMERS_FILE))
-        except Exception:
-            try: os.unlink(tmp)
-            except OSError: pass
-            raise
+            cur = conn.execute(
+                "SELECT * FROM prospects WHERE legacy_id=?", (identifier,)
+            )
+            r = cur.fetchone()
+            if r:
+                return r["customer_id"], dict(r)
+        finally:
+            conn.close()
+        return None, None
 
-    def _load(self):
+    def _load_json_legacy(self):
+        """P1-9：只读读取 customers.json（legacy），不写入。
+
+        返回 JSON 中的客户列表（未去重，未合并 SQLite）。
+        """
         try:
             data = json.loads(CUSTOMERS_FILE.read_text(encoding="utf-8"))
             if not isinstance(data, list):
-                raise ValueError(f"客户文件格式错误：期望 list，实际 {type(data).__name__}")
+                return []
             return data
-        except Exception as e:
-            import shutil, time
-            try:
-                backup = CUSTOMERS_FILE.with_suffix(f'.corrupt-{int(time.time())}.json')
-                shutil.copy2(CUSTOMERS_FILE, backup)
-                print(f"[customer_manager] 客户文件损坏，已备份到 {backup}: {e}", file=__import__('sys').stderr)
-            except Exception:
-                pass
-            # P0修复：文件存在但读取失败时，绝不返回空列表（防止后续写入清空28条客户）
-            # 仅当文件不存在时才返回空列表（首次运行）
-            if CUSTOMERS_FILE.exists():
-                raise RuntimeError(f"客户文件读取失败，已备份但拒绝返回空数据以保护现有客户: {e}")
+        except Exception:
             return []
 
-    def _save(self, data):
-        self._atomic_write(data)
+    def _load(self):
+        """P1-9：合并读取——SQLite 活跃客户 + JSON legacy 客户。
+
+        合并规则：
+        1. 从 SQLite prospects 读取所有 status != 'invalid' 的客户
+        2. 从 customers.json 读取 legacy 客户
+        3. 按 id 去重：SQLite 中已有对应 legacy_id 的，跳过 JSON 版本（SQLite 优先）
+        4. SQLite 行转换为 JSON 兼容 dict 格式
+        """
+        result = []
+        seen_ids = set()
+
+        # 1. 从 SQLite 读取
+        repo = _get_repo()
+        sqlite_ids = set()  # SQLite 中的 customer_id 和 legacy_id
+        if repo is not None:
+            try:
+                rows = repo.list_all_active_prospects()
+                for row in rows:
+                    cust = self._row_to_customer_dict(row)
+                    result.append(cust)
+                    seen_ids.add(cust["id"])
+                    if row.get("legacy_id"):
+                        sqlite_ids.add(row["legacy_id"])
+                    sqlite_ids.add(row["customer_id"])
+            except Exception:
+                pass
+
+        # 2. 从 JSON 读取 legacy 客户（SQLite 中没有的才加入）
+        for raw in self._load_json_legacy():
+            rid = raw.get("id")
+            if rid in seen_ids or rid in sqlite_ids:
+                continue  # SQLite 已有此客户（迁移版本优先）
+            # 补充缺失字段，保持与 SQLite 转换结果一致的结构
+            merged = dict(raw)
+            merged.setdefault("emails", [])
+            merged.setdefault("activities", [])
+            merged.setdefault("pipeline_stage", self._resolve_pipeline_stage(
+                raw.get("status", ""), "lead"))
+            merged.setdefault("last_contact", "")
+            merged.setdefault("next_follow_up", "")
+            merged.setdefault("analysis", "")
+            merged.setdefault("due_diligence", "")
+            merged.setdefault("notes", "")
+            merged.setdefault("grade", "C")
+            merged.setdefault("score", 0)
+            result.append(merged)
+            seen_ids.add(rid)
+
+        return result
 
     def _gen_unique_id(self, existing_ids):
         """生成不重复的客户ID（cust_前缀+8位UUID，与存量客户格式统一，冲突时重试）"""
@@ -177,11 +267,14 @@ class CustomerManager:
         return customer.get("email") or None
 
     def add_customer(self, customer_data, check_duplicate=True):
-        """添加客户。
+        """添加客户——P1-9：写入 SQLite prospects 表为权威源。
 
         check_duplicate=True 时先调用 repository 做重复检测，
         命中重复则不写入，返回 {'success': False, 'error': 'duplicate', 'matches': [...]}。
         status 默认 "new_lead"；传入旧中文状态时自动迁移为新状态 key。
+
+        Returns:
+            新增后的客户 dict（JSON 兼容格式）；重复时返回错误 dict。
         """
         # 可选：重复检测（repository 不可用时跳过）
         if check_duplicate:
@@ -197,84 +290,157 @@ class CustomerManager:
                     "matches": dup.get("matches", []),
                 }
 
-        data = self._load()
-        existing_ids = {c.get("id") for c in data}
-        # 状态规范化：默认 new_lead，旧中文状态自动迁移
+        repo = _get_repo()
+        if repo is None:
+            return {"success": False, "error": "repository_unavailable"}
+
+        # 生成客户 ID（保持 cust_ + 8位UUID 格式，与存量一致）
+        existing = self._load()
+        existing_ids = {c.get("id") for c in existing}
+        customer_id = self._gen_unique_id(existing_ids)
+
+        # 状态规范化
         status = _normalize_status(customer_data.get("status", "new_lead"))
         if "pipeline_stage" in customer_data:
             pipeline_stage = customer_data.get("pipeline_stage")
         else:
             pipeline_stage = self._resolve_pipeline_stage(status, "lead")
-        customer = {
-            "id": self._gen_unique_id(existing_ids),
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
+
+        now = datetime.now().isoformat()
+        # 构造写入 SQLite 的数据
+        prospect_data = {
+            "customer_id": customer_id,
+            "company_name": customer_data.get("company_name", ""),
+            "website": customer_data.get("website", ""),
+            "country": customer_data.get("country", ""),
+            "source": customer_data.get("source", ""),
             "status": status,
-            "pipeline_stage": pipeline_stage,
             "grade": customer_data.get("grade", "C"),
             "score": customer_data.get("score", 0),
+            "contact_person": customer_data.get("contact_person", ""),
+            "email": customer_data.get("email", "") or self._primary_email_of(customer_data),
+            "phone": customer_data.get("phone", ""),
+            "notes": customer_data.get("notes", ""),
             "analysis": customer_data.get("analysis", ""),
             "due_diligence": customer_data.get("due_diligence", ""),
             "last_contact": customer_data.get("last_contact", ""),
             "next_follow_up": customer_data.get("next_follow_up", ""),
+            "pipeline_stage": pipeline_stage,
+            "created_at": now,
+        }
+
+        try:
+            # 事务写入 + 写入后验证
+            record = repo.add_prospect(prospect_data)
+            # 验证：读回确认
+            expected = {
+                "company_name": prospect_data["company_name"],
+                "status": status,
+                "grade": prospect_data["grade"],
+                "pipeline_stage": pipeline_stage,
+            }
+            if not repo.verify_prospect_write(customer_id, expected):
+                return {"success": False, "error": "write_verification_failed"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+        # 返回 JSON 兼容格式的客户 dict
+        customer = {
+            "id": customer_id,
+            "customer_id": customer_id,
+            "created_at": now,
+            "updated_at": now,
+            "status": status,
+            "pipeline_stage": pipeline_stage,
+            "grade": prospect_data["grade"],
+            "score": prospect_data["score"],
+            "analysis": prospect_data["analysis"],
+            "due_diligence": prospect_data["due_diligence"],
+            "last_contact": prospect_data["last_contact"],
+            "next_follow_up": prospect_data["next_follow_up"],
             "emails": [],
             "activities": [],
-            "notes": "",
+            "notes": prospect_data["notes"],
+            "company_name": prospect_data["company_name"],
+            "website": prospect_data["website"],
+            "country": prospect_data["country"],
+            "source": prospect_data["source"],
+            "contact_person": prospect_data["contact_person"],
+            "email": prospect_data["email"],
+            "phone": prospect_data["phone"],
             **customer_data,
         }
-        # **customer_data 可能覆盖 status/pipeline_stage，这里再以规范化结果为准
         customer["status"] = status
         customer["pipeline_stage"] = pipeline_stage
-        data.append(customer)
-        self._save(data)
+        customer["id"] = customer_id
         return customer
 
     def _write_update(self, customer_id, updates):
-        """无状态校验地写入更新（move_stage 等粗粒度操作走此路径）。"""
-        data = self._load()
-        for c in data:
-            if c["id"] == customer_id:
-                if "status" in updates and "pipeline_stage" not in updates:
-                    updates["pipeline_stage"] = self._resolve_pipeline_stage(
-                        updates["status"], c.get("pipeline_stage", "lead"))
-                c.update(updates)
-                c["updated_at"] = datetime.now().isoformat()
-                self._save(data)
-                return c
-        return None
+        """P1-9：无状态校验地写入更新到 SQLite（move_stage 等粗粒度操作走此路径）。"""
+        repo = _get_repo()
+        if repo is None:
+            return None
+        # 解析实际 SQLite customer_id
+        actual_id, row = self._resolve_customer_id(customer_id)
+        if actual_id is None:
+            return None
+
+        # 如果更新了 status 但没指定 pipeline_stage，自动解析
+        if "status" in updates and "pipeline_stage" not in updates:
+            updates["pipeline_stage"] = self._resolve_pipeline_stage(
+                updates["status"], row.get("pipeline_stage", "lead") if row else "lead")
+
+        try:
+            updated = repo.update_prospect(actual_id, updates)
+            if updated is None:
+                return None
+            # 返回 JSON 兼容格式
+            return self._row_to_customer_dict(updated)
+        except Exception:
+            return None
 
     def update_customer(self, customer_id, updates):
-        """更新客户信息；若更新 status，先校验状态转移合法性。
+        """更新客户信息——P1-9：写入 SQLite prospects 表。
 
-        转移不合法时不更新，返回 None，并在 notes 中记录拒绝原因。
+        若更新 status，先校验状态转移合法性。
+        转移不合法时不更新，返回 None。
         """
-        data = self._load()
-        for c in data:
-            if c["id"] == customer_id:
-                # 状态转移校验
-                if "status" in updates:
-                    old_norm = _normalize_status(c.get("status", "new_lead"))
-                    new_norm = _normalize_status(updates["status"])
-                    if _UNIFIED_STATUS_AVAILABLE and old_norm != new_norm:
-                        ok, reason = validate_transition(old_norm, new_norm)
-                        if not ok:
-                            c["notes"] = (
-                                (c.get("notes", "") or "")
-                                + f" [状态转移被拒绝: {c.get('status')}→{updates['status']} ({reason})]"
-                            ).strip()
-                            c["updated_at"] = datetime.now().isoformat()
-                            self._save(data)
-                            return None
-                    updates["status"] = new_norm
-                # 如果更新了status，同步更新pipeline_stage
-                if "status" in updates and "pipeline_stage" not in updates:
-                    updates["pipeline_stage"] = self._resolve_pipeline_stage(
-                        updates["status"], c.get("pipeline_stage", "lead"))
-                c.update(updates)
-                c["updated_at"] = datetime.now().isoformat()
-                self._save(data)
-                return c
-        return None
+        repo = _get_repo()
+        if repo is None:
+            return None
+
+        actual_id, row = self._resolve_customer_id(customer_id)
+        if actual_id is None:
+            return None
+
+        # 状态转移校验
+        current_status = row.get("status", "new_lead")
+        if "status" in updates:
+            old_norm = _normalize_status(current_status)
+            new_norm = _normalize_status(updates["status"])
+            if _UNIFIED_STATUS_AVAILABLE and old_norm != new_norm:
+                ok, reason = validate_transition(old_norm, new_norm)
+                if not ok:
+                    # 记录拒绝原因到 notes
+                    existing_notes = row.get("notes", "") or ""
+                    new_notes = (existing_notes
+                                 + f" [状态转移被拒绝: {current_status}→{updates['status']} ({reason})]").strip()
+                    repo.update_prospect(actual_id, {"notes": new_notes})
+                    return None
+            updates["status"] = new_norm
+
+        # 如果更新了status，同步更新pipeline_stage
+        if "status" in updates and "pipeline_stage" not in updates:
+            updates["pipeline_stage"] = self._resolve_pipeline_stage(
+                updates["status"], row.get("pipeline_stage", "lead"))
+
+        try:
+            updated = repo.update_prospect(actual_id, updates)
+            if updated is None:
+                return None
+            return self._row_to_customer_dict(updated)
+        except Exception:
+            return None
 
     def move_stage(self, customer_id, new_stage):
         """移动客户到新的管道阶段（保留现有逻辑，支持新状态 key）。
@@ -306,16 +472,57 @@ class CustomerManager:
         })
 
     def delete_customer(self, customer_id):
-        """删除客户"""
-        data = self._load()
-        data = [c for c in data if c["id"] != customer_id]
-        self._save(data)
+        """P1-9：删除客户——SQLite 软删除（status=invalid）+ 级联关闭任务。
+
+        注意：customers.json 保持只读不变，删除仅影响 SQLite。
+        """
+        repo = _get_repo()
+        if repo is None:
+            return
+        actual_id, _row = self._resolve_customer_id(customer_id)
+        if actual_id is None:
+            return
+        try:
+            repo.cascade_delete_prospect(actual_id)
+        except Exception:
+            pass
 
     def get_customer(self, customer_id):
-        """获取单个客户"""
-        data = self._load()
-        for c in data:
-            if c["id"] == customer_id:
+        """获取单个客户——P1-9：从合并源读取，从 activity_log 加载 emails/activities。"""
+        # 先尝试 SQLite
+        repo = _get_repo()
+        if repo is not None:
+            actual_id, row = self._resolve_customer_id(customer_id)
+            if actual_id is not None:
+                cust = self._row_to_customer_dict(row)
+                # 从 activity_log 加载活动和邮件
+                try:
+                    logs = repo.list_activities(actual_id, limit=200)
+                    emails = []
+                    activities = []
+                    for log in logs:
+                        if log.get("activity_type") == "email":
+                            emails.append({
+                                "type": log.get("description", "").split(":", 1)[0] if ":" in log.get("description", "") else "email",
+                                "subject": "",
+                                "body": log.get("description", ""),
+                                "sent_at": log.get("created_at", ""),
+                                "status": "已发送",
+                            })
+                        else:
+                            activities.append({
+                                "type": log.get("activity_type", ""),
+                                "description": log.get("description", ""),
+                                "created_at": log.get("created_at", ""),
+                            })
+                    cust["emails"] = emails
+                    cust["activities"] = activities
+                except Exception:
+                    pass
+                return cust
+        # fallback：从 JSON legacy 读取
+        for c in self._load_json_legacy():
+            if c.get("id") == customer_id:
                 return c
         return None
 
@@ -333,37 +540,48 @@ class CustomerManager:
         return data
 
     def add_email(self, customer_id, email_type, subject, body):
-        """记录邮件"""
-        data = self._load()
-        for c in data:
-            if c["id"] == customer_id:
-                c["emails"].append({
-                    "type": email_type,
-                    "subject": subject,
-                    "body": body,
-                    "sent_at": datetime.now().isoformat(),
-                    "status": "草稿",
-                })
-                c["last_contact"] = datetime.now().isoformat()
-                c["updated_at"] = datetime.now().isoformat()
-                self._save(data)
-                return c
-        return None
+        """P1-9：记录邮件——写入 SQLite activity_log + 更新 prospects.last_contact。"""
+        repo = _get_repo()
+        if repo is None:
+            return None
+        actual_id, row = self._resolve_customer_id(customer_id)
+        if actual_id is None:
+            return None
+        now = datetime.now().isoformat()
+        try:
+            # 事务：写 activity_log + 更新 prospects.last_contact
+            with repo.transaction() as conn:
+                log_id = repo._gen_id("log")
+                conn.execute(
+                    """INSERT INTO activity_log
+                       (log_id, customer_id, activity_type, description, metadata, created_at, created_by)
+                       VALUES (?,?,?,?,?,?,?)""",
+                    (log_id, actual_id, "email",
+                     f"[{email_type}] {subject}",
+                     json.dumps({"type": email_type, "subject": subject, "body": body}, ensure_ascii=False),
+                     now, "system"),
+                )
+                conn.execute(
+                    "UPDATE prospects SET last_contact=?, updated_at=? WHERE customer_id=?",
+                    (now, now, actual_id),
+                )
+        except Exception:
+            return None
+        return self.get_customer(customer_id)
 
     def add_activity(self, customer_id, activity_type, description):
-        """记录活动日志"""
-        data = self._load()
-        for c in data:
-            if c["id"] == customer_id:
-                c.setdefault("activities", []).append({
-                    "type": activity_type,
-                    "description": description,
-                    "created_at": datetime.now().isoformat(),
-                })
-                c["updated_at"] = datetime.now().isoformat()
-                self._save(data)
-                return c
-        return None
+        """P1-9：记录活动日志——写入 SQLite activity_log 表。"""
+        repo = _get_repo()
+        if repo is None:
+            return None
+        actual_id, row = self._resolve_customer_id(customer_id)
+        if actual_id is None:
+            return None
+        try:
+            repo.add_activity(actual_id, activity_type, description)
+        except Exception:
+            return None
+        return self.get_customer(customer_id)
 
     def add_note(self, customer_id, note):
         """添加备注"""

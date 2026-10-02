@@ -13,6 +13,7 @@ import sqlite3
 import json
 import hashlib
 import os
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -392,6 +393,60 @@ class CustomerRepository:
             conn.commit()
         finally:
             conn.close()
+        self._ensure_columns()
+
+    def _ensure_columns(self) -> None:
+        """为已有表补充新增列（ALTER TABLE ADD COLUMN，幂等）。
+
+        P1-9：customers.json 的 pipeline_stage / last_contact / next_follow_up /
+        analysis / due_diligence 字段需要在 prospects 表中持久化，
+        使 SQLite 成为唯一写权威后不丢失这些字段。
+        """
+        new_columns = {
+            "prospects": [
+                ("pipeline_stage", "TEXT DEFAULT 'lead'"),
+                ("last_contact", "TEXT"),
+                ("next_follow_up", "TEXT"),
+                ("analysis", "TEXT"),
+                ("due_diligence", "TEXT"),
+            ],
+        }
+        conn = self._connect()
+        try:
+            for table, cols in new_columns.items():
+                existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+                for col_name, col_def in cols:
+                    if col_name not in existing:
+                        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}")
+            conn.commit()
+        finally:
+            conn.close()
+
+    # ------------------------------------------------------------------ #
+    # 事务支持（P1-9：多表写入原子性）
+    # ------------------------------------------------------------------ #
+
+    @contextmanager
+    def transaction(self):
+        """返回一个显式事务上下文管理器。
+
+        用法：
+            with repo.transaction() as conn:
+                conn.execute("INSERT ...", (...))
+                conn.execute("UPDATE ...", (...))
+            # 退出时自动 commit；异常自动 rollback
+
+        注意：该连接启用了 row_factory 与外键约束。
+        """
+        conn = self._connect()
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     # ------------------------------------------------------------------ #
     # Prospects CRUD
@@ -429,6 +484,12 @@ class CustomerRepository:
             "updated_at": now,
             "legacy_id": data.get("legacy_id"),
             "migrated_at": data.get("migrated_at"),
+            # P1-9：新增字段（与 customers.json 字段对齐）
+            "pipeline_stage": data.get("pipeline_stage") or "lead",
+            "last_contact": data.get("last_contact"),
+            "next_follow_up": data.get("next_follow_up"),
+            "analysis": data.get("analysis"),
+            "due_diligence": data.get("due_diligence"),
         }
 
         conn = self._connect()
@@ -437,8 +498,9 @@ class CustomerRepository:
                 """INSERT INTO prospects
                    (customer_id, company_name, website, country, source, status, grade, score,
                     buyer_type, product_categories, main_products, contact_person, email, phone,
-                    notes, created_at, updated_at, legacy_id, migrated_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    notes, created_at, updated_at, legacy_id, migrated_at,
+                    pipeline_stage, last_contact, next_follow_up, analysis, due_diligence)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 tuple(record.values()),
             )
             conn.commit()
@@ -481,6 +543,9 @@ class CustomerRepository:
             "company_name", "website", "country", "source", "status", "grade", "score",
             "buyer_type", "product_categories", "main_products", "contact_person",
             "email", "phone", "notes",
+            # P1-9：新增可更新字段
+            "pipeline_stage", "last_contact", "next_follow_up",
+            "analysis", "due_diligence",
         }
         fields = {k: v for k, v in updates.items() if k in allowed}
         if not fields:
@@ -562,6 +627,81 @@ class CustomerRepository:
             return cur.rowcount > 0
         finally:
             conn.close()
+
+    def cascade_delete_prospect(self, customer_id: str) -> Dict[str, Any]:
+        """
+        P1-9：软删除客户并级联处理关联表。
+
+        - prospects.status → 'invalid'
+        - follow_up_tasks → status='closed'（关闭未完成任务）
+        - evaluations / outreach_drafts / activity_log → 保留（历史审计数据不删除）
+
+        Returns:
+            {"success": bool, "prospect_updated": bool, "tasks_closed": int}
+        """
+        result = {"success": False, "prospect_updated": False, "tasks_closed": 0}
+        try:
+            with self.transaction() as conn:
+                # 1. 软删除 prospects
+                cur = conn.execute(
+                    "UPDATE prospects SET status='invalid', updated_at=? WHERE customer_id=?",
+                    (_now(), customer_id),
+                )
+                result["prospect_updated"] = cur.rowcount > 0
+
+                # 2. 级联：关闭该客户所有 pending 任务
+                cur = conn.execute(
+                    "UPDATE follow_up_tasks SET status='closed', close_reason='customer_deleted', "
+                    "updated_at=? WHERE customer_id=? AND status='pending'",
+                    (_now(), customer_id),
+                )
+                result["tasks_closed"] = cur.rowcount
+
+                result["success"] = True
+        except Exception as e:
+            result["error"] = str(e)
+        return result
+
+    def list_all_active_prospects(self) -> List[Dict[str, Any]]:
+        """
+        P1-9：列出所有未软删除的客户（status != 'invalid'）。
+
+        与 list_prospects 不同：不按 status/grade/source 过滤，不分页，
+        用于 CustomerManager 的合并读取。
+
+        Returns:
+            客户字典列表（按 updated_at DESC）。
+        """
+        conn = self._connect()
+        try:
+            cur = conn.execute(
+                "SELECT * FROM prospects WHERE status != 'invalid' "
+                "OR status IS NULL ORDER BY updated_at DESC"
+            )
+            return [dict(r) for r in cur.fetchall()]
+        finally:
+            conn.close()
+
+    def verify_prospect_write(self, customer_id: str, expected_fields: Dict[str, Any]) -> bool:
+        """
+        P1-9：写入后验证——从 SQLite 读回，确认关键字段与预期一致。
+
+        Args:
+            customer_id: 客户 ID。
+            expected_fields: 期望匹配的字段字典（只验证这些字段）。
+
+        Returns:
+            True=一致；False=不一致或记录不存在。
+        """
+        row = self.get_prospect(customer_id)
+        if row is None:
+            return False
+        for k, v in expected_fields.items():
+            if k not in row:
+                return False
+            if row[k] != v:
+                return False
+        return True
 
     def find_by_website(self, website: str) -> List[Dict[str, Any]]:
         """

@@ -108,7 +108,15 @@ class KnowledgeBase:
         return COMPANY["categories"]
 
     def get_company_brief(self):
-        """获取公司简介精简版（用于Prompt）"""
+        """获取公司简介精简版（用于Prompt）。
+
+        工厂数/出口国数/认证清单统一从 knowledge_facts.COMPANY_BRIEF_FACTS
+        （9.26 权威口径）动态读取，不在此硬编码，避免旧口径（4工厂/130国/ISO9001）
+        外泄到 Prompt。合作工厂为网络协作关系，非公司自有工厂。
+        """
+        from knowledge_facts import get_company_brief_facts
+        facts = get_company_brief_facts()
+        certs = "/".join(facts["certifications"])
         return f"""KaiLionCrafts（锴利匠心）
 - 公司：{COMPANY['name_en']}
 - 位置：{COMPANY['location']}（中国刀剪之都）
@@ -116,8 +124,8 @@ class KnowledgeBase:
 - 品牌：{COMPANY['brand']}
 - 创始人：{COMPANY['founder']}
 - 四大品类：{', '.join(COMPANY['categories'])}
-- 核心优势：阳江36家合作工厂网络（含4家家族深度绑定）、OEM/ODM/Private Label定制、免费4K产品摄影、创始人直接对接
-- 认证：CE/FDA/LFGB/RoHS/FSC/amfori BSCI（以具体产品和目标市场为准）
+- 供应链：阳江{facts['partner_factory_count']}家合作工厂网络（其中{facts['family_core_factory_count']}家为家族深度绑定核心工厂，均为网络协作关系）、出口{facts['export_country_count']}+国家/地区、OEM/ODM/Private Label定制、免费4K产品摄影、创始人直接对接
+- 认证：{certs}（以具体产品和目标市场为准）
 - 官网：{COMPANY['website']}"""
 
     def build_context(self, modules=None):

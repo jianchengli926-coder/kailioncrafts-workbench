@@ -190,11 +190,20 @@ if not st.session_state["authed"]:
             st.stop()
         pwd = st.text_input("", type="password", label_visibility="collapsed", placeholder="输入访问密码")
         if st.button("进 入", use_container_width=True, type="primary"):
+            # P1修复：真正的登录锁定——5次失败后冷却60秒，拒绝所有尝试
+            _fail_count = st.session_state.get("_login_fail_count", 0)
+            _lock_until = st.session_state.get("_login_lock_until", 0)
+            _now_ts = __import__("time").time()
+            if _fail_count >= 5 and _now_ts < _lock_until:
+                _remain = int(_lock_until - _now_ts)
+                st.error(f"🔒 已连续失败5次，账户已锁定。请{_remain}秒后再试。")
+                st.stop()
             # P2修复：常量时间比较，防止时序攻击
             import hmac as _hmac
             if _hmac.compare_digest(pwd, _access_pwd):
                 st.session_state["authed"] = True
                 st.session_state["_login_fail_count"] = 0
+                st.session_state["_login_lock_until"] = 0
                 try:
                     import json, os, tempfile
                     from datetime import datetime
@@ -248,7 +257,9 @@ if not st.session_state["authed"]:
                 except Exception:
                     pass
                 if fail_count >= 5:
-                    st.error(f"密码错误（已连续失败{fail_count}次，请稍后再试）")
+                    # 设置锁定截止时间：60秒冷却
+                    st.session_state["_login_lock_until"] = __import__("time").time() + 60
+                    st.error(f"🔒 密码错误（已连续失败{fail_count}次，账户已锁定60秒）")
                 else:
                     st.error("密码错误")
     st.stop()
@@ -864,7 +875,26 @@ if page == "🏠 仪表盘":
             _chain_html += f'<span style="color:#999;font-size:11px;">+{len(_chain)-6}更多</span>'
         _chain_html += '</div>'
         st.markdown(_chain_html, unsafe_allow_html=True)
-        
+
+        # MODEL-03：视觉模型路由链可视化（与文本链并列展示）
+        try:
+            from model_registry import get_vision_chain as _get_vchain
+            _vchain = _get_vchain()
+            if _vchain:
+                _vhtml = '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:6px;">'
+                _vhtml += '<span style="font-size:11px;color:#6366f1;">👁️ 视觉链:</span>'
+                for _vi, _ve in enumerate(_vchain[:4]):
+                    _vlabel = _ve.get("display_name") or _ve.get("id", "?")
+                    _vhtml += f'<span style="background:#eef2ff;padding:3px 8px;border-radius:4px;font-size:11px;border-left:2px solid #6366f1;">{_vlabel}</span>'
+                    if _vi < len(_vchain[:4]) - 1:
+                        _vhtml += '<span style="color:#999;font-size:10px;">→</span>'
+                if len(_vchain) > 4:
+                    _vhtml += f'<span style="color:#999;font-size:11px;">+{len(_vchain)-4}更多</span>'
+                _vhtml += '</div>'
+                st.markdown(_vhtml, unsafe_allow_html=True)
+        except Exception:
+            pass
+
         col_aibtn1, col_aibtn2 = st.columns(2)
         with col_aibtn1:
             if st.button("🔌 测试AI连接", use_container_width=True, key="dash_test_ai"):
@@ -5237,7 +5267,7 @@ elif page == "🤖 锴利自研AI工具库":
 
     # 工具列表
     TOOLS = [
-        {"id": "sku_naming", "name": "SKU命名工具", "icon": "🏷️", "category": "产品命名", "description": "SKU生成、材质代码表、SEO关键词", "status": "✅ 已上线", "features": "选品类+材质，一键生成SKU/SEO文件名/ALT Text/页面标题"},
+        {"id": "sku_naming", "name": "SKU命名工具（含产品SEO/图片SEO）", "icon": "🏷️", "category": "产品命名", "description": "SKU生成、材质代码表、产品SEO关键词、图片SEO文件名/ALT Text", "status": "✅ 已上线", "features": "选品类+材质，一键生成SKU/SEO文件名/ALT Text/页面标题；图片SEO(文件名+ALT)与产品SEO关键词均在此完成，无需独立卡片"},
         {"id": "line_art", "name": "产品线稿工具", "icon": "✏️", "category": "图片处理", "description": "上传图片转线稿、标注导出", "status": "✅ 已上线", "features": "上传产品图→调节强度→生成线稿→下载PNG"},
         {"id": "visual_correction", "name": "全品类视觉矫正", "icon": "🎨", "category": "图片处理", "description": "图片翻转、朝向统一、裁剪", "status": "✅ 已上线", "features": "水平/垂直翻转、旋转90/180/270度、导出"},
         {"id": "prompt_library", "name": "刀剪产品提示词", "icon": "💡", "category": "AI生图", "description": "4品类Prompt库、多比例", "status": "✅ 已上线", "features": "4品类选择→生成AI生图Prompt→复制到Midjourney"},
@@ -10469,7 +10499,19 @@ elif page == "🎯 精准客户开发":
 
         col1, col2 = st.columns(2)
         with col1:
-            draft_type = st.selectbox("草稿类型", cdg.DRAFT_TYPES, key="draft_type")
+            # DRAFT-02：草稿类型下拉使用可读中文标签，WhatsApp 选项明确可见
+            _DRAFT_TYPE_LABELS = {
+                "first_email": "首封开发信",
+                "linkedin_first_message": "LinkedIn 首条消息",
+                "follow_up_email": "跟进邮件",
+                "product_recommendation": "产品推荐",
+                "pain_point_analysis": "痛点分析",
+                "rfq_response": "报价(RFQ)回复",
+                "next_action_plan": "下一步行动计划",
+                "whatapp_message": "WhatsApp 话术",
+            }
+            draft_type = st.selectbox("草稿类型", cdg.DRAFT_TYPES, key="draft_type",
+                                      format_func=lambda x: _DRAFT_TYPE_LABELS.get(x, x))
             language = st.selectbox("语言", ["en", "zh"], key="draft_lang")
         with col2:
             mode = st.selectbox("模式", ["standard", "reasoning"], key="draft_mode",
@@ -11255,8 +11297,35 @@ elif page == "🤖 模型管理":
         st.success(f"✅ Ollama服务运行中，检测到 {len(ollama_models)} 个本地模型")
         col1, col2 = st.columns([3, 1])
         with col1:
-            for m in ollama_models:
-                st.caption(f"  • {m}")
+            # MODEL-08：逐模型标注视觉/生图能力，明确"本地不支持图像生成"
+            try:
+                from model_registry import LOCAL_MODELS as _LM, check_ollama_image_gen_support as _ck
+                for m in ollama_models:
+                    _mid = m
+                    _info = _LM.get(_mid, {})
+                    _cap = _info.get("category", "text")
+                    if _cap == "image":
+                        _tag = "🎨 图像生成(需运行时支持)"
+                    elif _info.get("vision_capable"):
+                        _tag = "👁️ 支持图片识别"
+                    elif _cap == "embedding":
+                        _tag = "🔢 向量嵌入"
+                    else:
+                        _tag = "💬 纯文本（不支持图片识别/生成）"
+                    st.caption(f"  • {m}　—　{_tag}")
+                # 总体说明：本地 Ollama 不支持图像生成
+                try:
+                    _img_ok, _img_reason = _ck()
+                    if not _img_ok:
+                        st.caption(f"⚠️ 本地 Ollama 不支持图像生成：{_img_reason}（生图请使用云端 CogView-3）")
+                    else:
+                        st.caption("ℹ️ 本地 Ollama 已支持 FLUX 图像生成；其余本地文本模型仅用于聊天/分析。")
+                except Exception:
+                    st.caption("⚠️ 本地 Ollama 文本/视觉模型不用于图像生成；生图请使用云端 CogView-3。")
+            except Exception:
+                for m in ollama_models:
+                    st.caption(f"  • {m}")
+                st.caption("⚠️ 本地 Ollama 模型不支持图像生成；生图请使用云端 CogView-3。")
         with col2:
             if st.button("🔄 刷新模型列表", use_container_width=True):
                 refresh_ollama_models()

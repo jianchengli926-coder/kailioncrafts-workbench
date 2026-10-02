@@ -360,16 +360,30 @@ class HealthManager:
             self._states[model_id]["last_failover_reason"] = reason
 
     def get_status(self, model_id):
-        """获取模型状态摘要"""
+        """获取模型状态摘要。
+
+        冷却过期后若仍停留在限流(rate_limited)态，自动自愈为可用(available)，
+        保证 status 字段、status_label 与 is_available() 返回值一致，
+        避免 UI 持续显示"限流"而实际已可用。
+        """
         with self._state_lock:
             self._ensure(model_id)
-            s = dict(self._states[model_id])
-            # 检查冷却是否已过
-            if s["cooldown_until"] > 0 and time.time() > s["cooldown_until"]:
+            stored = self._states[model_id]
+            now = time.time()
+            # 自愈：限流冷却已过期 -> 自动恢复为可用
+            if (stored["status"] == HEALTH_RATE_LIMITED
+                    and stored["cooldown_until"] > 0
+                    and now > stored["cooldown_until"]):
+                stored["status"] = HEALTH_AVAILABLE
+                stored["rate_limit_count"] = 0
+                stored["cooldown_until"] = 0
+                stored["last_error"] = None
+            s = dict(stored)
+            # 计算剩余冷却时间
+            if s["cooldown_until"] > 0 and now > s["cooldown_until"]:
                 s["cooldown_remaining"] = 0
-                # 冷却过后允许健康检查恢复，但不自动改状态
             else:
-                s["cooldown_remaining"] = max(0, int(s["cooldown_until"] - time.time()))
+                s["cooldown_remaining"] = max(0, int(s["cooldown_until"] - now))
             s["status_label"] = HEALTH_LABELS.get(s["status"], s["status"])
             return s
 

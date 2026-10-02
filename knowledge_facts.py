@@ -27,6 +27,38 @@ PACK_STATUSES = ["draft", "approved", "archived"]
 HIGH_RISK_TYPES = ["certification", "testimonial", "factory_capability"]
 ALLOWED_SOURCE_TYPES = ["document", "url", "internal_record", "ai_summary", "user_input"]
 
+# ============ 权威公司简介事实（对外/对内统一口径） ============
+# 来源：data/company_kb_v7/01_公司与品牌/05a_对外材料最新版数据_9.26.md（9.26 Company Profile/Catalog）
+# 硬约束：
+#   - "合作工厂网络" ≠ "自有工厂"，禁止表述为自有/自营工厂
+#   - 认证清单不含 ISO9001（无此认证）
+#   - 任何对外文案数字以本结构为准，旧版（4工厂/130国）作废
+COMPANY_BRIEF_FACTS = {
+    "partner_factory_count": 36,          # 36 家归档合作工厂网络
+    "family_core_factory_count": 4,       # 其中 4 家为家族深度绑定核心工厂
+    "export_country_count": 160,          # 出口 160+ 国家/地区
+    "listed_sku_count": 127,             # 127+ listed SKUs
+    # 权威认证/第三方检测（不含 ISO9001）
+    "certifications": ["CE", "FDA", "LFGB", "RoHS", "FSC", "BSCI", "TÜV SÜD", "SGS"],
+    "prohibited_claims": ["自有工厂", "自营工厂", "ISO9001", "ISO 9001"],
+    "source_doc": "data/company_kb_v7/01_公司与品牌/05a_对外材料最新版数据_9.26.md",
+}
+
+
+def get_company_brief_facts():
+    """返回权威公司简介事实（只读副本）。
+
+    knowledge_base.get_company_brief() 等模块统一从这里读取数字与认证，
+    避免在多处硬编码旧口径（4工厂/130国/ISO9001）。
+    """
+    return {
+        "partner_factory_count": COMPANY_BRIEF_FACTS["partner_factory_count"],
+        "family_core_factory_count": COMPANY_BRIEF_FACTS["family_core_factory_count"],
+        "export_country_count": COMPANY_BRIEF_FACTS["export_country_count"],
+        "listed_sku_count": COMPANY_BRIEF_FACTS["listed_sku_count"],
+        "certifications": list(COMPANY_BRIEF_FACTS["certifications"]),
+    }
+
 
 def _conn():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)

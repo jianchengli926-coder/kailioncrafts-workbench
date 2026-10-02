@@ -988,18 +988,31 @@ const server = http.createServer(async (req, res) => {
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
+      const reqStart = Date.now();
       try {
         const params = JSON.parse(body || '{}');
+        // P2.2C: 确保本地模型默认使用 num_ctx=8192
+        const isLocalManual = params.manualModel && ModelRouter.isLocalModel(params.manualModel);
+        const numCtx = params.numCtx || (isLocalManual ? 8192 : undefined);
+
         const result = await ModelRouter.generate({
           taskType: params.taskType || 'text',
           prompt: params.prompt || '',
           manualModel: params.manualModel || null,
-          numCtx: params.numCtx,
+          numCtx: numCtx,
           images: params.images
         });
+
+        // P2.2C: 记录调用日志（不记录完整prompt和API Key）
+        console.log(`[AI生成] model=${result.model || 'unknown'} success=${result.success} ` +
+          `failover=${result.failover || false} attempts=${result.attempt || 1} ` +
+          `elapsed=${result.elapsedMs || 0}ms manual=${result.manual || false} ` +
+          `traceId=${result.traceId || 'unknown'} duration=${Date.now()-reqStart}ms`);
+
         res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
         res.end(JSON.stringify(result));
       } catch(e) {
+        console.error(`[AI生成] 异常: ${e.message}`);
         res.writeHead(500, {'Content-Type':'application/json'});
         res.end(JSON.stringify({success:false, error:'生成失败', message:e.message}));
       }

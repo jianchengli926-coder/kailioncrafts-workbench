@@ -262,13 +262,14 @@ async function callLocalModel(options) {
 
   // 真实 Ollama 调用（生产环境）
   const http = require('http');
+  // P2.2C: keep_alive 是请求级参数，不是 options 中的参数
   const postData = JSON.stringify({
     model,
     prompt,
     stream: false,
+    keep_alive: DEFAULT_CONFIG.keepAlive,
     options: {
-      num_ctx: numCtx || DEFAULT_CONFIG.numCtx,
-      keep_alive: DEFAULT_CONFIG.keepAlive
+      num_ctx: numCtx || DEFAULT_CONFIG.numCtx
     }
   });
 
@@ -289,10 +290,31 @@ async function callLocalModel(options) {
       res.on('end', () => {
         try {
           const parsed = JSON.parse(data);
+          // P2.2C: 优先使用正式 response 字段，不得把 thinking 当作正文
+          const responseText = parsed.response || parsed.message?.content || '';
+          const thinkingText = parsed.thinking || parsed.reasoning_content || parsed.analysis || '';
+
+          // 如果正式 response 为空但 thinking 有内容，返回明确错误
+          if (!responseText.trim() && thinkingText.trim()) {
+            resolve({
+              success: false,
+              model,
+              error: {
+                type: 'empty_response_with_thinking',
+                message: '模型只返回了内部推理(thinking)，没有正式响应正文，不得用作客户开发信内容',
+                thinkingLength: thinkingText.length
+              },
+              raw: parsed,
+              statusCode: res.statusCode
+            });
+            return;
+          }
+
           resolve({
             success: true,
             model,
-            response: parsed.response || '',
+            response: responseText,
+            thinking: thinkingText, // 仅作为内部诊断元数据，不进入正文
             raw: parsed,
             statusCode: res.statusCode
           });

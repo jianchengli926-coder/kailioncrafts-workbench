@@ -2097,6 +2097,12 @@ async function generateCampaignTaskDraft(taskId){
       sourceTrace: result.sourceTrace || [],
       knowledgeContext: result.knowledgeContext,
       providerPolicy: campaign.providerPolicy || 'online_safe',
+      // P2.2C: 模型路由元数据
+      model: result.model || null,
+      failover: result.failover || false,
+      attempts: result.attempts || 1,
+      traceId: result.traceId || null,
+      generatedAt: now,
       campaignId: campaign.campaignId,
       taskId: task.taskId,
       campaignTaskId: task.taskId,
@@ -7156,6 +7162,54 @@ async function callAI(messages, opts={}){
   // 运行时事实过滤：所有对外AI调用必须经过此层，防止旧工具绕过事实访问层
   // V77.3.1: 必须传递opts.context，否则externalCompanyResearch等上下文感知模式永远不生效
   messages = sanitizeFactsForAI(messages, opts.context || 'kaiLionOutbound');
+
+  // P2.2C: 服务端模型路由（通过 /api/ai/generate 调用后端 model-router）
+  if(opts.useServerRouter === true){
+    const promptText = typeof messages === 'string' ? messages :
+      (Array.isArray(messages) ? messages.map(m=>m.content).join('\n') : String(messages));
+    try{
+      const t0 = performance.now();
+      const resp = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          taskType: opts.taskType || 'text',
+          prompt: promptText,
+          manualModel: opts.manualModel || opts.model || null,
+          numCtx: opts.numCtx || 8192
+        })
+      });
+      const result = await resp.json();
+      const latency = Math.round(performance.now()-t0);
+      if(result.success && result.response){
+        // P2.2C: 只使用正式 response，不使用 thinking
+        recordProviderStatus(result.model && result.model.includes('qwen') ? 'ollama' : 'glm', result.model, true, null, latency, result.attempt>0?result.attempt-1:0);
+        logApiCall(result.model || 'server_router', opts.purpose||'general', 0, 0, 0, 'success');
+        return {
+          content: result.response,
+          usage: {},
+          latency: latency,
+          error: null,
+          mock: false,
+          model: result.model,
+          cost: 0,
+          fallbackCount: result.attempt > 1 ? result.attempt - 1 : 0,
+          failover: result.failover || false,
+          attempts: result.attempt || 1,
+          traceId: result.traceId,
+          serverRouter: true,
+          slowResponse: result.slowResponse || null
+        };
+      }
+      // 失败
+      const errMsg = result.error ? (result.error.message || result.error.type || JSON.stringify(result.error)) : '服务端生成失败';
+      logApiCall(result.model || 'server_router', opts.purpose||'general', 0, 0, 0, 'error');
+      return {content:null, usage:{}, error:errMsg, model:result.model||null, latency, failover:result.failover||false, attempts:result.attempt||1, traceId:result.traceId, serverRouter:true};
+    }catch(e){
+      return {content:null, usage:{}, error:'服务端路由调用失败: '+e.message, model:null, latency:0, serverRouter:true};
+    }
+  }
+
   let chain = getFallbackChain(opts);
   // V77.2.1: providerPolicy=local_only 模式只允许Ollama，失败后不回退在线模型
   if(opts.providerPolicy === 'local_only'){
@@ -22364,10 +22418,17 @@ async function generateOutreachEmailDraft(customer, options={}){
   const policy = options.providerPolicy || 'online_safe';
   const kbCtx = await retrieveKnowledgeForOutreach(customer, policy);
   const prompt = buildOutreachEmailPrompt(customer, options, kbCtx);
-  const result = await callAI([{role:'user', content:prompt}], { purpose:'outreach_email', temperature:0.35, providerPolicy:policy, context:'kaiLionOutbound' });
-  if(result.error) return { error:result.error, knowledgeContext:kbCtx, prompt:prompt };
-  if(!result.content) return { error:'未配置可用AI模型；未生成开发信草稿', knowledgeContext:kbCtx, prompt:prompt, mock:!!result.mock };
-  return { ...parseOutreachEmailResult(result.content), raw:result.content, knowledgeContext:kbCtx, model:result.model, latency:result.latency, mock:!!result.mock, prompt:prompt };
+  // P2.2C: 使用服务端模型路由（model-router.js），复用故障转移、慢响应、本地锁
+  const result = await callAI([{role:'user', content:prompt}], {
+    purpose:'outreach_email', temperature:0.35, providerPolicy:policy, context:'kaiLionOutbound',
+    useServerRouter: true,
+    taskType: 'text',
+    manualModel: options.manualModel || null,
+    numCtx: options.numCtx || 8192
+  });
+  if(result.error) return { error:result.error, knowledgeContext:kbCtx, prompt:prompt, model:result.model, failover:result.failover, attempts:result.attempts, traceId:result.traceId };
+  if(!result.content) return { error:'未配置可用AI模型；未生成开发信草稿', knowledgeContext:kbCtx, prompt:prompt, mock:!!result.mock, model:result.model, failover:result.failover, attempts:result.attempts, traceId:result.traceId };
+  return { ...parseOutreachEmailResult(result.content), raw:result.content, knowledgeContext:kbCtx, model:result.model, latency:result.latency, mock:!!result.mock, prompt:prompt, failover:result.failover, attempts:result.attempts, traceId:result.traceId, serverRouter:true };
 }
 
 function renderOutreachKbContext(kbCtx, containerId){

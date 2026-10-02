@@ -51,6 +51,8 @@ const DEFAULT_CONFIG = {
   numCtxMax: 32768,
   keepAlive: 0,
   timeoutMs: 120000,
+  temperature: 0.5,  // P2.2D-4: 稳定温度，平衡创造性和一致性
+  maxOutputTokens: 400,  // P2.2D-4: 限制输出为120-180词邮件所需范围
   slowResponseSingleThreshold: 30000,  // 单次>30秒
   slowResponseConsecutiveThreshold: 15000, // 连续两次>15秒
   slowResponseExpiryMs: 300000, // 慢响应状态5分钟过期
@@ -262,15 +264,19 @@ async function callLocalModel(options) {
 
   // 真实 Ollama 调用（生产环境）
   const http = require('http');
-  // P2.2C: keep_alive 是请求级参数，不是 options 中的参数
+  // P2.2D-4: 性能优化 - 关闭 thinking、限制输出、稳定温度
   const postData = JSON.stringify({
     model,
     prompt,
     stream: false,
     keep_alive: DEFAULT_CONFIG.keepAlive,
     options: {
-      num_ctx: numCtx || DEFAULT_CONFIG.numCtx
-    }
+      num_ctx: numCtx || DEFAULT_CONFIG.numCtx,
+      temperature: DEFAULT_CONFIG.temperature,
+      num_predict: DEFAULT_CONFIG.maxOutputTokens
+    },
+    // Ollama 0.35.0: 显式关闭 thinking 模式
+    thinking: false
   });
 
   return new Promise((resolve, reject) => {

@@ -1985,12 +1985,17 @@ async function generateCampaignTaskDraft(taskId){
   }
 
   // 第二步：调用生成函数（不持有快照）
+  // P2.2D-4: 支持手动模型选择（本地 qwen3.5/qwen2.5）
   let result;
   try {
+    const draftMode = window._draftModelMode || 'auto';
+    const manualModel = draftMode === 'qwen35' ? 'qwen3.5:9b' :
+                        draftMode === 'qwen25' ? 'qwen2.5:7b' : null;
     result = await generateOutreachEmailDraft(customer0, {
       providerPolicy: campaign0.providerPolicy || 'online_safe',
       lang: customer0.country === '德国' ? 'de' : customer0.country === '日本' ? 'ja' : 'en',
-      tone: 'professional'
+      tone: 'professional',
+      manualModel: manualModel
     });
   } catch(e){
     return {success:false, errors:['生成异常: ' + e.message]};
@@ -2196,12 +2201,17 @@ async function regenerateCampaignTaskDraft(taskId){
   }
 
   // 第二步：调用生成函数（不持有快照）
+  // P2.2D-4: 支持手动模型选择
   let result;
   try {
+    const draftMode = window._draftModelMode || 'auto';
+    const manualModel = draftMode === 'qwen35' ? 'qwen3.5:9b' :
+                        draftMode === 'qwen25' ? 'qwen2.5:7b' : null;
     result = await generateOutreachEmailDraft(customer0, {
       providerPolicy: draft0.providerPolicy || campaign0.providerPolicy || 'online_safe',
       lang: draft0.language === '中文' ? 'zh' : draft0.language === '德语' ? 'de' : draft0.language === '日语' ? 'ja' : 'en',
-      tone: 'professional'
+      tone: 'professional',
+      manualModel: manualModel
     });
   } catch(e){
     return {success:false, errors:['重新生成异常: ' + e.message]};
@@ -3176,6 +3186,16 @@ function renderCampaignTaskWorkflowActions(task, campaign){
   const disabledAttr = ui.busy ? 'disabled' : '';
   const busyStyle = ui.busy ? 'opacity:0.5;cursor:not-allowed;' : '';
 
+  // P2.2D-4: 草稿生成模型选择器（仅显示自动/本地qwen3.5/本地qwen2.5，不显示deepseek/qwen2.5vl/doubao）
+  if(ui.canGenerate || ui.canRegenerate){
+    const currentMode = window._draftModelMode || 'auto';
+    html += `<select onchange="setDraftModelMode(this.value)" style="padding:2px 4px;border-radius:4px;font-size:10px;margin-right:4px;margin-bottom:2px;border:1px solid #cbd5e1" title="选择草稿生成模型">
+      <option value="auto" ${currentMode==='auto'?'selected':''}>自动路由</option>
+      <option value="qwen35" ${currentMode==='qwen35'?'selected':''}>本地 qwen3.5:9b</option>
+      <option value="qwen25" ${currentMode==='qwen25'?'selected':''}>本地 qwen2.5:7b</option>
+    </select>`;
+  }
+
   // 生成草稿
   if(ui.canGenerate){
     html += `<button onclick="confirmGenerateCampaignTaskDraft(${jsArg(task.taskId)})" ${disabledAttr} style="${busyStyle}background:#e6fffa;color:#234e52;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;margin-bottom:2px">生成草稿</button>`;
@@ -3215,6 +3235,13 @@ function openCampaignTaskDraft(taskId){
   }
   if(!linkCheck.draft){ toast('草稿不存在', 'err'); return; }
   openDraftEditor(linkCheck.draft.id);
+}
+
+/* P2.2D-4: 设置草稿生成模型模式 */
+function setDraftModelMode(mode){
+  window._draftModelMode = mode;
+  const modeNames = {auto:'自动路由', qwen35:'本地 qwen3.5:9b', qwen25:'本地 qwen2.5:7b'};
+  toast('草稿生成模式: ' + (modeNames[mode] || mode), 'info');
 }
 
 /* 确认生成草稿 */
@@ -22471,8 +22498,8 @@ async function retrieveKnowledgeForOutreach(customer, providerPolicy){
     // Defense in depth: enforce sensitivity again on the client, then separate facts/templates by eligibility.
     const allowedSensitivity = policy === 'local_only' ? ['public', 'internal'] : ['public'];
     const isAllowed = item => item && allowedSensitivity.includes(item.sensitivity || 'internal');
-    ctx.matchedFacts = (data.facts || []).filter(f => isAllowed(f) && f.factEligible === true).slice(0, 6);
-    ctx.matchedTemplates = (data.templates || []).filter(t => isAllowed(t) && t.templateEligible === true).slice(0, 3);
+    ctx.matchedFacts = (data.facts || []).filter(f => isAllowed(f) && f.factEligible === true).slice(0, 5);
+    ctx.matchedTemplates = (data.templates || []).filter(t => isAllowed(t) && t.templateEligible === true).slice(0, 2);
     ctx.citations = (data.citations || []).filter(c => isAllowed(c) && (c.factEligible === true || c.templateEligible === true));
     ctx.excludedCount = data.excludedCount || 0;
     ctx.excludedByEligibilityCount = data.excludedByEligibilityCount || 0;
@@ -22487,48 +22514,41 @@ async function retrieveKnowledgeForOutreach(customer, providerPolicy){
 
 function buildOutreachKbContextPrompt(kbCtx){
   if(!kbCtx || kbCtx.status !== 'completed' || !kbCtx.matchedFacts || kbCtx.matchedFacts.length === 0){
-    return '\n\n【KaiLionCrafts Knowledge Base Context】\n未找到可作为公司事实的已确认知识库依据。不得使用公司能力、产品、MOQ、交期、认证、产能、价格、工厂、供应链或案例等具体声明；如客户需要相关信息，请写为“可根据具体需求进一步确认”。';
+    return '\n\n【KaiLionCrafts Knowledge Base Context】\n未找到可作为公司事实的已确认知识库依据。不得使用公司能力、产品、MOQ、交期、认证、产能、价格、工厂、供应链或案例等具体声明；如客户需要相关信息，请写为"可根据具体需求进一步确认"。';
   }
-  let prompt = '\n\n【KaiLionCrafts Knowledge Base Context】\n此区块是开发信唯一的KaiLionCrafts公司事实来源。当前模式：' + (kbCtx.executionMode || 'online_safe') + '；provider=' + (kbCtx.provider || 'online_glm') + '。\n';
-  prompt += '【可作为公司事实（factEligible）】\n';
-  kbCtx.matchedFacts.forEach((f, i) => {
-    prompt += (i + 1) + '. ' + f.title + (f.headingPath ? ' (' + f.headingPath + ')' : '') + ': ' + (f.shortEvidence || '').substring(0, 160) + '\n';
-    prompt += '   [来源: ' + f.relativePath + '; sensitivity: ' + f.sensitivity + '; authority: ' + f.authorityLevel + ']\n';
+  // P2.2D-4: 精简上下文 - 最多5条事实，每条仅80字符摘要，不传完整来源详情
+  const maxFacts = 5;
+  const maxEvidenceLen = 80;
+  let prompt = '\n\n【KaiLionCrafts Knowledge Base Context (compact)】\n仅使用以下已确认事实，不得编造。\n';
+  prompt += '【可作为公司事实】\n';
+  kbCtx.matchedFacts.slice(0, maxFacts).forEach((f, i) => {
+    prompt += (i + 1) + '. ' + f.title + ': ' + (f.shortEvidence || '').substring(0, maxEvidenceLen) + '\n';
   });
-  if(kbCtx.matchedTemplates && kbCtx.matchedTemplates.length){
-    prompt += '\n【仅结构参考（templateEligible，不得作为公司事实）】\n';
-    kbCtx.matchedTemplates.forEach((t, i) => {
-      prompt += (i + 1) + '. ' + t.title + ': ' + (t.shortEvidence || '').substring(0, 100) + ' [仅用于措辞/结构，不得转述为公司能力或数据]\n';
-    });
-  }
   prompt += '\n【开发信事实规则】\n';
-  prompt += '- 只能将 factEligible 条目中的明确内容写成 KaiLionCrafts 事实；templateEligible 绝不能作为事实。\n';
-  prompt += '- 不得声称拥有自有工厂、生产线或合作工厂认证；没有事实依据时不写 MOQ、交期、产能、价格、成本优势、出口国家数、工厂数或客户案例。\n';
-  prompt += '- 如需表述供应链关系，优先使用 “Strategic manufacturing partners” 或 “Local manufacturing network”，且仅在上方事实支持时使用。\n';
-  prompt += '- 四大核心产品仅限 Kitchen Knives、Professional Scissors、Outdoor Knives、Kitchen Accessories；所有输出为待人工审核的草稿。';
+  prompt += '- 只能将上述事实写成 KaiLionCrafts 事实；不得编造 MOQ、交期、产能、认证、价格或客户案例。\n';
+  prompt += '- 不得声称拥有自有工厂；如需表述供应链关系，使用 "Strategic manufacturing partners" 或 "Local manufacturing network"。\n';
+  prompt += '- 输出为待人工审核的草稿，不得做任何承诺。';
   return prompt;
 }
 
 function buildOutreachEmailPrompt(customer, options, kbCtx){
   const lang = options?.lang || 'en';
-  const toneMap = {professional:'professional and procurement-oriented', friendly:'warm but professional', direct:'concise and direct'};
+  // P2.2D-4: 精简客户信息 - 只传必要字段
   const customerFacts = [
     'Company: ' + (customer.company || 'Unknown'),
-    'Country/region: ' + (customer.country || 'Unknown'),
-    'Customer type: ' + (customer.customerType || 'Unknown'),
-    'Main products: ' + (customer.mainProducts || customer.products || 'Unknown'),
-    'Contact: ' + ((customer.contact && customer.contact.name) || 'there') + ((customer.contact && customer.contact.title) ? ' (' + customer.contact.title + ')' : '')
+    'Country: ' + (customer.country || 'Unknown'),
+    'Buyer type: ' + (customer.customerType || 'Unknown'),
+    'Main products: ' + (customer.mainProducts || customer.products || 'Unknown')
   ].join('\n');
-  return 'You are preparing a first-contact B2B outbound email draft for KaiLionCrafts.\n\n【Customer information — use only as provided, do not invent customer facts】\n' + customerFacts +
+  return 'Write a first-contact B2B outbound email for KaiLionCrafts.\n\n【Customer info】\n' + customerFacts +
     buildOutreachKbContextPrompt(kbCtx) +
-    (options?.extra ? '\n\n【Additional request】' + options.extra : '') +
-    '\n\n【Writing requirements】\n' +
-    '1. Write in ' + (lang === 'zh' ? 'Chinese' : 'English') + '; tone: ' + (toneMap[options?.tone] || toneMap.professional) + '.\n' +
-    '2. Return exactly: Subject: <subject>, then a blank line, then the email body.\n' +
-    '3. Keep it concise (English: max 150 words), personalized to the provided customer information, with one low-friction CTA.\n' +
-    '4. Do not invent company or customer facts. Do not state a template as a company fact. If customer website, contact or product details are missing, write conservatively and do not claim to have reviewed their site.\n' +
-    '5. This is a draft for human review; never make guarantees, pricing commitments, certification claims, MOQ, lead-time or sample promises without a factEligible source.\n' +
-    '6. Include the KaiLionCrafts official website https://kailioncrafts.com/ in the signature or CTA area. If no real contact name or email is available, the draft must be marked as needing contact info; do not fabricate a contact person.';
+    '\n\n【Requirements】\n' +
+    '1. Language: ' + (lang === 'zh' ? 'Chinese' : 'English') + '. Tone: professional.\n' +
+    '2. Format: "Subject: <subject>" then blank line then email body.\n' +
+    '3. Length: 120-180 English words. One clear CTA.\n' +
+    '4. Do not invent facts. Use only the knowledge base context above.\n' +
+    '5. This is a draft for human review. No guarantees, pricing, MOQ, lead-time or certification claims without fact support.\n' +
+    '6. Include https://kailioncrafts.com/ in signature. If contact name is missing, write conservatively.';
 }
 
 function parseOutreachEmailResult(content){

@@ -275,8 +275,8 @@ async function callLocalModel(options) {
       temperature: DEFAULT_CONFIG.temperature,
       num_predict: DEFAULT_CONFIG.maxOutputTokens
     },
-    // Ollama 0.35.0: 显式关闭 thinking 模式
-    thinking: false
+    // Ollama 0.35.0: 显式关闭 thinking 模式（正确参数名为 think，不是 thinking）
+    think: false
   });
 
   return new Promise((resolve, reject) => {

@@ -102,7 +102,7 @@ console.log('\n--- 二、qwen3.5 本地性能配置验证 ---');
 
 test('9. 标准模式关闭 thinking', () => {
   const modelRouterCode = fs.readFileSync(path.join(__dirname, 'model-router.js'), 'utf8');
-  assert.ok(modelRouterCode.includes('thinking: false'), '未关闭 thinking');
+  assert.ok(modelRouterCode.includes('think: false'), '未关闭 thinking（Ollama 0.35.0 参数名为 think）');
 });
 
 test('10. thinking 不进入正文', () => {

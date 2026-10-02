@@ -2119,6 +2119,7 @@ async function generateCampaignTaskDraft(taskId){
       legacyMetadata: false
     };
     draft.draftId = draft.id;
+    if(!S.drafts) S.drafts = [];
     S.drafts.unshift(draft);
 
     // 关联任务
@@ -2126,6 +2127,7 @@ async function generateCampaignTaskDraft(taskId){
     task.previousStage = task.stage;
     task.stage = 'draft_pending_review';
     task.lastUpdatedAt = now;
+    if(!task.auditHistory) task.auditHistory = [];
     task.auditHistory.push({
       at: now, from: task.previousStage, to: 'draft_pending_review',
       actor: 'system', action: 'campaign_draft_generated',
@@ -2327,6 +2329,7 @@ async function regenerateCampaignTaskDraft(taskId){
     task.previousStage = task.stage;
     task.stage = 'draft_pending_review';
     task.lastUpdatedAt = now;
+    if(!task.auditHistory) task.auditHistory = [];
     task.auditHistory.push({
       at: now, from: task.previousStage, to: 'draft_pending_review',
       actor: 'system', action: 'campaign_draft_regenerated',

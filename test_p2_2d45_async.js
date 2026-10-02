@@ -186,9 +186,9 @@ test('Fact 内容按长度截断（不传完整 sourceExcerpt）', () => {
   assert.ok(hasTruncation || true, '应该有内容截断逻辑');
 });
 
-test('model-router.js 传递 thinking: false', () => {
+test('model-router.js 传递 think: false', () => {
   const routerCode = fs.readFileSync(path.join(__dirname, 'model-router.js'), 'utf8');
-  assert.ok(routerCode.includes('thinking: false') || routerCode.includes('thinking:false'), '必须传递 thinking: false');
+  assert.ok(routerCode.includes('think: false') || routerCode.includes('think:false'), '必须传递 think: false（Ollama 0.35.0 正确参数名）');
 });
 
 test('model-router.js 传递 num_ctx=8192', () => {

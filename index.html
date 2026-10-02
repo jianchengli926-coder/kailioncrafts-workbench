@@ -6893,6 +6893,10 @@ async function loadModelRouterStatus(){
           <div>${renderChain('视觉', chains.vision || [])}</div>
           <div>${renderChain('生图', chains.image || [])}</div>
         </div>
+        <div style="margin-top:6px;font-size:11px;color:#718096;">
+          Embedding（固定，不参与故障转移）: <code style="background:#e2e8f0;padding:1px 6px;border-radius:3px;">nomic-embed-text:latest</code>
+          | qwen3.5:9b 是第一本地文本模型
+        </div>
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px">
           <div>
             <span style="color:#718096;font-size:11px">本地锁：</span>
@@ -6907,9 +6911,9 @@ async function loadModelRouterStatus(){
             <span style="font-weight:600;color:${slowModels.length>0?'#d69e2e':'#38a169'}">${slowModels.length>0?slowModels.map(m=>m.model).join(', '):'无'}</span>
           </div>
         </div>
-        <div style="margin-top:8px;font-size:11px;color:#a0aec0">
-          Trace统计：成功 ${traceStats.success||0} / 失败 ${traceStats.error||0} / 故障转移 ${traceStats.failover||0} |
-          num_ctx=${health.config?.numCtx||8192} | keep_alive=${health.config?.keepAlive||0}
+        <div style="margin-top:8px;font-size:11px;color:#a0aec0;line-height:1.8;">
+          Trace统计：成功 ${traceStats.success||0} / 失败 ${traceStats.error||0} / 故障转移 ${traceStats.failover||0}<br>
+          本地模型配置：num_ctx 默认=${health.config?.numCtx||8192} / 长文=16384 / 最大=32768 | keep_alive=${health.config?.keepAlive||0}（请求后立即释放）
         </div>
       </div>
     `;
@@ -14197,7 +14201,7 @@ function openDraftEditor(did, isNew){
       <div class="form-group"><label>正文（AI 生成草稿，发送前请人工审核修改）</label>
         <textarea class="form-control" id="dr_body" style="min-height:260px;font-family:Menlo,monospace;font-size:12.5px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${esc(d.body || d.content || '')}</textarea></div>
       <div class="form-group"><label>审核备注</label><textarea class="form-control" id="dr_review_notes" rows="2" placeholder="例如：已核对产品描述；删除未确认认证声明">${esc(d.reviewNotes || '')}</textarea></div>
-      <div style="font-size:11px;margin:-4px 0 12px;color:${d.reviewStatus==='reviewed' ? '#166534' : '#92400e'}">审核状态：${d.reviewStatus==='reviewed' ? '✅ 已人工审核' : '⚠️ 待人工审核'}${d.manuallyEdited ? ' · ✏️ 含人工修正' : ''}</div>
+      <div style="font-size:11px;margin:-4px 0 12px;color:${d.reviewStatus==='reviewed' ? '#166534' : (d.reviewStatus==='rejected' ? '#991b1b' : '#92400e')}">审核状态：${d.reviewStatus==='reviewed' ? '✅ 已人工审核' : (d.reviewStatus==='rejected' ? '❌ 已拒绝（' + esc(d.rejectReason || '无原因') + '）' : '⚠️ 待人工审核')}${d.manuallyEdited ? ' · ✏️ 含人工修正' : ''}</div>
       <!-- P2.2B-1.5 草稿知识溯源面板 -->
       <div style="margin-bottom:16px">
         ${renderDraftTraceabilityPanel(d)}
@@ -14215,6 +14219,7 @@ function openDraftEditor(did, isNew){
       <div class="btn-row">
         <button class="btn btn-primary" onclick="saveDraft('${d.id}')">💾 保存草稿</button>
         <button class="btn btn-gold" onclick="markDraftReviewed('${d.id}')">🧑‍⚖️ 标记已审核</button>
+        <button class="btn btn-danger" onclick="rejectDraft('${d.id}')" style="background:#dc2626;color:#fff;border-color:#dc2626;">❌ 拒绝草稿</button>
         <button class="btn btn-outline" onclick="spamCheck()">🛡 检测进箱率</button>
         <button class="btn btn-success" onclick="markSent('${d.id}')">✅ 标记已人工发送</button>
         <button class="btn btn-outline" onclick="regenDraft('${d.id}')">🔄 AI 重新生成</button>
@@ -14399,6 +14404,55 @@ function markSent(did){
   toast('已人工标记发送（无真实投递证据）');
   closeDrawer(); renderView();
 }
+
+/* P2.2D-1: 拒绝草稿（保存审核原因，不自动发送） */
+function rejectDraft(did){
+  const d = S.drafts.find(x=>x.id===did); if(!d) return;
+  const reason = prompt('请输入拒绝原因（必填）：');
+  if(!reason || !reason.trim()){ toast('拒绝原因不能为空','err'); return; }
+
+  const linkCheck = getExclusiveCampaignTaskByDraftId(did);
+  if(!linkCheck.success){
+    toast('Draft 关联冲突，拒绝失败: ' + (linkCheck.errors||[]).join('; '), 'err');
+    return;
+  }
+  const linkedTask = linkCheck.task;
+
+  const snapshot = createOutreachWorkflowSnapshot();
+  const changedKeys = ['drafts'];
+
+  d.reviewStatus = 'rejected';
+  d.rejectedAt = now();
+  d.rejectedBy = 'user';
+  d.rejectReason = reason.trim();
+  d.status = '已拒绝';
+
+  if(linkedTask && !CAMPAIGN_TERMINAL_STAGES.includes(linkedTask.stage)){
+    changedKeys.push('campaignCustomerTasks');
+    const now = new Date().toISOString();
+    linkedTask.previousStage = linkedTask.stage;
+    linkedTask.stage = 'draft_rejected';
+    linkedTask.lastUpdatedAt = now;
+    linkedTask.auditHistory.push({
+      at: now, from: linkedTask.previousStage, to: 'draft_rejected',
+      actor: 'user', action: 'campaign_draft_rejected',
+      source: 'manual_review', draftId: did,
+      note: '草稿被拒绝: ' + reason.trim()
+    });
+  }
+
+  syncCustomerToOutreachKB(d.customerId);
+  changedKeys.push('outreachKnowledgeBase');
+
+  const persistResult = safePersistOutreachWorkflowData(snapshot, changedKeys);
+  if(!persistResult.success){
+    toast('拒绝保存失败: ' + persistResult.error, 'err');
+    return;
+  }
+  toast('❌ 草稿已拒绝，原因已保存');
+  openDraftEditor(did);
+}
+
 async function regenDraft(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
   const c = S.customers.find(x=>x.id===d.customerId);
@@ -23529,8 +23583,91 @@ function renderDraftTraceabilityPanel(draft){
     html += '<div style="font-size:11px;color:#991b1b;">' + draft.riskFlags.map(c => '• ' + esc(String(c))).join('<br>') + '</div>';
   }
 
+  // P2.2D-1: AI 生成记录面板
+  if(draft.model || draft.traceId){
+    html += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0;">';
+    html += '<div style="font-size:12px;font-weight:600;color:#1e40af;margin-bottom:8px;">🤖 AI 生成记录</div>';
+    html += '<div style="font-size:11px;color:#475569;line-height:1.9;">';
+    html += '<div>使用模型: <code style="background:#e0e7ff;padding:1px 6px;border-radius:3px;">' + esc(draft.model || 'unknown') + '</code></div>';
+    html += '<div>调用模式: ' + (draft.manual ? '<span style="color:#7c3aed;font-weight:600">手动模型</span>' : '<span style="color:#059669;font-weight:600">自动路由</span>') + '</div>';
+    if(draft.taskType) html += '<div>任务类型: ' + esc(draft.taskType) + '</div>';
+    html += '<div>故障转移: ' + (draft.failover ? '<span style="color:#d97706;font-weight:600">是（' + (draft.attempts || 2) + ' 次尝试）</span>' : '<span style="color:#64748b">否</span>') + '</div>';
+    if(draft.attempts) html += '<div>尝试次数: ' + esc(draft.attempts) + '</div>';
+    if(draft.elapsedMs) html += '<div>响应耗时: ' + esc(draft.elapsedMs) + ' ms</div>';
+    if(draft.generatedAt) html += '<div>生成时间: ' + esc(draft.generatedAt) + '</div>';
+    if(draft.traceId){
+      html += '<div>Trace ID: <a href="javascript:void(0)" onclick="showTraceDetail(\'' + esc(draft.traceId) + '\')" style="color:#2563eb;text-decoration:underline;word-break:break-all;">' + esc(draft.traceId) + '</a></div>';
+    }
+    html += '</div>';
+    html += '<div style="margin-top:8px;padding:6px 10px;background:#fef3c7;border-radius:4px;font-size:11px;color:#92400e;font-weight:600;">⚠️ 草稿仅供人工审核，尚未发送</div>';
+    html += '</div>';
+  } else if(draft.legacyMetadata){
+    html += '<div style="margin-top:14px;padding:8px 12px;background:#f1f5f9;border-radius:4px;font-size:11px;color:#64748b;">📋 历史草稿：缺少完整 AI / Fact 元数据</div>';
+  }
+
   html += '</div>';
   return html;
+}
+
+/* P2.2D-1: Trace 详情查看（脱敏） */
+async function showTraceDetail(traceId){
+  if(!traceId) return;
+  try{
+    const resp = await fetch('/api/ai/traces/' + encodeURIComponent(traceId));
+    const data = await resp.json();
+    const t = data.trace || data;
+    if(!t || !t.traceId){
+      openDrawer(`
+        <div class="drawer-head"><h2 style="font-size:16px;color:var(--primary)">Trace 详情</h2><span class="modal-close" onclick="closeDrawer()">×</span></div>
+        <div class="drawer-body">
+          <div style="padding:20px;background:#f8fafc;border-radius:8px;text-align:center;color:#64748b;font-size:13px;">
+            ℹ️ 该 Trace 仅保留在当前服务内存中，服务重启后不可读取。
+          </div>
+        </div>`);
+      return;
+    }
+    let attemptsHtml = '';
+    if(t.failoverDetails && t.failoverDetails.length > 0){
+      attemptsHtml = '<div style="font-size:12px;font-weight:600;color:#475569;margin:10px 0 6px;">尝试记录</div>';
+      attemptsHtml += t.failoverDetails.map((fd,i) => `
+        <div style="padding:8px 10px;background:#f8fafc;border-radius:4px;margin-bottom:4px;font-size:11px;">
+          <div><b>#${i+1}</b> 模型: <code>${esc(fd.model || fd.sourceModel || 'unknown')}</code></div>
+          <div>结果: ${fd.success ? '<span style="color:#16a34a">成功</span>' : '<span style="color:#dc2626">失败</span>'}</div>
+          ${fd.elapsedMs ? `<div>耗时: ${esc(fd.elapsedMs)} ms</div>` : ''}
+          ${fd.errorCode ? `<div>错误码: <code>${esc(fd.errorCode)}</code></div>` : ''}
+          ${fd.reason ? `<div>原因: ${esc(fd.reason)}</div>` : ''}
+          <div>模式: ${fd.automatic === false ? '手动' : '自动'}</div>
+        </div>`).join('');
+    }
+    openDrawer(`
+      <div class="drawer-head"><h2 style="font-size:16px;color:var(--primary)">Trace 详情</h2><span class="modal-close" onclick="closeDrawer()">×</span></div>
+      <div class="drawer-body" style="font-size:12px;color:#334155;line-height:2;">
+        <div><b>Trace ID:</b> <code style="word-break:break-all;">${esc(t.traceId)}</code></div>
+        <div><b>任务类型:</b> ${esc(t.taskType || 'unknown')}</div>
+        <div><b>调用模式:</b> ${t.manual ? '<span style="color:#7c3aed">手动</span>' : '<span style="color:#059669">自动</span>'}</div>
+        <div><b>状态:</b> <span style="color:${t.status==='success'?'#16a34a':'#dc2626'}">${esc(t.status || 'unknown')}</span></div>
+        ${t.sourceModel ? `<div><b>源模型:</b> <code>${esc(t.sourceModel)}</code></div>` : ''}
+        ${t.targetModel ? `<div><b>目标模型:</b> <code>${esc(t.targetModel)}</code></div>` : ''}
+        ${t.reason ? `<div><b>故障转移原因:</b> ${esc(t.reason)}</div>` : ''}
+        ${t.elapsedMs ? `<div><b>总耗时:</b> ${esc(t.elapsedMs)} ms</div>` : ''}
+        ${t.attempt ? `<div><b>尝试次数:</b> ${esc(t.attempt)}</div>` : ''}
+        ${t.startedAt ? `<div><b>开始时间:</b> ${esc(t.startedAt)}</div>` : ''}
+        ${t.completedAt ? `<div><b>完成时间:</b> ${esc(t.completedAt)}</div>` : ''}
+        ${t.localLockState ? `<div><b>本地锁状态:</b> ${esc(JSON.stringify(t.localLockState))}</div>` : ''}
+        ${attemptsHtml}
+        <div style="margin-top:14px;padding:8px 12px;background:#fef3c7;border-radius:4px;font-size:11px;color:#92400e;">
+          🔒 Trace 详情已脱敏：不显示 API Key、密码、完整 prompt、thinking 或完整客户联系方式。
+        </div>
+      </div>`);
+  }catch(e){
+    openDrawer(`
+      <div class="drawer-head"><h2 style="font-size:16px;color:var(--primary)">Trace 详情</h2><span class="modal-close" onclick="closeDrawer()">×</span></div>
+      <div class="drawer-body">
+        <div style="padding:20px;background:#fef2f2;border-radius:8px;color:#dc2626;font-size:13px;">
+          ❌ 无法获取 Trace 详情: ${esc(e.message)}
+        </div>
+      </div>`);
+  }
 }
 
 /* 客户开发闭环进度条（只读） */

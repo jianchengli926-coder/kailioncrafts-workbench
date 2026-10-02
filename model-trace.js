@@ -22,7 +22,8 @@ const SENSITIVE_KEYS = [
   'token', 'accessToken', 'access_token',
   'password', 'passwd', 'secret',
   'cookie', 'set-cookie',
-  'x-api-key', 'X-API-Key'
+  'x-api-key', 'X-API-Key',
+  'thinking', 'reasoning_content', 'analysis', 'reasoning'
 ];
 
 /**

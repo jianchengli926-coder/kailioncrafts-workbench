@@ -4041,6 +4041,110 @@ function renderProspectPriorityPanel(customer){
   </div>`;
 }
 
+// P2.4A: 客户开发整合摘要（审核状态、跟进计划、最近结果）
+function renderCustomerDevelopmentSummary(customer){
+  const drafts = (S.drafts || []).filter(d => d.customerId === customer.id);
+  const needsReview = drafts.filter(d => d.reviewStatus === 'needs_review' || d.reviewStatus === 'draft_pending_review' || d.status === 'needs_review');
+  const approvedNotSent = drafts.filter(d => (d.reviewStatus === 'approved' || d.status === 'approved') && !d.manualSendRecord);
+  const rejected = drafts.filter(d => d.reviewStatus === 'rejected' || d.status === 'rejected');
+  const needsEvidence = drafts.filter(d => d.reviewStatus === 'needs_evidence' || d.status === 'needs_evidence');
+  const manuallySent = drafts.filter(d => d.reviewStatus === 'manually_sent' || d.manualSendRecord);
+
+  const followUps = (S.followUps || []).filter(f => f.customerId === customer.id);
+  const nextFollowUp = followUps.filter(f => f.status === 'planned').sort((a,b) => new Date(a.plannedAt) - new Date(b.plannedAt))[0];
+  const overdueFollowUps = followUps.filter(f => f.status === 'planned' && new Date(f.plannedAt) < new Date(Date.now() - 86400000));
+  const completedFollowUps = followUps.filter(f => f.status === 'completed');
+
+  const outcomes = (S.outreachOutcomes || []).filter(o => o.customerId === customer.id);
+  const latestOutcome = outcomes.sort((a,b) => new Date(b.occurredAt) - new Date(a.occurredAt))[0];
+
+  const isBlocked = customer.dnc === true || customer.doNotContact === true ||
+    customer.identityStatus === 'unverified' || customer.duplicateStatus === 'pending' ||
+    (customer.hardBlockers && customer.hardBlockers.some(b => !b.resolved));
+
+  const outcomeLabels = {
+    replied: '已回复', interested: '感兴趣', not_interested: '不感兴趣',
+    requested_quote: '请求报价', requested_sample: '请求样品',
+    no_response: '无响应', bounced: '退信', wrong_contact: '联系人错误',
+    do_not_contact: '要求DNC', meeting_requested: '请求会议', other: '其他'
+  };
+
+  return `
+  <div class="card card-pad mb16">
+    <div class="card-title">📋 客户开发摘要</div>
+
+    <!-- 审核状态 -->
+    <div class="mb12">
+      <div class="text-sm fw700 mb4">草稿审核状态</div>
+      <div class="flex gap8 flex-wrap">
+        <span class="badge badge-warning">待审核 ${needsReview.length}</span>
+        <span class="badge badge-success">已通过未发送 ${approvedNotSent.length}</span>
+        <span class="badge" style="background:var(--red);color:#fff">已拒绝 ${rejected.length}</span>
+        ${needsEvidence.length > 0 ? `<span class="badge">需补证据 ${needsEvidence.length}</span>` : ''}
+        <span class="badge">已人工发送 ${manuallySent.length}</span>
+      </div>
+      ${isBlocked ? `
+        <div class="text-sm mt4" style="color:var(--red)"><b>⚠️ 客户当前被阻断，不可进入对外开发</b></div>
+      ` : ''}
+    </div>
+
+    <!-- 跟进计划 -->
+    <div class="mb12">
+      <div class="text-sm fw700 mb4">跟进计划</div>
+      ${nextFollowUp ? `
+        <div class="text-sm">
+          <b>下一次跟进：</b>${fmtDay(nextFollowUp.plannedAt)}
+          (${esc(nextFollowUp.channel || 'email')} / ${esc(nextFollowUp.actionType || '-')})
+          ${nextFollowUp.timezone === 'unknown' ? '<span style="color:var(--orange)">时区待确认</span>' : esc(nextFollowUp.timezone)}
+          ${overdueFollowUps.length > 0 ? `<span style="color:var(--red)">（${overdueFollowUps.length}项已逾期）</span>` : ''}
+        </div>
+        <div class="text-xs text-muted">已完成 ${completedFollowUps.length} 项 / 共 ${followUps.length} 项</div>
+      ` : `
+        <div class="text-sm text-muted">暂无跟进计划</div>
+      `}
+    </div>
+
+    <!-- 最近人工结果 -->
+    <div>
+      <div class="text-sm fw700 mb4">最近人工结果</div>
+      ${latestOutcome ? `
+        <div class="text-sm">
+          <b>${outcomeLabels[latestOutcome.outcome] || latestOutcome.outcome}</b>
+          (${esc(latestOutcome.channel || '-')}) - ${fmtDay(latestOutcome.occurredAt)}
+          ${latestOutcome.note ? `<div class="text-xs text-muted mt2">${esc(latestOutcome.note.substring(0,100))}</div>` : ''}
+          ${latestOutcome.nextAction ? `<div class="text-xs mt2" style="color:var(--primary)">下一步: ${esc(latestOutcome.nextAction)}</div>` : ''}
+        </div>
+      ` : `
+        <div class="text-sm text-muted">暂无人工结果记录</div>
+      `}
+      <div class="text-xs text-muted mt4">
+        数据来源：${(S.websiteEvidences||[]).filter(e=>e.customerId===customer.id&&e.reviewStatus==='reviewed').length} 条已核验网站证据 |
+        共 ${outcomes.length} 条结果记录
+      </div>
+    </div>
+
+    <!-- 操作提示 -->
+    <div class="mt12 pt8" style="border-top:1px solid #e4e7eb">
+      <div class="flex gap8 flex-wrap">
+        ${needsReview.length > 0 ? `<button class="btn btn-sm btn-primary" onclick="currentView='reviewQueue';renderView()">去审核草稿</button>` : ''}
+        ${!isBlocked && approvedNotSent.length > 0 ? `<span class="text-sm" style="color:var(--green)">✓ 有 ${approvedNotSent.length} 封草稿已通过，可由 Leo 外部人工发送</span>` : ''}
+        ${!nextFollowUp && !isBlocked ? `<button class="btn btn-sm btn-outline" onclick="promptCreateFollowUp('${customer.id}')">创建跟进计划</button>` : ''}
+      </div>
+      <div class="text-xs text-muted mt4">
+        ⚠️ approved 不代表已发送；needs_review 不计为已联系；所有外部发送必须由 Leo 人工完成
+      </div>
+    </div>
+  </div>`;
+}
+
+// 提示创建跟进计划
+function promptCreateFollowUp(customerId){
+  const note = prompt('跟进备注（可选）：');
+  const days = prompt('几天后跟进？（默认3天）', '3');
+  const plannedAt = new Date(Date.now() + (parseInt(days)||3) * 86400000).toISOString();
+  createFollowUp(customerId, {plannedAt: plannedAt, reminderNote: note || '', actionType: 'follow_up_1'});
+}
+
 // 渲染网站证据面板（客户详情页）
 function renderWebsiteEvidencePanel(customerId){
   const evidences = getCustomerWebsiteEvidences(customerId);
@@ -12616,6 +12720,9 @@ function openCustomerDetail(cid){
           ${renderProspectPriorityPanel(c)}
         </div>
         <div style="margin-top:12px">
+          ${renderCustomerDevelopmentSummary(c)}
+        </div>
+        <div style="margin-top:12px">
           ${renderWebsiteEvidencePanel(c.id)}
         </div>
       </div>
@@ -16103,7 +16210,7 @@ function exportData(){
 }
 function resetData(){
   confirmDlg('将清空所有本地数据并重新注入演示数据，确定？', ()=>{
-    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','campaignSchemaVersion','knowledgeFacts','knowledgePacks'].forEach(k=>DB.remove(k));
+    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','campaignSchemaVersion','knowledgeFacts','knowledgePacks','websiteEvidences','outreachQueues','prospectPriorities','followUps','outreachOutcomes'].forEach(k=>DB.remove(k));
     loadState(); seedData(); go('dashboard'); toast('已重置为演示数据');
   });
 }
@@ -18860,12 +18967,13 @@ function exportAllData(){
   });
   // P2.2D-6: 添加 schemaVersion 和完整元信息
   const collectionCounts = {};
-  ['customers','drafts','campaigns','campaignCustomerTasks','outreachKnowledgeBase','knowledgeFacts','knowledgePacks','orders','products','communications'].forEach(k => {
+  // P2.4A: 添加新集合统计
+  ['customers','drafts','campaigns','campaignCustomerTasks','outreachKnowledgeBase','knowledgeFacts','knowledgePacks','orders','products','communications','websiteEvidences','outreachQueues','prospectPriorities','followUps','outreachOutcomes'].forEach(k => {
     if(Array.isArray(S[k])) collectionCounts[k] = S[k].length;
   });
   data._backupMeta = {
     version: 'V75.3',
-    schemaVersion: 'P2.2D-6',
+    schemaVersion: 'P2.4A',
     exportTime: new Date().toISOString(),
     exportDate: new Date().toLocaleDateString('zh-CN'),
     customerCount: (S.customers || []).filter(c=>!c.isDemo).length,
@@ -18934,6 +19042,14 @@ function importAllData(input){
       Object.keys(data).forEach(k=>{
         if(k!=='_backupMeta'){
           S[k] = data[k];
+        }
+      });
+
+      // P2.4A: 缺失集合自动补空数组
+      const requiredCollections = ['websiteEvidences','outreachQueues','prospectPriorities','followUps','outreachOutcomes'];
+      requiredCollections.forEach(k => {
+        if(!Array.isArray(S[k])){
+          S[k] = [];
         }
       });
 
@@ -28900,7 +29016,7 @@ function clearAllData(){
   if(!confirm('再次确认：真的要清空所有数据吗？')) return;
 
   // V79.0P1 修复：快照 + 固定顺序删除 + 失败逆序恢复
-  const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','outreachKnowledgeBase','knowledgeFacts','knowledgePacks'];
+  const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','outreachKnowledgeBase','knowledgeFacts','knowledgePacks','websiteEvidences','outreachQueues','prospectPriorities','followUps','outreachOutcomes'];
   const objectKeys = ['settings','customerIdentityMigration','campaignSchemaVersion'];
   const allKeys = arrayKeys.concat(objectKeys);
   const specialKeys = ['prospectLeads','prospectProfiles'];

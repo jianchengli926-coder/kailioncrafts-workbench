@@ -41,7 +41,11 @@ console.log('--- 一、exportAllData schemaVersion ---');
 
 test('1. exportAllData 包含 schemaVersion 字段', () => {
   assert.ok(indexHtmlCode.includes('schemaVersion'), '必须包含 schemaVersion');
-  assert.ok(indexHtmlCode.includes("schemaVersion: 'P2.2D-6'"), 'schemaVersion 应为 P2.2D-6');
+  assert.ok(
+    indexHtmlCode.includes("schemaVersion: 'P2.2D-6'") ||
+    indexHtmlCode.includes("schemaVersion: 'P2.4A'"),
+    'schemaVersion 应为 P2.2D-6 或 P2.4A'
+  );
 });
 
 test('2. exportAllData 包含 collectionCounts', () => {

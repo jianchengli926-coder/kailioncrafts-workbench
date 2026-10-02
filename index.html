@@ -18140,6 +18140,92 @@ function renderApiSettings(){
   </div>`;
 }
 
+/* P2.2D-6.1: 备份密钥安全收口 - 脱敏工具函数 */
+const SECRET_FIELD_PATTERNS = [
+  /^apiKey$/i,
+  /^secret$/i,
+  /^password$/i,
+  /^passwd$/i,
+  /^authorization$/i,
+  /^bearerToken$/i,
+  /^bearer_token$/i,
+  /^cookie$/i,
+  /^cookies$/i,
+  /^webhookSecret$/i,
+  /^webhook_secret$/i,
+  /^token$/i,
+  /^accessToken$/i,
+  /^access_token$/i,
+  /^refreshToken$/i,
+  /^refresh_token$/i,
+  /^privateKey$/i,
+  /^private_key$/i
+];
+
+function isSecretField(key){
+  if(!key || typeof key !== 'string') return false;
+  return SECRET_FIELD_PATTERNS.some(p => p.test(key));
+}
+
+function redactSecretsInObject(obj, depth){
+  if(depth === undefined) depth = 0;
+  if(depth > 10) return obj;
+  if(obj === null || obj === undefined) return obj;
+  if(Array.isArray(obj)){
+    return obj.map(item => redactSecretsInObject(item, depth + 1));
+  }
+  if(typeof obj === 'object'){
+    const result = {};
+    for(const key of Object.keys(obj)){
+      if(isSecretField(key)){
+        const val = obj[key];
+        if(val && typeof val === 'object'){
+          result[key] = redactSecretsInObject(val, depth + 1);
+        } else if(val !== undefined && val !== null && val !== ''){
+          result[key] = { configured: true, redacted: true };
+        } else {
+          result[key] = val;
+        }
+      } else {
+        result[key] = redactSecretsInObject(obj[key], depth + 1);
+      }
+    }
+    return result;
+  }
+  return obj;
+}
+
+function countSensitiveFields(obj, depth){
+  if(depth === undefined) depth = 0;
+  if(depth > 10) return 0;
+  if(obj === null || obj === undefined) return 0;
+  if(Array.isArray(obj)){
+    return obj.reduce((sum, item) => sum + countSensitiveFields(item, depth + 1), 0);
+  }
+  if(typeof obj === 'object'){
+    let count = 0;
+    for(const key of Object.keys(obj)){
+      if(isSecretField(key)){
+        const val = obj[key];
+        if(val !== undefined && val !== null && val !== '' && typeof val !== 'object'){
+          count++;
+        }
+      }
+      count += countSensitiveFields(obj[key], depth + 1);
+    }
+    return count;
+  }
+  return 0;
+}
+
+function hasSensitiveFields(obj){
+  return countSensitiveFields(obj) > 0;
+}
+
+function isRedactedPlaceholder(val){
+  return val && typeof val === 'object' && val.configured === true && val.redacted === true;
+}
+
 /* V75.3 数据一键导出与恢复 */
 function exportAllData(){
   const data = {};
@@ -18168,10 +18254,18 @@ function exportAllData(){
     packCount: (S.knowledgePacks || []).length,
     productCount: (S.products || []).length,
     orderCount: (S.orders || []).length,
-    collectionCounts: collectionCounts
+    collectionCounts: collectionCounts,
+    secretsRedacted: true
   };
 
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  // P2.2D-6.1: 导出前脱敏所有敏感字段
+  const redactedData = redactSecretsInObject(data);
+  const secretCount = countSensitiveFields(data);
+  if(secretCount > 0){
+    redactedData._backupMeta.redactedSecretCount = secretCount;
+  }
+
+  const blob = new Blob([JSON.stringify(redactedData, null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -18188,11 +18282,6 @@ function importAllData(input){
   const file = input.files[0];
   if(!file) return;
 
-  if(!confirm('确定要从备份文件恢复数据吗？这将覆盖当前所有数据，建议先导出当前数据备份。')){
-    input.value = '';
-    return;
-  }
-
   const reader = new FileReader();
   reader.onload = function(e){
     try{
@@ -18201,12 +18290,46 @@ function importAllData(input){
         toast('❌ 无效的备份文件格式');
         return;
       }
+
+      // P2.2D-6.1: 检测敏感字段并警告
+      const sensitiveCount = countSensitiveFields(data);
+      const hasRedacted = data._backupMeta && data._backupMeta.secretsRedacted === true;
+      let confirmMsg = '确定要从备份文件恢复数据吗？这将覆盖当前所有数据，建议先导出当前数据备份。';
+      if(sensitiveCount > 0 && !hasRedacted){
+        confirmMsg = '⚠️ 安全警告：此备份包含 ' + sensitiveCount + ' 个敏感字段（API Key/密码等）。\n' +
+                     '导入时不会覆盖本机已配置的 API 密钥。\n\n' +
+                     '确定要从备份文件恢复数据吗？这将覆盖当前所有业务数据。';
+      }
+      if(!confirm(confirmMsg)){
+        input.value = '';
+        return;
+      }
+
+      // P2.2D-6.1: 保存本机 API 密钥快照
+      const localApisSnapshot = S.apis ? JSON.parse(JSON.stringify(S.apis)) : [];
+
       // 恢复数据
       Object.keys(data).forEach(k=>{
         if(k!=='_backupMeta'){
           S[k] = data[k];
         }
       });
+
+      // P2.2D-6.1: 恢复本机 API 密钥
+      if(Array.isArray(S.apis) && localApisSnapshot.length > 0){
+        S.apis.forEach((importedApi, idx) => {
+          const localApi = localApisSnapshot.find(a => a.id === importedApi.id);
+          if(localApi && (isRedactedPlaceholder(importedApi.apiKey) || !importedApi.apiKey)){
+            importedApi.apiKey = localApi.apiKey;
+          }
+        });
+        localApisSnapshot.forEach(localApi => {
+          if(!S.apis.find(a => a.id === localApi.id)){
+            S.apis.push(localApi);
+          }
+        });
+      }
+
       persist();
       toast('✅ 数据恢复成功！页面即将刷新');
       logAction('data_import', '从备份恢复数据', '备份时间:'+data._backupMeta.exportDate);
@@ -18319,8 +18442,10 @@ function exportBackup(){
     knowledge:S.knowledge,apis:S.apis,settings:S.settings,monitors:S.monitors,monitorLogs:S.monitorLogs,
     keywords:S.keywords,contents:S.contents,backlinks:S.backlinks,exhibitions:S.exhibitions,
     prompts:S.prompts,publicPool:S.publicPool,receivables:S.receivables,exportedAt:new Date().toISOString()};
-  downloadFile('kailion_backup_'+todayStr()+'.json',JSON.stringify(all,null,2),'application/json');
-  toast('已导出全量备份');
+  // P2.2D-6.1: 导出前脱敏所有敏感字段
+  const redactedAll = redactSecretsInObject(all);
+  downloadFile('kailion_backup_'+todayStr()+'.json',JSON.stringify(redactedAll,null,2),'application/json');
+  toast('已导出全量备份（敏感字段已脱敏）');
 }
 
 /* V4 时区 + 进箱率检测 + 社媒话术 */
@@ -27317,7 +27442,20 @@ function importBackup(){
         const knownKeys = ['customers','drafts','campaigns','campaignCustomerTasks','outreachKnowledgeBase','orders','products','settings'];
         const hasKnownKey = knownKeys.some(k => d[k] !== undefined);
         if(!hasKnownKey && !d._backupMeta){ toast('备份文件未包含有效业务数据','err'); return; }
-        if(!confirm('导入备份将覆盖当前所有数据，确定继续？\n建议先导出当前数据备份。')) return;
+
+        // P2.2D-6.1: 检测备份中的敏感字段并警告
+        const sensitiveCount = countSensitiveFields(d);
+        const hasRedacted = d._backupMeta && d._backupMeta.secretsRedacted === true;
+        let confirmMsg = '导入备份将覆盖当前所有数据，确定继续？\n建议先导出当前数据备份。';
+        if(sensitiveCount > 0 && !hasRedacted){
+          confirmMsg = '⚠️ 安全警告：此备份包含 ' + sensitiveCount + ' 个敏感字段（API Key/密码等）。\n' +
+                       '导入时不会覆盖本机已配置的 API 密钥。\n\n' +
+                       '导入备份将覆盖当前所有业务数据，确定继续？\n建议先导出当前数据备份。';
+        }
+        if(!confirm(confirmMsg)) return;
+
+        // P2.2D-6.1: 保护本机 API 密钥 - 导入前保存本机 apis
+        const localApisSnapshot = S.apis ? JSON.parse(JSON.stringify(S.apis)) : [];
 
         // V79.0P1 修复：导入前快照（含 key 存在状态），失败时 dirty-write 回滚
         const allKeys = Object.keys(d).filter(k => k !== '_backupMeta');
@@ -27334,6 +27472,25 @@ function importBackup(){
         const sKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','orders','opportunities','followupTasks','customerIdentityMigration','campaignSchemaVersion','knowledgeFacts','knowledgePacks'];
         sKeys.forEach(k=>{ if(d[k] !== undefined) S[k] = d[k]; });
 
+        // P2.2D-6.1: 恢复本机 API 密钥，不被备份中的 redacted 占位值或旧密钥覆盖
+        if(Array.isArray(S.apis) && localApisSnapshot.length > 0){
+          S.apis.forEach((importedApi, idx) => {
+            const localApi = localApisSnapshot.find(a => a.id === importedApi.id);
+            if(localApi){
+              // 本机已有此 API 配置，保留本机 apiKey
+              if(isRedactedPlaceholder(importedApi.apiKey) || !importedApi.apiKey){
+                importedApi.apiKey = localApi.apiKey;
+              }
+            }
+          });
+          // 合并本机独有的 API 配置（备份中没有的）
+          localApisSnapshot.forEach(localApi => {
+            if(!S.apis.find(a => a.id === localApi.id)){
+              S.apis.push(localApi);
+            }
+          });
+        }
+
         // 恢复辅助
         function restoreKey(k){
           try{
@@ -27349,7 +27506,9 @@ function importBackup(){
         let failedError = null;
         for(const key of allKeys){
           try {
-            DB.save(key, d[key]);
+            // P2.2D-6.1: apis 使用合并后的数据（含本机密钥保护）
+            const saveValue = (key === 'apis' && S.apis) ? S.apis : d[key];
+            DB.save(key, saveValue);
             savedKeys.push(key);
           } catch(e){
             failedKey = key; failedError = e.message||String(e); break;

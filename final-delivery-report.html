@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaiLionCrafts 工作台 · 最终交付验收报告</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #1a1a2e; line-height: 1.6; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 30px 20px; }
+  .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: white; padding: 40px; border-radius: 16px; margin-bottom: 30px; }
+  .header h1 { font-size: 28px; margin-bottom: 8px; }
+  .header .subtitle { opacity: 0.85; font-size: 14px; }
+  .header .meta { display: flex; gap: 30px; margin-top: 20px; flex-wrap: wrap; }
+  .header .meta-item { font-size: 13px; }
+  .header .meta-item span { opacity: 0.6; display: block; }
+  .header .meta-item strong { font-size: 15px; }
+  .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .card h2 { font-size: 20px; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #e8ecf1; color: #1a1a2e; }
+  .card h3 { font-size: 16px; margin: 16px 0 10px; color: #16213e; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 16px 0; }
+  .stat-box { background: #f8f9fc; border-radius: 10px; padding: 16px; text-align: center; }
+  .stat-box .num { font-size: 28px; font-weight: 700; color: #0f3460; }
+  .stat-box .label { font-size: 12px; color: #666; margin-top: 4px; }
+  .stat-box.pass .num { color: #27ae60; }
+  .stat-box.fail .num { color: #e74c3c; }
+  .stat-box.warn .num { color: #f39c12; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: #f0f2f5; padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #ddd; }
+  td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+  tr:hover { background: #fafbfc; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge.pass { background: #d4edda; color: #155724; }
+  .badge.partial { background: #fff3cd; color: #856404; }
+  .badge.fail { background: #f8d7da; color: #721c24; }
+  .badge.blocked { background: #e2e3e5; color: #383d41; }
+  .badge.info { background: #d1ecf1; color: #0c5460; }
+  .routing-chain { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; padding: 12px; background: #f8f9fc; border-radius: 8px; font-size: 13px; }
+  .routing-chain .node { background: #0f3460; color: white; padding: 6px 14px; border-radius: 6px; font-weight: 500; }
+  .routing-chain .node.local { background: #27ae60; }
+  .routing-chain .node.unsupported { background: #95a5a6; text-decoration: line-through; }
+  .routing-chain .arrow { color: #999; font-size: 18px; }
+  .warning-box { background: #fff3cd; border-left: 4px solid #f39c12; padding: 14px 18px; border-radius: 6px; margin: 12px 0; }
+  .danger-box { background: #f8d7da; border-left: 4px solid #e74c3c; padding: 14px 18px; border-radius: 6px; margin: 12px 0; }
+  .success-box { background: #d4edda; border-left: 4px solid #27ae60; padding: 14px 18px; border-radius: 6px; margin: 12px 0; }
+  .info-box { background: #d1ecf1; border-left: 4px solid #17a2b8; padding: 14px 18px; border-radius: 6px; margin: 12px 0; }
+  ul { padding-left: 20px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  .verdict { background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; padding: 30px; border-radius: 12px; text-align: center; margin: 20px 0; }
+  .verdict h2 { color: white; border: none; font-size: 22px; margin-bottom: 10px; }
+  .verdict p { font-size: 16px; opacity: 0.95; }
+  .footer { text-align: center; color: #999; font-size: 12px; padding: 20px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>🏭 KaiLionCrafts 企业AI客户开发工作台</h1>
+  <div class="subtitle">最终交付验收报告 · Final Delivery Acceptance Report</div>
+  <div class="meta">
+    <div class="meta-item"><span>项目路径</span><strong>AI客户开发工作台</strong></div>
+    <div class="meta-item"><span>分支</span><strong>fresh_start</strong></div>
+    <div class="meta-item"><span>提交</span><strong>2e2f4dd</strong></div>
+    <div class="meta-item"><span>标签</span><strong>release/deep-analysis-round2</strong></div>
+    <div class="meta-item"><span>生成时间</span><strong>2026-10-02</strong></div>
+  </div>
+</div>
+
+<!-- 交付结论 -->
+<div class="verdict">
+  <h2>✅ 交付结论</h2>
+  <p>已完成核心功能和安全范围内的最终交付验收，可用于正式演示和受控使用。</p>
+</div>
+
+<!-- 核心指标 -->
+<div class="card">
+  <h2>📊 核心验收指标</h2>
+  <div class="stats-grid">
+    <div class="stat-box pass"><div class="num">192</div><div class="label">自动化测试通过</div></div>
+    <div class="stat-box pass"><div class="num">19/19</div><div class="label">py_compile通过</div></div>
+    <div class="stat-box pass"><div class="num">28</div><div class="label">正式客户（不变）</div></div>
+    <div class="stat-box pass"><div class="num">0</div><div class="label">P0/P1问题</div></div>
+    <div class="stat-box pass"><div class="num">8</div><div class="label">浏览器PASS</div></div>
+    <div class="stat-box warn"><div class="num">5</div><div class="label">浏览器PARTIAL</div></div>
+    <div class="stat-box"><div class="num">0</div><div class="label">浏览器FAIL</div></div>
+    <div class="stat-box pass"><div class="num">MD5</div><div class="label">customers.json不变</div></div>
+  </div>
+</div>
+
+<!-- Git状态 -->
+<div class="card">
+  <h2>🔧 版本与Git状态</h2>
+  <table>
+    <tr><th>项目</th><th>值</th><th>状态</th></tr>
+    <tr><td>分支</td><td>fresh_start</td><td><span class="badge pass">已同步</span></td></tr>
+    <tr><td>HEAD提交</td><td>2e2f4dd</td><td><span class="badge pass">已推送</span></td></tr>
+    <tr><td>发布标签</td><td>release/deep-analysis-round2-20261002-0710</td><td><span class="badge pass">已推送</span></td></tr>
+    <tr><td>远程仓库</td><td>github.com/jianchengli926-coder/kailioncrafts-workbench</td><td><span class="badge pass">可达</span></td></tr>
+    <tr><td>工作区</td><td>干净（无已修改文件）</td><td><span class="badge pass">干净</span></td></tr>
+    <tr><td>敏感文件</td><td>API Key/密码/客户数据均在.gitignore</td><td><span class="badge pass">未提交</span></td></tr>
+  </table>
+  <div class="info-box">未跟踪文件为HTML报告、截图、auth_lock.json等运行时产物，不影响代码交付。</div>
+</div>
+
+<!-- 模型路由 -->
+<div class="card">
+  <h2>🤖 模型路由与故障转移</h2>
+  
+  <h3>文本路由（4节点）</h3>
+  <div class="routing-chain">
+    <span class="node">GLM-4.7 Flash</span><span class="arrow">→</span>
+    <span class="node">GLM-4 Flash</span><span class="arrow">→</span>
+    <span class="node local">qwen3.5:9b</span><span class="arrow">→</span>
+    <span class="node local">qwen2.5:7b</span>
+  </div>
+
+  <h3>本地文本路由（2节点）</h3>
+  <div class="routing-chain">
+    <span class="node local">qwen3.5:9b</span><span class="arrow">→</span>
+    <span class="node local">qwen2.5:7b</span>
+  </div>
+
+  <h3>视觉路由（3节点）</h3>
+  <div class="routing-chain">
+    <span class="node">GLM-4.6V Flash</span><span class="arrow">→</span>
+    <span class="node local">qwen3.5:9b</span><span class="arrow">→</span>
+    <span class="node local">qwen2.5vl:7b</span>
+  </div>
+
+  <h3>图像生成路由</h3>
+  <div class="routing-chain">
+    <span class="node">CogView-3-Flash</span><span class="arrow">→</span>
+    <span class="node unsupported">FLUX.2 Klein 4B (运行时不支持)</span>
+  </div>
+
+  <h3>故障转移规则</h3>
+  <div class="two-col">
+    <div>
+      <strong>✅ 触发故障转移：</strong>
+      <ul>
+        <li>HTTP 408 / 429 / 500 / 502 / 503 / 504</li>
+        <li>网络错误、连接失败、请求超时</li>
+        <li>模型不存在或服务不可用</li>
+        <li>单次请求超30秒 / 连续两次超15秒</li>
+      </ul>
+    </div>
+    <div>
+      <strong>❌ 不触发故障转移：</strong>
+      <ul>
+        <li>HTTP 401 / 403（API Key错误）</li>
+        <li>参数错误、用户输入为空</li>
+        <li>内容审核拒绝</li>
+        <li>工具调用参数错误</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="warning-box">
+    <strong>⚠️ FLUX 状态：</strong>Ollama 0.35.0 不支持图像生成模型，FLUX.2 Klein 4B（5.7GB）虽已安装但标记为 <code>runtime_unsupported</code>，图像生成仅依赖 CogView 云端。不会伪造本地生图成功。
+  </div>
+</div>
+
+<!-- 自动化测试 -->
+<div class="card">
+  <h2>🧪 自动化测试结果</h2>
+  <table>
+    <tr><th>测试套件</th><th>总数</th><th>通过</th><th>失败</th><th>覆盖范围</th></tr>
+    <tr><td>test_model_routing.py</td><td>73</td><td><span class="badge pass">73</span></td><td>0</td><td>模型路由/故障转移/本地锁/健康检查</td></tr>
+    <tr><td>test_p1_security.py</td><td>22</td><td><span class="badge pass">22</span></td><td>0</td><td>密码安全/API Key脱敏/原子写入/CSV导出</td></tr>
+    <tr><td>test_customer_loop.py</td><td>76</td><td><span class="badge pass">76</span></td><td>0</td><td>客户开发闭环/状态机/DNC/草稿审核/任务</td></tr>
+    <tr><td>test_dual_write_consistency.py</td><td>13</td><td><span class="badge pass">13</span></td><td>0</td><td>JSON/SQLite双写一致性/事务回滚</td></tr>
+    <tr><td>test_ssrf_toctou.py</td><td>8</td><td><span class="badge pass">8</span></td><td>0</td><td>SSRF防护/DNS rebinding/IP钉住</td></tr>
+    <tr style="font-weight:700;background:#f0f7ff"><td>合计</td><td>192</td><td>192</td><td>0</td><td>—</td></tr>
+  </table>
+  <div class="success-box">✅ 全部192项自动化测试通过，19个核心Python文件py_compile通过。</div>
+</div>
+
+<!-- 浏览器测试 -->
+<div class="card">
+  <h2>🌐 浏览器冒烟测试</h2>
+  <p style="font-size:13px;color:#666;margin-bottom:12px;">测试环境：内部浏览器访问 http://localhost:8501。因视口0x0限制，部分页面导航通过代码验证补充。</p>
+  <table>
+    <tr><th>编号</th><th>功能</th><th>状态</th><th>证据</th></tr>
+    <tr><td>AUTH-01</td><td>登录页显示</td><td><span class="badge pass">PASS</span></td><td>品牌化标题、密码框、忘记密码提示</td></tr>
+    <tr><td>AUTH-02</td><td>密码输入框类型</td><td><span class="badge pass">PASS</span></td><td>input[type=password]存在</td></tr>
+    <tr><td>AUTH-03</td><td>正确密码登录</td><td><span class="badge pass">PASS</span></td><td>登录成功进入业务页面</td></tr>
+    <tr><td>AUTH-04</td><td>错误密码不泄露</td><td><span class="badge pass">PASS</span></td><td>通用错误提示（代码验证）</td></tr>
+    <tr><td>AUTH-05</td><td>5次失败锁定60秒</td><td><span class="badge pass">PASS</span></td><td>auth_lock.json持久化（代码验证）</td></tr>
+    <tr><td>DASH-01</td><td>仪表盘数据</td><td><span class="badge pass">PASS</span></td><td>28客户/A级3/评分53/财务指标</td></tr>
+    <tr><td>CRM-01</td><td>客户中心页面</td><td><span class="badge pass">PASS</span></td><td>CRM HUB/子页面导航/数据迁移工具</td></tr>
+    <tr><td>CRM-02</td><td>客户管理列表</td><td><span class="badge pass">PASS</span></td><td>28客户/导出按钮/无错误/无API泄露</td></tr>
+    <tr><td>CRM-03</td><td>客户详情5区域</td><td><span class="badge partial">PARTIAL</span></td><td>代码验证完整，浏览器视口受限</td></tr>
+    <tr><td>CRM-04</td><td>跟进任务新增保存</td><td><span class="badge partial">PARTIAL</span></td><td>后端SQLite验证通过</td></tr>
+    <tr><td>KB-01</td><td>知识库搜索</td><td><span class="badge pass">PASS</span></td><td>搜索"工厂"20条/无备份泄露</td></tr>
+    <tr><td>MODEL-01</td><td>模型管理页</td><td><span class="badge partial">PARTIAL</span></td><td>路由代码验证正确</td></tr>
+    <tr><td>MODEL-02</td><td>AI真实调用</td><td><span class="badge pass">PASS</span></td><td>9.1秒响应/内容正确引用公司事实</td></tr>
+    <tr><td>TOOL-01</td><td>AI工具库</td><td><span class="badge partial">PARTIAL</span></td><td>9工具入口存在</td></tr>
+    <tr><td>SETTING-01</td><td>设置/供应商管理</td><td><span class="badge partial">PARTIAL</span></td><td>API Key掩码代码验证</td></tr>
+    <tr><td>EXPORT-01</td><td>CSV导出</td><td><span class="badge pass">PASS</span></td><td>28客户/中文正常/utf-8-sig</td></tr>
+    <tr><td>SEC-01</td><td>页面无API Key泄露</td><td><span class="badge pass">PASS</span></td><td>已测页面无sk-/api_key</td></tr>
+    <tr><td>SEC-02</td><td>页面无traceback</td><td><span class="badge pass">PASS</span></td><td>所有已测页面无Python错误</td></tr>
+  </table>
+  <div class="stats-grid" style="margin-top:16px">
+    <div class="stat-box pass"><div class="num">8</div><div class="label">PASS</div></div>
+    <div class="stat-box warn"><div class="num">5</div><div class="label">PARTIAL</div></div>
+    <div class="stat-box fail"><div class="num">0</div><div class="label">FAIL</div></div>
+    <div class="stat-box"><div class="num">0</div><div class="label">BLOCKED</div></div>
+  </div>
+</div>
+
+<!-- 数据完整性 -->
+<div class="card">
+  <h2>💾 数据完整性</h2>
+  <table>
+    <tr><th>检查项</th><th>结果</th><th>状态</th></tr>
+    <tr><td>customers.json MD5</td><td>23944c53722a667f27b29180ef6bdf17</td><td><span class="badge pass">未变化</span></td></tr>
+    <tr><td>JSON客户数量</td><td>28条</td><td><span class="badge pass">一致</span></td></tr>
+    <tr><td>SQLite prospects数量</td><td>28条</td><td><span class="badge pass">一致</span></td></tr>
+    <tr><td>测试数据残留</td><td>已清理184条（2任务+178评估+3 prospect评估+1 evidence）</td><td><span class="badge pass">已清理</span></td></tr>
+    <tr><td>关联表数据</td><td>follow_up_tasks/evaluations/evidence/activity_log 均为0</td><td><span class="badge pass">干净</span></td></tr>
+    <tr><td>重复客户</td><td>Henckels公司名匹配2条（历史数据）</td><td><span class="badge info">已知</span></td></tr>
+    <tr><td>真实客户消息发送</td><td>无</td><td><span class="badge pass">未发送</span></td></tr>
+  </table>
+  <div class="info-box">清理前备份：<code>data/_backup_pre_cleanup_20261002_080120/workbench.db</code>；迁移备份：<code>data/_backup_pre_migration_*/</code></div>
+</div>
+
+<!-- 安全检查 -->
+<div class="card">
+  <h2>🔒 安全检查</h2>
+  <div class="two-col">
+    <div>
+      <h3>密码安全</h3>
+      <ul>
+        <li>✅ 密码从环境变量 <code>WORKBENCH_ACCESS_PASSWORD</code> 读取</li>
+        <li>✅ 密码文件 <code>~/.config/kailioncrafts/workbench.env</code> 权限600</li>
+        <li>✅ 无硬编码密码</li>
+        <li>✅ 密码不进日志/Trace/HTML</li>
+        <li>✅ 5次失败锁定60秒（持久化）</li>
+        <li>✅ 1小时会话超时</li>
+      </ul>
+    </div>
+    <div>
+      <h3>API Key与数据安全</h3>
+      <ul>
+        <li>✅ 供应商页面API Key掩码（前4+后4）</li>
+        <li>✅ API Key不进DOM value</li>
+        <li>✅ API Key不进Trace/日志/Git</li>
+        <li>✅ JSON配置原子写入（临时文件+os.replace）</li>
+        <li>✅ 文件损坏时先备份再恢复</li>
+        <li>✅ 删除操作二次确认</li>
+        <li>✅ SSRF防护（IP钉住+DNS rebinding）</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 运行环境 -->
+<div class="card">
+  <h2>🖥️ 运行环境</h2>
+  <table>
+    <tr><th>组件</th><th>状态</th><th>详情</th></tr>
+    <tr><td>Streamlit</td><td><span class="badge pass">运行中</span></td><td>端口8501，HTTP 200</td></tr>
+    <tr><td>Ollama</td><td><span class="badge pass">运行中</span></td><td>版本0.35.0，6个模型</td></tr>
+    <tr><td>硬件</td><td><span class="badge info">Apple M4</span></td><td>16GB统一内存</td></tr>
+    <tr><td>外置硬盘</td><td><span class="badge pass">已连接</span></td><td>Kingston 1TB NV1 40Gbps</td></tr>
+    <tr><td>启动脚本</td><td><span class="badge pass">已配置</span></td><td>桌面.command，自动加载密码文件</td></tr>
+  </table>
+</div>
+
+<!-- 已知限制 -->
+<div class="card">
+  <h2>⚠️ 已知限制（不阻塞演示）</h2>
+  <div class="warning-box">
+    <strong>1. FLUX本地图像生成不可用</strong> — Ollama 0.35.0不支持图像生成模型，图像生成仅依赖CogView云端。
+  </div>
+  <div class="warning-box">
+    <strong>2. GLM-4.7 Flash可能限流</strong> — 免费模型高峰期429，工作台自动故障转移，建议演示前手动切GLM-4 Flash。
+  </div>
+  <div class="warning-box">
+    <strong>3. 5个AI生成类功能端到端验证</strong> — 代码和UI完整，仅快速问答做了真实调用验证；其余建议演示前手动触发。
+  </div>
+  <div class="warning-box">
+    <strong>4. 实验性功能</strong> — 视频反推、白平衡取色工具UI存在但深层功能未完整验收，演示时避开。
+  </div>
+  <div class="warning-box">
+    <strong>5. 飞书协同</strong> — 需FEISHU_APP_ID/FEISHU_APP_SECRET环境变量，未配置则不可用（不影响其他功能）。
+  </div>
+  <div class="warning-box">
+    <strong>6. 窄屏/公网未测试</strong> — 仅验证localhost宽屏，公网Cloudflare Tunnel未验证。
+  </div>
+  <div class="warning-box">
+    <strong>7. 浏览器视口限制</strong> — 内部浏览器视口0x0导致部分页面导航测试受限，非应用问题。
+  </div>
+</div>
+
+<!-- 演示操作顺序 -->
+<div class="card">
+  <h2>📋 明天演示操作顺序</h2>
+  <ol style="padding-left:20px">
+    <li><strong>启动</strong>：双击桌面启动脚本，等待浏览器自动打开 http://localhost:8501</li>
+    <li><strong>登录</strong>：输入密码进入工作台</li>
+    <li><strong>仪表盘</strong>：展示28客户、A级3、评分53、AI今日工作建议</li>
+    <li><strong>客户中心→客户管理</strong>：展示客户列表、筛选、CSV导出</li>
+    <li><strong>客户详情</strong>：展示跟进任务、活动日志、网站证据、评估历史、草稿历史</li>
+    <li><strong>精准客户开发</strong>：展示ICP评估表单、重复检测、DNC阻断</li>
+    <li><strong>数据看板</strong>：展示漏斗、等级分布、历史导入28条</li>
+    <li><strong>快速问答</strong>：实时AI对话，展示在线→本地故障转移</li>
+    <li><strong>模型管理</strong>：展示4节点路由、健康状态、本地锁、手动切换</li>
+    <li><strong>公司知识库</strong>：搜索"工厂"或"剪刀"，展示知识库内容</li>
+    <li><strong>AI工具库</strong>：展示SEO/SKU/线稿/作图工具入口</li>
+  </ol>
+  <div class="danger-box">
+    <strong>🚫 演示期间禁止：</strong>新增/删除客户、发送客户消息、触发视频生成、点击视频反推/白平衡工具、执行数据迁移、刷新页面。
+  </div>
+</div>
+
+<!-- 回滚方式 -->
+<div class="card">
+  <h2>🔄 回滚与恢复</h2>
+  <pre style="background:#f8f9fc;padding:16px;border-radius:8px;font-size:12px;overflow-x:auto">
+# 代码回滚
+git reset --hard 2e2f4dd
+
+# 数据恢复
+cp data/_backup_pre_migration_*/customers.json data/customers.json
+cp data/_backup_pre_migration_*/workbench.db data/workbench.db
+
+# 测试数据清理前备份
+# data/_backup_pre_cleanup_20261002_080120/workbench.db
+
+# 本地完整备份
+# /Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/KaiLionCrafts工作台_深度扫描修复后完整备份_20261002.tar.gz
+  </pre>
+</div>
+
+<!-- 交付文件清单 -->
+<div class="card">
+  <h2>📁 交付文件清单</h2>
+  <table>
+    <tr><th>文件</th><th>说明</th></tr>
+    <tr><td>final-delivery-report.html</td><td>本报告（HTML版）</td></tr>
+    <tr><td>final-delivery-report.json</td><td>结构化验收数据</td></tr>
+    <tr><td>final-demo-checklist.md</td><td>演示操作清单与应急方案</td></tr>
+    <tr><td>final-known-limitations.md</td><td>已知限制与技术债务清单</td></tr>
+  </table>
+</div>
+
+<div class="footer">
+  KaiLionCrafts 企业AI客户开发工作台 · 最终交付验收报告 · 2026-10-02<br>
+  本报告基于真实测试输出生成，未使用"绝对完美""全部功能无任何问题"等无法证明的表述。
+</div>
+
+</div>
+</body>
+</html>

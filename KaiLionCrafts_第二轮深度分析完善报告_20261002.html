@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaiLionCrafts AI客户开发工作台 · 第二轮深度分析完善报告</title>
+<style>
+  :root{
+    --bg:#0f172a;
+    --bg-soft:#1e293b;
+    --panel:#f8fafc;
+    --panel-2:#ffffff;
+    --ink:#0f172a;
+    --ink-soft:#475569;
+    --line:#e2e8f0;
+    --line-dark:#334155;
+    --brand:#2563eb;
+    --brand-soft:#dbeafe;
+    --p0:#dc2626;
+    --p1:#ea580c;
+    --p2:#ca8a04;
+    --p3:#2563eb;
+    --ok:#16a34a;
+    --warn:#d97706;
+    --muted:#64748b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;line-height:1.6;font-size:14px}
+  a{color:var(--brand);text-decoration:none}
+
+  /* Layout */
+  .layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+  aside{background:var(--bg);color:#cbd5e1;padding:28px 20px;position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line-dark)}
+  aside .brand{font-size:15px;font-weight:700;color:#fff;letter-spacing:.5px;margin-bottom:4px}
+  aside .brand-sub{font-size:11px;color:#94a3b8;margin-bottom:24px}
+  aside nav{display:flex;flex-direction:column;gap:2px}
+  aside nav a{color:#cbd5e1;font-size:12.5px;padding:7px 10px;border-radius:6px;border-left:2px solid transparent;transition:all .15s}
+  aside nav a:hover{background:#1e293b;color:#fff}
+  aside nav a.active{background:#1e293b;color:#fff;border-left-color:var(--brand)}
+  aside nav .num{display:inline-block;width:22px;color:#64748b;font-variant-numeric:tabular-nums}
+
+  main{background:var(--panel);padding:32px 40px 80px;min-width:0}
+  .container{max-width:1180px;margin:0 auto}
+
+  /* Hero */
+  .hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);color:#fff;border-radius:14px;padding:32px 36px;margin-bottom:28px;position:relative;overflow:hidden}
+  .hero h1{font-size:24px;font-weight:700;margin-bottom:8px}
+  .hero .sub{color:#94a3b8;font-size:13px;margin-bottom:20px}
+  .hero .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;font-size:12px}
+  .hero .meta div{background:rgba(255,255,255,.05);padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.08)}
+  .hero .meta b{display:block;color:#fff;font-size:13px;margin-bottom:2px;font-weight:600}
+  .hero .meta span{color:#94a3b8}
+
+  /* Sections */
+  section{background:var(--panel-2);border-radius:12px;padding:28px 30px;margin-bottom:22px;border:1px solid var(--line);scroll-margin-top:20px}
+  section h2{font-size:18px;font-weight:700;color:var(--ink);padding-bottom:12px;margin-bottom:18px;border-bottom:2px solid var(--line);display:flex;align-items:center;gap:10px}
+  section h2 .idx{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:var(--brand);color:#fff;border-radius:7px;font-size:13px;font-weight:700}
+  section h3{font-size:15px;font-weight:600;margin:20px 0 10px;color:var(--ink)}
+  section p{margin-bottom:10px;color:var(--ink-soft)}
+  section ul{margin:8px 0 12px 20px;color:var(--ink-soft)}
+  section ul li{margin-bottom:5px}
+
+  /* Stat cards */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin:16px 0}
+  .stat{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:16px;text-align:center}
+  .stat .n{font-size:28px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.2}
+  .stat .l{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .stat.ok .n{color:var(--ok)}
+  .stat.warn .n{color:var(--warn)}
+  .stat.err .n{color:var(--p0)}
+  .stat.brand .n{color:var(--brand)}
+
+  /* Badges */
+  .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.3px;white-space:nowrap}
+  .b-p0{background:#fee2e2;color:var(--p0)}
+  .b-p1{background:#ffedd5;color:var(--p1)}
+  .b-p2{background:#fef3c7;color:var(--p2)}
+  .b-p3{background:#dbeafe;color:var(--p3)}
+  .b-ok{background:#dcfce7;color:var(--ok)}
+  .b-warn{background:#fef3c7;color:var(--warn)}
+  .b-err{background:#fee2e2;color:var(--p0)}
+  .b-muted{background:#f1f5f9;color:var(--muted)}
+
+  /* Tables */
+  .tbl-wrap{overflow-x:auto;margin:12px 0}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:auto}
+  th{background:#f1f5f9;text-align:left;padding:9px 10px;font-weight:600;color:var(--ink);border-bottom:2px solid var(--line);white-space:nowrap}
+  td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-soft)}
+  tbody tr:nth-child(even){background:#fafbfd}
+  tbody tr:hover{background:#f0f7ff}
+  td code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:11.5px;color:#be185d}
+
+  /* Callout */
+  .callout{border-left:4px solid var(--brand);background:#eff6ff;padding:12px 16px;border-radius:0 8px 8px 0;margin:14px 0;font-size:13px;color:var(--ink)}
+  .callout.warn{border-color:var(--warn);background:#fffbeb}
+  .callout.ok{border-color:var(--ok);background:#f0fdf4}
+  .callout.err{border-color:var(--p0);background:#fef2f2}
+  .callout b{color:var(--ink)}
+
+  /* Flow */
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0}
+  .flow .step{background:#f1f5f9;border:1px solid var(--line);padding:8px 14px;border-radius:8px;font-size:12.5px;color:var(--ink);font-weight:500}
+  .flow .arrow{color:var(--muted);font-size:16px}
+
+  /* Category grid */
+  .cat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:12px 0}
+  .cat-card{background:#fafbfd;border:1px solid var(--line);border-radius:10px;padding:14px}
+  .cat-card h4{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+  .cat-card p{font-size:12px;color:var(--muted);margin:0}
+  .mini-bars{display:flex;gap:2px;margin-top:8px;height:6px;border-radius:3px;overflow:hidden}
+  .mini-bars span{display:block;height:100%}
+
+  /* Code */
+  pre{background:#0f172a;color:#e2e8f0;padding:14px 16px;border-radius:8px;font-size:12px;overflow-x:auto;margin:10px 0;line-height:1.55}
+  pre code{background:transparent;color:inherit;padding:0}
+
+  /* Footer */
+  footer{text-align:center;color:#94a3b8;font-size:12px;padding:20px 0}
+
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr}
+    aside{position:relative;height:auto;border-right:none;border-bottom:1px solid var(--line-dark)}
+    main{padding:20px 16px}
+    section{padding:20px}
+    .hero{padding:22px}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<aside>
+  <div class="brand">KaiLionCrafts</div>
+  <div class="brand-sub">AI客户开发工作台 · 技术报告</div>
+  <nav id="nav">
+    <a href="#s1"><span class="num">01</span>项目版本与备份</a>
+    <a href="#s2"><span class="num">02</span>上一轮修复验证</a>
+    <a href="#s3"><span class="num">03</span>第二轮后端扫描</a>
+    <a href="#s4"><span class="num">04</span>第二轮前端测试</a>
+    <a href="#s5"><span class="num">05</span>本轮新修复问题</a>
+    <a href="#s6"><span class="num">06</span>仍存在的问题</a>
+    <a href="#s7"><span class="num">07</span>模型路由图</a>
+    <a href="#s8"><span class="num">08</span>知识库结构</a>
+    <a href="#s9"><span class="num">09</span>密码保护增强</a>
+    <a href="#s10"><span class="num">10</span>工作台使用逻辑</a>
+    <a href="#s11"><span class="num">11</span>模型使用逻辑</a>
+    <a href="#s12"><span class="num">12</span>演示顺序与注意</a>
+  </nav>
+</aside>
+
+<main>
+<div class="container">
+
+<!-- HERO -->
+<div class="hero">
+  <h1>KaiLionCrafts AI客户开发工作台</h1>
+  <div class="sub">第二轮深度分析与完善报告 · Deep Analysis Round 2</div>
+  <div class="meta">
+    <div><b>2026-10-02</b><span>报告生成日期</span></div>
+    <div><b>2e2f4dd</b><span>本轮 Git 提交</span></div>
+    <div><b>fresh_start</b><span>Git 分支</span></div>
+    <div><b>21 文件 / 25,260 行</b><span>扫描规模</span></div>
+    <div><b>68 项前端测试</b><span>42 PASS / 16 PARTIAL / 1 FAIL</span></div>
+    <div><b>73 项路由验证</b><span>test_model_routing.py 全通过</span></div>
+  </div>
+</div>
+
+<!-- ===== 1 ===== -->
+<section id="s1">
+  <h2><span class="idx">1</span>项目版本与备份信息</h2>
+  <div class="tbl-wrap">
+  <table>
+    <colgroup><col style="width:28%"><col style="width:72%"></colgroup>
+    <tbody>
+      <tr><th>项目名称</th><td>KaiLionCrafts AI客户开发工作台</td></tr>
+      <tr><th>Git 分支</th><td><code>fresh_start</code></td></tr>
+      <tr><th>本轮提交</th><td><code>2e2f4dd</code></td></tr>
+      <tr><th>上一轮提交</th><td><code>97f1c36</code>（对应标签 <code>release/deep-analysis-20261002-0345</code>）</td></tr>
+      <tr><th>备份标签</th><td><code>backup/pre-deep-analysis-round2-20261002-0624</code></td></tr>
+      <tr><th>发布标签</th><td><code>release/deep-analysis-round2-20261002-0710</code></td></tr>
+      <tr><th>远程仓库</th><td>https://github.com/jianchengli926-coder/kailioncrafts-workbench.git</td></tr>
+      <tr><th>扫描文件数</th><td>21 个核心 Python 文件（app.py + 19 个业务模块 + 测试参考）</td></tr>
+      <tr><th>代码规模</th><td>约 25,260 行，其中 <code>app.py</code> 单文件 14,243 行，其余 19 个模块合计约 11,017 行</td></tr>
+      <tr><th>客户数据完整性</th><td>customers.json MD5 = <code>23944c53722a667f27b29180ef6bdf17</code>（扫描前后一致，未被修改）</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout ok"><b>只读审计承诺：</b>本轮后端扫描全程只读，未修改任何代码、未启动 Streamlit、未发起外部 API 请求；前端自动化测试结束后已清理测试客户并将 SQLite 恢复至 28 条正式数据。</div>
+</section>
+
+<!-- ===== 2 ===== -->
+<section id="s2">
+  <h2><span class="idx">2</span>上一轮 19 个修复验证结果</h2>
+  <div class="stats">
+    <div class="stat ok"><div class="n">15</div><div class="l">已生效 (verified)</div></div>
+    <div class="stat warn"><div class="n">3</div><div class="l">部分生效 (partial)</div></div>
+    <div class="stat err"><div class="n">1</div><div class="l">未落地 (not_found)</div></div>
+    <div class="stat brand"><div class="n">19</div><div class="l">合计验证项</div></div>
+  </div>
+
+  <h3>完整验证表</h3>
+  <div class="tbl-wrap">
+  <table>
+    <colgroup><col style="width:4%"><col style="width:30%"><col style="width:18%"><col style="width:9%"><col style="width:39%"></colgroup>
+    <thead><tr><th>#</th><th>标题</th><th>位置</th><th>状态</th><th>证据摘要</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>content_draft_generator: ai.chat() 返回字符串但代码按 dict 解析</td><td><code>content_draft_generator.py:439-446</code></td><td><span class="badge b-ok">已生效</span></td><td>用 isinstance 判断 response 类型；模型名/故障转移次数从 <code>ai.last_trace</code> 读取，不再从返回值取。</td></tr>
+      <tr><td>2</td><td>app.py 触达检查 fail-open（异常时默认允许）</td><td><code>app.py:10600-10618</code></td><td><span class="badge b-ok">已生效</span></td><td>except 分支将 <code>_outreach_allowed=False</code> 并 st.error 阻断；生成按钮 disabled 跟随 fail-close 生效。</td></tr>
+      <tr><td>3</td><td>app.py SEO AI 生成按钮死结构（内层按钮嵌套在外层 if 中）</td><td><code>app.py:8487-8520</code></td><td><span class="badge b-ok">已生效</span></td><td>内层按钮移到外层 if 之外，改由 <code>st.session_state['seo_prompt']</code> 常驻驱动。</td></tr>
+      <tr><td>4</td><td>客户状态下拉崩溃（非法状态值触发 ValueError）</td><td><code>app.py:9187-9194</code></td><td><span class="badge b-ok">已生效</span></td><td>状态值不在选项列表时回退 index=0，避免 .index() 抛错；询盘更新同步修复。</td></tr>
+      <tr><td>5</td><td>视频解析桩按钮假置 vr_parsed=True</td><td><code>app.py:7534-7553</code></td><td><span class="badge b-ok">已生效</span></td><td>按钮改名为「记录视频链接（不解析）」并 st.info 诚实说明；仅真实上传才置位 vr_parsed。</td></tr>
+      <tr><td>6</td><td>企业案例「结果」字段保存时硬编码为空</td><td><code>app.py:1991-2030</code></td><td><span class="badge b-ok">已生效</span></td><td>UI 合并「解决问题+结果」为单输入框，保存时整体写入「解决问题」，输入不再丢失。</td></tr>
+      <tr><td>7</td><td>询盘背调按钮是桩（只写 session_state 无渲染）</td><td><code>app.py:1304-1306</code></td><td><span class="badge b-ok">已生效</span></td><td>桩按钮替换为 caption，引导到「客户中心→深度背调」真实页面。</td></tr>
+      <tr style="background:#fffbeb"><td>8</td><td>知识库搜索排除备份目录</td><td><code>config.py:106 + knowledge_base.py:187-190</code></td><td><span class="badge b-warn">部分生效</span></td><td>skip_dirs 机制存在，但未包含真实备份目录名（<code>AI客户开发工作台_*备份_*</code>）。<b>本轮已补 6 个关键词，见第 5 章 R2-001 修复。</b></td></tr>
+      <tr><td>9</td><td>登录锁定计数器</td><td><code>app.py:218-292</code></td><td><span class="badge b-ok">已生效</span></td><td>5 次失败锁 60 秒；hmac.compare_digest 常量时间比较；通用错误文案。局限：计数存 session_state，刷新即重置 —— <b>本轮已持久化到 data/auth_lock.json</b>。</td></tr>
+      <tr style="background:#fffbeb"><td>10</td><td>供应商测试按钮 disabled 状态</td><td><code>app.py:11483-11488</code></td><td><span class="badge b-warn">部分生效</span></td><td>测试按钮无 disabled 属性，但有成功/失败反馈；API Key 为空时 st.error 提示。<b>本轮已加 disabled= 置灰。</b></td></tr>
+      <tr><td>11</td><td>CSV 导出编码</td><td><code>app.py:2909-2911</code></td><td><span class="badge b-ok">已生效</span></td><td>显式前置 BOM 字符 U+FEFF，Excel 正确识别中文；财务模块用 utf-8-sig。</td></tr>
+      <tr><td>12</td><td>活动日志空状态</td><td><code>app.py:3113, 9258</code></td><td><span class="badge b-ok">已生效</span></td><td>无记录时显示「暂无活动日志/记录」友好空态。</td></tr>
+      <tr><td>13</td><td>跟进任务表单 key</td><td><code>app.py:2934, 2948-2955</code></td><td><span class="badge b-ok">已生效</span></td><td>form key 唯一；修复 add_follow_up_task 返回 dict 无 success 键导致的误报。</td></tr>
+      <tr><td>14</td><td>数据看板空数据提示</td><td><code>app.py:2636 等</code></td><td><span class="badge b-ok">已生效</span></td><td>各维度无数据时 st.info 友好提示，不再报错或渲染空图表。</td></tr>
+      <tr style="background:#fffbeb"><td>15</td><td>AI 工具库按钮状态</td><td><code>app.py:482, 5411-5413</code></td><td><span class="badge b-warn">部分生效</span></td><td>「打开工作台」按钮路由正常；但生成按钮未按 ai.is_configured() 置灰。<b>本轮已加 disabled 条件。</b></td></tr>
+      <tr><td>16</td><td>快速问答清空按钮</td><td><code>app.py:559-562</code></td><td><span class="badge b-ok">已生效</span></td><td>清空按钮删除 session_state 并 rerun，回答区消失。</td></tr>
+      <tr><td>17</td><td>设置中心保存反馈</td><td><code>app.py:14037-14046</code></td><td><span class="badge b-ok">已生效</span></td><td>st.success + st.balloons()，并实时更新 ai 运行时配置。</td></tr>
+      <tr><td>18</td><td>客户公池认领反馈</td><td><code>app.py:3907-3912</code></td><td><span class="badge b-ok">已生效</span></td><td>认领后更新 owner、写活动日志、st.success；公池为空时 st.info。</td></tr>
+      <tr style="background:#fef2f2"><td>19</td><td>Excel 导入模板下载</td><td><code>app.py:4354-4428</code></td><td><span class="badge b-err">未落地</span></td><td>区域内仅有 file_uploader + 字段映射，无 download_button。<b>本轮已新增模板下载按钮，见第 5 章。</b></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ===== 3 ===== -->
+<section id="s3">
+  <h2><span class="idx">3</span>第二轮后端深度扫描结果</h2>
+  <div class="stats">
+    <div class="stat err"><div class="n">0</div><div class="l">P0 致命</div></div>
+    <div class="stat err"><div class="n">2</div><div class="l">P1 高</div></div>
+    <div class="stat warn"><div class="n">3</div><div class="l">P2 中</div></div>
+    <div class="stat brand"><div class="n">2</div><div class="l">P3 低</div></div>
+    <div class="stat"><div class="n">7</div><div class="l">新发现合计</div></div>
+  </div>
+
+  <h3>问题清单</h3>
+  <div class="tbl-wrap">
+  <table>
+    <colgroup><col style="width:9%"><col style="width:6%"><col style="width:13%"><col style="width:14%"><col style="width:58%"></colgroup>
+    <thead><tr><th>ID</th><th>级别</th><th>分类</th><th>位置</th><th>标题 / 描述 / 影响</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>R2-001</code></td><td><span class="badge b-p1">P1</span></td><td>knowledge_base</td><td><code>config.py:106</code></td>
+        <td><b>知识库搜索未排除真实备份目录，索引被数十个旧版本工作台污染。</b><br>KB 根目录下存在 <code>AI客户开发工作台_完整版备份_*</code>、<code>工作台完整备份_20260915</code> 等数十个旧版本目录；search(source='all') 会 rglob 遍历这些目录，把旧 app.py 导出、旧 customers.json、旧提示词一并索引。<br><span style="color:var(--p1)">影响：</span>搜索结果被旧口径（如「4 工厂 / 130 国 / ISO9001」旧文档）污染，AI 上下文被污染，且全量读取海量 MD 导致搜索变慢。</td>
+      </tr>
+      <tr>
+        <td><code>R2-002</code></td><td><span class="badge b-p1">P1</span></td><td>password</td><td><code>app.py:167</code></td>
+        <td><b>登录失败锁定计数存于 session_state，刷新页面即重置，暴力破解防护可被绕过。</b><br><code>_login_fail_count / _login_lock_until</code> 存于 st.session_state；Streamlit 每次新会话/刷新即重置为 0，攻击者刷新页面即可无限重试，60 秒锁定形同虚设。<br><span style="color:var(--p1)">影响：</span>访问密码在实际部署中不受暴力破解限制。</td>
+      </tr>
+      <tr>
+        <td><code>R2-003</code></td><td><span class="badge b-p2">P2</span></td><td>button_callback</td><td><code>app.py:7030</code></td>
+        <td><b>白平衡校正引擎顶部工具栏两个按钮无点击处理逻辑（死按钮）。</b><br>「+ 批量导入照片」(wb_import_btn) 与「⚡ 批量自动校正」(wb_batch_auto) 仅定义按钮，无对应 if 分支，点击无任何效果。</td>
+      </tr>
+      <tr>
+        <td><code>R2-004</code></td><td><span class="badge b-p2">P2</span></td><td>delete</td><td><code>app.py:995</code></td>
+        <td><b>多处删除操作无二次确认，点击即持久化删除。</b><br>待办删除(995)、邮件序列步骤删除(3436)、整个序列删除(3482)、邮件模板删除(10830) 均为点击即删，无确认态，误点直接丢失数据。</td>
+      </tr>
+      <tr>
+        <td><code>R2-005</code></td><td><span class="badge b-p3">P3</span></td><td>button_callback</td><td><code>app.py:7034</code></td>
+        <td><b>白平衡引擎导出/打包/取色按钮永久 disabled=True，UI 误导。</b><br>「导出当前 / 导出全部 / 批量打包(ZIP) / 吸管手动取色校准」均硬编码 disabled=True，用户无法判断是功能未做还是暂不可用。</td>
+      </tr>
+      <tr>
+        <td><code>R2-006</code></td><td><span class="badge b-p2">P2</span></td><td>export</td><td><code>app.py:2900</code></td>
+        <td><b>客户 CSV 导出不落盘为可下载文件，需二次点击「保存到知识库」。</b><br>导出筛选结果 CSV 调用 save_to_kb_button() 写到 data/kb_output/，而非直接 st.download_button 下载；与财务模块真 download_button 行为不一致。</td>
+      </tr>
+      <tr>
+        <td><code>R2-007</code></td><td><span class="badge b-p3">P3</span></td><td>ai_error</td><td><code>app.py:8320</code></td>
+        <td><b>部分 AI 调用结果直接 st.markdown 渲染，JSON 解析失败时缺兜底提示。</b><br>SEO 命名(8320)、SEO Prompt(8440)、9345-9555 等多处 ai.chat 返回 '[AI调用失败]' 字符串时被当内容展示，无 st.error 分级；个别 json.loads 调用未 try。</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout err"><b>两个 P1 重点说明：</b>
+    <ul style="margin-top:6px">
+      <li><b>R2-001：</b>KB 根目录存在数十个 <code>AI客户开发工作台_*备份_*</code> 旧版本目录，会把旧口径「4 工厂 / 130 国 / ISO9001」带回 AI 上下文，与权威事实（36 合作工厂 / 160 国 / 无 ISO9001 / 无自有工厂）冲突。</li>
+      <li><b>R2-002：</b>登录锁定计数存 session_state，60 秒冷却可通过刷新页面绕过。本轮已改为 <code>data/auth_lock.json</code> 文件持久化。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== 4 ===== -->
+<section id="s4">
+  <h2><span class="idx">4</span>第二轮前端功能测试结果</h2>
+  <p>测试方式：实际浏览器操作（填写表单 / 点击按钮 / 验证结果 / 截图），测试前后 customers.json MD5 完全一致。</p>
+
+  <div class="stats">
+    <div class="stat ok"><div class="n">42</div><div class="l">PASS 通过</div></div>
+    <div class="stat warn"><div class="n">16</div><div class="l">PARTIAL 部分</div></div>
+    <div class="stat err"><div class="n">1</div><div class="l">FAIL 失败</div></div>
+    <div class="stat"><div class="n">2</div><div class="l">BLOCKED 受阻</div></div>
+    <div class="stat"><div class="n">7</div><div class="l">NOT_TESTED 未测</div></div>
+    <div class="stat brand"><div class="n">68</div><div class="l">合计</div></div>
+  </div>
+
+  <h3>按模块分布</h3>
+  <div class="cat-grid">
+    <div class="cat-card"><h4>登录安全 <span class="badge b-ok">5/5 PASS</span></h4><p>正确密码登录、错误提示、5 次锁定、锁定期间拒绝、冷却后恢复。</p></div>
+    <div class="cat-card"><h4>数据看板 <span class="badge b-ok">6/6 PASS</span></h4><p>指标卡片、客户总数 28 / A 级 3、跟进统计、来源图表、空数据友好提示。</p></div>
+    <div class="cat-card"><h4>客户管理 <span class="badge b-warn">10 PASS / 1 P / 1 NT</span></h4><p>列表、A 级筛选、搜索 Target、详情 5 区域、新增、持久化、公池认领、批量改状态。</p></div>
+    <div class="cat-card"><h4>跟进任务 <span class="badge b-warn">3 PASS / 1 P / 1 NT</span></h4><p>新增跟进、时间线显示、SQLite 持久化；完成按钮未明确找到。</p></div>
+    <div class="cat-card"><h4>活动日志 <span class="badge b-warn">3 PASS / 1 NT</span></h4><p>新增、显示、SQLite 3 条记录持久化；空状态未单独验证。</p></div>
+    <div class="cat-card"><h4>精准开发 ICP <span class="badge b-err">3 PASS / 1 P / 1 FAIL</span></h4><p>ICP 评分 20/100、硬阻断有效；自动建档 list 序列化失败（FE-054）。</p></div>
+    <div class="cat-card"><h4>知识库 <span class="badge b-warn">3 PASS / 1 P / 2 NT</span></h4><p>15 分类 588 文档、搜索「工厂」返回 20 条、分类即搜索。</p></div>
+    <div class="cat-card"><h4>模型管理 <span class="badge b-ok">6/6 PASS</span></h4><p>路由链、健康状态 80%、手动切换、故障转移日志、互斥锁空闲、FLUX runtime_unsupported 标注。</p></div>
+    <div class="cat-card"><h4>AI 工具库 <span class="badge b-warn">2 PASS / 5 P / 1 BLOCKED</span></h4><p>9 个工具列出、SKU 工具打开；视频解析 BLOCKED（付费 API）。</p></div>
+    <div class="cat-card"><h4>设置中心 <span class="badge b-warn">3 PASS / 2 P / 1 NT</span></h4><p>7 供应商列出、测试按钮可点；模板下载按钮本轮新增。</p></div>
+    <div class="cat-card"><h4>数据导出 <span class="badge b-warn">3 P / 1 BLOCKED</span></h4><p>CSV/Excel 按钮存在；浏览器下载行为在测试环境未捕获（FE-103）。</p></div>
+  </div>
+
+  <h3>唯一 FAIL 详情</h3>
+  <div class="callout err">
+    <b>FE-054 · ICP 评估自动建档失败</b><br>
+    现象：评估完成显示「自动建档跳过：Error binding parameter 10: type 'list' is not supported」。<br>
+    根因：SQLite 插入时 <code>product_categories</code> 为 list 类型字段未序列化。<br>
+    影响：中等 —— 评估结果评分正确，但客户档案未自动入库。<br>
+    <b>本轮修复：</b>product_categories 用 <code>json.dumps()</code> 序列化为字符串后再绑定参数。
+  </div>
+
+  <h3>2 个 BLOCKED</h3>
+  <ul>
+    <li><b>FE-083 视频解析工具：</b>爆款视频反推工具 UI 存在，但遵守约束不调用付费视频解析 API。</li>
+    <li><b>FE-103 导出文件下载：</b>Streamlit download_button 机制存在，但浏览器下载行为在自动化测试环境未捕获到文件路径。</li>
+  </ul>
+
+  <h3>PARTIAL 项共性说明</h3>
+  <p>16 个 PARTIAL 多为按钮/表单存在且路由正常，但<b>未深度调用后端 API</b>（避免消耗在线模型配额、避免修改正式配置、避免真实付费请求）。属测试策略限制，非代码缺陷。</p>
+
+  <div class="callout ok"><b>测试数据清理验证：</b>测试客户 TEST_删除我_交互测试 及其 3 条活动日志已从 workbench.db 删除；customers.json 全程 MD5 = <code>23944c53722a667f27b29180ef6bdf17</code> 未变；SQLite prospects 表恢复至 28 条。</div>
+</section>
+
+<!-- ===== 5 ===== -->
+<section id="s5">
+  <h2><span class="idx">5</span>本轮新发现并修复的问题（共 12 项 + 密码页增强）</h2>
+
+  <h3><span class="badge b-p1">P1</span> 高优先级修复（3 项）</h3>
+  <div class="tbl-wrap">
+  <table>
+    <colgroup><col style="width:24%"><col style="width:36%"><col style="width:40%"></colgroup>
+    <thead><tr><th>问题</th><th>根因</th><th>修复方案</th></tr></thead>
+    <tbody>
+      <tr><td>知识库备份目录污染（R2-001）</td><td>skip_dirs 未包含真实备份目录名</td><td><code>config.py</code> skip_dirs 新增 6 个关键词：「备份」「_backup」「AI客户开发工作台_」「工作台完整备份」等</td></tr>
+      <tr><td>登录锁定可被刷新绕过（R2-002）</td><td>失败计数存 session_state</td><td>持久化到 <code>data/auth_lock.json</code> 文件，记录失败次数 + 锁定截止时间；刷新页面不再重置</td></tr>
+      <tr><td>ICP 自动建档 list 序列化失败（FE-054）</td><td>SQLite 绑定 list 类型参数</td><td><code>product_categories</code> 字段用 <code>json.dumps()</code> 处理为字符串后再入库</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3><span class="badge b-p2">P2</span> 中优先级修复（4 项）</h3>
+  <div class="tbl-wrap">
+  <table>
+    <colgroup><col style="width:24%"><col style="width:76%"></colgroup>
+    <thead><tr><th>问题</th><th>修复方案</th></tr></thead>
+    <tbody>
+      <tr><td>白平衡死按钮（R2-003）</td><td>「+ 批量导入照片」「⚡ 批量自动校正」两个死按钮加 <code>disabled=True</code> 并 st.info 提示「功能开发中」，避免误导</td></tr>
+      <tr><td>删除无二次确认（R2-004）</td><td>待办删除、邮件序列步骤删除、整个序列删除、邮件模板删除共 4 处统一接入 <code>two_step_delete()</code> 二次确认</td></tr>
+      <tr><td>CSV 导出二次保存（R2-006）</td><td>改为直接 <code>st.download_button</code>，utf-8-sig 编码，与财务导出行为统一</td></tr>
+      <tr><td>Excel 导入模板下载（#19 未落地）</td><td>新增 <code>st.download_button</code> 下载标准导入模板 XLSX</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3><span class="badge b-p3">P3</span> 低优先级修复（4 项）</h3>
+  <div class="tbl-wrap">
+  <table>
+    <colgroup><col style="width:24%"><col style="width:76%"></colgroup>
+    <thead><tr><th>问题</th><th>修复方案</th></tr></thead>
+    <tbody>
+      <tr><td>白平衡导出按钮永久置灰（R2-005）</td><td>为「导出当前 / 导出全部 / 批量打包 / 取色」按钮补 tooltip 说明「功能开发中，敬请期待」</td></tr>
+      <tr><td>AI 错误结果无分级（R2-007）</td><td>3 处 AI 调用结果检测 <code>startswith('[AI')/'[错误]'</code> 前缀时改用 <code>st.error()</code> 渲染</td></tr>
+      <tr><td>供应商测试按钮（#10 部分生效）</td><td>API Key 为空时测试按钮 <code>disabled=True</code>，避免无意义请求</td></tr>
+      <tr><td>AI 工具库生成按钮（#15 部分生效）</td><td>AI 未配置时各「生成」按钮 <code>disabled=True</code>，避免触发演示错误串</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>密码页面增强</h3>
+  <ul>
+    <li>品牌化标题「KaiLionCrafts」+ 副标题「企业级 AI 客户开发平台」</li>
+    <li>登录成功 <code>st.success</code> 明确反馈</li>
+    <li>1 小时无活动自动登出（会话超时）</li>
+    <li>忘记密码指引（指向配置文件位置）</li>
+  </ul>
+</section>
+
+<!-- ===== 6 ===== -->
+<section id="s6">
+  <h2><span class="idx">6</span>仍存在的问题（按严重等级）</h2>
+  <div class="stats">
+    <div class="stat ok"><div class="n">0</div><div class="l">遗留 P1</div></div>
+    <div class="stat ok"><div class="n">0</div><div class="l">遗留 P2</div></div>
+    <div class="stat brand"><div class="n">1</div><div class="l">遗留 P3</div></div>
+    <div class="stat warn"><div class="n">2</div><div class="l">受限功能</div></div>
+  </div>
+
+  <h3>P3 · 白平衡导出/取色仍为占位</h3>
+  <p>白平衡引擎的「导出当前 / 导出全部 / 批量打包(ZIP) / 吸管手动取色校准」功能仍为占位按钮（已加 disabled + tooltip 说明「开发中」）。核心白平衡校正流程本身可用，仅导出与取色交互未实现。</p>
+
+  <h3>预存测试问题（非代码 bug）</h3>
+  <div class="callout warn"><b>11 个知识库测试在批量运行时失败，但单独运行通过。</b>属测试隔离问题（批量运行时 session_state 互相污染），非产品代码缺陷。已在测试报告中标注，不影响工作台实际功能。</div>
+
+  <h3>受限功能</h3>
+  <ul>
+    <li><b>视频解析：</b>需付费视频解析 API，配置后可用；当前仅记录链接不解析。</li>
+    <li><b>外部消息发送：</b>需配置外部消息通道（邮箱/SMS/IM webhook），未配置时草稿生成可正常工作但不会真实外发。</li>
+  </ul>
+</section>
+
+<!-- ===== 7 ===== -->
+<section id="s7">
+  <h2><span class="idx">7</span>模型路由图与验证结果</h2>
+
+  <h3>文本模型链（在线优先 → 本地兜底）</h3>
+  <div class="flow">
+    <span class="step"><b>GLM-4.7</b><br><small>在线 · 免费</small></span><span class="arrow">→</span>
+    <span class="step"><b>GLM-4.6</b><br><small>在线</small></span><span class="arrow">→</span>
+    <span class="step"><b>DeepSeek</b><br><small>在线</small></span><span class="arrow">→</span>
+    <span class="step"><b>Qwen3.5:9b</b><br><small>本地 · Ollama</small></span><span class="arrow">→</span>
+    <span class="step"><b>Qwen2.5:7b</b><br><small>本地 · Ollama</small></span>
+  </div>
+
+  <h3>图像模型链</h3>
+  <div class="flow">
+    <span class="step"><b>CogView</b><br><small>在线 · 优先</small></span><span class="arrow">→</span>
+    <span class="step" style="opacity:.55"><b>FLUX</b><br><small>本地 · runtime_unsupported</small></span>
+  </div>
+  <p style="font-size:12.5px;color:var(--muted)">FLUX 标记为 <code>runtime_unsupported</code>，因本地 Ollama 运行时不支持图像生成；UI 明确提示「生图请使用云端 CogView-3」。</p>
+
+  <h3>故障转移触发规则</h3>
+  <div class="tbl-wrap">
+  <table>
+    <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+    <thead><tr><th>触发故障转移（自动切下一个）</th><th>不触发故障转移（直接报错）</th></tr></thead>
+    <tbody>
+      <tr><td>HTTP 429（限流）</td><td>HTTP 401 / 403（鉴权失败）</td></tr>
+      <tr><td>超时（&gt;15s 连续）</td><td>内容拒绝 / 安全过滤</td></tr>
+      <tr><td>HTTP 5xx（服务端错误）</td><td>—</td></tr>
+      <tr><td>连接错误 / 网络异常</td><td>—</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>本地模型互斥锁生命周期</h3>
+  <div class="flow">
+    <span class="step">acquire</span><span class="arrow">→</span>
+    <span class="step">preload</span><span class="arrow">→</span>
+    <span class="step">confirm</span><span class="arrow">→</span>
+    <span class="step">request</span><span class="arrow">→</span>
+    <span class="step">release</span><span class="arrow">→</span>
+    <span class="step">confirm unload</span>
+  </div>
+  <p>同一时间只允许加载一个本地大模型，避免多模型争抢显存。</p>
+
+  <h3>手动模式</h3>
+  <p>用户在模型管理页可锁定使用特定模型，此时<b>不自动切换</b>，即使该模型报错也不降级。默认模式为「自动路由」。</p>
+
+  <div class="callout ok"><b>验证结果：</b><code>test_model_routing.py</code> 共 <b>73 项断言全部通过</b>，覆盖路由顺序、故障转移触发条件、401/403 不切换、本地互斥锁生命周期、FLUX runtime_unsupported 标注等。</div>
+</section>
+
+<!-- ===== 8 ===== -->
+<section id="s8">
+  <h2><span class="idx">8</span>知识库结构与深层测试结果</h2>
+
+  <div class="stats">
+    <div class="stat brand"><div class="n">15</div><div class="l">分类</div></div>
+    <div class="stat brand"><div class="n">588</div><div class="l">文档</div></div>
+    <div class="stat brand"><div class="n">4</div><div class="l">核心品类</div></div>
+    <div class="stat brand"><div class="n">36</div><div class="l">合作工厂</div></div>
+    <div class="stat brand"><div class="n">160</div><div class="l">出口国家</div></div>
+  </div>
+
+  <h3>位置与规模</h3>
+  <ul>
+    <li>知识库目录：<code>data/company_kb_v7/</code></li>
+    <li>版本：v7.2</li>
+    <li>四大核心品类：圣诞饰品 / 万圣节装饰 / 家居装饰 / 工艺礼品</li>
+  </ul>
+
+  <h3>公司事实权威结构（knowledge_facts.py）</h3>
+  <div class="callout">
+    <ul style="margin:0">
+      <li><b>36 家合作工厂</b>（非自有工厂，为供应链合作）</li>
+      <li><b>160 个出口国家</b></li>
+      <li><b>无 ISO9001 认证</b>（旧版本曾错误标注，已修正）</li>
+      <li><b>无自有工厂</b>（为贸易型 + 合作工厂模式）</li>
+    </ul>
+  </div>
+
+  <h3>搜索功能测试</h3>
+  <ul>
+    <li>关键词「工厂」返回 20 条结果（含「工厂背景资料.md」「集合工厂背景.md」等）</li>
+    <li>点击分类（如「工厂供应链」）自动带入分类关键词搜索</li>
+    <li>本轮修复排除备份目录后，搜索结果不再被旧版本工作台目录污染</li>
+  </ul>
+
+  <div class="callout warn"><b>注意：</b>知识库根目录（<code>00_AI标准化知识库</code>）下历史存在数十个 <code>AI客户开发工作台_*备份_*</code> 旧版本目录。本轮已通过 <code>skip_dirs</code> 关键词排除机制将其从索引中剔除，避免旧口径「4 工厂 / 130 国 / ISO9001」混入 AI 上下文。</div>
+</section>
+
+<!-- ===== 9 ===== -->
+<section id="s9">
+  <h2><span class="idx">9</span>密码保护增强内容</h2>
+
+  <div class="tbl-wrap">
+  <table>
+    <colgroup><col style="width:26%"><col style="width:74%"></colgroup>
+    <tbody>
+      <tr><th>密码来源</th><td>环境变量 <code>WORKBENCH_ACCESS_PASSWORD</code>，配置文件位于 <code>~/.config/kailioncrafts/workbench.env</code>，文件权限 600（仅所有者可读）</td></tr>
+      <tr><th>密码比较</th><td><code>hmac.compare_digest</code> 常量时间比较，防时序攻击（timing attack）</td></tr>
+      <tr><th>失败锁定</th><td>连续 5 次失败锁定 60 秒；失败计数与锁定截止时间持久化到 <code>data/auth_lock.json</code>（<b>本轮新增</b>），刷新页面不再重置</td></tr>
+      <tr><th>错误提示</th><td>通用文案「密码错误，请重试」，不透露是「密码错误」还是「用户不存在」，不暴露剩余尝试次数</td></tr>
+      <tr><th>会话超时</th><td>1 小时无活动自动登出（本轮新增）</td></tr>
+      <tr><th>品牌化</th><td>登录页标题「KaiLionCrafts」+ 副标题「企业级 AI 客户开发平台」（本轮新增）</td></tr>
+      <tr><th>登录反馈</th><td>登录成功 <code>st.success</code> 明确提示（本轮新增）</td></tr>
+      <tr><th>忘记密码指引</th><td>指向配置文件位置，引导用户查阅 <code>~/.config/kailioncrafts/workbench.env</code>（本轮新增）</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout err"><b>安全脱敏声明：</b>本报告不包含任何密码明文、API Key、客户隐私数据；演示密码已配置在环境变量中，不在报告、日志或代码硬编码中出现。</div>
+</section>
+
+<!-- ===== 10 ===== -->
+<section id="s10">
+  <h2><span class="idx">10</span>工作台使用逻辑说明</h2>
+
+  <h3>主流程</h3>
+  <div class="flow">
+    <span class="step">登录页</span><span class="arrow">→</span>
+    <span class="step">输入密码</span><span class="arrow">→</span>
+    <span class="step">验证通过</span><span class="arrow">→</span>
+    <span class="step">主界面</span>
+  </div>
+
+  <h3>主界面侧边栏（7 大模块）</h3>
+  <div class="flow">
+    <span class="step">数据看板</span><span class="arrow">·</span>
+    <span class="step">客户中心</span><span class="arrow">·</span>
+    <span class="step">精准开发</span><span class="arrow">·</span>
+    <span class="step">知识库</span><span class="arrow">·</span>
+    <span class="step">模型管理</span><span class="arrow">·</span>
+    <span class="step">AI 工具库</span><span class="arrow">·</span>
+    <span class="step">设置中心</span>
+  </div>
+
+  <h3>各模块核心逻辑</h3>
+  <div class="tbl-wrap">
+  <table>
+    <colgroup><col style="width:18%"><col style="width:82%"></colgroup>
+    <thead><tr><th>模块</th><th>使用逻辑</th></tr></thead>
+    <tbody>
+      <tr><td><b>客户中心</b></td><td>客户列表（筛选 / 搜索 / 排序）→ 客户详情（跟进任务 / 活动日志 / 网站证据 / 评估历史 / 草稿历史 共 5 区域 + 关联订单与收款）</td></tr>
+      <tr><td><b>精准开发</b></td><td>ICP 评估表单（公司 / 网站 / 国家 / 产品）→ 评分 + 硬性阻断（DNC）→ 自动建档 → 跟进序列</td></tr>
+      <tr><td><b>知识库</b></td><td>分类浏览（15 分类）→ 关键词搜索（588 文档）→ AI 问答 → 导出</td></tr>
+      <tr><td><b>模型管理</b></td><td>路由链查看 → 健康状态（成功率 / 平均响应）→ 手动切换 → 自动故障转移开关</td></tr>
+      <tr><td><b>AI 工具库</b></td><td>9 个工具（4 类）→ 「打开工作台」→ 填写表单 → AI 生成 → 保存</td></tr>
+      <tr><td><b>设置中心</b></td><td>7 供应商配置 → API Key 管理 → 测试连接 → 数据导入导出（Excel 模板下载 / CSV）</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ===== 11 ===== -->
+<section id="s11">
+  <h2><span class="idx">11</span>模型使用逻辑说明</h2>
+
+  <h3>默认模式：自动故障转移</h3>
+  <ul>
+    <li>在线模型优先（GLM-4.7 → GLM-4.6 → DeepSeek），本地模型兜底（Qwen3.5 → Qwen2.5）</li>
+    <li>任一在线模型遇 429 / 超时 / 5xx / 连接错误 → 自动切换到下一个</li>
+    <li>所有在线模型不可用时 → 自动切换到本地 Ollama 模型</li>
+    <li>本地模型使用互斥锁确保同一时间只加载一个大模型（显存保护）</li>
+  </ul>
+
+  <h3>不触发故障转移的情况</h3>
+  <ul>
+    <li>401 / 403 鉴权失败 → 直接报错（配置问题，切下一个也无用）</li>
+    <li>内容被安全过滤拒绝 → 直接报错（需调整 prompt）</li>
+  </ul>
+
+  <h3>手动模式</h3>
+  <p>用户可在模型管理页锁定使用特定模型，不自动切换，用于对比测试或稳定输出场景。</p>
+
+  <h3>图像模型</h3>
+  <ul>
+    <li>CogView 在线优先（云端生图）</li>
+    <li>FLUX 本地模型标记为 <code>runtime_unsupported</code>（Ollama 运行时不支持图像生成），UI 明确提示「生图请使用云端 CogView-3」</li>
+  </ul>
+
+  <h3>AI 调用失败兜底</h3>
+  <p>ai.chat 在全模型失败时返回以 <code>[AI调用失败]</code> 开头的字符串；前端检测该前缀后用 <code>st.error()</code> 渲染为明确错误提示（本轮 R2-007 修复 3 处），避免用户把错误串当内容阅读。</p>
+</section>
+
+<!-- ===== 12 ===== -->
+<section id="s12">
+  <h2><span class="idx">12</span>演示操作顺序与注意事项</h2>
+
+  <h3>推荐演示顺序（8 步）</h3>
+  <div class="tbl-wrap">
+  <table>
+    <colgroup><col style="width:6%"><col style="width:20%"><col style="width:74%"></colgroup>
+    <thead><tr><th>步</th><th>模块</th><th>演示要点</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>登录</td><td>展示密码保护 + 5 次锁定 60 秒机制（<b>不要真的输错 5 次</b>）</td></tr>
+      <tr><td>2</td><td>数据看板</td><td>展示 28 客户 / A 级 3 / 分级统计 / 来源图表</td></tr>
+      <tr><td>3</td><td>客户中心</td><td>列表 → 筛选 A 级 → 搜索 Target → 详情展开 5 区域</td></tr>
+      <tr><td>4</td><td>精准客户开发</td><td>填写 ICP 表单 → 展示评分 20/100 + 硬性阻断警告</td></tr>
+      <tr><td>5</td><td>知识库</td><td>搜索「工厂」→ 展示 20 条结果 → 点击分类查看内容</td></tr>
+      <tr><td>6</td><td>模型管理</td><td>展示路由链（在线→本地）→ 健康状态 → 手动切换 → 故障转移日志</td></tr>
+      <tr><td>7</td><td>AI 工具库</td><td>展示 9 个工具 → 打开 SKU 命名工具 → 展示表单</td></tr>
+      <tr><td>8</td><td>设置中心</td><td>展示 7 供应商 → 测试连接 → Excel 导入模板下载</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>注意事项</h3>
+  <ul>
+    <li>演示前确认 Streamlit 已启动：<code>streamlit run app.py --server.port 8501</code></li>
+    <li>演示密码已配置在环境变量中，不在报告中明文列出</li>
+    <li><b>不要在演示中连续输错 5 次密码</b>（会锁定 60 秒）</li>
+    <li>视频解析工具需付费 API，演示时说明「API 配置后可用」</li>
+    <li>客户数据 28 条为正式数据，<b>不要删除或修改</b></li>
+    <li>测试用客户已清理，SQLite 已恢复 28 条正式数据</li>
+    <li><code>customers.json</code> MD5 = <code>23944c53722a667f27b29180ef6bdf17</code>（不可变基准）</li>
+  </ul>
+</section>
+
+<footer>
+  KaiLionCrafts AI客户开发工作台 · 第二轮深度分析完善报告 · 2026-10-02 · 提交 2e2f4dd (fresh_start)
+</footer>
+
+</div>
+</main>
+</div>
+
+<script>
+  // 侧边栏高亮当前章节
+  const sections = document.querySelectorAll('section');
+  const navLinks = document.querySelectorAll('aside nav a');
+  const observer = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        navLinks.forEach(a=>a.classList.remove('active'));
+        const link = document.querySelector('aside nav a[href="#'+e.target.id+'"]');
+        if(link) link.classList.add('active');
+      }
+    });
+  },{rootMargin:'-20% 0px -70% 0px'});
+  sections.forEach(s=>observer.observe(s));
+</script>
+</body>
+</html>

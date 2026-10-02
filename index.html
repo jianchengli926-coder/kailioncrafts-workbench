@@ -3968,6 +3968,86 @@ async function collectWebsiteEvidence(customerId, url){
   }
 }
 
+// P2.5B: 由基础 URL 推导标准子页面路径（保留已有 pathname）
+function _joinEvidenceUrlPath(base, suffix){
+  try{
+    const u = new URL(base);
+    let p = u.pathname || '/';
+    if(p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+    u.pathname = p + suffix;
+    return u.origin + u.pathname + (u.search || '') + (u.hash || '');
+  }catch(e){
+    return String(base).replace(/\/+$/, '') + suffix;
+  }
+}
+
+// P2.5B: 多页面证据采集（POST /api/evidence/collect {customerId, pages}）
+// 成功后把返回的所有 evidences 依次 unshift 到 S.websiteEvidences（按 evidenceId 去重）
+async function collectWebsiteEvidenceMulti(customerId, pages){
+  if(!customerId || !Array.isArray(pages) || pages.length === 0){
+    toast('客户ID和页面列表必填','err'); return null;
+  }
+  try{
+    toast('正在采集 ' + pages.length + ' 个页面（只读，不联系客户）...');
+    const resp = await fetch('/api/evidence/collect', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({customerId, pages: pages})
+    });
+    const result = await resp.json();
+    const evs = result.evidences || (result.evidence ? [result.evidence] : []);
+    if(!S.websiteEvidences) S.websiteEvidences = [];
+    let added = 0, skippedDup = 0;
+    evs.forEach(ev => {
+      if(!ev || !ev.evidenceId) return;
+      const exists = S.websiteEvidences.some(x => x.evidenceId === ev.evidenceId);
+      if(exists){ skippedDup++; return; }
+      S.websiteEvidences.unshift(ev);
+      added++;
+    });
+    persist();
+    // 汇总统计：成功 / 跳过 / 失败（失败 evidence 带 error/errorType）
+    const okCount = evs.filter(e => e && !e.error).length;
+    const failCount = evs.filter(e => e && e.error).length;
+    const skipCount = (result.skipped || []).length;
+    toast('采集完成：成功 ' + okCount + ' 页，跳过 ' + skipCount + ' 页，失败 ' + failCount + ' 页' + (skippedDup ? '（去重跳过 ' + skippedDup + ' 条）' : ''), failCount > 0 ? 'err' : 'ok');
+    if(failCount > 0){
+      const failedList = evs.filter(e => e && e.error).slice(0,3)
+        .map(f => (f.pageType || f.sourceUrl || '页') + ':' + (f.error || '未知错误')).join('；');
+      toast('失败详情: ' + failedList, 'err');
+    }
+    renderView();
+    return result;
+  }catch(e){
+    toast('采集请求失败: ' + e.message, 'err');
+    return null;
+  }
+}
+
+// P2.5B: 页面类型复选框切换处理（最多 3 个，实时更新计数与按钮文案）
+function onEvidencePageToggle(cb){
+  const ids = ['ev_page_home','ev_page_about','ev_page_products','ev_page_contact','ev_page_custom'];
+  const boxes = ids.map(id => document.getElementById(id)).filter(Boolean);
+  const checked = boxes.filter(b => b.checked);
+  if(checked.length > 3){
+    cb.checked = false;
+    toast('最多同时采集 3 个页面','err');
+    return;
+  }
+  const n = boxes.filter(b => b.checked).length;
+  const countEl = document.getElementById('ev_page_count');
+  if(countEl) countEl.textContent = '已选 ' + n + ' 页';
+  const btn = document.getElementById('evidence_collect_btn');
+  if(btn) btn.textContent = '只读采集（已选 ' + n + ' 页）';
+}
+
+// P2.5B: 读取审核备注 textarea 并调用 reviewWebsiteEvidence（替代 window.prompt）
+function reviewEvidenceWithNote(evidenceId, status){
+  const ta = document.getElementById('ev_note_' + evidenceId);
+  const note = ta ? ta.value.trim() : '';
+  reviewWebsiteEvidence(evidenceId, status, note);
+}
+
 // 审核网站证据
 function reviewWebsiteEvidence(evidenceId, status, note){
   const evidence = (S.websiteEvidences || []).find(e => e.evidenceId === evidenceId);
@@ -4037,8 +4117,68 @@ function renderProspectPriorityPanel(customer){
       ${!inQueue ? `<button class="btn btn-primary btn-sm" onclick="addToOutreachQueue('${customer.id}')">加入开发名单</button>` : `<span class="badge badge-success">已在开发名单中</span>`}
       ${p.priorityTier !== 'blocked' ? `<button class="btn btn-outline btn-sm" onclick="currentView='outreachQueue';renderView()">查看开发名单</button>` : ''}
     </div>
+    ${(() => {
+      const reviewedEvs = getCustomerWebsiteEvidences(customer.id).filter(e => e.reviewStatus === 'reviewed');
+      const canRecalc = reviewedEvs.length > 0;
+      const lastRecalc = customer.lastPriorityRecalc || null;
+      return `
+      <div class="flex gap8 mt8" style="align-items:center">
+        ${canRecalc
+          ? `<button class="btn btn-outline btn-sm" onclick="recalculateCustomerPriority('${customer.id}')">🔄 基于已审核证据重算</button>`
+          : `<button class="btn btn-outline btn-sm" disabled title="需先审核网站证据" style="opacity:.5;cursor:not-allowed">🔄 基于已审核证据重算</button>`}
+        <span class="text-xs text-muted">已核验证据 ${reviewedEvs.length} 条${canRecalc ? '' : '（需先审核网站证据才能重算）'}</span>
+      </div>
+      ${lastRecalc ? `<div class="text-xs text-muted mt4">🕘 最近重算：版本 v${esc(lastRecalc.calculationVersion || '-')} · 依据 ${(lastRecalc.evidenceIds || []).length} 条证据 · ${fmtDay(lastRecalc.recalculatedAt)}${typeof lastRecalc.scoreDelta === 'number' ? '（分数' + (lastRecalc.scoreDelta >= 0 ? '+' : '') + lastRecalc.scoreDelta + '）' : ''}</div>` : ''}`;
+    })()}
     <div class="text-xs text-muted mt4">评分版本: ${esc(p.calculationVersion)} | 计算时间: ${fmtDay(p.calculatedAt)}</div>
   </div>`;
+}
+
+// P2.5B: 基于已审核证据手动重算客户优先级（不自动入名单/不发邮件/不改身份状态/不建跟进）
+function recalculateCustomerPriority(customerId){
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer){ toast('客户不存在','err'); return; }
+  const reviewedEvs = getCustomerWebsiteEvidences(customerId).filter(e => e.reviewStatus === 'reviewed');
+  if(reviewedEvs.length === 0){ toast('需先审核网站证据','err'); return; }
+  const evidenceIds = reviewedEvs.map(e => e.evidenceId);
+  const before = {
+    priorityScore: (typeof customer.priorityScore === 'number') ? customer.priorityScore : null,
+    priorityTier: customer.priorityTier || null,
+    scoreBreakdown: customer.scoreBreakdown ? JSON.parse(JSON.stringify(customer.scoreBreakdown)) : null
+  };
+  const calcResult = calculateProspectPriority(customerId);
+  if(!calcResult.success){ toast('优先级计算失败: ' + (calcResult.error || ''),'err'); return; }
+  const after = calcResult.priority;
+  const beforeScore = (typeof before.priorityScore === 'number') ? before.priorityScore : 0;
+  const scoreDelta = after.priorityScore - beforeScore;
+  // 写回 customer 对象
+  customer.priorityScore = after.priorityScore;
+  customer.priorityTier = after.priorityTier;
+  customer.scoreBreakdown = after.scoreBreakdown;
+  customer.positiveReasons = after.positiveReasons;
+  customer.missingEvidence = after.missingEvidence;
+  customer.hardBlockers = after.hardBlockers;
+  customer.calculationVersion = after.calculationVersion;
+  customer.lastPriorityRecalc = {
+    evidenceIds: evidenceIds,
+    calculationVersion: after.calculationVersion,
+    before: before,
+    after: {
+      priorityScore: after.priorityScore,
+      priorityTier: after.priorityTier,
+      scoreBreakdown: after.scoreBreakdown,
+      positiveReasons: after.positiveReasons,
+      missingEvidence: after.missingEvidence,
+      hardBlockers: after.hardBlockers
+    },
+    scoreDelta: scoreDelta,
+    recalculatedAt: new Date().toISOString()
+  };
+  persist();
+  const newAdv = (after.positiveReasons || []).length;
+  const missingNow = (after.missingEvidence || []).length;
+  toast('重算完成：' + beforeScore + '→' + after.priorityScore + '（' + (scoreDelta >= 0 ? '+' : '') + scoreDelta + '），优势 ' + newAdv + ' 项，缺失 ' + missingNow + ' 项');
+  renderView();
 }
 
 // P2.4A: 客户开发整合摘要（审核状态、跟进计划、最近结果）
@@ -4161,13 +4301,26 @@ function renderWebsiteEvidencePanel(customerId){
       <div class="flex gap8">
         <input type="text" class="form-control" id="evidence_url_input"
           placeholder="https://example.com" value="${esc(defaultUrl)}">
-        <button class="btn btn-primary" onclick="doCollectWebsiteEvidence('${customerId}')">
-          只读采集
+        <button class="btn btn-primary" id="evidence_collect_btn" onclick="doCollectWebsiteEvidence('${customerId}')">
+          只读采集（已选 1 页）
         </button>
       </div>
       <div class="text-xs text-muted mt4">
         仅允许 http/https，自动阻断 localhost、私有 IP、内网域名。连接超时10秒，总超时30秒。
       </div>
+    </div>
+    <div class="form-group">
+      <label>采集页面（默认仅首页，最多选 3 个；其他页面需明确选择）</label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="ev_page_home" checked onchange="onEvidencePageToggle(this)"> 🏠 首页</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="ev_page_about" onchange="onEvidencePageToggle(this)"> 🏢 关于</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="ev_page_products" onchange="onEvidencePageToggle(this)"> 📦 产品</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="ev_page_contact" onchange="onEvidencePageToggle(this)"> 📞 联系</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="ev_page_custom" onchange="onEvidencePageToggle(this)"> ✏️ 自定义</label>
+        <input type="text" class="form-control" id="evidence_custom_url_input" placeholder="自定义页面 URL（可选）" style="max-width:260px">
+        <span class="badge" id="ev_page_count" style="background:#ebf8ff;color:#2c5282">已选 1 页</span>
+      </div>
+      <div class="text-xs text-muted mt4">关于/产品/联系页由官网 URL 自动推导路径（/about、/products、/contact）并保留已有路径；自定义页使用上方 URL。</div>
     </div>`;
 
   if(evidences.length === 0){
@@ -4188,18 +4341,26 @@ function renderWebsiteEvidencePanel(customerId){
       };
       const color = statusColors[ev.reviewStatus] || 'var(--gray)';
       const label = statusLabels[ev.reviewStatus] || ev.reviewStatus;
+      // P2.5B: pageType 徽章（旧证据缺 pageType 按 home 处理）
+      const pt = ev.pageType || 'home';
+      const ptColors = {home:'#718096', about:'#3182ce', products:'#ed8936', contact:'#38a169', custom:'#805ad5'};
+      const ptLabels = {home:'首页', about:'关于', products:'产品', contact:'联系', custom:'自定义'};
+      const ptColor = ptColors[pt] || '#718096';
+      const ptLabel = ptLabels[pt] || pt;
 
       html += `
       <div class="card card-pad mb8" style="border-left: 3px solid ${color}">
         <div class="flex justify-between align-center mb8">
           <div>
             <span class="badge" style="background:${color};color:#fff">${label}</span>
+            <span class="badge" style="background:${ptColor};color:#fff;margin-left:4px" title="${esc(pt)}页面">${ptLabel}</span>
             <span class="text-sm ml8">${esc(ev.pageTitle || '无标题')}</span>
           </div>
           <span class="text-xs text-muted">${fmtDay(ev.fetchedAt)}</span>
         </div>
         <div class="text-xs text-muted mb4">
           <b>来源:</b> <a href="${esc(ev.finalUrl || ev.sourceUrl)}" target="_blank" rel="noopener">${esc(ev.finalUrl || ev.sourceUrl)}</a>
+          | <b>页面:</b> ${esc(ptLabel)}
           | <b>HTTP:</b> ${ev.httpStatus || 'N/A'}
           | <b>Hash:</b> <code class="mono">${esc(ev.contentHash || 'N/A')}</code>
         </div>`;
@@ -4239,16 +4400,24 @@ function renderWebsiteEvidencePanel(customerId){
       // 人工核验按钮
       if(ev.reviewStatus === 'pending'){
         html += `
-        <div class="flex gap8 mt8">
-          <button class="btn btn-sm btn-success" onclick="reviewWebsiteEvidence('${ev.evidenceId}','reviewed')">确认可用</button>
-          <button class="btn btn-sm btn-outline" onclick="reviewWebsiteEvidence('${ev.evidenceId}','rejected')">拒绝</button>
-          <button class="btn btn-sm btn-outline" onclick="reviewWebsiteEvidence('${ev.evidenceId}','conflict')">标记冲突</button>
+        <div class="mt8">
+          <textarea id="ev_note_${ev.evidenceId}" class="form-control" rows="2" placeholder="审核备注（可选）" style="margin-bottom:6px"></textarea>
+          <div class="flex gap8">
+            <button class="btn btn-sm btn-success" onclick="reviewEvidenceWithNote('${ev.evidenceId}','reviewed')">确认可用</button>
+            <button class="btn btn-sm btn-outline" onclick="reviewEvidenceWithNote('${ev.evidenceId}','rejected')">拒绝</button>
+            <button class="btn btn-sm btn-outline" onclick="reviewEvidenceWithNote('${ev.evidenceId}','conflict')">标记冲突</button>
+          </div>
         </div>`;
       } else if(ev.reviewStatus === 'reviewed'){
         html += `<div class="text-xs mt4" style="color:var(--green)">✓ 已核验，可用于 ICP 评估和开发草稿</div>
         <button class="btn btn-sm btn-outline mt4" onclick="createFactFromWebsiteEvidence('${ev.evidenceId}')">创建 pending Fact（需人工审核）</button>`;
       } else {
         html += `<div class="text-xs mt4" style="color:var(--red)">✗ ${esc(ev.reviewNote || '不可用')}</div>`;
+      }
+
+      // P2.5B: 审核后显示审核人/时间/备注
+      if(ev.reviewStatus !== 'pending' && (ev.reviewedBy || ev.reviewedAt)){
+        html += `<div class="text-xs text-muted mt4">✍️ ${esc(ev.reviewedBy || '-')} · ${fmtDay(ev.reviewedAt)}${ev.reviewNote ? ' · 备注: ' + esc(ev.reviewNote) : ''}</div>`;
       }
 
       html += `</div>`;
@@ -4259,12 +4428,31 @@ function renderWebsiteEvidencePanel(customerId){
   return html;
 }
 
-// 执行网站证据采集（从输入框读取 URL）
+// 执行网站证据采集（从输入框和页面类型复选框读取，统一走 multi 接口）
 function doCollectWebsiteEvidence(customerId){
   const urlInput = document.getElementById('evidence_url_input');
-  const url = urlInput ? urlInput.value.trim() : '';
-  if(!url){ toast('请输入客户官网 URL','err'); return; }
-  collectWebsiteEvidence(customerId, url);
+  const baseUrl = urlInput ? urlInput.value.trim() : '';
+  if(!baseUrl){ toast('请输入客户官网 URL','err'); return; }
+  const pages = [];
+  const pushPage = (url, pageType) => { if(url) pages.push({url: url, pageType: pageType}); };
+  // home = 基础 URL
+  const homeCb = document.getElementById('ev_page_home');
+  if(homeCb && homeCb.checked) pushPage(baseUrl, 'home');
+  // about / products / contact 由基础 URL 推导路径
+  const std = [['ev_page_about','about','/about'],['ev_page_products','products','/products'],['ev_page_contact','contact','/contact']];
+  std.forEach(([id, ptype, suffix]) => {
+    const cb = document.getElementById(id);
+    if(cb && cb.checked) pushPage(_joinEvidenceUrlPath(baseUrl, suffix), ptype);
+  });
+  // custom = 自定义 URL 输入框
+  const customCb = document.getElementById('ev_page_custom');
+  const customInput = document.getElementById('evidence_custom_url_input');
+  if(customCb && customCb.checked && customInput && customInput.value.trim()){
+    pushPage(customInput.value.trim(), 'custom');
+  }
+  if(pages.length === 0){ toast('请至少选择 1 个页面进行采集','err'); return; }
+  if(pages.length > 3){ toast('最多同时采集 3 个页面','err'); return; }
+  collectWebsiteEvidenceMulti(customerId, pages);
 }
 
 /* P2.3B: 客户优先级排序和人工开发名单 */
@@ -9092,6 +9280,7 @@ const NAV = [
   {key:'outreachAnalytics',icon:'📊',label:'开发复盘',title:'开发复盘',crumb:'基于真实录入结果 · 不编造数据'},
   {key:'outreach',icon:'📤',label:'触达中心',title:'多渠道触达中心',crumb:'邮件·WhatsApp·领英·电话统一管理'},
   {key:'bulkImport',icon:'📥',label:'批量导入',title:'客户批量导入',crumb:'CSV导入·字段映射·数据清洗·安全确认'},
+  {key:'importHistory',icon:'📜',label:'导入历史',title:'导入批次历史',crumb:'批次记录·映射配置·错误预览·按批次筛选客户'},
   {group:'系统'},
   {key:'tools',icon:'🧰',label:'工具箱',title:'工具箱',crumb:'14类·100+工具'},
   {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings'},
@@ -10246,6 +10435,122 @@ function exportBulkErrorRows(){
   toast('✅ 问题行 CSV 已导出');
 }
 
+/* P2.5B: 导入批次历史页面 */
+function viewImportHistory(root){
+  const batches = (S.importBatches || []).slice().sort((a,b) => new Date(b.importedAt) - new Date(a.importedAt));
+  // routeParams.batchId 来自客户详情批次链接；window._importHistoryExpand 用于展开/收起切换
+  if(routeParams.batchId && !window._importHistoryExpand) window._importHistoryExpand = routeParams.batchId;
+  const expandId = window._importHistoryExpand || '';
+  const statusBadge = {completed:['#c6f6d5','#22543d'], partial:['#fefcbf','#744210'], failed:['#fed7d7','#742a2a']};
+
+  let html = `
+    <div style="background:linear-gradient(120deg,#2c5282,var(--primary));color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:17px">📜 导入历史</div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:4px">批次记录 · 字段映射 · 错误预览 · 按批次筛选客户</div>
+      <div style="font-size:12px;opacity:.75;margin-top:6px">仅显示文件名与文件哈希前 8 位，不保存/不展示原始 CSV 内容。</div>
+    </div>`;
+
+  if(batches.length === 0){
+    html += `<div class="card card-pad"><div class="text-muted text-sm py16">暂无导入批次记录。前往「批量导入」导入客户后，批次会记录在这里。</div></div>`;
+    root.innerHTML = html;
+    return;
+  }
+
+  html += `<div class="card card-pad"><div class="card-title">导入批次（${batches.length}）</div>
+  <div class="table-wrap"><table class="tbl">
+    <thead><tr><th>批次ID</th><th>文件</th><th>导入时间</th><th>操作人</th><th>总行数</th><th>成功</th><th>跳过</th><th>阻断</th><th>失败</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>`;
+  batches.forEach(b => {
+    const sb = statusBadge[b.status] || ['#e2e8f0', '#4a5568'];
+    const fileHashShort = (b.fileHash || '').substring(0, 8);
+    html += `<tr>
+      <td class="text-sm"><code style="font-size:11px">${esc(b.importBatchId)}</code></td>
+      <td class="text-sm">${esc(b.fileName)}${fileHashShort ? `<div class="text-xs text-muted">hash: ${esc(fileHashShort)}</div>` : ''}</td>
+      <td class="text-sm">${fmtDate(b.importedAt)}</td>
+      <td class="text-sm">${esc(b.importedBy || '-')}</td>
+      <td class="text-sm">${b.rowCount || 0}</td>
+      <td class="text-sm" style="color:var(--green);font-weight:600">${b.importedCount || 0}</td>
+      <td class="text-sm text-muted">${b.skippedCount || 0}</td>
+      <td class="text-sm text-muted">${b.blockedCount || 0}</td>
+      <td class="text-sm text-muted">${b.errorCount || 0}</td>
+      <td><span class="badge" style="background:${sb[0]};color:${sb[1]}">${esc(b.status || '-')}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm btn-outline" onclick="toggleImportBatchDetail('${esc(b.importBatchId)}')">${expandId === b.importBatchId ? '收起' : '详情'}</button>
+        <button class="btn btn-sm btn-primary" onclick="viewCustomersFromBatch('${esc(b.importBatchId)}')">查看客户</button>
+      </td>
+    </tr>`;
+    if(expandId === b.importBatchId) html += renderImportBatchDetail(b);
+  });
+  html += `</tbody></table></div></div>`;
+  root.innerHTML = html;
+}
+
+// 展开单个批次详情：映射配置 / 汇总统计 / 导入客户ID / 错误行预览（最多20条）
+function renderImportBatchDetail(b){
+  const mapping = b.mapping || {};
+  const stats = (b.summary && b.summary.stats) || {};
+  const custIds = (b.summary && b.summary.importedCustomerIds) || [];
+  const errors = (b.summary && b.summary.errors) || [];
+  const mapKeys = Object.keys(mapping);
+  let html = `<tr><td colspan="11" style="background:#f7fafc">
+    <div style="padding:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <div class="text-sm fw700 mb4">字段映射配置</div>
+          <table class="tbl" style="font-size:12px"><tbody>`;
+  mapKeys.forEach(col => {
+    html += `<tr><td class="text-muted">${esc(col)}</td><td>→ ${esc(mapping[col])}</td></tr>`;
+  });
+  if(mapKeys.length === 0) html += `<tr><td class="text-muted">无映射记录</td></tr>`;
+  html += `</tbody></table>
+        </div>
+        <div>
+          <div class="text-sm fw700 mb4">汇总统计</div>
+          <div class="text-sm" style="line-height:1.9">
+            总行数: ${stats.totalRows != null ? stats.totalRows : (b.rowCount || 0)}<br>
+            成功导入: <b style="color:var(--green)">${b.importedCount || 0}</b>　
+            跳过: ${b.skippedCount || 0}　
+            阻断: ${b.blockedCount || 0}　
+            失败: ${b.errorCount || 0}
+          </div>
+          <div class="text-sm fw700 mt8 mb4">导入客户（${custIds.length}）</div>
+          <div style="max-height:120px;overflow:auto">`;
+  if(custIds.length === 0){
+    html += `<div class="text-xs text-muted">无</div>`;
+  } else {
+    custIds.forEach(cid => {
+      const c = (S.customers || []).find(x => x.id === cid);
+      html += `<button class="btn btn-sm btn-outline" style="margin:0 4px 4px 0" onclick="go('customers');setTimeout(()=>{try{openCustomerDetail('${cid}')}catch(e){}},120)">${esc(c ? c.company : cid)}</button>`;
+    });
+  }
+  html += `</div>
+        </div>
+      </div>
+      <div class="text-sm fw700 mt8 mb4">错误行预览（最多 20 条，共 ${errors.length}）</div>`;
+  if(errors.length === 0){
+    html += `<div class="text-xs text-muted">无错误行</div>`;
+  } else {
+    html += `<div style="max-height:140px;overflow:auto"><table class="tbl" style="font-size:12px"><thead><tr><th>行号</th><th>错误</th></tr></thead><tbody>`;
+    errors.slice(0, 20).forEach(er => {
+      const errs = er.errors ? (Array.isArray(er.errors) ? er.errors.join('；') : String(er.errors)) : (er.error || '');
+      html += `<tr><td>${er.row != null ? er.row : '-'}</td><td style="color:var(--red)">${esc(errs)}</td></tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+  html += `</div></td></tr>`;
+  return html;
+}
+
+function toggleImportBatchDetail(batchId){
+  window._importHistoryExpand = (window._importHistoryExpand === batchId) ? '' : batchId;
+  renderView();
+}
+
+function viewCustomersFromBatch(batchId){
+  window._customerFilter = { importBatchId: batchId };
+  go('customers');
+}
+
 
 function renderView(){
   // V76.0 懒加载搜索结果（只加载一次）
@@ -10259,7 +10564,7 @@ function renderView(){
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, prospect:viewProspectDev, devplans:viewDevPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, outreachKB:viewOutreachKB, campaigns:viewCampaigns, campaignDetail:viewCampaignDetail, knowledgeFacts:viewKnowledgeFacts, knowledgePacks:viewKnowledgePacks, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
-    seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach, dailyWork:viewDailyWork, outreachQueue:viewOutreachQueue, reviewQueue:viewReviewQueue, followUpPlan:viewFollowUpPlan, outreachAnalytics:viewOutreachAnalytics, bulkImport:viewBulkImport};
+    seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach, dailyWork:viewDailyWork, outreachQueue:viewOutreachQueue, reviewQueue:viewReviewQueue, followUpPlan:viewFollowUpPlan, outreachAnalytics:viewOutreachAnalytics, bulkImport:viewBulkImport, importHistory:viewImportHistory};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
@@ -12148,6 +12453,9 @@ const CUST_PAGE = 10;
 function viewCustomers(root){
   custFilter.q = routeParams.q || custFilter.q || '';
   let list = S.customers.slice();
+  // P2.5B: 按导入批次筛选（来自导入历史页"查看该批次客户"）
+  const batchFilterId = (window._customerFilter && window._customerFilter.importBatchId) || '';
+  if(batchFilterId) list = list.filter(c => c.importBatchId === batchFilterId);
   if(custFilter.grade) list = list.filter(c=>c.scores.grade===custFilter.grade);
   if(custFilter.country) list = list.filter(c=>c.country===custFilter.country);
   if(custFilter.source) list = list.filter(c=>c.source===custFilter.source);
@@ -12220,6 +12528,13 @@ function viewCustomers(root){
         </div>
       </div>
     </div>
+    ${batchFilterId ? (()=>{
+      const b = (S.importBatches||[]).find(x=>x.importBatchId===batchFilterId);
+      return `<div class="card card-pad mb16" style="background:#ebf8ff;border:1px solid #bee3f8;display:flex;align-items:center;justify-content:space-between">
+        <div class="text-sm" style="color:#2c5282">📦 正在按导入批次筛选：<b>${esc(batchFilterId)}</b>${b?' · 文件：'+esc(b.fileName):''}（共 ${list.length} 个客户）</div>
+        <button class="btn btn-sm btn-outline" onclick="window._customerFilter=null;resetCustomerFilter()">✕ 清除批次筛选</button>
+      </div>`;
+    })() : ''}
     <div class="flex gap8 mb16">
       ${[['all','全部客户'],['new','新开发客户'],['old','老客户（已成交）']].map(([k,l])=>
         `<button class="btn ${custFilter.view===k?'btn-gold':'btn-outline'}" onclick="custFilter.view='${k}';custFilter.page=1;renderView()">${l}</button>`).join('')}
@@ -13107,7 +13422,7 @@ function renderCustomerImportInfoPanel(c){
         <span class="text-sm text-muted">${esc(c.importDecision||'')}</span>
       </div>
       <div class="text-sm" style="line-height:1.9;margin-top:8px">
-        <div>📦 导入批次：<code style="font-size:11px">${esc(c.importBatchId)}</code></div>
+        <div>📦 导入批次：<code style="font-size:11px;cursor:pointer;color:var(--primary)" title="查看批次详情" onclick="closeDrawer();go('importHistory',{batchId:'${esc(c.importBatchId)}'})">${esc(c.importBatchId)}</code></div>
         <div>🕐 导入时间：<b>${fmtDate(c.createdAt)}</b>${batch?' · 文件：'+esc(batch.fileName):''}</div>
         <div>📄 原始来源：${esc(c.sourceDocument||c.source||'bulk_import')}</div>
         ${c.sourceUrl?`<div>🔗 来源链接：<a href="${safeUrl(c.sourceUrl)}" target="_blank" style="color:var(--primary)">${esc(c.sourceUrl)}</a></div>`:''}
@@ -14653,6 +14968,7 @@ function renderGroupedCustomers(){
 }
 function resetCustomerFilter(){
   custFilter = {q:'', grade:'', country:'', source:'', tag:'', status:'', customerType:'', followDays:'', view:'all', page:1, selected:[]};
+  window._customerFilter = null;
   renderView();
   toast('✅ 筛选条件已重置');
 }

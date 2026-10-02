@@ -31,6 +31,33 @@ const CONFIG = {
   allowedProtocols: ['http:', 'https:']
 };
 
+// ============== P2.5B: 多页证据采集 ==============
+// 页面类型分类（home/about/products/contact/custom）
+const PAGE_TYPES = ['home', 'about', 'products', 'contact', 'custom'];
+// 单次采集最多页数
+const MAX_PAGES_PER_COLLECT = 3;
+// 证据 schema 版本（P2.5B：多页 + pageType）
+const EVIDENCE_SCHEMA_VERSION = 'P2.5B';
+
+/**
+ * 规范化 pageType：必须属于 PAGE_TYPES，否则归为 custom
+ * @param {string} pageType
+ * @returns {string}
+ */
+function normalizePageType(pageType) {
+  return PAGE_TYPES.includes(pageType) ? pageType : 'custom';
+}
+
+/**
+ * 规范化 URL 用于去重比较：忽略末尾斜杠、大小写、首尾空白
+ * @param {string} u
+ * @returns {string}
+ */
+function normalizeUrlForCompare(u) {
+  if (!u || typeof u !== 'string') return '';
+  return u.trim().toLowerCase().replace(/\/+$/, '');
+}
+
 // ============== SSRF 防护 ==============
 
 /**
@@ -515,11 +542,16 @@ const EVIDENCE_REVIEW_STATUSES = ['pending', 'reviewed', 'rejected', 'conflict']
  */
 function createWebsiteEvidence(input) {
   const now = new Date().toISOString();
+  // pageType：未提供视为 home；提供但非法归为 custom（旧证据缺该字段时由使用处兼容为 home）
+  const pageType = input.pageType
+    ? (PAGE_TYPES.includes(input.pageType) ? input.pageType : 'custom')
+    : 'home';
   return {
     evidenceId: 'wev_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8),
     customerId: input.customerId || '',
     sourceUrl: input.sourceUrl || '',
     finalUrl: input.finalUrl || input.sourceUrl || '',
+    pageType: pageType,
     pageTitle: input.pageTitle || '',
     fetchedAt: input.fetchedAt || now,
     httpStatus: input.httpStatus || 0,
@@ -540,7 +572,7 @@ function createWebsiteEvidence(input) {
     errorType: input.errorType || null,
     createdAt: now,
     updatedAt: now,
-    schemaVersion: 'P2.3A'
+    schemaVersion: EVIDENCE_SCHEMA_VERSION
   };
 }
 
@@ -662,10 +694,106 @@ async function collectWebsiteEvidence(customerId, url, options = {}) {
   return { success: true, evidence };
 }
 
-// ============== 导出 ==============
+/**
+ * P2.5B: 多页采集客户网站证据
+ *
+ * - pages 为数组，每项 {url, pageType}，pageType 默认 'home'。
+ * - 校验：pages 必须是非空数组且长度 <= MAX_PAGES_PER_COLLECT。
+ * - 去重：若 options.existingEvidences 为数组，对每个待采集页面，若同 customerId 下
+ *   已存在 sourceUrl 或 finalUrl 完全匹配（忽略末尾斜杠、大小写）且无 error 的证据，则跳过。
+ * - 对每个未跳过页面调用现有 collectWebsiteEvidence，把 evidence.pageType 设为该页 pageType。
+ * - 每页独立 evidenceId，页面级来源可追溯，绝不混合多页内容。
+ *
+ * @param {string} customerId - 客户 ID
+ * @param {Array<{url:string, pageType?:string}>} pages - 待采集页面
+ * @param {Object} options - { existingEvidences: Array }
+ * @returns {Promise<Object>} { success, evidences, results, skipped, error? }
+ */
+async function collectWebsiteEvidenceMulti(customerId, pages, options = {}) {
+  const bad = { success: false, evidences: [], results: [], skipped: [] };
+
+  if (!Array.isArray(pages) || pages.length === 0) {
+    return Object.assign(bad, { error: 'pages 必须是非空数组' });
+  }
+  if (pages.length > MAX_PAGES_PER_COLLECT) {
+    return Object.assign(bad, {
+      error: '单次采集页数超过上限 (' + MAX_PAGES_PER_COLLECT + ')'
+    });
+  }
+
+  const existing = Array.isArray(options.existingEvidences) ? options.existingEvidences : [];
+  const evidences = [];
+  const results = [];
+  const skipped = [];
+  let allSuccess = true;
+
+  for (const page of pages) {
+    const url = (page && page.url) || '';
+    const pageType = normalizePageType(page && page.pageType ? page.pageType : 'home');
+
+    // 去重：同 customerId 下已有 sourceUrl/finalUrl 匹配且无 error 的证据则跳过
+    const normUrl = normalizeUrlForCompare(url);
+    const dup = existing.find(e =>
+      e &&
+      e.customerId === customerId &&
+      !e.error &&
+      (normalizeUrlForCompare(e.sourceUrl) === normUrl ||
+       normalizeUrlForCompare(e.finalUrl) === normUrl)
+    );
+    if (dup) {
+      skipped.push({
+        url: url,
+        pageType: pageType,
+        reason: 'duplicate_existing_evidence',
+        existingEvidenceId: dup.evidenceId
+      });
+      continue;
+    }
+
+    // 单页独立采集（保持 collectWebsiteEvidence 原有签名与返回格式）
+    let result;
+    try {
+      result = await collectWebsiteEvidence(customerId, url, options);
+    } catch (e) {
+      result = {
+        success: false,
+        evidence: createWebsiteEvidence({
+          customerId,
+          sourceUrl: url,
+          error: e.message,
+          errorType: 'collect_exception'
+        }),
+        error: e.message
+      };
+    }
+
+    // 页面级来源标记：把该页 pageType 落到证据上（绝不混合多页内容）
+    if (result && result.evidence) {
+      result.evidence.pageType = pageType;
+    }
+
+    results.push(result);
+    if (result && result.evidence) {
+      evidences.push(result.evidence);
+    }
+    if (!result || !result.success) {
+      allSuccess = false;
+    }
+  }
+
+  return {
+    success: allSuccess,
+    evidences: evidences,
+    results: results,
+    skipped: skipped
+  };
+}
 
 module.exports = {
   CONFIG,
+  PAGE_TYPES,
+  MAX_PAGES_PER_COLLECT,
+  EVIDENCE_SCHEMA_VERSION,
   EVIDENCE_REVIEW_STATUSES,
   validateUrl,
   isIpAddress,
@@ -681,5 +809,6 @@ module.exports = {
   reviewWebsiteEvidence,
   isEvidenceUsableForPublic,
   isEvidenceUsableForInternal,
-  collectWebsiteEvidence
+  collectWebsiteEvidence,
+  collectWebsiteEvidenceMulti
 };

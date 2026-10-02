@@ -540,6 +540,76 @@ function canGeneratePublicDraft(customer, context) {
   return { allowed: true, reason: '可以生成公开草稿' };
 }
 
+/**
+ * P2.5B: 新证据审核后重算 ICP 优先级（纯函数，不修改 customer）
+ *
+ * @param {Object} customer - 客户对象
+ * @param {Array<string>} evidenceIds - 本次触发重算的已审核证据 ID
+ * @param {Object} context - 上下文（含 evidences/facts/drafts/packs 等）
+ * @returns {Object} { success, before, after, evidenceIds, calculationVersion,
+ *                      scoreDelta, addedPositiveReasons, resolvedMissingItems,
+ *                      newMissingItems, recalculatedAt }
+ */
+function recalculateProspectPriorityWithEvidence(customer, evidenceIds, context = {}) {
+  if (!customer) {
+    return { success: false, error: '客户不存在' };
+  }
+
+  // 读取重算前快照（若 customer 上没有任何已有评分字段则 before 为 null）
+  const hasBefore =
+    customer.priorityScore != null ||
+    customer.priorityTier != null ||
+    (Array.isArray(customer.positiveReasons) && customer.positiveReasons.length > 0) ||
+    (Array.isArray(customer.missingEvidence) && customer.missingEvidence.length > 0);
+
+  const before = hasBefore
+    ? {
+        priorityScore: customer.priorityScore != null ? customer.priorityScore : null,
+        priorityTier: customer.priorityTier || null,
+        positiveReasons: Array.isArray(customer.positiveReasons) ? customer.positiveReasons : [],
+        missingEvidence: Array.isArray(customer.missingEvidence) ? customer.missingEvidence : []
+      }
+    : null;
+
+  // 重算（不修改 customer 对象本身）
+  const after = calculateProspectPriority(customer, context);
+
+  const evidenceIdList = Array.isArray(evidenceIds) ? evidenceIds.slice() : [];
+
+  // 用 reason 对象的 JSON 作为指纹做集合比较
+  const toFingerprint = (list) =>
+    new Set((list || []).map(item => JSON.stringify(item)));
+
+  const beforeReasons = toFingerprint(before ? before.positiveReasons : []);
+  const beforeMissing = toFingerprint(before ? before.missingEvidence : []);
+  const afterMissing = toFingerprint(after.missingEvidence);
+
+  const addedPositiveReasons = (after.positiveReasons || []).filter(
+    r => !beforeReasons.has(JSON.stringify(r))
+  );
+  const resolvedMissingItems = (before ? before.missingEvidence : []).filter(
+    m => !afterMissing.has(JSON.stringify(m))
+  );
+  const newMissingItems = (after.missingEvidence || []).filter(
+    m => !beforeMissing.has(JSON.stringify(m))
+  );
+
+  const scoreDelta = after.priorityScore - (before && before.priorityScore != null ? before.priorityScore : 0);
+
+  return {
+    success: true,
+    before: before,
+    after: after,
+    evidenceIds: evidenceIdList,
+    calculationVersion: after.calculationVersion,
+    scoreDelta: scoreDelta,
+    addedPositiveReasons: addedPositiveReasons,
+    resolvedMissingItems: resolvedMissingItems,
+    newMissingItems: newMissingItems,
+    recalculatedAt: new Date().toISOString()
+  };
+}
+
 module.exports = {
   PRIORITY_VERSION,
   calculateProspectPriority,
@@ -550,5 +620,6 @@ module.exports = {
   calculateContactCompletenessScore,
   calculateOutreachReadinessScore,
   createFactFromEvidence,
-  canGeneratePublicDraft
+  canGeneratePublicDraft,
+  recalculateProspectPriorityWithEvidence
 };

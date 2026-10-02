@@ -161,9 +161,9 @@ test('20. 新证据默认 publicUseAllowed=false', () => {
   assert.strictEqual(ev.publicUseAllowed, false);
 });
 
-test('21. 证据包含 schemaVersion=P2.3A', () => {
+test('21. 证据包含 schemaVersion=P2.5B（P2.5B 起多页采集版本号升级）', () => {
   const ev = WebsiteEvidence.createWebsiteEvidence({customerId: 'c1', sourceUrl: 'https://x.com'});
-  assert.strictEqual(ev.schemaVersion, 'P2.3A');
+  assert.strictEqual(ev.schemaVersion, 'P2.5B');
 });
 
 console.log('\n--- 三、人工审核流程 ---');

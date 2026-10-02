@@ -1068,7 +1068,8 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // P2.3A: 网站证据采集（只读，SSRF防护）
+  // P2.3A / P2.5B: 网站证据采集（只读，SSRF防护）
+  // 支持 {customerId, url} 单页，以及 {customerId, pages:[{url,pageType}]} 多页
   if (pathname === '/api/evidence/collect' && req.method === 'POST') {
     if (!requireAuth(req, res)) return;
     let body = '';
@@ -1076,16 +1077,38 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const params = JSON.parse(body || '{}');
-        const { customerId, url } = params;
-        if (!customerId || !url) {
+        const { customerId, url, pages } = params;
+        if (!customerId) {
           res.writeHead(400, {'Content-Type':'application/json'});
-          res.end(JSON.stringify({success:false, error:'customerId 和 url 必填'}));
+          res.end(JSON.stringify({success:false, error:'customerId 必填'}));
           return;
         }
-        console.log(`[网站证据采集] customer=${customerId} url=${url}`);
-        const result = await WebsiteEvidence.collectWebsiteEvidence(customerId, url);
-        res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
-        res.end(JSON.stringify(result));
+        const hasPages = Array.isArray(pages) && pages.length > 0;
+        if (!url && !hasPages) {
+          res.writeHead(400, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({success:false, error:'url 和 pages 至少提供一个'}));
+          return;
+        }
+
+        if (hasPages) {
+          // P2.5B: 多页采集。证据持久化在前端 localStorage，server 不持有内存证据，
+          // 因此 existingEvidences 传 []，去重由前端负责。
+          console.log(`[网站证据采集] customer=${customerId} pages=${pages.length}`);
+          const multiResult = await WebsiteEvidence.collectWebsiteEvidenceMulti(customerId, pages, { existingEvidences: [] });
+          res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+          res.end(JSON.stringify({
+            success: multiResult.success,
+            evidences: multiResult.evidences,
+            results: multiResult.results,
+            skipped: multiResult.skipped
+          }));
+        } else {
+          // P2.3A: 单页采集（向后兼容）
+          console.log(`[网站证据采集] customer=${customerId} url=${url}`);
+          const result = await WebsiteEvidence.collectWebsiteEvidence(customerId, url);
+          res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+          res.end(JSON.stringify({ success: result.success, evidence: result.evidence, evidences: [result.evidence] }));
+        }
       } catch(e) {
         console.error('[网站证据采集] 错误:', e.message);
         res.writeHead(500, {'Content-Type':'application/json'});

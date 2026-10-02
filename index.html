@@ -18150,15 +18150,25 @@ function exportAllData(){
       data[k] = S[k];
     }
   });
-  // 添加元信息
+  // P2.2D-6: 添加 schemaVersion 和完整元信息
+  const collectionCounts = {};
+  ['customers','drafts','campaigns','campaignCustomerTasks','outreachKnowledgeBase','knowledgeFacts','knowledgePacks','orders','products','communications'].forEach(k => {
+    if(Array.isArray(S[k])) collectionCounts[k] = S[k].length;
+  });
   data._backupMeta = {
     version: 'V75.3',
+    schemaVersion: 'P2.2D-6',
     exportTime: new Date().toISOString(),
     exportDate: new Date().toLocaleDateString('zh-CN'),
-    customerCount: S.customers.filter(c=>!c.isDemo).length,
-    draftCount: S.drafts.length,
-    productCount: S.products.length,
-    orderCount: S.orders.length
+    customerCount: (S.customers || []).filter(c=>!c.isDemo).length,
+    draftCount: (S.drafts || []).length,
+    campaignCount: (S.campaigns || []).length,
+    taskCount: (S.campaignCustomerTasks || []).length,
+    factCount: (S.knowledgeFacts || []).length,
+    packCount: (S.knowledgePacks || []).length,
+    productCount: (S.products || []).length,
+    orderCount: (S.orders || []).length,
+    collectionCounts: collectionCounts
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
@@ -18171,7 +18181,7 @@ function exportAllData(){
   document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
   toast('✅ 全部数据已导出为备份文件');
-  logAction('data_export', '导出全部数据', '客户'+S.customers.filter(c=>!c.isDemo).length+'/开发信'+S.drafts.length+'/产品'+S.products.length);
+  logAction('data_export', '导出全部数据', '客户'+(S.customers||[]).filter(c=>!c.isDemo).length+'/开发信'+(S.drafts||[]).length+'/产品'+(S.products||[]).length);
 }
 
 function importAllData(input){
@@ -23953,18 +23963,150 @@ function exportHandoffPack(draftId){
   if(!draft) return;
   const customer = S.customers.find(c => c.id === draft.customerId);
   const contact = customer ? (customer.contact || {}) : {};
+
+  // P2.2D-6: 脱敏邮箱和联系方式
+  function maskEmail(email){
+    if(!email || typeof email !== 'string') return '';
+    const parts = email.split('@');
+    if(parts.length !== 2) return email;
+    const user = parts[0];
+    const domain = parts[1];
+    if(user.length <= 2) return user[0] + '***@' + domain;
+    return user[0] + '***' + user[user.length-1] + '@' + domain;
+  }
+  function maskPhone(phone){
+    if(!phone || typeof phone !== 'string') return '';
+    if(phone.length <= 4) return '****';
+    return phone.substring(0, 2) + '****' + phone.substring(phone.length - 2);
+  }
+
+  // P2.2D-6: 获取客户开发准备状态
+  let readiness = null;
+  try {
+    readiness = validateCustomerOutreachReadiness(draft.customerId);
+  } catch(e) { readiness = null; }
+
+  // P2.2D-6: 获取 Knowledge Pack 信息
+  const pack = draft.knowledgePackId ? (S.knowledgePacks || []).find(p => p.packId === draft.knowledgePackId) : null;
+  const frozenFacts = (pack && pack.frozenFactSnapshots) ? pack.frozenFactSnapshots : [];
+
+  // P2.2D-6: 获取 ICP 评估
+  let icpScore = null;
+  let hardBlockers = [];
+  if(customer && customer.icpEvaluation){
+    icpScore = customer.icpEvaluation.score || customer.icpEvaluation.icpScore || null;
+    hardBlockers = customer.icpEvaluation.hardBlockers || customer.icpEvaluation.blockers || [];
+  }
+
   let text = '========== 人工发送交接包 ==========\n\n';
-  text += '导出时间: ' + new Date().toLocaleString('zh-CN') + '\n\n';
+  text += '导出时间: ' + new Date().toLocaleString('zh-CN') + '\n';
+  text += '交接包版本: P2.2D-6\n\n';
+
+  // 客户资料
   text += '【客户资料】\n';
   text += '公司: ' + (customer ? (customer.company || '') : '') + '\n';
   if(customer && customer.website) text += '网站: ' + customer.website + '\n';
-  if(customer && customer.country) text += '国家: ' + customer.country + '\n';
-  text += '\n【联系信息】\n';
+  if(customer && customer.country) text += '国家/地区: ' + customer.country + '\n';
+  if(customer && customer.buyerType) text += '买家类型: ' + customer.buyerType + '\n';
+  if(customer && customer.mainProducts) text += '主营产品: ' + customer.mainProducts + '\n';
+  if(customer && customer.customerStatus) text += '客户状态: ' + customer.customerStatus + '\n';
+  text += '\n';
+
+  // 联系信息（脱敏）
+  text += '【联系信息】\n';
   if(contact.name) text += '联系人: ' + contact.name + '\n';
-  if(contact.email) text += '邮箱: ' + contact.email + '\n';
-  text += '\n【邮件主题】\n' + (draft.subject || '') + '\n';
+  if(contact.title) text += '职位: ' + contact.title + '\n';
+  if(contact.email) text += '邮箱: ' + maskEmail(contact.email) + ' (完整邮箱请在工作台查看)\n';
+  if(contact.linkedin) text += 'LinkedIn: ' + contact.linkedin + '\n';
+  if(contact.phone) text += '电话: ' + maskPhone(contact.phone) + '\n';
+  if(!contact.name && !contact.email && !contact.phone && !contact.linkedin){
+    text += '⚠️ 暂无联系信息，请先补充\n';
+  }
+  text += '\n';
+
+  // 开发判断
+  text += '【开发判断】\n';
+  if(icpScore !== null) text += 'ICP 分数: ' + icpScore + '\n';
+  if(customer && customer.doNotContact) text += 'DNC 状态: ⚠️ 已标记拒绝联系\n';
+  else text += 'DNC 状态: 正常\n';
+  if(customer && customer.isDuplicate) text += '重复状态: ⚠️ 检测到重复客户\n';
+  else text += '重复状态: 未检测到重复\n';
+  if(hardBlockers && hardBlockers.length > 0){
+    text += 'Hard Blockers:\n';
+    hardBlockers.forEach(b => text += '  - ' + (b.reason || b) + '\n');
+  } else {
+    text += 'Hard Blockers: 无\n';
+  }
+  if(draft.riskFlags && draft.riskFlags.length > 0){
+    text += '风险标记:\n';
+    draft.riskFlags.forEach(r => text += '  - ' + r + '\n');
+  }
+  if(draft.missingInformation && draft.missingInformation.length > 0){
+    text += '缺失信息:\n';
+    draft.missingInformation.forEach(m => text += '  - ' + m + '\n');
+  }
+  text += '\n';
+
+  // 知识依据
+  text += '【知识依据】\n';
+  if(pack){
+    text += 'Knowledge Pack: ' + (pack.name || pack.packId) + '\n';
+    text += 'Pack ID: ' + pack.packId + '\n';
+    text += 'Pack 版本: ' + (draft.knowledgePackVersion || pack.version || 'unknown') + '\n';
+    text += 'Snapshot Hash: ' + (draft.knowledgeSnapshotHash || pack.knowledgeSnapshotHash || 'unknown') + '\n';
+    text += '冻结事实数量: ' + frozenFacts.length + '\n';
+    if(frozenFacts.length > 0){
+      text += '冻结事实:\n';
+      frozenFacts.forEach((f, i) => {
+        text += '  ' + (i+1) + '. ' + (f.title || f.factId) + ' (v' + (f.version || '?') + ')\n';
+        if(f.sourceDocument) text += '     来源: ' + f.sourceDocument + '\n';
+      });
+    }
+  } else {
+    text += '⚠️ 未绑定 Knowledge Pack\n';
+  }
+  if(draft.factIds && draft.factIds.length > 0){
+    text += '草稿 Fact IDs: ' + draft.factIds.join(', ') + '\n';
+  }
+  text += '\n';
+
+  // 个性化草稿
+  text += '【个性化草稿】\n';
+  text += '草稿类型: ' + (draft.draftType || 'first_email') + '\n';
+  text += '草稿状态: ' + (draft.reviewStatus || draft.status || 'unreviewed') + '\n';
+  text += '内部使用: ' + (draft.internalOnly ? '是' : '否') + '\n';
+  text += '\n';
+  text += '【邮件主题】\n' + (draft.subject || '') + '\n';
   text += '\n【邮件正文】\n' + (draft.body || draft.content || '') + '\n';
-  text += '\n⚠️ 本工作台不会发送任何消息，请在外部渠道人工发送。\n';
+  text += '\n';
+
+  // AI 生成记录
+  text += '【AI 生成记录】\n';
+  if(draft.model){
+    text += '使用模型: ' + draft.model + '\n';
+    text += '调用模式: ' + (draft.manual ? '手动' : '自动路由') + '\n';
+    text += '故障转移: ' + (draft.failover ? '是' : '否') + '\n';
+    text += '尝试次数: ' + (draft.attempts || 1) + '\n';
+    if(draft.elapsedMs) text += '响应耗时: ' + draft.elapsedMs + ' ms\n';
+    if(draft.traceId) text += 'Trace ID: ' + draft.traceId + '\n';
+    if(draft.generatedAt) text += '生成时间: ' + draft.generatedAt + '\n';
+  } else {
+    text += '无 AI 生成记录（可能为人工创建或历史草稿）\n';
+  }
+  text += '\n';
+
+  // 重要提示
+  text += '========== 重要提示 ==========\n';
+  text += '⚠️ 请 Leo 审核并在外部邮箱或社交平台人工发送。\n';
+  text += '⚠️ 本工作台不会发送任何邮件或消息。\n';
+  text += '⚠️ 联系信息已脱敏，完整信息请在工作台查看。\n';
+  if(draft.internalOnly){
+    text += '⚠️ 此草稿标记为内部使用，不得直接对外发送。\n';
+  }
+  if(hardBlockers && hardBlockers.length > 0){
+    text += '⚠️ 存在 Hard Blockers，建议先解决后再发送。\n';
+  }
+
   const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -27229,7 +27371,67 @@ function importBackup(){
           return;
         }
 
-        toast('✅ 备份已导入，页面即将刷新');
+        // P2.2D-6: 兼容迁移 - 旧数据缺少新字段时使用默认值，标记 legacy
+        try {
+          const isLegacy = !d._backupMeta || !d._backupMeta.schemaVersion || d._backupMeta.schemaVersion !== 'P2.2D-6';
+          let legacyCount = 0;
+
+          // 兼容旧草稿
+          if(Array.isArray(S.drafts)){
+            S.drafts.forEach(draft => {
+              let changed = false;
+              if(draft.knowledgePackId === undefined){ draft.knowledgePackId = null; changed = true; }
+              if(draft.knowledgePackVersion === undefined){ draft.knowledgePackVersion = null; changed = true; }
+              if(draft.knowledgeSnapshotHash === undefined){ draft.knowledgeSnapshotHash = null; changed = true; }
+              if(draft.factIds === undefined){ draft.factIds = []; changed = true; }
+              if(draft.factVersions === undefined){ draft.factVersions = []; changed = true; }
+              if(draft.confirmedClaims === undefined){ draft.confirmedClaims = []; changed = true; }
+              if(draft.inferredClaims === undefined){ draft.inferredClaims = []; changed = true; }
+              if(draft.missingInformation === undefined){ draft.missingInformation = []; changed = true; }
+              if(draft.riskFlags === undefined){ draft.riskFlags = []; changed = true; }
+              if(draft.sourceTrace === undefined){ draft.sourceTrace = []; changed = true; }
+              if(draft.model === undefined){ draft.model = null; changed = true; }
+              if(draft.failover === undefined){ draft.failover = false; changed = true; }
+              if(draft.attempts === undefined){ draft.attempts = 1; changed = true; }
+              if(draft.traceId === undefined){ draft.traceId = null; changed = true; }
+              if(draft.reviewStatus === undefined){ draft.reviewStatus = draft.status || 'unreviewed'; changed = true; }
+              if(draft.internalOnly === undefined){ draft.internalOnly = !draft.knowledgePackId; changed = true; }
+              if(isLegacy && !draft.model && !draft.traceId){
+                draft.legacyMetadata = true;
+                changed = true;
+              }
+              if(changed) legacyCount++;
+            });
+          }
+
+          // 兼容旧客户
+          if(Array.isArray(S.customers)){
+            S.customers.forEach(cust => {
+              if(cust.customerStatus === undefined) cust.customerStatus = 'new';
+              if(cust.statusHistory === undefined) cust.statusHistory = [];
+            });
+          }
+
+          // 兼容旧 Campaign
+          if(Array.isArray(S.campaigns)){
+            S.campaigns.forEach(camp => {
+              if(camp.knowledgePackId === undefined) camp.knowledgePackId = null;
+              if(camp.knowledgePackVersion === undefined) camp.knowledgePackVersion = null;
+              if(camp.knowledgeSnapshotHash === undefined) camp.knowledgeSnapshotHash = null;
+            });
+          }
+
+          // 重新持久化迁移后的数据
+          if(legacyCount > 0){
+            try { DB.save('drafts', S.drafts); } catch(e){}
+            try { DB.save('customers', S.customers); } catch(e){}
+            try { DB.save('campaigns', S.campaigns); } catch(e){}
+          }
+
+          toast('✅ 备份已导入' + (isLegacy ? '（旧格式已兼容迁移，'+legacyCount+'条草稿标记为 legacy）' : '') + '，页面即将刷新');
+        } catch(migErr){
+          toast('✅ 备份已导入（兼容迁移警告: '+migErr.message+'），页面即将刷新');
+        }
         setTimeout(()=>location.reload(), 1500);
       } catch(err) {
         toast('❌ 备份文件解析失败: '+err.message, 'err');

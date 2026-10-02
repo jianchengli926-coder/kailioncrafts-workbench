@@ -639,6 +639,88 @@ function serveStaticFile(req, res, filePath) {
 const activeSessions = new Map();
 const failedAttempts = new Map(); // ip -> {count, firstFailTime}
 
+// P2.2D-4.5: 异步生成任务管理（内存存储，服务重启后失效）
+const asyncJobs = new Map();
+const AsyncJobManager = {
+  createJob(params) {
+    const jobId = 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+    const job = {
+      jobId,
+      status: 'queued',
+      params,
+      result: null,
+      error: null,
+      createdAt: new Date().toISOString(),
+      startedAt: null,
+      completedAt: null,
+      cancelled: false
+    };
+    asyncJobs.set(jobId, job);
+    this._executeJob(job);
+    return job;
+  },
+  async _executeJob(job) {
+    job.status = 'generating';
+    job.startedAt = new Date().toISOString();
+    try {
+      const isLocalManual = job.params.manualModel && ModelRouter.isLocalModel(job.params.manualModel);
+      const numCtx = job.params.numCtx || (isLocalManual ? 8192 : undefined);
+      const result = await ModelRouter.generate({
+        taskType: job.params.taskType || 'text',
+        prompt: job.params.prompt || '',
+        manualModel: job.params.manualModel || null,
+        numCtx,
+        images: job.params.images
+      });
+      if (job.cancelled) {
+        job.status = 'cancelled';
+      } else {
+        job.status = result.success ? 'succeeded' : 'failed';
+        job.result = result;
+        if (!result.success) job.error = result.error || { message: '生成失败' };
+      }
+    } catch(e) {
+      if (job.cancelled) {
+        job.status = 'cancelled';
+      } else {
+        job.status = 'failed';
+        job.error = { message: e.message, type: e.type || 'exception' };
+      }
+    }
+    job.completedAt = new Date().toISOString();
+    setTimeout(() => asyncJobs.delete(job.jobId), 3600000);
+  },
+  getJob(jobId) {
+    const job = asyncJobs.get(jobId);
+    if (!job) return null;
+    return {
+      jobId: job.jobId,
+      status: job.status,
+      result: job.result,
+      error: job.error,
+      createdAt: job.createdAt,
+      startedAt: job.startedAt,
+      completedAt: job.completedAt,
+      elapsedMs: job.startedAt ? (job.completedAt ? new Date(job.completedAt) - new Date(job.startedAt) : Date.now() - new Date(job.startedAt)) : 0
+    };
+  },
+  cancelJob(jobId) {
+    const job = asyncJobs.get(jobId);
+    if (!job) return { success: false, error: '任务不存在' };
+    if (job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled') {
+      return { success: false, error: '任务已结束' };
+    }
+    job.cancelled = true;
+    job.status = 'cancelled';
+    job.completedAt = new Date().toISOString();
+    try {
+      const LocalModelLock = require('./local-model-lock.js');
+      LocalModelLock.forceReleaseAll();
+    } catch(e) {}
+    return { success: true, message: '任务已取消，本地模型锁已释放' };
+  }
+};
+
 // ============ 创建HTTP服务器 ============
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
@@ -1017,6 +1099,50 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({success:false, error:'生成失败', message:e.message}));
       }
     });
+    return;
+  }
+
+  // P2.2D-4.5: 创建异步生成任务
+  if (pathname === '/api/ai/generate-async' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const params = JSON.parse(body || '{}');
+        const job = AsyncJobManager.createJob(params);
+        res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+        res.end(JSON.stringify({ jobId: job.jobId, status: job.status, createdAt: job.createdAt }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({error:'创建任务失败', message:e.message}));
+      }
+    });
+    return;
+  }
+
+  // P2.2D-4.5: 查询异步任务状态
+  if (pathname.match(/^\/api\/ai\/jobs\/[^\/]+$/) && req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
+    const jobId = pathname.split('/').pop();
+    const job = AsyncJobManager.getJob(jobId);
+    if (!job) {
+      res.writeHead(404, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({error:'任务不存在或已失效（服务重启后内存任务不可恢复）', jobId}));
+      return;
+    }
+    res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+    res.end(JSON.stringify(job));
+    return;
+  }
+
+  // P2.2D-4.5: 取消异步任务
+  if (pathname.match(/^\/api\/ai\/jobs\/[^\/]+\/cancel$/) && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
+    const jobId = pathname.split('/')[4];
+    const result = AsyncJobManager.cancelJob(jobId);
+    res.writeHead(result.success ? 200 : 400, {'Content-Type':'application/json; charset=utf-8'});
+    res.end(JSON.stringify(result));
     return;
   }
 

@@ -7200,6 +7200,81 @@ async function callAI(messages, opts={}){
   // V77.3.1: 必须传递opts.context，否则externalCompanyResearch等上下文感知模式永远不生效
   messages = sanitizeFactsForAI(messages, opts.context || 'kaiLionOutbound');
 
+  // P2.2D-4.5: 异步服务端模型路由（用于本地模型长耗时生成）
+  if(opts.useServerRouter === true && opts.async === true){
+    const promptText = typeof messages === 'string' ? messages :
+      (Array.isArray(messages) ? messages.map(m=>m.content).join('\n') : String(messages));
+    try{
+      // 1. 创建异步任务
+      const createResp = await fetch('/api/ai/generate-async', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          taskType: opts.taskType || 'text',
+          prompt: promptText,
+          manualModel: opts.manualModel || opts.model || null,
+          numCtx: opts.numCtx || 8192
+        })
+      });
+      const createResult = await createResp.json();
+      if(!createResult.jobId){
+        return {content:null, error:'创建异步任务失败', serverRouter:true, async:true};
+      }
+      const jobId = createResult.jobId;
+      window._currentAsyncJobId = jobId;
+
+      // 2. 轮询任务状态（最多180秒）
+      const maxWait = 180000;
+      const pollInterval = 3000;
+      const startTime = Date.now();
+      let lastStatus = 'queued';
+
+      while(Date.now() - startTime < maxWait){
+        await new Promise(r => setTimeout(r, pollInterval));
+        const jobResp = await fetch('/api/ai/jobs/' + jobId);
+        if(!jobResp.ok){
+          if(jobResp.status === 404){
+            return {content:null, error:'任务已失效（服务可能已重启）', serverRouter:true, async:true, jobId};
+          }
+          continue;
+        }
+        const job = await jobResp.json();
+        lastStatus = job.status;
+
+        if(job.status === 'succeeded'){
+          const result = job.result || {};
+          return {
+            content: result.response,
+            usage: {},
+            latency: job.elapsedMs || 0,
+            error: null,
+            model: result.model,
+            failover: result.failover || false,
+            attempts: result.attempt || 1,
+            traceId: result.traceId,
+            serverRouter: true,
+            async: true,
+            jobId,
+            slowResponse: result.slowResponse || null
+          };
+        }
+        if(job.status === 'failed'){
+          const err = job.error || {};
+          return {content:null, error: err.message || '生成失败', model:null, latency:job.elapsedMs||0, serverRouter:true, async:true, jobId};
+        }
+        if(job.status === 'cancelled'){
+          return {content:null, error:'任务已取消', serverRouter:true, async:true, jobId, cancelled:true};
+        }
+        // 继续轮询
+      }
+
+      // 超时
+      return {content:null, error:'异步生成超时（超过180秒），最后状态: ' + lastStatus, serverRouter:true, async:true, jobId};
+    }catch(e){
+      return {content:null, error:'异步路由调用失败: '+e.message, model:null, latency:0, serverRouter:true, async:true};
+    }
+  }
+
   // P2.2C: 服务端模型路由（通过 /api/ai/generate 调用后端 model-router）
   if(opts.useServerRouter === true){
     const promptText = typeof messages === 'string' ? messages :
@@ -22563,17 +22638,21 @@ async function generateOutreachEmailDraft(customer, options={}){
   const policy = options.providerPolicy || 'online_safe';
   const kbCtx = await retrieveKnowledgeForOutreach(customer, policy);
   const prompt = buildOutreachEmailPrompt(customer, options, kbCtx);
-  // P2.2C: 使用服务端模型路由（model-router.js），复用故障转移、慢响应、本地锁
+  // P2.2D-4.5: 本地模型使用异步模式（避免长耗时导致浏览器 fetch 超时）
+  const manualModel = options.manualModel || null;
+  const isLocalManual = manualModel && (manualModel.includes('qwen3.5') || manualModel.includes('qwen2.5'));
+  const useAsync = isLocalManual || options.forceAsync;
   const result = await callAI([{role:'user', content:prompt}], {
     purpose:'outreach_email', temperature:0.35, providerPolicy:policy, context:'kaiLionOutbound',
     useServerRouter: true,
+    async: useAsync,
     taskType: 'text',
-    manualModel: options.manualModel || null,
+    manualModel: manualModel,
     numCtx: options.numCtx || 8192
   });
-  if(result.error) return { error:result.error, knowledgeContext:kbCtx, prompt:prompt, model:result.model, failover:result.failover, attempts:result.attempts, traceId:result.traceId };
-  if(!result.content) return { error:'未配置可用AI模型；未生成开发信草稿', knowledgeContext:kbCtx, prompt:prompt, mock:!!result.mock, model:result.model, failover:result.failover, attempts:result.attempts, traceId:result.traceId };
-  return { ...parseOutreachEmailResult(result.content), raw:result.content, knowledgeContext:kbCtx, model:result.model, latency:result.latency, mock:!!result.mock, prompt:prompt, failover:result.failover, attempts:result.attempts, traceId:result.traceId, serverRouter:true };
+  if(result.error) return { error:result.error, knowledgeContext:kbCtx, prompt:prompt, model:result.model, failover:result.failover, attempts:result.attempts, traceId:result.traceId, async:result.async, jobId:result.jobId };
+  if(!result.content) return { error:'未配置可用AI模型；未生成开发信草稿', knowledgeContext:kbCtx, prompt:prompt, mock:!!result.mock, model:result.model, failover:result.failover, attempts:result.attempts, traceId:result.traceId, async:result.async, jobId:result.jobId };
+  return { ...parseOutreachEmailResult(result.content), raw:result.content, knowledgeContext:kbCtx, model:result.model, latency:result.latency, mock:!!result.mock, prompt:prompt, failover:result.failover, attempts:result.attempts, traceId:result.traceId, serverRouter:true, async:result.async, jobId:result.jobId };
 }
 
 function renderOutreachKbContext(kbCtx, containerId){

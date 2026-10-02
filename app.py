@@ -3023,22 +3023,51 @@ EN: ...
                                     except Exception as _ne:
                                         st.error(f"新增失败：{_ne}")
 
-                    # ===== 2. 活动日志区域 =====
+                    # ===== 2. 活动日志区域（兼容旧JSON activities + 新SQLite activity_log）=====
                     with st.expander("📝 活动日志", expanded=False):
-                        if not _scid:
-                            st.caption("该客户尚未在 SQLite 建档，活动日志不可用。")
-                        else:
+                        # 统一读取适配层：合并旧JSON activities和新SQLite activity_log
+                        _all_acts = []
+                        # 2a. 旧JSON客户活动日志（字段: type中文/created_at/description）
+                        _json_acts = cust.get("activities", []) or []
+                        _type_map = {"邮件": "email", "WhatsApp": "whatsapp", "电话": "call",
+                                     "面谈": "meeting", "样品": "sample", "报价": "quote",
+                                     "note": "note", "email": "email", "whatsapp": "whatsapp",
+                                     "call": "call", "meeting": "meeting", "quote": "quote", "sample": "sample"}
+                        for _ja in _json_acts:
+                            _raw_type = _ja.get("type", "") or _ja.get("activity_type", "")
+                            _all_acts.append({
+                                "activity_type": _type_map.get(_raw_type, _raw_type or "note"),
+                                "description": _ja.get("description", "") or "",
+                                "created_at": _ja.get("created_at", "") or "",
+                                "created_by": _ja.get("created_by", "legacy"),
+                                "source": "json",
+                            })
+                        # 2b. 新SQLite活动日志
+                        if _scid and _dr2:
                             try:
-                                _acts_sql = _dr2.list_activities(_scid) if _dr2 else []
+                                for _sa in _dr2.list_activities(_scid):
+                                    _all_acts.append({
+                                        "activity_type": _sa.get("activity_type", "") or "note",
+                                        "description": _sa.get("description", "") or "",
+                                        "created_at": _sa.get("created_at", "") or "",
+                                        "created_by": _sa.get("created_by", ""),
+                                        "source": "sqlite",
+                                    })
                             except Exception:
-                                _acts_sql = []
-                            if _acts_sql:
-                                for _al in _acts_sql:
-                                    st.markdown(
-                                        f"- `{(_al.get('created_at','') or '')[:16]}` "
-                                        f"**[{_al.get('activity_type','')}]** {_al.get('description','')}")
-                            else:
-                                st.caption("暂无活动日志")
+                                pass
+                        # 按时间倒序合并
+                        _all_acts.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+
+                        if _all_acts:
+                            for _al in _all_acts:
+                                _src_tag = "（旧数据）" if _al.get("source") == "json" else ""
+                                st.markdown(
+                                    f"- `{(_al.get('created_at','') or '')[:16]}` "
+                                    f"**[{_al.get('activity_type','')}]** {_al.get('description','')}{_src_tag}")
+                        else:
+                            st.caption("暂无活动日志")
+                        # 新增活动记录（仅写入SQLite，不修改旧JSON）
+                        if _scid and _dr2:
                             with st.form("detail_new_activity_form"):
                                 st.markdown("**＋ 新增活动记录**")
                                 _at1, _at2 = st.columns([1, 3])
@@ -3053,6 +3082,8 @@ EN: ...
                                         st.rerun()
                                     except Exception as _ae:
                                         st.error(f"记录失败：{_ae}")
+                        elif not _scid:
+                            st.caption("该客户尚未在 SQLite 建档，新增活动需先迁移。")
 
                     # ===== 3. 网站证据区域 =====
                     with st.expander("🌐 网站证据", expanded=False):

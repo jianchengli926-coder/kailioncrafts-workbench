@@ -78,7 +78,8 @@ const FAILOVER_FORBIDDEN_CODES = new Set([
 const FAILOVER_ALLOWED_TYPES = new Set([
   'timeout', 'abort', 'connection_refused', 'econnrefused',
   'network_error', 'ollama_unavailable', 'slow_response',
-  'rate_limited', 'service_unavailable'
+  'rate_limited', 'service_unavailable', 'not_configured',
+  'config_error', 'empty_response', 'parse_error'
 ]);
 
 // 禁止故障转移的错误类型
@@ -349,27 +350,151 @@ async function callLocalModel(options) {
 }
 
 /**
- * 调用云端模型（mock 实现，不调用真实 API）
+ * 调用云端模型（真实智谱 GLM API 实现，OpenAI 兼容格式）
  * @param {Object} options - 调用选项
  * @returns {Promise<Object>} 调用结果
  */
 async function callCloudModel(options) {
-  const { model, prompt, mockProvider } = options;
+  const { model, prompt, mockProvider, timeoutMs } = options;
 
-  // 如果有 mock provider，使用 mock
+  // 如果有 mock provider，使用 mock（测试用）
   if (mockProvider) {
     return mockProvider({ model, prompt });
   }
 
-  // 生产环境应调用真实云端 API，但本阶段使用 mock 避免真实调用
-  return {
-    success: false,
-    model,
-    error: {
-      type: 'not_configured',
-      message: 'Cloud model API not configured in this environment'
-    }
-  };
+  // 从 api_config.json 读取 GLM 配置
+  let apiConfig = null;
+  try {
+    const cfgPath = require('path').join(__dirname, 'api_config.json');
+    apiConfig = JSON.parse(require('fs').readFileSync(cfgPath, 'utf8'));
+  } catch (e) {
+    return { success: false, model, error: { type: 'config_error', message: '无法读取 api_config.json: ' + e.message } };
+  }
+
+  const glmCfg = (apiConfig && apiConfig.glm) || {};
+  const apiKey = glmCfg.apiKey || '';
+  const endpoint = (glmCfg.endpoint || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/$/, '');
+  const timeout = timeoutMs || glmCfg.timeout || 30000;
+
+  // API Key 为空时返回明确错误，触发故障转移到本地模型
+  if (!apiKey || apiKey.length === 0) {
+    return {
+      success: false,
+      model,
+      error: {
+        type: 'not_configured',
+        message: 'GLM API Key 未配置（api_config.json 中 glm.apiKey 为空），已自动故障转移到本地模型',
+        recoverable: true
+      }
+    };
+  }
+
+  // 构建 OpenAI 兼容格式请求体
+  const messages = typeof prompt === 'string'
+    ? [{ role: 'user', content: prompt }]
+    : (Array.isArray(prompt) ? prompt : [{ role: 'user', content: String(prompt) }]);
+
+  const postData = JSON.stringify({
+    model: model,
+    messages: messages,
+    temperature: 0.7,
+    stream: false
+  });
+
+  // 解析 endpoint 获取 host 和 path
+  const url = new URL(endpoint + '/chat/completions');
+  const isHttps = url.protocol === 'https:';
+  const httpModule = isHttps ? require('https') : require('http');
+
+  return new Promise((resolve) => {
+    const req = httpModule.request({
+      hostname: url.hostname,
+      port: url.port || (isHttps ? 443 : 80),
+      path: url.pathname + url.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apiKey,
+        'Content-Length': Buffer.byteLength(postData)
+      },
+      timeout: timeout
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          // 处理错误响应
+          if (parsed.error) {
+            resolve({
+              success: false,
+              model,
+              error: {
+                type: 'api_error',
+                message: parsed.error.message || JSON.stringify(parsed.error),
+                code: parsed.error.code,
+                statusCode: res.statusCode
+              },
+              statusCode: res.statusCode
+            });
+            return;
+          }
+          // 解析 OpenAI 兼容格式响应
+          const content = parsed.choices && parsed.choices[0] && parsed.choices[0].message
+            ? parsed.choices[0].message.content
+            : '';
+          if (!content || !content.trim()) {
+            resolve({
+              success: false,
+              model,
+              error: { type: 'empty_response', message: '模型返回空内容', statusCode: res.statusCode },
+              statusCode: res.statusCode
+            });
+            return;
+          }
+          resolve({
+            success: true,
+            model,
+            response: content,
+            usage: parsed.usage || {},
+            statusCode: res.statusCode,
+            raw: parsed
+          });
+        } catch (e) {
+          resolve({
+            success: false,
+            model,
+            error: { type: 'parse_error', message: '响应解析失败: ' + e.message, statusCode: res.statusCode },
+            statusCode: res.statusCode
+          });
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      resolve({
+        success: false,
+        model,
+        error: {
+          type: err.code === 'ECONNREFUSED' ? 'connection_refused' : 'network_error',
+          message: err.message,
+          code: err.code
+        }
+      });
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({
+        success: false,
+        model,
+        error: { type: 'timeout', message: '请求超时（' + timeout + 'ms）', timeoutMs: timeout }
+      });
+    });
+
+    req.write(postData);
+    req.end();
+  });
 }
 
 /**

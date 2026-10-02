@@ -5714,6 +5714,25 @@ function getLockRemaining(){
   const s = getLockState();
   return s.lockedUntil ? Math.max(0,Math.ceil((s.lockedUntil-Date.now())/1000)) : 0;
 }
+
+// 认证建立后刷新依赖会话的状态，避免登录前的 401 初始化请求留下过期 UI。
+async function refreshAuthenticatedRuntimeState(){
+  try{
+    if(typeof fetchKBStatus === 'function') await fetchKBStatus();
+  }catch(e){
+    console.warn('[运行时状态] 知识库状态刷新失败:', e.message || e);
+  }
+  try{
+    const resp = await fetch('/api/ai/config');
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    const cfg = await resp.json();
+    window.AI_SERVER_CONFIG = cfg;
+    if(typeof renderProviderStatus === 'function') renderProviderStatus();
+  }catch(e){
+    console.warn('[运行时状态] AI配置刷新失败:', e.message || e);
+  }
+}
+
 async function checkLock(e){
   e.preventDefault();
   const inp = document.getElementById('lockInput');
@@ -5740,6 +5759,7 @@ async function checkLock(e){
       sessionStorage.setItem('kl_unlocked','1');
       document.getElementById('lockScreen').classList.add('hidden');
       setTimeout(()=>{ document.getElementById('lockScreen').style.display='none'; },450);
+      await refreshAuthenticatedRuntimeState();
       if(ACCESS_IS_DEFAULT){
         setTimeout(()=>{ toast('⚠️ 当前使用临时默认密码，请立即在设置中修改密码','err'); },1000);
       }
@@ -17940,6 +17960,8 @@ async function kbLoadTree() {
     console.error('加载分类树失败:', e);
   }
   kbBrowserState.treeLoading = false;
+  // 修复：数据加载完成后触发重新渲染，否则页面停留在"加载分类树..."
+  if (typeof renderView === 'function') renderView();
 }
 
 // 加载文档详情
@@ -39146,4 +39168,3 @@ if(document.readyState === 'loading'){
 }else{
   initArkDB();
 }
-

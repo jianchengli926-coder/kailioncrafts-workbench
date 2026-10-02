@@ -11,7 +11,7 @@
  * - 不调用云端 AI
  */
 
-const PRIORITY_VERSION = 'P2.3B-v1';
+const PRIORITY_VERSION = 'P2.3C-v1';
 
 /**
  * 计算客户优先级评分

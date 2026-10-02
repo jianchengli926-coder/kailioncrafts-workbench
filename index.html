@@ -4012,11 +4012,11 @@ function renderProspectPriorityPanel(customer){
   return `
   <div class="card card-pad mb16" id="prospect-priority-panel">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>🎯 开发优先级</span>
+      <span>🎯 开发优先级（五维评分）</span>
       <span class="badge" style="background:${tierColor};color:#fff;font-weight:700">${tierLabels[p.priorityTier] || p.priorityTier}</span>
     </div>
     <div class="stat-grid" style="margin-bottom:12px">
-      <div class="stat-card"><div class="stat-label">总分</div><div class="stat-value" style="color:${tierColor}">${p.priorityScore}</div></div>
+      <div class="stat-card" style="background:#f0f7ff"><div class="stat-label">总分（五维合计）</div><div class="stat-value" style="color:${tierColor}">${p.priorityScore}</div></div>
       <div class="stat-card"><div class="stat-label">ICP匹配</div><div class="stat-value">${p.scoreBreakdown.icpMatch}/30</div></div>
       <div class="stat-card"><div class="stat-label">身份证据</div><div class="stat-value">${p.scoreBreakdown.identityAndEvidence}/20</div></div>
       <div class="stat-card"><div class="stat-label">产品市场</div><div class="stat-value">${p.scoreBreakdown.productMarketFit}/20</div></div>
@@ -4165,7 +4165,7 @@ function doCollectWebsiteEvidence(customerId){
 
 /* P2.3B: 客户优先级排序和人工开发名单 */
 
-const PRIORITY_VERSION = 'P2.3B-v1';
+const PRIORITY_VERSION = 'P2.3C-v1';
 
 // 计算客户优先级（前端实现，与 prospect-priority.js 保持一致）
 function calculateProspectPriority(customerId){
@@ -6375,6 +6375,9 @@ function loadState(){
   // P2.3B: 客户开发名单
   S.outreachQueues = DB.load('outreachQueues') || [];
   S.prospectPriorities = DB.load('prospectPriorities') || [];
+  // P2.3C: 跟进计划和人工结果记录
+  S.followUps = DB.load('followUps') || [];
+  S.outreachOutcomes = DB.load('outreachOutcomes') || [];
 
   // 统一公司事实访问层（P1事实源统一）
   // 所有对外AI输出必须通过此入口取得公司事实；未确认的信息返回'待确认'
@@ -8976,6 +8979,9 @@ const NAV = [
   {key:'linkedin',icon:'💼',label:'领英拓客',title:'领英智能拓客',crumb:'4步拓客法 · AI站内信 · 智能互动'},
   {key:'socialmonitor',icon:'📡',label:'社媒监控',title:'社媒关键词监控',crumb:'监控行业痛点 · 发现潜在客户'},
   {key:'outreachQueue',icon:'🎯',label:'开发名单',title:'客户开发名单',crumb:'优先级排序 · 逐个生成草稿 · 人工审核发送'},
+  {key:'reviewQueue',icon:'📋',label:'审核队列',title:'人工审核队列',crumb:'集中审核草稿 · 通过/拒绝/补证据'},
+  {key:'followUpPlan',icon:'📅',label:'跟进计划',title:'跟进计划',crumb:'客户跟进提醒 · 工作台内待办'},
+  {key:'outreachAnalytics',icon:'📊',label:'开发复盘',title:'开发复盘',crumb:'基于真实录入结果 · 不编造数据'},
   {key:'outreach',icon:'📤',label:'触达中心',title:'多渠道触达中心',crumb:'邮件·WhatsApp·领英·电话统一管理'},
   {group:'系统'},
   {key:'tools',icon:'🧰',label:'工具箱',title:'工具箱',crumb:'14类·100+工具'},
@@ -9709,7 +9715,7 @@ function renderView(){
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, prospect:viewProspectDev, devplans:viewDevPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, outreachKB:viewOutreachKB, campaigns:viewCampaigns, campaignDetail:viewCampaignDetail, knowledgeFacts:viewKnowledgeFacts, knowledgePacks:viewKnowledgePacks, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
-    seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach, outreachQueue:viewOutreachQueue};
+    seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach, outreachQueue:viewOutreachQueue, reviewQueue:viewReviewQueue, followUpPlan:viewFollowUpPlan, outreachAnalytics:viewOutreachAnalytics};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
@@ -20689,6 +20695,529 @@ function openDraftForCustomer(customerId){
   currentView = 'customers';
   renderView();
   toast('请在客户详情页找到开发任务并生成草稿');
+}
+
+/* P2.3C: 人工审核队列、跟进计划与结果复盘 */
+
+// 获取待审核草稿列表
+function getReviewQueue(){
+  const drafts = S.drafts || [];
+  return drafts.filter(d =>
+    d.reviewStatus === 'needs_review' ||
+    d.reviewStatus === 'draft_pending_review' ||
+    d.status === 'needs_review' ||
+    d.status === 'draft_pending_review'
+  );
+}
+
+// 获取被拒绝草稿
+function getRejectedDrafts(){
+  const drafts = S.drafts || [];
+  return drafts.filter(d =>
+    d.reviewStatus === 'rejected' || d.status === 'rejected'
+  );
+}
+
+// 审核草稿通过
+function approveDraft(draftId, note){
+  const draft = (S.drafts || []).find(d => d.draftId === draftId || d.id === draftId);
+  if(!draft){ toast('草稿不存在','err'); return false; }
+  const previousStatus = draft.reviewStatus || draft.status;
+  draft.reviewStatus = 'approved';
+  draft.status = 'approved';
+  draft.reviewedBy = 'Leo';
+  draft.reviewedAt = new Date().toISOString();
+  draft.reviewNote = note || '';
+  draft.reviewHistory = draft.reviewHistory || [];
+  draft.reviewHistory.push({
+    previousStatus: previousStatus,
+    nextStatus: 'approved',
+    changedAt: new Date().toISOString(),
+    changedBy: 'Leo',
+    reason: note || '人工审核通过'
+  });
+  persist();
+  toast('草稿已审核通过（不代表已发送）');
+  renderView();
+  return true;
+}
+
+// 拒绝草稿
+function rejectDraft(draftId, reason){
+  if(!reason || !reason.trim()){ toast('请填写拒绝原因','err'); return false; }
+  const draft = (S.drafts || []).find(d => d.draftId === draftId || d.id === draftId);
+  if(!draft){ toast('草稿不存在','err'); return false; }
+  const previousStatus = draft.reviewStatus || draft.status;
+  draft.reviewStatus = 'rejected';
+  draft.status = 'rejected';
+  draft.rejectedBy = 'Leo';
+  draft.rejectedAt = new Date().toISOString();
+  draft.rejectReason = reason;
+  draft.reviewHistory = draft.reviewHistory || [];
+  draft.reviewHistory.push({
+    previousStatus: previousStatus,
+    nextStatus: 'rejected',
+    changedAt: new Date().toISOString(),
+    changedBy: 'Leo',
+    reason: reason
+  });
+  persist();
+  toast('草稿已拒绝');
+  renderView();
+  return true;
+}
+
+// 标记需要补证据
+function markDraftNeedsEvidence(draftId, missingItems){
+  const draft = (S.drafts || []).find(d => d.draftId === draftId || d.id === draftId);
+  if(!draft){ toast('草稿不存在','err'); return false; }
+  const previousStatus = draft.reviewStatus || draft.status;
+  draft.reviewStatus = 'needs_evidence';
+  draft.status = 'needs_evidence';
+  draft.missingEvidenceItems = missingItems || [];
+  draft.reviewHistory = draft.reviewHistory || [];
+  draft.reviewHistory.push({
+    previousStatus: previousStatus,
+    nextStatus: 'needs_evidence',
+    changedAt: new Date().toISOString(),
+    changedBy: 'Leo',
+    reason: '需要补充证据: ' + (missingItems || []).join(', ')
+  });
+  persist();
+  toast('已标记需要补证据');
+  renderView();
+  return true;
+}
+
+// 记录已人工发送（事后 CRM 记录，不实际发送）
+function markManuallySent(draftId, channel, sentAt, note){
+  const draft = (S.drafts || []).find(d => d.draftId === draftId || d.id === draftId);
+  if(!draft){ toast('草稿不存在','err'); return false; }
+  if(draft.reviewStatus !== 'approved' && draft.status !== 'approved'){
+    toast('只有审核通过的草稿才能标记已人工发送','err'); return false;
+  }
+  if(draft.reviewStatus === 'rejected' || draft.status === 'rejected'){
+    toast('被拒绝的草稿不能标记已人工发送','err'); return false;
+  }
+  draft.manualSendRecord = {
+    channel: channel || 'email',
+    sentAt: sentAt || new Date().toISOString(),
+    note: note || '',
+    manualSendSource: 'manual_mark',
+    recordedBy: 'Leo',
+    recordedAt: new Date().toISOString()
+  };
+  draft.reviewStatus = 'manually_sent';
+  draft.status = 'manually_sent';
+  persist();
+  toast('已记录人工发送（工作台未发送任何消息）');
+  renderView();
+  return true;
+}
+
+// 创建跟进计划
+function createFollowUp(customerId, options){
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer){ toast('客户不存在','err'); return null; }
+  // DNC 或 blocked 客户不得创建外部联系跟进
+  if(customer.dnc === true || customer.doNotContact === true){
+    toast('DNC 客户不得创建外部联系跟进','err'); return null;
+  }
+  const followUp = {
+    followUpId: 'fu_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2,8),
+    customerId: customerId,
+    campaignId: options.campaignId || null,
+    draftId: options.draftId || null,
+    taskId: options.taskId || null,
+    plannedAt: options.plannedAt || new Date(Date.now() + 86400000).toISOString(),
+    timezone: options.timezone || 'unknown',
+    channel: options.channel || 'email',
+    actionType: options.actionType || 'follow_up_1',
+    status: 'planned',
+    reminderNote: options.reminderNote || '',
+    sourceStatus: options.sourceStatus || 'manual',
+    createdBy: 'Leo',
+    completedBy: null,
+    completedAt: null,
+    outcomeId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  if(!S.followUps) S.followUps = [];
+  S.followUps.unshift(followUp);
+  persist();
+  toast('跟进计划已创建');
+  return followUp;
+}
+
+// 更新跟进状态
+function updateFollowUpStatus(followUpId, status, note){
+  const fu = (S.followUps || []).find(f => f.followUpId === followUpId);
+  if(!fu){ toast('跟进计划不存在','err'); return false; }
+  const validStatuses = ['planned','due','completed','skipped','cancelled'];
+  if(!validStatuses.includes(status)){ toast('无效状态','err'); return false; }
+  fu.status = status;
+  fu.updatedAt = new Date().toISOString();
+  if(status === 'completed'){
+    fu.completedBy = 'Leo';
+    fu.completedAt = new Date().toISOString();
+  }
+  if(note) fu.completionNote = note;
+  persist();
+  toast('跟进状态已更新为: ' + status);
+  renderView();
+  return true;
+}
+
+// 记录人工结果
+function recordOutcome(customerId, outcome, options){
+  const customer = (S.customers || []).find(c => c.id === customerId);
+  if(!customer){ toast('客户不存在','err'); return null; }
+  const validOutcomes = ['replied','interested','not_interested','requested_quote','requested_sample','no_response','bounced','wrong_contact','do_not_contact','meeting_requested','other'];
+  if(!validOutcomes.includes(outcome)){ toast('无效结果类型','err'); return null; }
+  const record = {
+    outcomeId: 'oc_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2,8),
+    customerId: customerId,
+    campaignId: options.campaignId || null,
+    draftId: options.draftId || null,
+    channel: options.channel || 'email',
+    occurredAt: options.occurredAt || new Date().toISOString(),
+    timezone: options.timezone || 'unknown',
+    outcome: outcome,
+    note: options.note || '',
+    nextAction: options.nextAction || '',
+    recordedBy: 'Leo',
+    source: 'manual_entry',
+    createdAt: new Date().toISOString()
+  };
+  if(!S.outreachOutcomes) S.outreachOutcomes = [];
+  S.outreachOutcomes.unshift(record);
+  // 如果是 DNC 结果，更新客户状态
+  if(outcome === 'do_not_contact'){
+    customer.dnc = true;
+    customer.doNotContact = true;
+  }
+  persist();
+  toast('结果已记录');
+  return record;
+}
+
+// 获取复盘统计
+function getOutreachAnalytics(filters){
+  const customers = S.customers || [];
+  const drafts = S.drafts || [];
+  const queues = S.outreachQueues || [];
+  const followUps = S.followUps || [];
+  const outcomes = S.outreachOutcomes || [];
+  const evidences = S.websiteEvidences || [];
+
+  const now = new Date();
+  const stats = {
+    totalCustomers: customers.length,
+    tierA: queues.filter(q => q.priorityTier === 'A').length,
+    tierB: queues.filter(q => q.priorityTier === 'B').length,
+    tierC: queues.filter(q => q.priorityTier === 'C').length,
+    blocked: queues.filter(q => q.priorityTier === 'blocked').length,
+    needsReview: drafts.filter(d => d.reviewStatus === 'needs_review' || d.reviewStatus === 'draft_pending_review').length,
+    approvedNotSent: drafts.filter(d => (d.reviewStatus === 'approved' || d.status === 'approved') && !d.manualSendRecord).length,
+    manuallySent: drafts.filter(d => d.reviewStatus === 'manually_sent' || d.manualSendRecord).length,
+    rejected: drafts.filter(d => d.reviewStatus === 'rejected').length,
+    followUpDue: followUps.filter(f => f.status === 'planned' && new Date(f.plannedAt) <= now).length,
+    followUpOverdue: followUps.filter(f => f.status === 'planned' && new Date(f.plannedAt) < new Date(now.getTime() - 86400000)).length,
+    followUpCompleted: followUps.filter(f => f.status === 'completed').length,
+    replied: outcomes.filter(o => o.outcome === 'replied').length,
+    interested: outcomes.filter(o => o.outcome === 'interested').length,
+    requestedQuote: outcomes.filter(o => o.outcome === 'requested_quote').length,
+    noResponse: outcomes.filter(o => o.outcome === 'no_response').length,
+    dnc: customers.filter(c => c.dnc === true || c.doNotContact === true).length,
+    evidencePending: evidences.filter(e => e.reviewStatus === 'pending').length,
+    evidenceReviewed: evidences.filter(e => e.reviewStatus === 'reviewed').length,
+    totalOutcomes: outcomes.length
+  };
+
+  // 计算回复率（基于真实记录的分母）
+  if(stats.manuallySent > 0){
+    stats.replyRate = Math.round(stats.replied / stats.manuallySent * 100);
+    stats.replyRateDenominator = stats.manuallySent;
+  } else {
+    stats.replyRate = null;
+    stats.replyRateDenominator = 0;
+    stats.insufficientData = true;
+  }
+
+  return stats;
+}
+
+/* P2.3C: 人工审核队列页面 */
+function viewReviewQueue(root){
+  const reviewDrafts = getReviewQueue();
+  const rejectedDrafts = getRejectedDrafts();
+  const customers = S.customers || [];
+
+  root.innerHTML = `
+    <div style="background:linear-gradient(120deg,var(--primary),#2c5282);color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:17px">📋 人工审核队列</div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:4px">集中审核 AI 生成的开发草稿。审核通过后由 Leo 在外部渠道人工发送，工作台不自动发送任何消息。</div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stat-grid" style="margin-bottom:16px">
+      <div class="stat-card"><span class="stat-icon">⏳</span>
+        <div class="stat-label">待审核</div><div class="stat-value" style="color:var(--orange)">${reviewDrafts.length}</div></div>
+      <div class="stat-card"><span class="stat-icon">✅</span>
+        <div class="stat-label">已通过未发送</div><div class="stat-value" style="color:var(--green)">${(S.drafts||[]).filter(d=>(d.reviewStatus==='approved'||d.status==='approved')&&!d.manualSendRecord).length}</div></div>
+      <div class="stat-card"><span class="stat-icon">📤</span>
+        <div class="stat-label">已人工发送</div><div class="stat-value">${(S.drafts||[]).filter(d=>d.reviewStatus==='manually_sent'||d.manualSendRecord).length}</div></div>
+      <div class="stat-card gold"><span class="stat-icon">❌</span>
+        <div class="stat-label">已拒绝</div><div class="stat-value" style="color:var(--red)">${rejectedDrafts.length}</div></div>
+    </div>
+
+    <!-- 待审核草稿列表 -->
+    <div class="card card-pad mb16">
+      <div class="card-title">待审核草稿（${reviewDrafts.length}）</div>
+      ${reviewDrafts.length === 0 ? `
+        <div class="text-muted text-center py24">暂无待审核草稿</div>
+      ` : `
+        <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>公司</th>
+              <th>国家</th>
+              <th>优先级</th>
+              <th>主题</th>
+              <th>模型</th>
+              <th>Pack</th>
+              <th>风险</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${reviewDrafts.map(d => {
+              const customer = customers.find(c => c.id === d.customerId);
+              const pack = d.knowledgePackId ? getKnowledgePackById(d.knowledgePackId) : null;
+              const priority = (S.outreachQueues||[]).find(q => q.customerId === d.customerId);
+              const tierColors = {A:'var(--green)', B:'var(--orange)', C:'var(--gray)', blocked:'var(--red)'};
+              return `
+                <tr>
+                  <td>${esc(customer ? (customer.company || customer.name) : '未知')}</td>
+                  <td>${esc(customer ? (customer.country || '-') : '-')}</td>
+                  <td>${priority ? `<span class="badge" style="background:${tierColors[priority.priorityTier]||'var(--gray)'};color:#fff">${priority.priorityTier} ${priority.priorityScore}</span>` : '-'}</td>
+                  <td class="text-sm">${esc(d.subject || '(无主题)').substring(0,40)}</td>
+                  <td class="text-sm">${esc(d.model || '-')}${d.manual ? ' (手动)' : ''}</td>
+                  <td class="text-sm">${pack ? esc(pack.name || pack.packId).substring(0,20) : '未绑定'}</td>
+                  <td>${(d.riskFlags||[]).length > 0 ? `<span style="color:var(--red)">${d.riskFlags.length}项</span>` : '<span style="color:var(--green)">无</span>'}</td>
+                  <td class="text-sm">${fmtDay(d.createdAt || d.generatedAt)}</td>
+                  <td>
+                    <div class="flex gap4 flex-wrap">
+                      <button class="btn btn-xs btn-primary" onclick="approveDraft('${d.draftId || d.id}')">通过</button>
+                      <button class="btn btn-xs btn-outline" onclick="promptRejectDraft('${d.draftId || d.id}')">拒绝</button>
+                      <button class="btn btn-xs btn-outline" onclick="currentDraft='${d.draftId || d.id}';currentView='drafts';renderView()">详情</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+        </div>
+      `}
+    </div>
+
+    <!-- 安全提示 -->
+    <div class="card card-pad" style="background:#fff8e6;border-left:3px solid var(--orange)">
+      <div style="font-size:13px">
+        <b>⚠️ 重要：</b>
+        "审核通过"仅表示 Leo 人工审核完成，<b>不代表已发送</b>。
+        所有邮件、LinkedIn、WhatsApp 消息必须由 Leo 在外部渠道人工发送。
+        工作台不会自动发送任何消息，也不会调用 SMTP、邮件 API 或 Webhook。
+      </div>
+    </div>
+  `;
+}
+
+// 提示拒绝草稿
+function promptRejectDraft(draftId){
+  const reason = prompt('请输入拒绝原因：');
+  if(reason && reason.trim()){
+    rejectDraft(draftId, reason.trim());
+  }
+}
+
+/* P2.3C: 跟进计划页面 */
+function viewFollowUpPlan(root){
+  const followUps = S.followUps || [];
+  const customers = S.customers || [];
+  const now = new Date();
+
+  // 分类
+  const planned = followUps.filter(f => f.status === 'planned' && new Date(f.plannedAt) > now);
+  const due = followUps.filter(f => f.status === 'planned' && new Date(f.plannedAt) <= now && new Date(f.plannedAt) >= new Date(now.getTime() - 86400000));
+  const overdue = followUps.filter(f => f.status === 'planned' && new Date(f.plannedAt) < new Date(now.getTime() - 86400000));
+  const completed = followUps.filter(f => f.status === 'completed');
+
+  root.innerHTML = `
+    <div style="background:linear-gradient(120deg,var(--primary),#2c5282);color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:17px">📅 跟进计划</div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:4px">管理客户跟进提醒。只在工作台内显示待办，不自动发送消息给客户。</div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stat-grid" style="margin-bottom:16px">
+      <div class="stat-card"><span class="stat-icon">📋</span>
+        <div class="stat-label">计划中</div><div class="stat-value">${planned.length}</div></div>
+      <div class="stat-card gold"><span class="stat-icon">⏰</span>
+        <div class="stat-label">今日到期</div><div class="stat-value" style="color:var(--orange)">${due.length}</div></div>
+      <div class="stat-card"><span class="stat-icon">⚠️</span>
+        <div class="stat-label">已逾期</div><div class="stat-value" style="color:var(--red)">${overdue.length}</div></div>
+      <div class="stat-card"><span class="stat-icon">✅</span>
+        <div class="stat-label">已完成</div><div class="stat-value" style="color:var(--green)">${completed.length}</div></div>
+    </div>
+
+    <!-- 跟进列表 -->
+    <div class="card card-pad">
+      <div class="card-title">跟进任务（${followUps.length}）</div>
+      ${followUps.length === 0 ? `
+        <div class="text-muted text-center py24">暂无跟进计划。可在客户详情页创建跟进提醒。</div>
+      ` : `
+        <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>状态</th>
+              <th>客户</th>
+              <th>动作类型</th>
+              <th>渠道</th>
+              <th>计划时间</th>
+              <th>时区</th>
+              <th>备注</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${[...overdue, ...due, ...planned, ...completed].slice(0,50).map(f => {
+              const customer = customers.find(c => c.id === f.customerId);
+              const isOverdue = f.status === 'planned' && new Date(f.plannedAt) < new Date(now.getTime() - 86400000);
+              const isDue = f.status === 'planned' && !isOverdue && new Date(f.plannedAt) <= now;
+              const statusBadge = f.status === 'completed' ? '<span class="badge badge-success">已完成</span>' :
+                isOverdue ? '<span class="badge" style="background:var(--red);color:#fff">已逾期</span>' :
+                isDue ? '<span class="badge badge-warning">今日到期</span>' :
+                '<span class="badge">计划中</span>';
+              return `
+                <tr style="${isOverdue ? 'background:#fff5f5' : ''}">
+                  <td>${statusBadge}</td>
+                  <td>${esc(customer ? (customer.company || customer.name) : '未知')}</td>
+                  <td class="text-sm">${esc(f.actionType || '-')}</td>
+                  <td class="text-sm">${esc(f.channel || '-')}</td>
+                  <td class="text-sm">${fmtDay(f.plannedAt)}</td>
+                  <td class="text-sm">${f.timezone === 'unknown' ? '<span style="color:var(--orange)">待确认</span>' : esc(f.timezone)}</td>
+                  <td class="text-sm">${esc(f.reminderNote || '').substring(0,30)}</td>
+                  <td>
+                    <div class="flex gap4">
+                      ${f.status === 'planned' ? `
+                        <button class="btn btn-xs btn-primary" onclick="updateFollowUpStatus('${f.followUpId}','completed')">完成</button>
+                        <button class="btn btn-xs btn-outline" onclick="updateFollowUpStatus('${f.followUpId}','cancelled')">取消</button>
+                      ` : ''}
+                      <button class="btn btn-xs btn-outline" onclick="currentCustomer='${f.customerId}';currentView='customers';renderView()">客户</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+/* P2.3C: 开发复盘页面 */
+function viewOutreachAnalytics(root){
+  const stats = getOutreachAnalytics();
+
+  root.innerHTML = `
+    <div style="background:linear-gradient(120deg,var(--primary),#2c5282);color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:17px">📊 开发复盘</div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:4px">基于 Leo 人工录入的真实结果统计。不使用 AI 推断，不编造回复率或转化率。</div>
+    </div>
+
+    <!-- 客户分层统计 -->
+    <div class="card card-pad mb16">
+      <div class="card-title">客户优先级分布</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">A 类（优先）</div><div class="stat-value" style="color:var(--green)">${stats.tierA}</div></div>
+        <div class="stat-card"><div class="stat-label">B 类（补充）</div><div class="stat-value" style="color:var(--orange)">${stats.tierB}</div></div>
+        <div class="stat-card"><div class="stat-label">C 类（暂缓）</div><div class="stat-value" style="color:var(--gray)">${stats.tierC}</div></div>
+        <div class="stat-card"><div class="stat-label">阻断</div><div class="stat-value" style="color:var(--red)">${stats.blocked}</div></div>
+      </div>
+    </div>
+
+    <!-- 草稿审核统计 -->
+    <div class="card card-pad mb16">
+      <div class="card-title">草稿审核流程</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">待审核</div><div class="stat-value" style="color:var(--orange)">${stats.needsReview}</div></div>
+        <div class="stat-card"><div class="stat-label">已通过未发送</div><div class="stat-value" style="color:var(--green)">${stats.approvedNotSent}</div></div>
+        <div class="stat-card"><div class="stat-label">已人工发送</div><div class="stat-value">${stats.manuallySent}</div></div>
+        <div class="stat-card"><div class="stat-label">已拒绝</div><div class="stat-value" style="color:var(--red)">${stats.rejected}</div></div>
+      </div>
+    </div>
+
+    <!-- 跟进统计 -->
+    <div class="card card-pad mb16">
+      <div class="card-title">跟进计划</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">今日到期</div><div class="stat-value" style="color:var(--orange)">${stats.followUpDue}</div></div>
+        <div class="stat-card"><div class="stat-label">已逾期</div><div class="stat-value" style="color:var(--red)">${stats.followUpOverdue}</div></div>
+        <div class="stat-card"><div class="stat-label">已完成</div><div class="stat-value" style="color:var(--green)">${stats.followUpCompleted}</div></div>
+      </div>
+    </div>
+
+    <!-- 结果统计 -->
+    <div class="card card-pad mb16">
+      <div class="card-title">人工录入结果（基于真实记录）</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">已回复</div><div class="stat-value" style="color:var(--green)">${stats.replied}</div></div>
+        <div class="stat-card"><div class="stat-label">感兴趣</div><div class="stat-value">${stats.interested}</div></div>
+        <div class="stat-card"><div class="stat-label">请求报价</div><div class="stat-value">${stats.requestedQuote}</div></div>
+        <div class="stat-card"><div class="stat-label">无响应</div><div class="stat-value" style="color:var(--gray)">${stats.noResponse}</div></div>
+        <div class="stat-card"><div class="stat-label">DNC</div><div class="stat-value" style="color:var(--red)">${stats.dnc}</div></div>
+      </div>
+      ${stats.insufficientData ? `
+        <div class="text-sm mt8" style="color:var(--orange)">
+          ⚠️ 暂无足够数据计算回复率（已人工发送 ${stats.manuallySent} 封，回复 ${stats.replied} 封）。
+          数据不足时不显示 0%，避免误导。
+        </div>
+      ` : `
+        <div class="text-sm mt8">
+          回复率: <b>${stats.replyRate}%</b>（${stats.replied}/${stats.replyRateDenominator}，基于已人工发送数量）
+        </div>
+      `}
+    </div>
+
+    <!-- 证据统计 -->
+    <div class="card card-pad mb16">
+      <div class="card-title">网站证据</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">待核验</div><div class="stat-value" style="color:var(--orange)">${stats.evidencePending}</div></div>
+        <div class="stat-card"><div class="stat-label">已核验</div><div class="stat-value" style="color:var(--green)">${stats.evidenceReviewed}</div></div>
+      </div>
+    </div>
+
+    <!-- 统计口径说明 -->
+    <div class="card card-pad" style="background:#f8f9fa;border-left:3px solid var(--gray)">
+      <div class="card-title">📐 统计口径说明</div>
+      <div class="text-sm" style="line-height:1.8">
+        <div>• <b>已人工发送</b>：仅统计 Leo 手动标记 "manually_sent" 的草稿，不包含 approved 但未发送的草稿</div>
+        <div>• <b>回复率</b>：回复数 / 已人工发送数，分母为真实记录的发送数量</div>
+        <div>• <b>结果记录</b>：全部来自 Leo 手动录入，不自动从邮箱或 LinkedIn 抓取</div>
+        <div>• <b>不统计</b>：needs_review 不计为已联系，approved 不计为已发送，completed follow-up 不计为回复</div>
+        <div>• <b>数据不足</b>：发送数为 0 时不显示回复率，避免误导性 0%</div>
+      </div>
+    </div>
+  `;
 }
 
 function viewPipeline(root){

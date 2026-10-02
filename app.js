@@ -5697,36 +5697,77 @@ function confirmAddCustomerToCampaign(campaignId, customerId){
 
 /* ============ 密码登录屏障（服务端验证，可更换，不硬编码） ============ */
 let ACCESS_IS_DEFAULT = false;
+// 防暴力破解：失败次数与锁定
+const LOCK_MAX_ATTEMPTS = 5;
+const LOCK_DURATION_MS = 30000;
+function getLockState(){
+  try{ return JSON.parse(localStorage.getItem('kl_lock_state')||'{}'); }catch(e){ return {}; }
+}
+function setLockState(s){ try{ localStorage.setItem('kl_lock_state',JSON.stringify(s)); }catch(e){} }
+function isLockedOut(){
+  const s = getLockState();
+  if(s.lockedUntil && Date.now() < s.lockedUntil){ return true; }
+  if(s.lockedUntil && Date.now() >= s.lockedUntil){ setLockState({attempts:0,lockedUntil:0}); }
+  return false;
+}
+function getLockRemaining(){
+  const s = getLockState();
+  return s.lockedUntil ? Math.max(0,Math.ceil((s.lockedUntil-Date.now())/1000)) : 0;
+}
 async function checkLock(e){
   e.preventDefault();
-  const val = document.getElementById('lockInput').value;
+  const inp = document.getElementById('lockInput');
+  const btn = document.querySelector('.lock-btn');
   const err = document.getElementById('lockError');
-  if(!val){ err.textContent = '请输入密码'; return false; }
+  const val = inp.value;
+  if(!val){ err.textContent = '请输入密码'; inp.focus(); return false; }
+  if(isLockedOut()){
+    err.textContent = '🔒 尝试次数过多，请 '+getLockRemaining()+' 秒后再试';
+    return false;
+  }
   err.textContent = '验证中...';
+  btn.disabled = true; btn.textContent = '⏳ 验证中...';
   try{
     const resp = await fetch('/api/access/verify', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type':'application/json'},
       body: JSON.stringify({password: val})
     });
     const data = await resp.json();
     if(data.valid){
       err.textContent = '';
+      setLockState({attempts:0,lockedUntil:0});
       sessionStorage.setItem('kl_unlocked','1');
       document.getElementById('lockScreen').classList.add('hidden');
       setTimeout(()=>{ document.getElementById('lockScreen').style.display='none'; },450);
-      // 如果是默认密码，提示修改
       if(ACCESS_IS_DEFAULT){
         setTimeout(()=>{ toast('⚠️ 当前使用临时默认密码，请立即在设置中修改密码','err'); },1000);
       }
     }else{
-      err.textContent = '密码错误，请重新输入';
-      document.getElementById('lockInput').value = '';
-      document.getElementById('lockInput').focus();
-      setTimeout(()=>{ err.textContent = ''; },2500);
+      const s = getLockState();
+      s.attempts = (s.attempts||0)+1;
+      const remain = LOCK_MAX_ATTEMPTS - s.attempts;
+      if(s.attempts >= LOCK_MAX_ATTEMPTS){
+        s.lockedUntil = Date.now()+LOCK_DURATION_MS;
+        err.textContent = '🔒 连续5次错误，已锁定30秒';
+        inp.disabled = true; btn.disabled = true;
+        const tick = setInterval(()=>{
+          const r = getLockRemaining();
+          if(r<=0){ clearInterval(tick); inp.disabled=false; btn.disabled=false; btn.textContent='进 入 工 作 台'; err.textContent=''; inp.value=''; inp.focus(); }
+          else{ err.textContent = '🔒 已锁定，请 '+r+' 秒后再试'; }
+        },1000);
+      }else{
+        err.textContent = '❌ 密码错误，还剩 '+remain+' 次机会';
+      }
+      setLockState(s);
+      inp.value = ''; inp.focus();
+      inp.parentElement.classList.add('shake');
+      setTimeout(()=>{ inp.parentElement.classList.remove('shake'); },500);
     }
   }catch(err2){
     err.textContent = '验证失败：' + err2.message;
+  }finally{
+    if(!isLockedOut()){ btn.disabled = false; btn.textContent = '进 入 工 作 台'; }
   }
   return false;
 }

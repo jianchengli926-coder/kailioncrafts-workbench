@@ -128,6 +128,10 @@ input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;outlin
 .lock-error{color:#e53e3e;font-size:13px;text-align:center;min-height:18px;transition:opacity .2s;font-weight:500}
 .lock-footer{position:absolute;bottom:28px;left:0;right:0;text-align:center;font-size:11px;color:#a0aec0;letter-spacing:1px;z-index:1}
 .lock-hint{font-size:11px;color:#a0aec0;text-align:center;margin-top:4px}
+.lock-btn:disabled{opacity:.6;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+.lock-input-wrap.shake{animation:shake .4s ease-in-out;border-color:#e53e3e!important}
+
 
 /* ============ 布局骨架 ============ */
 .app{display:flex;height:100vh;width:100vw}

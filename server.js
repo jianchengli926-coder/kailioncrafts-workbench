@@ -930,7 +930,24 @@ const server = http.createServer(async (req, res) => {
   }
 
   // 验证密码（登录）
-  if (pathname === '/api/access/verify' && req.method === 'POST') {
+  // 密码登录速率限制（防暴力破解）
+const ACCESS_RATE_LIMIT = new Map();
+function checkAccessRateLimit(ip){
+  const now = Date.now();
+  const windowMs = 60000;
+  const maxAttempts = 10;
+  const key = ip + '_' + Math.floor(now / windowMs);
+  const count = (ACCESS_RATE_LIMIT.get(key) || 0) + 1;
+  ACCESS_RATE_LIMIT.set(key, count);
+  // 清理过期条目
+  for(const k of ACCESS_RATE_LIMIT.keys()){
+    const ts = parseInt(k.split('_')[1]) * windowMs;
+    if(now - ts > windowMs * 2) ACCESS_RATE_LIMIT.delete(k);
+  }
+  return count <= maxAttempts;
+}
+
+if (pathname === '/api/access/verify' && req.method === 'POST') {
     const ip = getClientIp(req);
     if (isRateLimited(ip)) {
       res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });

@@ -6408,7 +6408,7 @@ window.onunhandledrejection = function(event){
 console.log('%c✅ 全局错误处理已启用', 'color:#0f7b3f;font-weight:bold');
 
 /* ---------- 全局状态 ---------- */
-let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[], outreachKnowledgeBase:[], campaigns:[], campaignCustomerTasks:[], campaignFollowUpTasks:[], knowledgeFacts:[], knowledgePacks:[] };
+let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[], outreachKnowledgeBase:[], campaigns:[], campaignCustomerTasks:[], campaignFollowUpTasks:[], knowledgeFacts:[], knowledgePacks:[], importBatches:[] };
 
 /* ============================================================
  * 数据版本管理与迁移（全局作用域，供 DOMContentLoaded 调用）
@@ -6589,6 +6589,8 @@ function getTimelineEvents(cid, limit=50){
   S.contentHistory = DB.load('contentHistory') || null;
   S.communications = DB.load('communications') || null;
   S.outreachKnowledgeBase = DB.load('outreachKnowledgeBase') || [];
+  // P2.5A: 客户批量导入批次记录
+  S.importBatches = DB.load('importBatches') || [];
   // V79.0A Campaign 数据层
   S.campaigns = DB.load('campaigns') || [];
   S.campaignCustomerTasks = DB.load('campaignCustomerTasks') || [];
@@ -6615,7 +6617,7 @@ function getTimelineEvents(cid, limit=50){
   Object.keys(S).forEach(k => {
     if (S[k] === null) {
       // 根据属性名判断应该初始化为数组还是对象
-      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks'];
+      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','importBatches'];
       if (arrayKeys.includes(k)) S[k] = [];
       else S[k] = {};
     }
@@ -6663,6 +6665,7 @@ function persist(){
   DB.save('devPlans',S.devPlans); DB.save('apiLogs',S.apiLogs); DB.save('pipeline2',S.pipeline2);
   DB.save('outreachKnowledgeBase',S.outreachKnowledgeBase);
   DB.save('campaigns',S.campaigns); DB.save('campaignCustomerTasks',S.campaignCustomerTasks);
+  DB.save('importBatches', S.importBatches||[]);
 }
 
 /* V74.6 导出客户数据为CSV */
@@ -9088,6 +9091,7 @@ const NAV = [
   {key:'followUpPlan',icon:'📅',label:'跟进计划',title:'跟进计划',crumb:'客户跟进提醒 · 工作台内待办'},
   {key:'outreachAnalytics',icon:'📊',label:'开发复盘',title:'开发复盘',crumb:'基于真实录入结果 · 不编造数据'},
   {key:'outreach',icon:'📤',label:'触达中心',title:'多渠道触达中心',crumb:'邮件·WhatsApp·领英·电话统一管理'},
+  {key:'bulkImport',icon:'📥',label:'批量导入',title:'客户批量导入',crumb:'CSV导入·字段映射·数据清洗·安全确认'},
   {group:'系统'},
   {key:'tools',icon:'🧰',label:'工具箱',title:'工具箱',crumb:'14类·100+工具'},
   {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings'},
@@ -9808,6 +9812,441 @@ function getTagCloudHTML(){
 }
 
 
+/* ============================================================
+ * P2.5A: 客户批量导入页面
+ * ============================================================ */
+let _bulkImportState = null;
+
+function resetBulkImportState(){
+  _bulkImportState = {
+    step: 1,
+    fileName: '', fileHash: '',
+    headers: [], rows: [], parseWarnings: [],
+    mapping: {}, unmapped: [],
+    previewResult: null, importResult: null,
+    importing: false, confirmed: false
+  };
+}
+
+function viewBulkImport(root){
+  if(!_bulkImportState) resetBulkImportState();
+  const st = _bulkImportState;
+
+  // 安全检查：CustomerImport 模块必须已加载
+  if(typeof CustomerImport === 'undefined'){
+    root.innerHTML = `
+      <div class="card card-pad" style="border-left:4px solid var(--red)">
+        <h3 style="margin:0 0 8px">⚠️ customer-import.js 未加载</h3>
+        <p class="text-sm text-muted">批量导入模块尚未加载完成，请刷新页面重试。若持续出现，请确认 customer-import.js 文件存在于 index.html 同目录。</p>
+      </div>`;
+    return;
+  }
+
+  root.innerHTML = `
+    <div style="background:linear-gradient(120deg,#2c5282,var(--primary));color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:17px">📥 客户批量导入</div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:4px">CSV 本地导入 · 字段映射 · 数据清洗 · 重复/DNC 检测 · 人工确认后入库</div>
+      <div style="font-size:12px;opacity:.75;margin-top:6px">🔒 安全：选择文件后仅本地预览，绝不自动写入客户库；导入需人工勾选确认。不会自动发送任何邮件/消息。</div>
+    </div>
+
+    ${renderBulkStepIndicator(st.step)}
+
+    ${st.step === 1 ? bulkStep1(st) : ''}
+    ${st.step === 2 ? bulkStep2(st) : ''}
+    ${st.step === 3 ? bulkStep3(st) : ''}
+    ${st.step === 4 ? bulkStep4(st) : ''}
+  `;
+}
+
+function renderBulkStepIndicator(step){
+  const steps = [
+    {n:1, label:'选择文件'},
+    {n:2, label:'字段映射'},
+    {n:3, label:'预览清洗'},
+    {n:4, label:'确认导入'}
+  ];
+  return `<div class="card card-pad mb16" style="padding:12px 20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;max-width:600px;margin:0 auto">
+      ${steps.map((s,i)=>{
+        const active = step >= s.n;
+        return `<div style="display:flex;align-items:center;flex:1;${i<steps.length-1?'border-right:2px solid '+(step>s.n?'var(--green)':'#e2e8f0'):''}">
+          <div style="width:28px;height:28px;border-radius:50%;background:${active?'var(--primary)':'#e2e8f0'};color:${active?'#fff':'#718096'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${s.n}</div>
+          <div style="margin-left:8px;font-size:12px;font-weight:${active?'600':'400'};color:${active?'var(--primary)':'#a0aec0'}">${s.label}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+/* 步骤1：选择 CSV 文件 */
+function bulkStep1(st){
+  // 显示历史批次
+  const batches = (S.importBatches||[]).slice().slice(0,5);
+  return `
+    <div class="card card-pad mb16">
+      <div class="card-title">① 选择 CSV 文件</div>
+      <p class="text-sm text-muted" style="margin:0 0 12px">选择包含客户数据的 CSV 文件。文件仅在您的浏览器本地解析，不会上传到任何服务器。</p>
+      <div style="border:2px dashed #cbd5e0;border-radius:10px;padding:40px;text-align:center;background:#f7fafc">
+        <div style="font-size:42px;margin-bottom:10px">📄</div>
+        <div style="font-weight:600;color:#2d3748;margin-bottom:6px">拖拽 CSV 文件到此处，或点击选择</div>
+        <div class="text-sm text-muted" style="margin-bottom:16px">当前支持 CSV（UTF-8），XLSX 后续加入</div>
+        <input type="file" id="bulkImportFileInput" accept=".csv,text/csv" style="display:none" onchange="handleBulkImportFile(this)">
+        <button class="btn btn-primary" onclick="document.getElementById('bulkImportFileInput').click()">📂 选择 CSV 文件</button>
+      </div>
+      <div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:12px 16px;margin-top:12px;font-size:12.5px;color:#2c5282;line-height:1.7">
+        <b>💡 CSV 列名建议：</b>company/公司名称、website/网址、email/邮箱、country/国家、contact/联系人、phone/电话、products/产品类别、notes/备注<br>
+        系统会自动识别常见列名（中英文均可），您也可以在下一步手动调整映射。
+      </div>
+    </div>
+
+    ${batches.length ? `
+    <div class="card card-pad">
+      <div class="card-title">🕘 最近导入批次</div>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>时间</th><th>文件</th><th>总行数</th><th>成功导入</th><th>跳过/阻断/失败</th><th>状态</th></tr></thead>
+        <tbody>
+          ${batches.map(b=>`<tr>
+            <td class="text-sm">${fmtDate(b.importedAt)}</td>
+            <td class="text-sm">${esc(b.fileName)}</td>
+            <td class="text-sm">${b.rowCount}</td>
+            <td class="text-sm" style="color:var(--green);font-weight:600">${b.importedCount}</td>
+            <td class="text-sm text-muted">${b.skippedCount} / ${b.blockedCount} / ${b.errorCount}</td>
+            <td><span class="badge" style="background:#c6f6d5;color:#22543d">${esc(b.status)}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>` : ''}
+  `;
+}
+
+function handleBulkImportFile(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  if(typeof CustomerImport === 'undefined'){ toast('导入模块未加载', 'err'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const text = e.target.result;
+      const parsed = CustomerImport.parseCSV(text);
+      if(!parsed.headers.length || !parsed.rows.length){
+        toast('CSV 没有可导入的数据行', 'err');
+        return;
+      }
+      const auto = CustomerImport.autoMapColumns(parsed.headers);
+      resetBulkImportState();
+      const st = _bulkImportState;
+      st.step = 2;
+      st.fileName = file.name;
+      st.fileHash = CustomerImport.computeFileHash(text);
+      st.headers = parsed.headers;
+      st.rows = parsed.rows;
+      st.parseWarnings = parsed.warnings;
+      st.mapping = auto.mapping;
+      st.unmapped = auto.unmapped;
+      toast(`✅ 已解析 ${parsed.rows.length} 行，请检查字段映射`);
+      if(typeof logAction === 'function') logAction('import', '选择CSV文件', `${file.name} · ${parsed.rows.length}行`);
+      renderView();
+    }catch(err){
+      console.error('[BulkImport] 解析失败', err);
+      toast('CSV 解析失败: ' + err.message, 'err');
+    }
+  };
+  reader.onerror = function(){ toast('文件读取失败', 'err'); };
+  reader.readAsText(file, 'utf-8');
+}
+
+/* 步骤2：列名映射 */
+function bulkStep2(st){
+  const stdFields = CustomerImport.STANDARD_FIELDS;
+  const fieldLabels = {
+    companyName:'公司名称', website:'网站', country:'国家/地区', region:'省/城市',
+    buyerType:'客户类型', productCategories:'产品类别', mainProducts:'主营产品',
+    existingBrands:'现有品牌', procurementScenario:'采购场景', knownPainPoints:'已知痛点',
+    contactName:'联系人姓名', contactTitle:'联系人职位', email:'邮箱', linkedin:'LinkedIn',
+    phone:'电话', whatsapp:'WhatsApp', sourceDocument:'来源文档', sourceUrl:'来源链接',
+    sourceCapturedAt:'采集时间', notes:'备注'
+  };
+
+  const rowsHtml = st.headers.map((col, idx)=>{
+    const mapped = st.mapping[col] || '';
+    const isAuto = !!mapped;
+    return `<tr>
+      <td class="text-sm" style="font-family:monospace">${esc(col)}</td>
+      <td class="text-sm">${st.rows.length} 行数据</td>
+      <td>
+        <select class="form-control" style="max-width:220px" onchange="updateBulkImportMapping(${idx}, this.value)">
+          <option value="">— 不导入（放入 extraFields）—</option>
+          ${stdFields.map(f=>`<option value="${f}" ${mapped===f?'selected':''}>${f} · ${fieldLabels[f]||''}</option>`).join('')}
+        </select>
+      </td>
+      <td class="text-sm">${mapped
+        ? `<span class="badge" style="background:#c6f6d5;color:#22543d">✅ 已映射 ${fieldLabels[mapped]||mapped}</span>`
+        : `<span class="badge" style="background:#fefcbf;color:#744210">⚠️ 未映射</span>`}
+      </td>
+    </tr>`;
+  }).join('');
+
+  const mappedCount = Object.keys(st.mapping).length;
+  const unmappedCount = st.headers.length - mappedCount;
+
+  return `
+    <div class="card card-pad mb16">
+      <div class="flex-between mb16">
+        <div>
+          <div class="card-title" style="margin:0">② 字段映射 — ${esc(st.fileName)}</div>
+          <div class="text-sm text-muted">共 ${st.headers.length} 列 · ${st.rows.length} 数据行</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="resetBulkImportState();renderView()">↩️ 重新选择文件</button>
+      </div>
+
+      ${st.parseWarnings.length ? `
+        <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#744210;max-height:120px;overflow:auto">
+          <b>⚠️ 解析警告（${st.parseWarnings.length}）：</b><br>
+          ${st.parseWarnings.map(w=>'· '+esc(w)).join('<br>')}
+        </div>` : ''}
+
+      <div class="text-sm mb8" style="color:#4a5568">
+        已自动映射 <b style="color:var(--green)">${mappedCount}</b> 列，未映射 <b style="color:${unmappedCount?'var(--orange)':'#4a5568'}">${unmappedCount}</b> 列
+        ${unmappedCount ? '（未映射列将作为 extraFields 保留，不会丢弃数据）' : ''}
+      </div>
+
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>CSV 列名</th><th>数据量</th><th>映射到标准字段</th><th>状态</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table></div>
+
+      <div class="flex gap8 mt16" style="justify-content:flex-end">
+        <button class="btn btn-outline" onclick="resetBulkImportState();renderView()">取消</button>
+        <button class="btn btn-primary" onclick="generateBulkImportPreview()">🔍 生成清洗预览 →</button>
+      </div>
+    </div>
+  `;
+}
+
+function updateBulkImportMapping(idx, value){
+  const st = _bulkImportState;
+  if(!st || !st.headers[idx]) return;
+  const col = st.headers[idx];
+  if(value){
+    st.mapping[col] = value;
+  } else {
+    delete st.mapping[col];
+  }
+  // 轻量更新映射状态，不重新渲染整个页面（避免下拉失去焦点）
+  renderView();
+}
+
+function generateBulkImportPreview(){
+  const st = _bulkImportState;
+  if(!st || !st.rows.length){ toast('请先选择文件', 'err'); return; }
+  if(typeof CustomerImport === 'undefined'){ toast('导入模块未加载', 'err'); return; }
+  try{
+    const ctx = { customers: S.customers||[], archives: S.outreachKnowledgeBase||[] };
+    const preview = CustomerImport.generatePreview(st.rows, st.mapping, ctx);
+    st.previewResult = preview;
+    st.step = 3;
+    st.confirmed = false;
+    toast(`✅ 预览完成：${preview.stats.ready} 可导入 / ${preview.stats.needsReview} 需审核`);
+    renderView();
+  }catch(err){
+    console.error('[BulkImport] 预览失败', err);
+    toast('生成预览失败: ' + err.message, 'err');
+  }
+}
+
+/* 步骤3：预览清洗结果 */
+function bulkStep3(st){
+  const p = st.previewResult;
+  if(!p) return '<div class="card card-pad"><div class="empty">无预览数据</div></div>';
+  const s = p.stats;
+
+  const decisionBadge = (d)=>{
+    const map = {
+      ready: {t:'✅ 可导入', c:'#c6f6d5', tc:'#22543d'},
+      needs_review: {t:'⚠️ 需人工审核', c:'#feebc8', tc:'#7b341e'},
+      duplicate_blocked: {t:'🚫 重复阻断', c:'#e2e8f0', tc:'#2d3748'},
+      dnc_blocked: {t:'⛔ DNC 阻断', c:'#fed7d7', tc:'#742a2a'},
+      invalid: {t:'❌ 无效', c:'#fed7d7', tc:'#742a2a'}
+    };
+    const m = map[d] || {t:d, c:'#e2e8f0', tc:'#2d3748'};
+    return `<span class="badge" style="background:${m.c};color:${m.tc}">${m.t}</span>`;
+  };
+
+  // 最多显示前 200 行，避免 DOM 过大
+  const showRows = p.rows.slice(0, 200);
+  const truncatedNote = p.rows.length > 200
+    ? `<div class="text-sm text-muted" style="margin-top:8px">（仅显示前 200 行，共 ${p.rows.length} 行）</div>` : '';
+
+  const rowsHtml = showRows.map(r=>{
+    const c = r.cleaned || {};
+    const hasErr = r.validationErrors && r.validationErrors.length;
+    const hasWarn = r.warnings && r.warnings.length;
+    return `<tr style="${hasErr?'background:#fff5f5':hasWarn?'background:#fffbeb':''}">
+      <td class="text-sm text-muted">${r.rowNumber}</td>
+      <td class="text-sm" style="font-weight:600">${esc(c.companyName||'—')}</td>
+      <td class="text-sm" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.normalizedDomain||'—')}</td>
+      <td class="text-sm mono">${esc(c.emailMasked||'—')}</td>
+      <td class="text-sm">${r.duplicateStatus!=='new'?`<span class="badge" style="background:#e9d8fd;color:#44337a" title="${esc((r.duplicateMatches||[]).map(m=>m.evidence).join('; '))}">${r.duplicateStatus}</span>`:'<span class="text-muted">—</span>'}</td>
+      <td class="text-sm">${r.dncStatus==='blocked'?'<span style="color:var(--red);font-weight:600">blocked</span>':'<span class="text-muted">clear</span>'}</td>
+      <td>${decisionBadge(r.importDecision)}</td>
+      <td class="text-sm" style="max-width:260px">
+        ${hasErr?`<div style="color:var(--red);font-size:12px">${r.validationErrors.map(esc).join('<br>')}</div>`:''}
+        ${hasWarn?`<div style="color:var(--orange);font-size:12px;margin-top:2px">${r.warnings.map(esc).join('<br>')}</div>`:''}
+        ${!hasErr&&!hasWarn?'<span class="text-muted">—</span>':''}
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="card card-pad mb16">
+      <div class="flex-between mb16">
+        <div>
+          <div class="card-title" style="margin:0">③ 清洗预览 — ${esc(st.fileName)}</div>
+          <div class="text-sm text-muted">尚未写入客户库，请核对后确认导入</div>
+        </div>
+        <div class="flex gap8">
+          <button class="btn btn-outline btn-sm" onclick="_bulkImportState.step=2;renderView()">← 返回调整映射</button>
+          <button class="btn btn-outline btn-sm" onclick="exportBulkErrorRows()">📤 导出问题行 CSV</button>
+        </div>
+      </div>
+
+      <div class="stat-grid" style="margin-bottom:16px">
+        <div class="stat-card"><div class="stat-label">总行数</div><div class="stat-value">${s.totalRows}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--green)">✅ 可导入</div><div class="stat-value" style="color:var(--green)">${s.ready}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--orange)">⚠️ 需审核</div><div class="stat-value" style="color:var(--orange)">${s.needsReview}</div></div>
+        <div class="stat-card"><div class="stat-label">🚫 重复阻断</div><div class="stat-value" style="color:#4a5568">${s.duplicateBlocked}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--red)">⛔ DNC</div><div class="stat-value" style="color:var(--red)">${s.dncBlocked}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--red)">❌ 无效</div><div class="stat-value" style="color:var(--red)">${s.invalid}</div></div>
+      </div>
+
+      <div class="table-wrap" style="max-height:480px;overflow:auto"><table class="tbl">
+        <thead style="position:sticky;top:0;z-index:1">
+          <tr><th>行号</th><th>公司名</th><th>域名</th><th>邮箱(脱敏)</th><th>重复状态</th><th>DNC</th><th>导入决策</th><th>错误/警告</th></tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table></div>
+      ${truncatedNote}
+
+      <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:12px 16px;margin-top:16px;font-size:13px;color:#744210">
+        <b>⚠️ 注意：</b>"需人工审核"的行会被导入但标记为 <code>identity_pending</code>，需您后续做身份确认和 ICP 评估。"重复阻断"和"DNC阻断"的行不会导入。
+      </div>
+
+      <div style="margin-top:16px;padding:14px;background:#f7fafc;border-radius:8px;border:1px solid #e2e8f0">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px">
+          <input type="checkbox" id="bulkImportConfirm" ${st.confirmed?'checked':''} onchange="_bulkImportState.confirmed=this.checked;document.getElementById('bulkImportConfirmBtn').disabled=!this.checked">
+          <span>我已核对预览结果，确认将 <b>${s.ready + s.needsReview}</b> 条客户写入客户台账</span>
+        </label>
+        <div class="flex gap8 mt12" style="justify-content:flex-end">
+          <button class="btn btn-outline" onclick="resetBulkImportState();renderView()">取消导入</button>
+          <button class="btn btn-primary" id="bulkImportConfirmBtn" onclick="executeBulkImport()" ${st.confirmed?'':'disabled'}>
+            ${st.importing?'⏳ 导入中...':'✅ 确认导入'}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function executeBulkImport(){
+  const st = _bulkImportState;
+  if(!st || !st.previewResult){ toast('无预览数据', 'err'); return; }
+  if(!st.confirmed){ toast('请先勾选确认复选框', 'err'); return; }
+  if(st.importing){ toast('导入正在进行中，请勿重复点击', 'err'); return; }
+  if(typeof CustomerImport === 'undefined'){ toast('导入模块未加载', 'err'); return; }
+
+  st.importing = true;
+  const btn = document.getElementById('bulkImportConfirmBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ 导入中...'; }
+
+  // 异步执行，让 UI 先更新
+  setTimeout(()=>{
+    try{
+      const result = CustomerImport.executeImport(st.previewResult, {
+        S: S,
+        persistFn: persist,
+        uidFn: uid,
+        options: { fileName: st.fileName, fileHash: st.fileHash, importedBy: 'Leo' }
+      });
+      st.importResult = result;
+      st.step = 4;
+      if(typeof logAction === 'function') logAction('import', '执行批量导入',
+        `${st.fileName} · 成功${result.importedCount} 跳过${result.skippedCount} 阻断${result.blockedCount} 失败${result.errorCount}`);
+      if(result.success){
+        toast(`✅ 导入完成：成功 ${result.importedCount} 家`);
+      } else {
+        toast('导入失败: ' + (result.errors||[]).map(e=>e.error||e).join('; '), 'err');
+      }
+    }catch(err){
+      console.error('[BulkImport] 执行失败', err);
+      toast('导入执行异常: ' + err.message, 'err');
+    }finally{
+      st.importing = false;
+      renderView();
+    }
+  }, 50);
+}
+
+/* 步骤4：导入结果 */
+function bulkStep4(st){
+  const r = st.importResult;
+  if(!r) return '<div class="card card-pad"><div class="empty">无导入结果</div></div>';
+  const b = r.batchRecord || {};
+
+  return `
+    <div class="card card-pad mb16" style="border-left:4px solid var(--green)">
+      <div style="font-size:42px;text-align:center;margin-bottom:8px">${r.success?'🎉':'⚠️'}</div>
+      <h3 style="text-align:center;margin:0 0 6px;color:${r.success?'var(--green)':'var(--orange)'}">${r.success?'导入完成':'导入遇到问题'}</h3>
+      <p class="text-sm text-muted" style="text-align:center;margin:0 0 16px">批次 ID: <code>${esc(r.batchId||'—')}</code> · 文件: ${esc(st.fileName)}</p>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label" style="color:var(--green)">✅ 成功导入</div><div class="stat-value" style="color:var(--green)">${r.importedCount}</div></div>
+        <div class="stat-card"><div class="stat-label">⏭️ 跳过（重复）</div><div class="stat-value">${r.skippedCount}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--red)">⛔ 阻断（DNC）</div><div class="stat-value" style="color:var(--red)">${r.blockedCount}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--red)">❌ 失败</div><div class="stat-value" style="color:var(--red)">${r.errorCount}</div></div>
+      </div>
+
+      ${(r.errors||[]).length ? `
+        <div style="background:#fff5f5;border:1px solid #feb2b2;border-radius:8px;padding:12px 16px;margin-top:12px;font-size:12.5px;color:#742a2a;max-height:160px;overflow:auto">
+          <b>错误明细：</b><br>
+          ${r.errors.map(e=>'· 行'+(e.row||'?')+': '+esc(Array.isArray(e.errors)?e.errors.join('; '):(e.error||e.errors||''))).join('<br>')}
+        </div>` : ''}
+
+      <div class="flex gap8 mt16" style="justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="exportBulkErrorRows()">📤 导出问题行 CSV</button>
+        <button class="btn btn-outline" onclick="resetBulkImportState();renderView()">📥 导入新文件</button>
+        <button class="btn btn-primary" onclick="resetBulkImportState();go('customers')">👥 前往客户台账查看</button>
+      </div>
+
+      <div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:12px 16px;margin-top:16px;font-size:12.5px;color:#2c5282;line-height:1.7">
+        <b>💡 下一步建议：</b>
+        <ul style="margin:6px 0 0 18px">
+          <li>标记为 <code>identity_pending</code> 的客户需做<b>身份确认</b>（核对公司官网/联系人职位）</li>
+          <li>对新客户做 <b>ICP 评估</b>，判断是否符合目标客户画像</li>
+          <li>符合条件的客户可手动加入<b>开发名单</b>（触达中心 → 开发名单）</li>
+          <li>不要立即群发开发信，先逐家核对邮箱有效性和业务匹配度</li>
+        </ul>
+      </div>
+    </div>
+  `;
+}
+
+function exportBulkErrorRows(){
+  const st = _bulkImportState;
+  if(!st || !st.previewResult){ toast('暂无预览数据可导出', 'err'); return; }
+  if(typeof CustomerImport === 'undefined'){ toast('导入模块未加载', 'err'); return; }
+  const csv = CustomerImport.exportErrorRowsCSV(st.previewResult);
+  if(!csv){ toast('没有错误/警告行需要导出', 'ok'); return; }
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `导入问题行_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ 问题行 CSV 已导出');
+}
+
+
 function renderView(){
   // V76.0 懒加载搜索结果（只加载一次）
   if(!window._prospectResultsLoaded && prospectSearchResults.length === 0){
@@ -9820,7 +10259,7 @@ function renderView(){
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, prospect:viewProspectDev, devplans:viewDevPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, outreachKB:viewOutreachKB, campaigns:viewCampaigns, campaignDetail:viewCampaignDetail, knowledgeFacts:viewKnowledgeFacts, knowledgePacks:viewKnowledgePacks, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
-    seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach, dailyWork:viewDailyWork, outreachQueue:viewOutreachQueue, reviewQueue:viewReviewQueue, followUpPlan:viewFollowUpPlan, outreachAnalytics:viewOutreachAnalytics};
+    seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach, dailyWork:viewDailyWork, outreachQueue:viewOutreachQueue, reviewQueue:viewReviewQueue, followUpPlan:viewFollowUpPlan, outreachAnalytics:viewOutreachAnalytics, bulkImport:viewBulkImport};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
@@ -12649,6 +13088,52 @@ function claimCust(cid){
   renderView();
 }
 
+function renderCustomerImportInfoPanel(c){
+  // 查找对应批次
+  const batch = (S.importBatches||[]).find(b=>b.importBatchId===c.importBatchId);
+  const warnings = c.importWarnings || [];
+  // 缺失字段提示
+  const missing = [];
+  const contact = c.contact || {};
+  if(!contact.email) missing.push('邮箱');
+  if(!contact.phone && !contact.whatsapp) missing.push('电话/WhatsApp');
+  if(!c.country) missing.push('国家');
+  if(!c.products || (Array.isArray(c.products) && c.products.length===0)) missing.push('产品类别');
+
+  return `
+    <div class="card card-pad mb16" style="border-left:4px solid #d69e2e;background:linear-gradient(135deg,#fffaf0,#fff)">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📥 批量导入信息</span>
+        <span class="text-sm text-muted">${esc(c.importDecision||'')}</span>
+      </div>
+      <div class="text-sm" style="line-height:1.9;margin-top:8px">
+        <div>📦 导入批次：<code style="font-size:11px">${esc(c.importBatchId)}</code></div>
+        <div>🕐 导入时间：<b>${fmtDate(c.createdAt)}</b>${batch?' · 文件：'+esc(batch.fileName):''}</div>
+        <div>📄 原始来源：${esc(c.sourceDocument||c.source||'bulk_import')}</div>
+        ${c.sourceUrl?`<div>🔗 来源链接：<a href="${safeUrl(c.sourceUrl)}" target="_blank" style="color:var(--primary)">${esc(c.sourceUrl)}</a></div>`:''}
+        ${c.sourceCapturedAt?`<div>📅 采集时间：${esc(c.sourceCapturedAt)}</div>`:''}
+      </div>
+      ${warnings.length ? `
+        <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:6px;padding:8px 12px;margin-top:10px;font-size:12px;color:#744210">
+          <b>⚠️ 数据清洗警告：</b>
+          <ul style="margin:4px 0 0 18px">${warnings.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul>
+        </div>` : ''}
+      ${missing.length ? `
+        <div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:6px;padding:8px 12px;margin-top:10px;font-size:12px;color:#2c5282">
+          <b>📝 缺失字段：</b>${missing.map(esc).join('、')}
+        </div>` : ''}
+      <div style="background:#f0fff4;border:1px solid #9ae6b4;border-radius:6px;padding:8px 12px;margin-top:10px;font-size:12px;color:#22543d">
+        <b>💡 下一步建议：</b>
+        <ol style="margin:4px 0 0 18px;padding:0">
+          <li>身份确认：核对公司官网和联系人职位</li>
+          <li>ICP 评估：判断是否符合目标客户画像</li>
+          <li>确认后手动加入开发名单（触达中心 → 开发名单）</li>
+        </ol>
+      </div>
+    </div>
+  `;
+}
+
 function openCustomerDetail(cid){
   const c = S.customers.find(x=>x.id===cid); if(!c) return;
   c.scores = c.scores || {grade:'C',total:0,product:0,companyType:0,purchaseSignal:0,contactQuality:0};
@@ -12672,6 +13157,8 @@ function openCustomerDetail(cid){
         ${(c.tags||[]).map(t=>`<span class="badge badge-gold" style="cursor:pointer" onclick="copyText('${t}')">${esc(t)}</span>`).join('')}
         <span class="text-sm text-muted">业务员：${esc(c.owner||'Leo')}${c.isOld?' · <b style="color:var(--gold)">老客户</b>':''}</span>
       </div>
+
+      ${c.importBatchId ? renderCustomerImportInfoPanel(c) : ''}
 
       <!-- V53 快捷操作栏 -->
       <div class="card card-pad mb16" style="background:linear-gradient(135deg,#f0f4f8,#e2e8f0);border:none">
@@ -16203,7 +16690,7 @@ function saveSettings(){
 }
 function exportData(){
   const data = {};
-  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','knowledgeFacts','knowledgePacks'].forEach(k=>{ if(S[k]!==undefined) data[k]=S[k]; });
+  ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','knowledgeFacts','knowledgePacks','importBatches'].forEach(k=>{ if(S[k]!==undefined) data[k]=S[k]; });
   const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'kailion-ark-backup-'+todayStr()+'.json'; a.click();
@@ -16211,7 +16698,7 @@ function exportData(){
 }
 function resetData(){
   confirmDlg('将清空所有本地数据并重新注入演示数据，确定？', ()=>{
-    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','campaignSchemaVersion','knowledgeFacts','knowledgePacks','websiteEvidences','outreachQueues','prospectPriorities','followUps','outreachOutcomes'].forEach(k=>DB.remove(k));
+    ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','campaignSchemaVersion','knowledgeFacts','knowledgePacks','websiteEvidences','outreachQueues','prospectPriorities','followUps','outreachOutcomes','importBatches'].forEach(k=>DB.remove(k));
     loadState(); seedData(); go('dashboard'); toast('已重置为演示数据');
   });
 }
@@ -29451,7 +29938,7 @@ function clearAllData(){
   if(!confirm('再次确认：真的要清空所有数据吗？')) return;
 
   // V79.0P1 修复：快照 + 固定顺序删除 + 失败逆序恢复
-  const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','outreachKnowledgeBase','knowledgeFacts','knowledgePacks','websiteEvidences','outreachQueues','prospectPriorities','followUps','outreachOutcomes'];
+  const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','outreachKnowledgeBase','knowledgeFacts','knowledgePacks','websiteEvidences','outreachQueues','prospectPriorities','followUps','outreachOutcomes','importBatches'];
   const objectKeys = ['settings','customerIdentityMigration','campaignSchemaVersion'];
   const allKeys = arrayKeys.concat(objectKeys);
   const specialKeys = ['prospectLeads','prospectProfiles'];
@@ -39299,5 +39786,6 @@ if(document.readyState === 'loading'){
   </div>
 </div>
 
+<script src="customer-import.js"></script>
 </body>
 </html>

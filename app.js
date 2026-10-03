@@ -16262,7 +16262,7 @@ function viewSettings(root){
         </div>
         <div class="card card-pad mb16">
           <div class="card-title">📧 SMTP邮件发送配置（V25）</div>
-          <div class="text-sm text-muted mb12" style="line-height:1.8">配置企业邮箱SMTP信息后，可在开发信"审核发送"中批量自动发送开发信。建议使用独立域名企业邮箱，并配置SPF/DKIM/DMARC提高送达率。</div>
+      <div class="text-sm text-muted mb12" style="line-height:1.8">可保存企业邮箱 SMTP 参数用于内部记录和交接检查；当前工作台不会调用 SMTP、邮件 API 或 Webhook 自动发送任何消息。实际投递请由 Leo 在外部邮箱中人工完成。</div>
           <div class="grid-2" style="gap:12px;margin-bottom:12px">
             <div><label class="text-sm">SMTP服务器</label><input type="text" id="smtp_host" placeholder="如：smtp.exmail.qq.com" value="${(S.smtpConfig&&S.smtpConfig.host)||''}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
             <div><label class="text-sm">端口</label><input type="text" id="smtp_port" placeholder="465或587" value="${(S.smtpConfig&&S.smtpConfig.port)||'465'}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
@@ -32650,7 +32650,7 @@ function draftSend(){
   </div>
   ${!smtpReady?`<div class="card card-pad mb16" style="background:#fff5f5;border-left:4px solid var(--red)">
     <div class="fw700 mb8" style="color:var(--red)">⚠️ SMTP未配置</div>
-    <div class="text-sm mb12">请先前往「设置」页面配置SMTP邮件发送信息，配置后即可批量自动发送开发信。</div>
+    <div class="text-sm mb12">开发信需先经过人工审核；工作台只生成草稿和发送交接信息，不会自动调用 SMTP、邮件 API 或 Webhook。实际投递请在外部邮箱中人工完成。</div>
     <button class="btn btn-primary btn-sm" onclick="go('settings')">⚙️ 前往配置SMTP</button>
   </div>`:''}
   <div class="flex gap8 mb16">

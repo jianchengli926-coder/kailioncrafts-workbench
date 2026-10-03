@@ -80,9 +80,9 @@ li{margin-bottom:6px;font-size:14px}
 <!-- 核心指标 -->
 <div class="grid">
   <div class="card green"><div class="label">代码规模</div><div class="value">46,739</div><div class="desc">行 JavaScript（server.js 3734 + app.js 39108 + 模块 3897）</div></div>
-  <div class="card blue"><div class="label">功能页面</div><div class="value">15/15</div><div class="desc">全部页面渲染通过，0 个页面崩溃</div></div>
+  <div class="card blue"><div class="label">功能视图</div><div class="value">36/36</div><div class="desc">真实浏览器遍历全部侧栏视图，0 个页面崩溃</div></div>
   <div class="card green"><div class="label">API 路由</div><div class="value">40+</div><div class="desc">后端 REST API 端点全部正常响应</div></div>
-  <div class="card orange"><div class="label">发现问题</div><div class="value">6</div><div class="desc">已修复 4 项，2 项为配置待确认</div></div>
+  <div class="card orange"><div class="label">发现问题</div><div class="value">8</div><div class="desc">已修复 5 项，3 项为配置或历史测试待确认</div></div>
 </div>
 
 <!-- 第一章：问题诊断 -->
@@ -196,13 +196,14 @@ li{margin-bottom:6px;font-size:14px}
   <h2><span class="icon">🧪</span>三、内置浏览器全功能测试</h2>
   
   <div class="grid">
-    <div class="card green"><div class="label">测试页面总数</div><div class="value">15</div><div class="desc">覆盖核心流程、沟通跟进、交易产品、营销增长、数据智能、系统</div></div>
-    <div class="card green"><div class="label">通过</div><div class="value">15</div><div class="desc">页面正常渲染，无致命错误</div></div>
+    <div class="card green"><div class="label">测试功能视图总数</div><div class="value">36</div><div class="desc">覆盖全部侧栏导航和系统区域</div></div>
+    <div class="card green"><div class="label">通过</div><div class="value">36</div><div class="desc">全部视图正常渲染，无致命错误</div></div>
     <div class="card green"><div class="label">失败</div><div class="value">0</div><div class="desc">无页面崩溃或白屏</div></div>
-    <div class="card blue"><div class="label">控制台错误</div><div class="value">2-4</div><div class="desc">均为登录前 401 竞态请求，不影响功能</div></div>
+    <div class="card blue"><div class="label">控制台错误</div><div class="value">0</div><div class="desc">登录后认证状态刷新完成，复测无错误</div></div>
   </div>
 
   <h3>3.1 页面测试明细</h3>
+  <div class="alert alert-success"><strong>真实浏览器遍历：</strong>侧栏 36 个功能视图逐一点击测试，全部产生有效标题和内容（内容长度 104–9,189 字符），结果 36/36 通过。知识库搜索 “OEM kitchen scissors” 返回 30 条结果；本机索引显示 588 个文档、9156 个切片。</div>
   <table>
     <tr><th>#</th><th>页面</th><th>视图ID</th><th>内容长度</th><th>控制台错误</th><th>结果</th></tr>
     <tr><td>1</td><td>📊 数据看板</td><td>dashboard</td><td>5,819</td><td>2</td><td><span class="badge badge-pass">通过</span></td></tr>
@@ -370,6 +371,8 @@ li{margin-bottom:6px;font-size:14px}
     <tr><td>6</td><td>后端 callCloudModel 是 mock 实现</td><td><span class="badge badge-info">低</span></td><td><span class="badge badge-info">待确认</span></td><td>前端默认不使用后端路由，影响有限；如需后端路由可后续实现</td></tr>
     <tr><td>7</td><td>api_config.json 中 GLM apiKey 为空</td><td><span class="badge badge-warn">中</span></td><td><span class="badge badge-info">待确认</span></td><td>前端配置在 localStorage 中，需在设置页面确认；后端路由云端模型暂不可用</td></tr>
     <tr><td>8</td><td>企业知识库文档列表"加载分类树..."</td><td><span class="badge badge-info">低</span></td><td><span class="badge badge-info">待确认</span></td><td>数据文件完整（588文档），可能是前端加载时序问题，建议登录后刷新确认</td></tr>
+    <tr><td>9</td><td>登录前初始化请求返回 401 后顶部状态不刷新</td><td><span class="badge badge-warn">中</span></td><td><span class="badge badge-pass">已修复</span></td><td>登录成功后刷新知识库状态和服务端模型配置；复测显示 588 文件·9156 切片，控制台错误 0</td></tr>
+    <tr><td>10</td><td>设置页 SMTP 文案暗示可批量自动发送</td><td><span class="badge badge-fail">高</span></td><td><span class="badge badge-pass">已修复</span></td><td>改为明确说明仅保存配置和生成交接信息，实际发送必须由 Leo 在外部邮箱人工完成</td></tr>
   </table>
 </div>
 
@@ -394,6 +397,9 @@ extract inline JS to app.js; reset password to 441723
   <div class="alert alert-success">
     <strong>✅ 备份完成：</strong>所有修复已提交并推送到 GitHub 远程仓库（commit 20898ae）。交接文档类未跟踪文件按规则未提交。
   </div>
+  <div class="alert alert-warning">
+    <strong>本轮审计状态：</strong>以上为历史备份记录（commit 20898ae）。本轮登录状态刷新与 SMTP 文案修订尚未推送，需 Leo 明确确认后再执行新的 commit/push。
+  </div>
 </div>
 
 <!-- 第九章：总结 -->
@@ -403,7 +409,7 @@ extract inline JS to app.js; reset password to 441723
   <h3>9.1 工作台整体评估</h3>
   <div class="grid">
     <div class="card green"><div class="label">代码质量</div><div class="value" style="font-size:18px">优秀</div><div class="desc">模块清晰、注释完善、错误处理到位、无致命 bug</div></div>
-    <div class="card green"><div class="label">功能完整度</div><div class="value" style="font-size:18px">高</div><div class="desc">15个功能页面全部正常，40+ API 路由可用</div></div>
+    <div class="card green"><div class="label">功能完整度</div><div class="value" style="font-size:18px">高</div><div class="desc">36个功能视图全部正常，40+ API 路由可用</div></div>
     <div class="card green"><div class="label">模型系统</div><div class="value" style="font-size:18px">完善</div><div class="desc">在线优先+故障转移+本地兜底+手动切换，符合要求</div></div>
     <div class="card blue"><div class="label">安全性</div><div class="value" style="font-size:18px">已增强</div><div class="desc">密码防暴力破解+后端速率限制+模块禁访+CSP移除</div></div>
   </div>
@@ -420,7 +426,7 @@ extract inline JS to app.js; reset password to 441723
 
 <div class="footer">
   <p>KaiLionCrafts 外贸获客AI工作台 · 深度分析与完善报告</p>
-  <p>生成时间：2026-10-03 · 审计范围：全部后端代码 + 15个前端功能页面</p>
+  <p>生成时间：2026-10-03 · 审计范围：全部后端代码 + 36个前端功能视图 + 知识库检索与模型状态</p>
   <p>Crafted in Yangjiang, Trusted Worldwide © 2026</p>
 </div>
 

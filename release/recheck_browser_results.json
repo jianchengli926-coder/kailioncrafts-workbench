@@ -1,0 +1,732 @@
+{
+  "timestamp": "2026-10-03T14:05:26.352Z",
+  "desktop": {
+    "total": 37,
+    "passed": 37,
+    "failed": 0
+  },
+  "mobile": {
+    "total": 37,
+    "passed": 37,
+    "failed": 0
+  },
+  "newFeatures": [
+    {
+      "feature": "P1-2线索质量评分",
+      "passed": true,
+      "details": {
+        "hasQuality": true,
+        "hasBatch": true
+      }
+    },
+    {
+      "feature": "P1-1开发信质检",
+      "passed": true,
+      "details": {
+        "hasQuality": true,
+        "hasQc": true
+      }
+    },
+    {
+      "feature": "P2-1 SLA计时",
+      "passed": true,
+      "details": {
+        "hasSla": true,
+        "hasResp": true
+      }
+    },
+    {
+      "feature": "P1-3 Task增强",
+      "passed": true,
+      "details": {
+        "pageLoaded": true
+      }
+    }
+  ],
+  "extremeInput": [
+    {
+      "test": "XSS搜索注入",
+      "passed": true,
+      "note": "输入成功",
+      "noXssExec": true
+    },
+    {
+      "test": "SQL注入搜索",
+      "passed": true,
+      "note": "SQL注入仅作为文本处理，无后端DB"
+    },
+    {
+      "test": "超长字符串(10000字符)",
+      "passed": true,
+      "note": "输入不崩溃"
+    },
+    {
+      "test": "快速切换导航20次",
+      "passed": true,
+      "note": "无崩溃无白屏"
+    },
+    {
+      "test": "特殊字符/emoji输入",
+      "passed": true,
+      "note": "特殊字符不崩溃"
+    }
+  ],
+  "security": [
+    {
+      "url": "/api/lead-quality/mx-check",
+      "method": "POST",
+      "expect": 401,
+      "body": {
+        "domain": "test.com"
+      },
+      "actual": 401,
+      "passed": true
+    },
+    {
+      "url": "/api/ai/config",
+      "method": "GET",
+      "expect": 401,
+      "actual": 401,
+      "passed": true
+    },
+    {
+      "url": "/api/kb/status",
+      "method": "GET",
+      "expect": 401,
+      "actual": 401,
+      "passed": true
+    },
+    {
+      "url": "/server.js",
+      "method": "GET",
+      "expect": 403,
+      "actual": 403,
+      "passed": true
+    },
+    {
+      "url": "/api_config.json",
+      "method": "GET",
+      "expect": 403,
+      "actual": 403,
+      "passed": true
+    },
+    {
+      "url": "/test_sanitize.js",
+      "method": "GET",
+      "expect": 403,
+      "actual": 403,
+      "passed": true
+    },
+    {
+      "url": "/%E0%A4%A",
+      "method": "GET",
+      "expect": 400,
+      "actual": 400,
+      "passed": true
+    }
+  ],
+  "consoleErrors": {
+    "total": 0,
+    "unexpected": 0
+  },
+  "networkErrors": {
+    "total": 0,
+    "unexpected": 0
+  },
+  "desktopDetails": [
+    {
+      "key": "dashboard",
+      "label": "数据看板",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "plans",
+      "label": "开发任务",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "autosearch",
+      "label": "自动搜客",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "prospect",
+      "label": "精准开发",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "devplans",
+      "label": "开发计划",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "customers",
+      "label": "客户台账",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "drafts",
+      "label": "开发信",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "outreachKB",
+      "label": "客户开发知识库",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "campaigns",
+      "label": "客户开发Campaign",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "knowledgeFacts",
+      "label": "知识事实",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "knowledgePacks",
+      "label": "精准开发配置",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "inbox",
+      "label": "AI收件箱",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "schedule",
+      "label": "跟进日程",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "inquiry",
+      "label": "询盘管理",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "orders",
+      "label": "报价与订单",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "products",
+      "label": "产品与样品",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "knowledge",
+      "label": "知识库",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "market",
+      "label": "市场分析",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "seo",
+      "label": "SEO内容营销",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "expos",
+      "label": "展会管理",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "reports",
+      "label": "业绩战报",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "pipeline",
+      "label": "销售漏斗",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "agents",
+      "label": "AI Agent团队",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "activity",
+      "label": "操作日志",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "linkedin",
+      "label": "领英拓客",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "socialmonitor",
+      "label": "社媒监控",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "dailyWork",
+      "label": "今日工作",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "outreachQueue",
+      "label": "开发名单",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "reviewQueue",
+      "label": "审核队列",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "followUpPlan",
+      "label": "跟进计划",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "outreachAnalytics",
+      "label": "开发复盘",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "outreach",
+      "label": "触达中心",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "bulkImport",
+      "label": "批量导入",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "importHistory",
+      "label": "导入历史",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "tools",
+      "label": "工具箱",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "settings",
+      "label": "设置",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "manual",
+      "label": "使用说明书",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    }
+  ],
+  "mobileDetails": [
+    {
+      "key": "dashboard",
+      "label": "数据看板",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "plans",
+      "label": "开发任务",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "autosearch",
+      "label": "自动搜客",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "prospect",
+      "label": "精准开发",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "devplans",
+      "label": "开发计划",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "customers",
+      "label": "客户台账",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "drafts",
+      "label": "开发信",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "outreachKB",
+      "label": "客户开发知识库",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "campaigns",
+      "label": "客户开发Campaign",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "knowledgeFacts",
+      "label": "知识事实",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "knowledgePacks",
+      "label": "精准开发配置",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "inbox",
+      "label": "AI收件箱",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "schedule",
+      "label": "跟进日程",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "inquiry",
+      "label": "询盘管理",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "orders",
+      "label": "报价与订单",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "products",
+      "label": "产品与样品",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "knowledge",
+      "label": "知识库",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "market",
+      "label": "市场分析",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "seo",
+      "label": "SEO内容营销",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "expos",
+      "label": "展会管理",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "reports",
+      "label": "业绩战报",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "pipeline",
+      "label": "销售漏斗",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "agents",
+      "label": "AI Agent团队",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "activity",
+      "label": "操作日志",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "linkedin",
+      "label": "领英拓客",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "socialmonitor",
+      "label": "社媒监控",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "dailyWork",
+      "label": "今日工作",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "outreachQueue",
+      "label": "开发名单",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "reviewQueue",
+      "label": "审核队列",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "followUpPlan",
+      "label": "跟进计划",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "outreachAnalytics",
+      "label": "开发复盘",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "outreach",
+      "label": "触达中心",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "bulkImport",
+      "label": "批量导入",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "importHistory",
+      "label": "导入历史",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "tools",
+      "label": "工具箱",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "settings",
+      "label": "设置",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    },
+    {
+      "key": "manual",
+      "label": "使用说明书",
+      "passed": true,
+      "error": null,
+      "consoleErrors": 0,
+      "networkErrors": 0
+    }
+  ]
+}

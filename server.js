@@ -558,6 +558,7 @@ function proxyRequest(req, res, targetUrl) {
   });
 
   proxyReq.on('error', (err) => {
+    if (res.headersSent) { res.end(); return; }
     res.writeHead(502, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: '代理请求失败', detail: err.message }));
   });

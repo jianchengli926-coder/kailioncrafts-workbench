@@ -13593,7 +13593,7 @@ function renderTagList(){
   }).join('');
 }
 
-function addCustomerTag(){
+function createCustomTag(){
   const nameInput = document.getElementById('newTagName');
   const colorSelect = document.getElementById('newTagColor');
   const name = nameInput.value.trim();
@@ -18965,7 +18965,7 @@ function renderApiSettings(){
         <option value="#06b6d4">🔵 青色</option>
         <option value="#84cc16">🟢 黄绿</option>
       </select>
-      <button class="btn btn-primary btn-sm" onclick="addCustomerTag()">➕ 添加</button>
+      <button class="btn btn-primary btn-sm" onclick="createCustomTag()">➕ 添加</button>
     </div>
     <div id="tagList" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
       加载中...
@@ -21240,9 +21240,12 @@ function approveDraft(draftId, note){
   return true;
 }
 
-// 拒绝草稿
+// 拒绝草稿（reason可选，未提供时用prompt获取）
 function rejectDraft(draftId, reason){
-  if(!reason || !reason.trim()){ toast('请填写拒绝原因','err'); return false; }
+  if(!reason || !reason.trim()){
+    reason = prompt('请输入拒绝原因（必填）：');
+    if(!reason || !reason.trim()){ toast('请填写拒绝原因','err'); return false; }
+  }
   const draft = (S.drafts || []).find(d => d.draftId === draftId || d.id === draftId);
   if(!draft){ toast('草稿不存在','err'); return false; }
   const previousStatus = draft.reviewStatus || draft.status;
@@ -24263,11 +24266,11 @@ function openAddEmailTemplate(){
     </div>
     <div class="modal-foot">
       <button class="btn btn-outline" onclick="closeModal()">取消</button>
-      <button class="btn btn-gold" onclick="saveCustomTemplate()">💾 保存模板</button>
+      <button class="btn btn-gold" onclick="saveEmailTemplate()">💾 保存模板</button>
     </div>`);
 }
 
-function saveCustomTemplate(){
+function saveEmailTemplate(){
   const title = document.getElementById('newTplTitle').value.trim();
   const cat = document.getElementById('newTplCat').value;
   const lang = document.getElementById('newTplLang').value;

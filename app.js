@@ -1866,7 +1866,7 @@ function viewCampaigns(root){
   } else {
     // Campaign 列表表格
     html += `
-    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
           <tr style="background:#f7fafc;border-bottom:2px solid #e2e8f0">
@@ -2213,7 +2213,7 @@ function viewCampaignDetail(root, campaignId){
     </div>`;
   } else {
     html += `
-    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
           <tr style="background:#f7fafc;border-bottom:2px solid #e2e8f0">
@@ -4485,7 +4485,7 @@ function viewKnowledgeFacts(root){
   if(filtered.length === 0){
     html += '<div style="background:#fff;border:1px dashed #d1d5db;border-radius:10px;padding:40px;text-align:center;color:#6b7280">暂无知识事实。点击"新建事实"添加第一条可审核的事实依据。</div>';
   } else {
-    html += '<div style="background:#fff;border:1px solid #e4e7eb;border-radius:10px;overflow:hidden">';
+    html += '<div style="background:#fff;border:1px solid #e4e7eb;border-radius:10px;overflow-x:auto">';
     html += '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f7fafc;border-bottom:2px solid #e4e7eb">';
     html += '<th style="padding:10px 12px;text-align:left;color:#4a5568">标题</th><th style="padding:10px 12px;text-align:left;color:#4a5568">类型</th><th style="padding:10px 12px;text-align:left;color:#4a5568">状态</th><th style="padding:10px 12px;text-align:left;color:#4a5568">归属主体</th><th style="padding:10px 12px;text-align:left;color:#4a5568">来源</th><th style="padding:10px 12px;text-align:left;color:#4a5568">版本</th><th style="padding:10px 12px;text-align:left;color:#4a5568">操作</th>';
     html += '</tr></thead><tbody>';
@@ -5498,7 +5498,7 @@ function renderCampaignCustomerPicker(){
   if(archives.length === 0){
     html += `<div style="padding:30px;text-align:center;color:#a0aec0;font-size:13px">没有匹配的客户档案</div>`;
   } else {
-    html += `<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+    html += `<div style="border:1px solid #e2e8f0;border-radius:8px;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead>
           <tr style="background:#f7fafc;border-bottom:1px solid #e2e8f0">
@@ -5872,6 +5872,19 @@ function daysLater(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.to
 function fmtDate(iso){ if(!iso) return '-'; let d=new Date(iso); if(isNaN(d.getTime())){ const m=String(iso).match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})[T ]?(\d{1,2})?:?(\d{1,2})?/); if(m){ d=new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0)); } } if(isNaN(d.getTime())) return '-'; return (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
 function fmtDay(iso){ if(!iso) return '-'; let d=new Date(iso); if(isNaN(d.getTime())){ const m=String(iso).match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); if(m){ d=new Date(+m[1],+m[2]-1,+m[3]); } } if(isNaN(d.getTime())) return '-'; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+/* AI输出安全渲染：先转义HTML防止XSS，再渲染Markdown基本格式（标题/列表/加粗/换行） */
+function sanitizeAiOutput(text, accentColor){
+  if(!text) return '';
+  const safe = esc(text);
+  const color = accentColor || '#805ad5';
+  return safe
+    .replace(/^### (.*$)/gm, `<h4 style="color:${color};margin:12px 0 6px;font-size:14px">$1</h4>`)
+    .replace(/^## (.*$)/gm, `<h3 style="color:${color};margin:16px 0 8px;font-size:15px;border-bottom:1px solid #e2e8f0;padding-bottom:4px">$1</h3>`)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^- (.*$)/gm, `<div style="margin:4px 0;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:${color}">•</span>$1</div>`)
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+}
 /* 安全 URL：仅允许 http/https，防止 javascript: 等危险协议 */
 function safeUrl(u){
   if(!u || typeof u !== 'string') return '';
@@ -6622,61 +6635,64 @@ function seedData(){
 function b64enc(t){ return btoa(unescape(encodeURIComponent(t||''))); }
 function b64dec(t){ try{ return decodeURIComponent(escape(atob(t||''))); }catch(e){ return t||''; } }
 function defaultApis(){
+  // 安全修复：API Key 不再硬编码在前端源码中
+  // 用户需在「设置 → 模型配置」中手动输入，或由后端 api_config.json 提供
+  // 已泄露的 Key 请立即在对应平台轮换
   return [
     {id:uid(), name:'OpenAI中转站(wawapi)', type:'openai', baseURL:'https://wawapi.top/v1',
-     apiKey:b64enc('sk-74dec54a4361af5ba4d4416e6583219b2a1eac2502829d0d1e37c9ce59d19265'),
+     apiKey:b64enc(''),
      model:'gpt-4o-mini', temperature:0.7, enabled:false, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'智谱 GLM-4-Flash', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
-     apiKey:b64enc('ce5df9d38c5342c5993fef25bd7403b8.EwA0H7uNGYBUSLm5'),
+     apiKey:b64enc(''),
      model:'glm-4-flash', temperature:0.1, enabled:false, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'leo工作台(智谱)', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
-     apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
+     apiKey:b64enc(''),
      model:'glm-4-flash', temperature:0.1, enabled:true, isDefault:true,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'智谱 GLM-4.7-Flash(深度思考·免费)', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
-     apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
+     apiKey:b64enc(''),
      model:'glm-4.7-flash', temperature:0.1, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'智谱 GLM-4.6V-Flash(视觉理解·免费)', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
-     apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
+     apiKey:b64enc(''),
      model:'glm-4.6v-flash', temperature:0.1, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'智谱 GLM-4-Flash(文本生成·免费)', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
-     apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
+     apiKey:b64enc(''),
      model:'glm-4-flash', temperature:0.1, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'智谱 CogView-3-Flash(图像生成·免费)', type:'zhipu', baseURL:'https://open.bigmodel.cn/api/paas/v4',
-     apiKey:b64enc('b2b4d49717fd4b8693f040bd1ff2d5b2.XJ01ra8L0GF1ejBI'),
+     apiKey:b64enc(''),
      model:'cogview-3-flash', temperature:0.1, enabled:true, isDefault:false,
      caps:{lead:0,score:0,draft:0,reply:0,quote:0,assistant:0}},
     {id:uid(), name:'硅基流动 Qwen2.5-7B(免费·通用)', type:'siliconflow', baseURL:'https://api.siliconflow.cn/v1',
-     apiKey:b64enc('sk-nppaoxlxxcouplrgxboegpeqrrpsuzwkpgrvugvopdepuiet'),
+     apiKey:b64enc(''),
      model:'Qwen/Qwen2.5-7B-Instruct', temperature:0.7, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'硅基流动 GLM-4-9B(免费·通用)', type:'siliconflow', baseURL:'https://api.siliconflow.cn/v1',
-     apiKey:b64enc('sk-nppaoxlxxcouplrgxboegpeqrrpsuzwkpgrvugvopdepuiet'),
+     apiKey:b64enc(''),
      model:'THUDM/glm-4-9b-chat', temperature:0.7, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'硅基流动 InternLM2.5-7B(免费·推理)', type:'siliconflow', baseURL:'https://api.siliconflow.cn/v1',
-     apiKey:b64enc('sk-nppaoxlxxcouplrgxboegpeqrrpsuzwkpgrvugvopdepuiet'),
+     apiKey:b64enc(''),
      model:'internlm/internlm2_5-7b-chat', temperature:0.3, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'硅基流动 Qwen2-7B(免费·轻量)', type:'siliconflow', baseURL:'https://api.siliconflow.cn/v1',
-     apiKey:b64enc('sk-nppaoxlxxcouplrgxboegpeqrrpsuzwkpgrvugvopdepuiet'),
+     apiKey:b64enc(''),
      model:'Qwen/Qwen2-7B-Instruct', temperature:0.7, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'Gemini 3.5 Flash Lite(免费·推荐主力)', type:'gemini', baseURL:'https://generativelanguage.googleapis.com/v1beta',
-     apiKey:b64enc('AQ.'+'Ab8RN6K7c94mz8QOv0Z'+'onQ04HO4V1T2OMVTT_kz'+'JYq_TvFF-ZA'),
+     apiKey:b64enc(''),
      model:'gemini-3.5-flash-lite', temperature:0.7, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'Gemini 3.5 Flash(免费·标准)', type:'gemini', baseURL:'https://generativelanguage.googleapis.com/v1beta',
-     apiKey:b64enc('AQ.'+'Ab8RN6K7c94mz8QOv0Z'+'onQ04HO4V1T2OMVTT_kz'+'JYq_TvFF-ZA'),
+     apiKey:b64enc(''),
      model:'gemini-3.5-flash', temperature:0.7, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'Gemini 3.5 Pro(免费·高阶)', type:'gemini', baseURL:'https://generativelanguage.googleapis.com/v1beta',
-     apiKey:b64enc('AQ.'+'Ab8RN6K7c94mz8QOv0Z'+'onQ04HO4V1T2OMVTT_kz'+'JYq_TvFF-ZA'),
+     apiKey:b64enc(''),
      model:'gemini-3.5-pro', temperature:0.7, enabled:true, isDefault:false,
      caps:{lead:1,score:1,draft:1,reply:1,quote:1,assistant:1}},
     {id:uid(), name:'本地 Qwen2.5-7B(文本)', type:'ollama', baseURL:'http://localhost:11434/v1',
@@ -7186,7 +7202,7 @@ async function runChainTest(){
   el.innerHTML = '<div style="padding:12px;background:#ebf8ff;border-radius:6px;color:#2b6cb0">⏳ 正在测试模型链路，请稍候...</div>';
   try{
     const results = await testModelChain();
-    let html = '<table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px">';
+    let html = '<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;font-size:12px;border-collapse:collapse">';
     html += '<tr style="background:#edf2f7"><th style="padding:6px;text-align:left">测试项</th><th style="padding:6px">结果</th><th style="padding:6px">耗时</th><th style="padding:6px">详情</th></tr>';
     for(const r of results){
       html += `<tr style="border-bottom:1px solid #e2e8f0">
@@ -12644,7 +12660,7 @@ function aiBatchCheck(){
       persist(); confetti(); setTimeout(()=>{closeModal(); toast('已完成 '+ids.length+' 家客户背调','ok'); renderView();},800); return;
     }
     const c=S.customers.find(x=>x.id===ids[i]);
-    log.innerHTML+=`<div>🔍 正在核查 ${c.company} 的海关进口记录...</div><div style="color:var(--green)">  ✓ ${c.companySize||'50-200人'} · 成立${c.foundedYear||1990}年</div>`;
+    log.innerHTML+=`<div>🔍 正在核查 ${esc(c.company)} 的海关进口记录...</div><div style="color:var(--green)">  ✓ ${esc(c.companySize||'50-200人')} · 成立${esc(c.foundedYear||1990)}年</div>`;
     log.scrollTop=log.scrollHeight;
     document.getElementById('batchBar').style.width=Math.round((i+1)/ids.length*100)+'%';
     document.getElementById('batchPct').textContent=`已完成 ${i+1}/${ids.length}`;
@@ -28250,13 +28266,8 @@ async function runProfileGenerate(){
   const depthLabel = document.getElementById('profileDepthLabel');
   resultDiv.style.display = 'block';
   depthLabel.textContent = result.depthLabel;
-  // 简单的markdown渲染
-  let html = result.content
-    .replace(/^### (.*$)/gm, '<h4 style="color:#805ad5;margin:12px 0 6px;font-size:14px">$1</h4>')
-    .replace(/^## (.*$)/gm, '<h3 style="color:#805ad5;margin:16px 0 8px;font-size:15px;border-bottom:1px solid #e2e8f0;padding-bottom:4px">$1</h3>')
-    .replace(/^- (.*$)/gm, '<div style="margin:4px 0;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:#805ad5">•</span>$1</div>')
-    .replace(/\n\n/g, '<br><br>')
-    .replace(/\n/g, '<br>');
+  // AI输出安全渲染：先转义HTML，再渲染Markdown
+  let html = sanitizeAiOutput(result.content, '#805ad5');
   resultContent.innerHTML = html;
   // V77.2 显示公司知识库依据
   renderProfileKbContext(result.knowledgeContext, 'profileKbContextBox');
@@ -28641,13 +28652,8 @@ async function runReplyAnalysis(){
   const resultDiv = document.getElementById('replyResult');
   const resultContent = document.getElementById('replyResultContent');
   resultDiv.style.display = 'block';
-  // 简单的markdown渲染
-  let html = result.content
-    .replace(/^### (.*$)/gm, '<h4 style="color:#319795;margin:12px 0 6px;font-size:14px">$1</h4>')
-    .replace(/^## (.*$)/gm, '<h3 style="color:#319795;margin:16px 0 8px;font-size:15px;border-bottom:1px solid #e2e8f0;padding-bottom:4px">$1</h3>')
-    .replace(/^- (.*$)/gm, '<div style="margin:4px 0;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:#319795">•</span>$1</div>')
-    .replace(/\n\n/g, '<br><br>')
-    .replace(/\n/g, '<br>');
+  // AI输出安全渲染：先转义HTML，再渲染Markdown
+  let html = sanitizeAiOutput(result.content, '#319795');
   resultContent.innerHTML = html;
   // 刷新历史
   setTimeout(()=>viewTools(document.getElementById('mainContent')), 500);
@@ -33832,7 +33838,7 @@ async function prospectExecuteSearch(){
   for(let i=0; i<total; i++){
     const query = prospectGeneratedQueries[i];
     if(logEl){
-      logEl.innerHTML += `<div>▶ [${i+1}/${total}] 搜索："${query}"</div>`;
+      logEl.innerHTML += `<div>▶ [${i+1}/${total}] 搜索："${esc(query)}"</div>`;
       logEl.scrollTop = logEl.scrollHeight;
     }
 

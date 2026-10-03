@@ -1,4 +1,5 @@
 _shots/
+.playwright-cli/
 .DS_Store
 *.log
 node_modules/

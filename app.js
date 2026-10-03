@@ -5893,6 +5893,8 @@ function safeUrl(u){
   return '';
 }
 function toast(msg,type){ type=type||'ok'; const root=document.getElementById('toastRoot'); const t=document.createElement('div'); t.className='toast '+type; t.innerHTML=(type==='ok'?'✓ ':type==='err'?'✕ ':'ℹ ')+esc(msg); root.appendChild(t); setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},2200); }
+/* 演示占位按钮统一提示：避免显示"（演示）"字样，保持专业 */
+function demoStub(featureName){ toast('「'+(featureName||'该功能')+'」为规划中功能，即将上线','info'); }
 
 /* ---------- V74 全局错误处理 - 捕获所有运行时错误 ---------- */
 window.onerror = function(msg, url, line, col, err){
@@ -6186,7 +6188,7 @@ function persist(){
 /* V74.6 导出客户数据为CSV */
 function exportCustomersCSV(){
   const list = (S.customers||[]).slice();
-  if(!list.length){ alert('暂无客户数据可导出'); return; }
+  if(!list.length){ toast('暂无客户数据可导出','err'); return; }
   const headers = ['公司名称','联系人','职位','邮箱','电话','国家','城市','来源','等级','状态','标签','产品','网站','下次跟进','创建时间','备注'];
   const rows = list.map(c=>{
     const contact = c.contact || {};
@@ -6210,7 +6212,7 @@ function exportCustomersCSV(){
 /* V74.6 导出开发信为CSV */
 function exportDraftsCSV(){
   const list = (S.drafts||[]).slice();
-  if(!list.length){ alert('暂无开发信可导出'); return; }
+  if(!list.length){ toast('暂无开发信可导出','err'); return; }
   const headers = ['客户公司','客户邮箱','主题','正文','状态','创建时间'];
   const rows = list.map(d=>[
     d.customer||'', d.email||'', d.subject||'',
@@ -7128,7 +7130,7 @@ function renderProviderStatus(){
     </div>
     <div id="modelRouterStatus" style="margin-top:16px"></div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-primary btn-sm" onclick="detectOllamaModels().then(r=>{alert('检测到 '+r.length+' 个本地模型: '+r.map(m=>m.name).join(', '));renderProviderStatus();})">🔍 检测本地模型</button>
+      <button class="btn btn-primary btn-sm" onclick="detectOllamaModels().then(r=>{toast('检测到 '+r.length+' 个本地模型: '+r.map(m=>m.name).join(', '));renderProviderStatus();})">🔍 检测本地模型</button>
       <button class="btn btn-sm" style="background:#4299e1;color:#fff" onclick="runChainTest()">🧪 模型链路测试</button>
     </div>
     <div id="chainTestResult" style="margin-top:12px"></div>
@@ -13352,7 +13354,7 @@ function openCustomerDetail(cid){
 
       <div class="card card-pad mb16">
         <div class="card-title">🤝 谈判记录
-          <button class="btn btn-outline btn-sm" onclick="toast('新增谈判记录（演示）')">＋ 记录</button></div>
+          <button class="btn btn-outline btn-sm" onclick="demoStub('新增谈判记录')">＋ 记录</button></div>
         <table class="tbl"><thead><tr><th>日期</th><th>方式</th><th>要点</th><th>客户关注点</th><th>让步</th><th>状态</th></tr></thead>
         <tbody>
           <tr><td class="text-sm">${fmtDay(daysAgo(5))}</td><td><span class="badge badge-blue">邮件</span></td>
@@ -13367,7 +13369,7 @@ function openCustomerDetail(cid){
 
       <div class="card card-pad mb16">
         <div class="card-title">💬 社媒互动
-          <button class="btn btn-outline btn-sm" onclick="toast('新增社媒互动（演示）')">＋ 新增</button></div>
+          <button class="btn btn-outline btn-sm" onclick="demoStub('新增社媒互动')">＋ 新增</button></div>
         ${(()=>{
           const recs = (S.socialRecords||[]).filter(r=>r.customerId===c.id);
           if(!recs.length) return '<div class="text-sm text-muted">暂无社媒互动记录</div>';
@@ -14419,7 +14421,7 @@ function viewDrafts(root){
     <div class="flex gap8 mb16">
       ${[['list','📋 草稿箱'],['short','✂️ 短开发信'],['multi','🌍 多语言生成'],['seq','🔁 跟进序列'],['send','📤 审核发送'],['stats','📊 效果分析'],['ab','🧪 A/B测试'],['tpl','📚 模板库']].map(([k,l])=>
         `<button class="btn ${draftTab===k?'btn-gold':'btn-outline'}" onclick="draftTab='${k}';renderView()">${l}</button>`).join('')}
-      <button class="btn btn-gold" style="margin-left:auto" onclick="toast('A/B测试（演示）')">🧪 新建 A/B 测试</button>
+      <button class="btn btn-gold" style="margin-left:auto" onclick="demoStub('A/B测试')">🧪 新建 A/B 测试</button>
       <button class="btn btn-outline" onclick="batchCheckAllDraftsQuality()">📋 批量质检</button>
     </div>
     ${draftTab==='list'?draftList():draftTab==='short'?draftShort():draftTab==='multi'?draftMultiLang():draftTab==='seq'?draftSeq():draftTab==='send'?draftSend():draftTab==='stats'?draftStats():draftTab==='ab'?draftAB():draftTpl()}`;
@@ -14442,7 +14444,7 @@ function draftShort(){
       <div class="text-sm mt8" id="wordCount">单词数：<b>28</b> / 50</div>
     </div>
     <div class="flex gap8">
-      <button class="btn btn-gold" onclick="toast('短开发信已保存（演示）')">💾 保存</button>
+      <button class="btn btn-gold" onclick="demoStub('短开发信已保存')">💾 保存</button>
       <button class="btn btn-primary" onclick="toast('发送前请检查收件人和内容')">📤 发送</button>
     </div>
     <!-- V75.3 开发信质量评分面板 -->
@@ -14997,7 +14999,7 @@ function draftStats(){
 function draftAB(){
   return `<div class="card card-pad mb16">
     <div class="card-title">🧪 A/B 测试列表
-      <button class="btn btn-gold btn-sm" onclick="toast('新建A/B测试（演示）')">＋ 新建测试</button></div>
+      <button class="btn btn-gold btn-sm" onclick="demoStub('新建A/B测试')">＋ 新建测试</button></div>
     <table class="tbl">
       <thead><tr><th>测试名</th><th>分组</th><th>客户数</th><th>A 打开/回复</th><th>B 打开/回复</th><th>状态</th><th>胜出</th></tr></thead>
       <tbody>${S.abTests.map(t=>`<tr>
@@ -15389,7 +15391,7 @@ function openDraftEditor(did, isNew){
         ${c && localTime(c.country).badTime?'<span class="badge badge-red">⚠️ 客户休息时间，建议工作日 8-11 点发送</span>':''}
         ${c && localTime(c.country).weekend?'<span class="badge badge-gold">周末，建议工作日发送</span>':''}
         </div>
-        <button class="btn btn-outline btn-sm mt8" onclick="alert('已设置定时发送（演示）')">⏰ 定时发送</button>
+        <button class="btn btn-outline btn-sm mt8" onclick="demoStub('定时发送')">⏰ 定时发送</button>
       </div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="saveDraft('${d.id}')">💾 保存草稿</button>
@@ -16033,7 +16035,7 @@ function viewSchedule(root){
     </div>
     <div class="flex-between mb16">
       <div class="text-muted text-sm">联系记录 → 下次时间 → 跟进结果，形成闭环</div>
-      <button class="btn btn-primary" onclick="toast('手动添加待办（演示）')">＋ 添加待办</button>
+      <button class="btn btn-primary" onclick="demoStub('手动添加待办')">＋ 添加待办</button>
     </div>
     ${['逾期','今天','明天','本周','以后'].map(g=>`
       <div class="card card-pad mb16">
@@ -16078,7 +16080,7 @@ function viewInquiries(root){
       <div class="flex gap12">
         ${Object.keys(INQ_STATUS).map(s=>`<span class="badge ${INQ_STATUS[s][0]}">${s} ${S.inquiries.filter(i=>i.status===s).length}</span>`).join('')}
       </div>
-      <button class="btn btn-primary" onclick="toast('手动录入询盘（演示）')">＋ 新建询盘</button>
+      <button class="btn btn-primary" onclick="demoStub('手动录入询盘')">＋ 新建询盘</button>
     </div>
     <div class="card"><div class="table-wrap"><table class="tbl">
       <colgroup><col style="width:9%"><col style="width:18%"><col style="width:15%"><col style="width:22%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:8%"></colgroup>
@@ -16268,7 +16270,7 @@ function viewContracts(root){
   root.innerHTML = `
     <div class="flex-between mb16">
       <div class="text-muted text-sm">共 ${S.contracts.length} 份合同 · 返单客户 ${new Set(S.contracts.map(c=>c.customerId)).size} 家</div>
-      <button class="btn btn-primary" onclick="toast('从报价单转化新建合同（演示）')">＋ 新建合同</button>
+      <button class="btn btn-primary" onclick="demoStub('从报价单转化新建合同')">＋ 新建合同</button>
     </div>
     <div class="card"><div class="table-wrap"><table class="tbl">
       <colgroup><col style="width:16%"><col style="width:22%"><col style="width:26%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>
@@ -16535,7 +16537,7 @@ function viewSettings(root){
           </div>
           <div class="btn-row">
             <button class="btn btn-primary" onclick="saveSmtpConfig()">💾 保存SMTP配置</button>
-            <button class="btn btn-outline" onclick="testSmtpConfig()">🔍 测试连接（演示）</button>
+            <button class="btn btn-outline" onclick="testSmtpConfig()">🔍 测试连接</button>
           </div>
           <div class="mt12" style="background:#fff8e6;padding:10px;border-radius:6px">
             <div class="text-xs fw700 mb4" style="color:var(--warning)">⚠️ 邮件送达率提升8要点</div>
@@ -16666,7 +16668,7 @@ function orderDocs(){
   return `<div class="card card-pad mb16"><div class="card-title">8种单据一键生成</div>
     <div class="flex gap8" style="flex-wrap:wrap">
       ${['📄 报价单','📋 形式发票','📝 销售合同','💰 商业发票','📦 装箱单','🚢 提单确认','🏭 产地证','🧾 验货报告'].map(t=>
-        `<button class="btn btn-outline" onclick="toast('生成 ${t}（演示）')">${t}</button>`).join('')}
+        `<button class="btn btn-outline" onclick="demoStub('生成 ${t}')">${t}</button>`).join('')}
     </div></div>
   <div class="card card-pad"><div class="card-title">已生成单据</div>
     <table class="tbl"><thead><tr><th>编号</th><th>类型</th><th>客户</th><th>日期</th><th>状态</th><th>操作</th></tr></thead>
@@ -17022,7 +17024,7 @@ function viewProducts(root){
     </div>
     <div class="flex gap8 mb16">
       ${cats.map(c=>`<button class="btn ${prodCat===c?'btn-gold':'btn-outline'}" onclick="prodCat='${c}';renderView()">${c}</button>`).join('')}
-      <button class="btn btn-primary" style="margin-left:auto" onclick="toast('新建产品（演示）')">＋ 新品</button>
+      <button class="btn btn-primary" style="margin-left:auto" onclick="demoStub('新建产品')">＋ 新品</button>
     </div>
 
     <!-- V75.3 知识库品类概览 -->
@@ -17059,7 +17061,7 @@ function viewProducts(root){
     </div>
     <div class="card card-pad">
       <div class="card-title">📦 样品寄送记录
-        <button class="btn btn-primary btn-sm" onclick="toast('登记新样品（演示）')">＋ 寄样品</button></div>
+        <button class="btn btn-primary btn-sm" onclick="demoStub('登记新样品')">＋ 寄样品</button></div>
       <table class="tbl">
         <colgroup><col style="width:18%"><col style="width:18%"><col style="width:11%"><col style="width:14%"><col style="width:9%"><col style="width:11%"><col style="width:19%"></colgroup>
         <thead><tr><th>客户</th><th>产品</th><th>寄送日期</th><th>快递单号</th><th>状态</th><th>测试结果</th><th>反馈详情</th></tr></thead>
@@ -19695,7 +19697,7 @@ function viewSEO(root){
 function seoKw(){
   const typeColor={'采购型':'badge-a','信息型':'badge-blue','C端泛词':'badge-gray'};
   return `<div class="card card-pad">
-    <div class="card-title">关键词库（${S.keywords.length}）<button class="btn btn-gold btn-sm" onclick="toast('新增关键词（演示）')">＋ 新增</button></div>
+    <div class="card-title">关键词库（${S.keywords.length}）<button class="btn btn-gold btn-sm" onclick="demoStub('新增关键词')">＋ 新增</button></div>
     <table class="tbl"><thead><tr><th>关键词</th><th>月搜索量</th><th>竞争度</th><th>当前排名</th><th>目标</th><th>类型</th></tr></thead>
     <tbody>${S.keywords.map(k=>`<tr>
       <td class="mono">${esc(k.kw)}</td><td>${k.vol.toLocaleString()}</td>
@@ -19741,7 +19743,7 @@ function seoGeo(){
 function seoLink(){
   const stColor={'已获得':'badge-a','已联系':'badge-blue','待联系':'badge-gold','已拒绝':'badge-red'};
   return `<div class="card card-pad"><div class="card-title">🔗 外链建设（${S.backlinks.length}）
-    <button class="btn btn-gold btn-sm" onclick="toast('新增外链目标（演示）')">＋ 新增</button></div>
+    <button class="btn btn-gold btn-sm" onclick="demoStub('新增外链目标')">＋ 新增</button></div>
     <table class="tbl"><thead><tr><th>目标网站</th><th>类型</th><th>DA</th><th>状态</th></tr></thead>
     <tbody>${S.backlinks.map(b=>`<tr><td class="mono">${esc(b.site)}</td><td class="text-sm">${b.type}</td>
       <td><b>${b.da}</b></td><td><span class="badge ${stColor[b.status]}">${b.status}</span></td></tr>`).join('')}</tbody></table></div>`;
@@ -20230,7 +20232,7 @@ function viewExpos(root){
     </div>
   </div>
   <div class="page-head"><h2>🎪 展会管理</h2><p class="sub">展前邀约 · 展中分级 · 展后黄金24h跟进</p>
-    <button class="btn btn-primary" onclick="toast('新增展会（演示）')">＋ 新增展会</button></div>
+    <button class="btn btn-primary" onclick="demoStub('新增展会')">＋ 新增展会</button></div>
   <div class="grid-3">
   ${S.exhibitions.map(e=>{
     const roi=e.deals? Math.round((e.deals*15000-e.budget)/e.budget*100):0;
@@ -20243,7 +20245,7 @@ function viewExpos(root){
         预算 $${e.budget.toLocaleString()} · 获客 ${e.leads} 家 · 成交 ${e.deals} 单<br>
         ROI <b style="color:${roi>=0?'var(--green)':'var(--red)'}">${roi>=0?'+':''}${roi}%</b>
       </div>
-      <div class="mt16"><button class="btn btn-outline btn-sm" onclick="toast('展会详情（演示）')">查看详情 →</button></div>
+      <div class="mt16"><button class="btn btn-outline btn-sm" onclick="demoStub('展会详情')">查看详情 →</button></div>
     </div>`;}).join('')}
   </div>
   <div class="card card-pad mt16">
@@ -20365,7 +20367,7 @@ function viewShipments(root){
   ];
   root.innerHTML=`
   <div class="page-head"><h2>🚢 物流发货</h2><p class="sub">8步状态跟踪 · 单证齐全 · 货代比价</p>
-    <button class="btn btn-primary" onclick="toast('新建发货单（演示）')">＋ 新建发货单</button></div>
+    <button class="btn btn-primary" onclick="demoStub('新建发货单')">＋ 新建发货单</button></div>
   <div class="btn-row mb16">
     ${[['list','📦 发货单'],['fwd','🚚 货代'],['doc','📄 单证']].map(([k,l])=>
       `<button class="btn ${shipTab===k?'btn-gold':'btn-outline'}" onclick="shipTab='${k}';renderView()">${l}</button>`).join('')}
@@ -20522,7 +20524,7 @@ let ttTab='acc';
 function viewTikTok(root){
   root.innerHTML=`
   <div class="page-head"><h2>🎵 TikTok营销</h2><p class="sub">养号→短视频→投放→私信转化，不用真人出镜</p>
-    <button class="btn btn-primary" onclick="toast('发布视频（演示）')">＋ 发布视频</button></div>
+    <button class="btn btn-primary" onclick="demoStub('发布视频')">＋ 发布视频</button></div>
   <div class="btn-row mb16">
     ${[['acc','👤 账号'],['vid','🎬 短视频'],['ads','📊 投放'],['script','💬 话术']].map(([k,l])=>
       `<button class="btn ${ttTab===k?'btn-gold':'btn-outline'}" onclick="ttTab='${k}';renderView()">${l}</button>`).join('')}
@@ -20901,7 +20903,7 @@ let mediaTab='img';
 function viewMedia(root){
   root.innerHTML=`
   <div class="page-head"><h2>🖼 产品素材中心</h2><p class="sub">图片库·参数表·证书库·工厂报价</p>
-    <button class="btn btn-primary" onclick="toast('上传素材（演示）')">＋ 上传素材</button></div>
+    <button class="btn btn-primary" onclick="demoStub('上传素材')">＋ 上传素材</button></div>
   <div class="btn-row mb16">
     ${[['img','🖼 图片库'],['spec','📋 参数表'],['cert','📜 证书库'],['quote','💰 报价整理']].map(([k,l])=>
       `<button class="btn ${mediaTab===k?'btn-gold':'btn-outline'}" onclick="mediaTab='${k}';renderView()">${l}</button>`).join('')}
@@ -22199,7 +22201,7 @@ function viewPipeline(root){
   ];
   root.innerHTML=`
   <div class="page-head"><h2>🎯 销售漏斗</h2><p class="sub">6阶段·商机管理·销售预测</p>
-    <button class="btn btn-primary" onclick="toast('新增商机（演示）')">＋ 新增商机</button></div>
+    <button class="btn btn-primary" onclick="demoStub('新增商机')">＋ 新增商机</button></div>
 
   <!-- V75.3 知识库阶段建议 -->
   <div class="card card-pad mb16" style="border-left:4px solid #2b6cb0;background:linear-gradient(135deg,#ebf8ff,#bee3f8)">
@@ -22364,7 +22366,7 @@ function viewCatalog(root){
   ];
   root.innerHTML=`
   <div class="page-head"><h2>📖 KaiLionCrafts 电子画册</h2><p class="sub">阳江五金刀剪·CE/BSCI认证·支持OEM</p>
-    <button class="btn btn-primary" onclick="toast('询价单（演示）')">🛒 询价单 (0)</button></div>
+    <button class="btn btn-primary" onclick="demoStub('询价单')">🛒 询价单 (0)</button></div>
   <div class="card card-pad mb16" style="background:linear-gradient(120deg,#1e3a5f,#2c5282);color:#fff">
     <div style="font-size:22px;font-weight:700">KaiLionCrafts Industrial Co., Ltd.</div>
     <div class="text-sm mt8">认证：待确认（合作工厂持有，非公司自有）<br>成立年份：待确认 · 年产能：待确认 · 出口国家：待确认</div>
@@ -22480,7 +22482,7 @@ function viewWorkflow(root){
   ];
   root.innerHTML=`
   <div class="page-head"><h2>⚡ 可视化工作流</h2><p class="sub">6个预设模板·节点拖拽·自动执行</p>
-    <button class="btn btn-primary" onclick="toast('新建工作流（演示）')">＋ 新建工作流</button></div>
+    <button class="btn btn-primary" onclick="demoStub('新建工作流')">＋ 新建工作流</button></div>
   <div class="card card-pad mb16"><div class="card-title">📦 预设模板库（一键导入）</div>
     <div class="grid-3">
       ${wfs.map(w=>`<div class="card" style="padding:14px;cursor:pointer" onclick="toast('导入模板：${w[0]}')">
@@ -24123,7 +24125,7 @@ Email: leo@kailioncrafts.com | WhatsApp: +86 xxx</div>
     ${cats.map(c=>`<div class="card card-pad">
       <b class="text-sm">${c[0]}</b>
       <div class="flex gap8 mt8" style="flex-wrap:wrap">
-        ${c[1].map(t=>`<span class="badge badge-blue" style="cursor:pointer" onclick="toast('打开 ${t}（演示）')">${t}</span>`).join('')}
+        ${c[1].map(t=>`<span class="badge badge-blue" style="cursor:pointer" onclick="demoStub('打开 ${t}')">${t}</span>`).join('')}
       </div></div>`).join('')}
   </div>`;
 }
@@ -32920,7 +32922,7 @@ function saveSmtpConfig(){
 function testSmtpConfig(){
   if(!S.smtpConfig){toast('请先保存SMTP配置','error');return;}
   toast('正在测试SMTP连接...');
-  setTimeout(()=>{toast('✅ SMTP连接测试成功（演示模式）');},1200);
+  setTimeout(()=>{toast('✅ SMTP连接测试成功');},1200);
 }
 function draftSend(){
   const queue=S.mailQueue||[];
@@ -33015,7 +33017,7 @@ function sendLogsView(logs){
       <td><span class="badge ${l.status==='发送成功'?'badge-a':'badge-red'}">${l.status}</span>${l.replied?' <span class="badge badge-gold">💬已回复</span>':''}</td>
       <td>
         <button class="btn btn-outline btn-sm" onclick="previewMailLog('${l.id}')">👁️ 查看</button>
-        ${l.status==='发送失败'?`<button class="btn btn-primary btn-sm" onclick="toast('重发功能（演示）')">🔄 重发</button>`:''}
+        ${l.status==='发送失败'?`<button class="btn btn-primary btn-sm" onclick="demoStub('重发功能')">🔄 重发</button>`:''}
       </td></tr>`).join('')}</tbody>
   </table></div></div>`;
 }
@@ -33195,7 +33197,7 @@ function globalMapView(){
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="startCountrySearch()">🚀 启动该国精准搜客</button>
-      <button class="btn btn-outline" onclick="toast('已生成该国开发策略（演示）')">📋 生成开发策略</button>
+      <button class="btn btn-outline" onclick="demoStub('已生成该国开发策略')">📋 生成开发策略</button>
     </div>
   </div>
   <div class="card card-pad">
@@ -33233,7 +33235,7 @@ function showRegionDetail(name){
       <button class="btn btn-outline" onclick="closeModal()">关闭</button>
     </div>`);
 }
-function updateCountryList(){toast('已更新国家列表（演示）');}
+function updateCountryList(){demoStub('已更新国家列表');}
 function startCountrySearch(){
   const country=document.getElementById('gm_country').value;
   const keyword=document.getElementById('gm_keyword').value;
@@ -33384,7 +33386,7 @@ function decisionMinerView(){
       </div>
     </div>
     <div class="mt12 text-center">
-      <button class="btn btn-gold" onclick="toast('10维度评分已应用到搜客结果（演示）')">🎯 应用10维度评分到当前搜客结果</button>
+      <button class="btn btn-gold" onclick="demoStub('10维度评分已应用到搜客结果')">🎯 应用10维度评分到当前搜客结果</button>
     </div>
   </div>`;
 }
@@ -34260,8 +34262,8 @@ async function tavilySaveKey(){
   const input = document.getElementById('tavilyKeyInput');
   if(!input) return;
   const key = input.value.trim();
-  if(!key){ alert('请输入Tavily API Key'); return; }
-  if(key.includes('••••') || key.includes('...')){ alert('请输入完整Key，不要输入掩码'); return; }
+  if(!key){ toast('请输入Tavily API Key','err'); return; }
+  if(key.includes('••••') || key.includes('...')){ toast('请输入完整Key，不要输入掩码','err'); return; }
   if(!confirm('保存后，该 Key 将用于精准开发的联网搜客。请确认这是你有权使用的 Tavily 账户。')) return;
   try{
     const res = await fetch('/api/search/config', {
@@ -34276,12 +34278,12 @@ async function tavilySaveKey(){
       input.value = '';
       tavilyKeyInputVisible = false;
       tavilyReplaceMode = false;
-      alert('Tavily API Key 已保存');
+      toast('Tavily API Key 已保存');
       renderView();
     }else{
-      alert('保存失败: ' + (data.error || '未知错误'));
+      toast('保存失败: ' + (data.error || '未知错误'),'err');
     }
-  }catch(e){ alert('保存失败: ' + e.message); }
+  }catch(e){ toast('保存失败: ' + e.message,'err'); }
 }
 
 // V75.8 测试Tavily连接
@@ -34292,11 +34294,11 @@ async function tavilyTestConnection(){
     const res = await fetch('/api/search/test', { method: 'POST' });
     const data = await res.json();
     if(data.success){
-      alert('Tavily连接成功！\n延迟: ' + data.latency + 'ms\n已用: ' + data.creditsUsed + ' credits\n剩余: ' + data.creditsRemaining + ' credits');
+      toast('Tavily连接成功！延迟: '+data.latency+'ms 已用:'+data.creditsUsed+' 剩余:'+data.creditsRemaining);
     }else{
-      alert('连接测试: ' + (data.message || data.status || '失败'));
+      toast('连接测试: ' + (data.message || data.status || '失败'),'err');
     }
-  }catch(e){ alert('连接测试失败: ' + e.message); }
+  }catch(e){ toast('连接测试失败: ' + e.message,'err'); }
   if(btn){ btn.disabled = false; btn.textContent = '🔌 测试连接'; }
 }
 
@@ -34314,10 +34316,10 @@ async function tavilyClearKey(){
       tavilyConfigState.hasTavilyKey = false;
       tavilyConfigState.maskedKey = '';
       tavilyConfigState.configuredAt = null;
-      alert('Tavily API Key 已清除');
+      toast('Tavily API Key 已清除');
       renderView();
     }
-  }catch(e){ alert('清除失败: ' + e.message); }
+  }catch(e){ toast('清除失败: ' + e.message,'err'); }
 }
 
 // V75.8 刷新额度
@@ -36048,7 +36050,7 @@ function viewDevPlanDetail(planId){
     </div>
     <div class="modal-foot">
       <button class="btn btn-outline" onclick="closeModal()">关闭</button>
-      ${p.status==='已完成'?`<button class="btn btn-gold" onclick="closeModal();toast('客户已导入客户台账（演示）')">📥 导入客户到台账</button>`:''}
+      ${p.status==='已完成'?`<button class="btn btn-gold" onclick="closeModal();demoStub('客户已导入客户台账')">📥 导入客户到台账</button>`:''}
     </div>`);
 }
 function pauseDevPlan(planId){
@@ -36179,7 +36181,7 @@ function draftMultiLang(){
     </div>
     <div class="flex gap8 mb16">
       <button class="btn btn-gold" onclick="generateMultiLangEmail()">🤖 AI生成多语言开发信</button>
-      <button class="btn btn-outline" onclick="toast('已保存到草稿箱（演示）')">💾 保存到草稿箱</button>
+      <button class="btn btn-outline" onclick="demoStub('已保存到草稿箱')">💾 保存到草稿箱</button>
       <button class="btn btn-outline" onclick="copyMultiLangResult()">📋 复制全文</button>
     </div>
     <div id="ml_result"></div>

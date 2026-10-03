@@ -656,6 +656,20 @@ function serveStaticFile(req, res, filePath) {
 // ============ 全局会话与限速存储（跨请求共享，必须在 http.createServer 外部） ============
 const activeSessions = new Map();
 const failedAttempts = new Map(); // ip -> {count, firstFailTime}
+const ACCESS_RATE_LIMIT = new Map(); // ip_window -> count（滑动窗口限速，模块级跨请求共享）
+function checkAccessRateLimit(ip){
+  const now = Date.now();
+  const windowMs = 60000;
+  const maxAttempts = 10;
+  const key = ip + '_' + Math.floor(now / windowMs);
+  const count = (ACCESS_RATE_LIMIT.get(key) || 0) + 1;
+  ACCESS_RATE_LIMIT.set(key, count);
+  for(const k of ACCESS_RATE_LIMIT.keys()){
+    const ts = parseInt(k.split('_')[1]) * windowMs;
+    if(now - ts > windowMs * 2) ACCESS_RATE_LIMIT.delete(k);
+  }
+  return count <= maxAttempts;
+}
 
 // P2.2D-4.5: 异步生成任务管理（内存存储，服务重启后失效）
 const asyncJobs = new Map();
@@ -957,22 +971,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // 验证密码（登录）
-  // 密码登录速率限制（防暴力破解）
-const ACCESS_RATE_LIMIT = new Map();
-function checkAccessRateLimit(ip){
-  const now = Date.now();
-  const windowMs = 60000;
-  const maxAttempts = 10;
-  const key = ip + '_' + Math.floor(now / windowMs);
-  const count = (ACCESS_RATE_LIMIT.get(key) || 0) + 1;
-  ACCESS_RATE_LIMIT.set(key, count);
-  // 清理过期条目
-  for(const k of ACCESS_RATE_LIMIT.keys()){
-    const ts = parseInt(k.split('_')[1]) * windowMs;
-    if(now - ts > windowMs * 2) ACCESS_RATE_LIMIT.delete(k);
-  }
-  return count <= maxAttempts;
-}
+  // 密码登录速率限制（防暴力破解）— checkAccessRateLimit 已在模块级定义（行659），跨请求共享
 
 if (pathname === '/api/access/verify' && req.method === 'POST') {
     const ip = getClientIp(req);

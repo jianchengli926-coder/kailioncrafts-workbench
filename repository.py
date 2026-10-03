@@ -491,10 +491,11 @@ class CustomerRepository:
             "analysis": data.get("analysis"),
             "due_diligence": data.get("due_diligence"),
         }
-        # BUG-002 修复：SQLite TEXT 列不接受 list，product_categories 等列表字段需序列化为 JSON 字符串
-        for _list_field in ("product_categories",):
-            if isinstance(record.get(_list_field), (list, tuple)):
-                record[_list_field] = json.dumps(record[_list_field], ensure_ascii=False)
+        # BUG-002/FE-054 修复：SQLite TEXT 列不接受 list/dict，所有可能含复合类型的字段统一序列化为 JSON 字符串
+        for _json_field in ("product_categories", "main_products", "analysis", "due_diligence"):
+            val = record.get(_json_field)
+            if isinstance(val, (list, dict, tuple)):
+                record[_json_field] = json.dumps(val, ensure_ascii=False)
 
         conn = self._connect()
         try:
@@ -554,6 +555,11 @@ class CustomerRepository:
         fields = {k: v for k, v in updates.items() if k in allowed}
         if not fields:
             return self.get_prospect(customer_id)
+
+        # FE-054 修复：update 时 list/dict 字段也需序列化为 JSON 字符串，否则 SQLite 报 "type 'list' is not supported"
+        for _json_field in ("product_categories", "main_products", "analysis", "due_diligence"):
+            if _json_field in fields and isinstance(fields[_json_field], (list, dict, tuple)):
+                fields[_json_field] = json.dumps(fields[_json_field], ensure_ascii=False)
 
         fields["updated_at"] = _now()
         set_clause = ", ".join(f"{k}=?" for k in fields)

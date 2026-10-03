@@ -21,6 +21,7 @@ def _conn():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     c = sqlite3.connect(str(DB_PATH))
     c.row_factory = sqlite3.Row
+    c.execute("PRAGMA busy_timeout=5000")
     return c
 
 
@@ -104,23 +105,32 @@ def _next_content_no(cur):
 def add_content(**kw):
     init_db()
     c = _conn(); cur = c.cursor()
-    no = _next_content_no(cur)
-    cur.execute("""INSERT INTO content_records
-        (content_no,category,owner,platform,account_id,cover_path,title,content_type,
-         publish_url,landing_url,publish_date,views,likes,saves,comments,shares,
-         inquiries,orders,status,shoot_script,editing_script,caption,hashtags,
-         link_clicks,website_visits,followers_gained,multi_links,notes,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (no, kw.get("category"), kw.get("owner"), kw.get("platform"), kw.get("account_id"),
-         kw.get("cover_path"), kw.get("title"), kw.get("content_type", "Video"),
-         kw.get("publish_url"), kw.get("landing_url"),
-         kw.get("publish_date") or date.today().strftime("%Y-%m-%d"),
-         kw.get("views", 0), kw.get("likes", 0), kw.get("saves", 0), kw.get("comments", 0),
-         kw.get("shares", 0), kw.get("inquiries", 0), kw.get("orders", 0),
-         kw.get("status", "策划"), kw.get("shoot_script"), kw.get("editing_script"),
-         kw.get("caption"), kw.get("hashtags"), kw.get("link_clicks", 0),
-         kw.get("website_visits", 0), kw.get("followers_gained", 0), kw.get("multi_links"),
-         kw.get("notes"), datetime.now().strftime("%Y-%m-%d %H:%M")))
+    # P3 修复：单号生成非原子，INSERT 撞 UNIQUE 时重试最多 3 次
+    no = None
+    for attempt in range(3):
+        no = _next_content_no(cur)
+        try:
+            cur.execute("""INSERT INTO content_records
+                (content_no,category,owner,platform,account_id,cover_path,title,content_type,
+                 publish_url,landing_url,publish_date,views,likes,saves,comments,shares,
+                 inquiries,orders,status,shoot_script,editing_script,caption,hashtags,
+                 link_clicks,website_visits,followers_gained,multi_links,notes,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (no, kw.get("category"), kw.get("owner"), kw.get("platform"), kw.get("account_id"),
+                 kw.get("cover_path"), kw.get("title"), kw.get("content_type", "Video"),
+                 kw.get("publish_url"), kw.get("landing_url"),
+                 kw.get("publish_date") or date.today().strftime("%Y-%m-%d"),
+                 kw.get("views", 0), kw.get("likes", 0), kw.get("saves", 0), kw.get("comments", 0),
+                 kw.get("shares", 0), kw.get("inquiries", 0), kw.get("orders", 0),
+                 kw.get("status", "策划"), kw.get("shoot_script"), kw.get("editing_script"),
+                 kw.get("caption"), kw.get("hashtags"), kw.get("link_clicks", 0),
+                 kw.get("website_visits", 0), kw.get("followers_gained", 0), kw.get("multi_links"),
+                 kw.get("notes"), datetime.now().strftime("%Y-%m-%d %H:%M")))
+            break
+        except sqlite3.IntegrityError:
+            c.rollback()
+            if attempt == 2:
+                raise
     c.commit(); c.close()
     return no
 

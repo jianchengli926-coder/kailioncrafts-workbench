@@ -58,6 +58,12 @@ DRAFT_STATUSES = ["draft", "needs_review", "approved", "rejected"]
 PROHIBITED_CLAIMS = [
     "客户案例", "订单金额", "销售额", "MOQ", "产能", "交付周期",
     "认证", "客户评价", "工厂所有权", "未经确认的产品参数",
+    # English claims that must not appear in English drafts (scan is lowercased)
+    "we own the factory", "own factory", "owns the factory",
+    "iso 9001", "iso9001 certified", "iso certified",
+    "10000 pcs/month", "capacity of", "monthly capacity",
+    "cheaper than", "20% cheaper", "lowest price",
+    "ce/fda certified", "all certifications",
 ]
 
 # 安全的公司表述
@@ -449,6 +455,10 @@ def generate_content_draft(customer_id: str, draft_type: str,
             parsed = _parse_model_response(response if isinstance(response, str) else '')
         except Exception as e:
             return {'success': False, 'errors': [f'AI 调用失败: {str(e)}']}
+
+    # 6a. 空 body 拦截：AI 返回空白内容时不继续落库，避免生成空白开发信
+    if not parsed.get('body', '').strip():
+        return {'success': False, 'errors': ['AI 返回内容为空，请重试或调整提示词']}
 
     # 6. 安全检查：扫描禁止编造的内容
     risk_flags = list(parsed.get('risk_flags', []))

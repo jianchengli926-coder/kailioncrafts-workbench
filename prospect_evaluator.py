@@ -61,6 +61,7 @@ def _conn():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     c = sqlite3.connect(str(DB_PATH))
     c.row_factory = sqlite3.Row
+    c.execute("PRAGMA busy_timeout=5000")
     return c
 
 
@@ -227,7 +228,7 @@ def detect_duplicate_customer(customer_input: Dict, exclude_customer_id: Optiona
                         'confidence': 0.95,
                     })
         except Exception:
-            pass
+            return {'is_duplicate': True, 'matches': [], 'detection_count': 0, 'error': 'detection_failed'}
 
     # 检查数据库中的评估记录
     c = _conn()
@@ -276,7 +277,7 @@ def detect_duplicate_customer(customer_input: Dict, exclude_customer_id: Optiona
                     'source': 'repository',
                 })
         except Exception:
-            pass
+            return {'is_duplicate': True, 'matches': [], 'detection_count': 0, 'error': 'detection_failed'}
 
     # 去重
     seen = set()
@@ -322,7 +323,7 @@ def check_dnc(customer_input: Dict) -> Dict:
                             'detected_at': _now(),
                         })
         except Exception:
-            pass
+            return {'is_dnc': True, 'matches': [], 'error': 'dnc_check_failed'}
 
     # 检查 repository suppression_list + prospects.status=dnc
     repo = _get_repo()
@@ -341,7 +342,7 @@ def check_dnc(customer_input: Dict) -> Dict:
                     'source': 'repository',
                 })
         except Exception:
-            pass
+            return {'is_dnc': True, 'matches': [], 'error': 'dnc_check_failed'}
 
     return {
         'is_dnc': len(dnc_matches) > 0,

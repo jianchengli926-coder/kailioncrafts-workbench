@@ -441,7 +441,7 @@ class AIClient:
         used_model = None
         used_label = None
         last_error = None
-        mode = "manual" if manual_model else "auto"
+        route_mode = "manual" if manual_model else "auto"
         local_lock_status = None
 
         # 构建尝试链
@@ -476,7 +476,7 @@ class AIClient:
                     "reason": f"健康状态:{skip_reason}",
                     "elapsed": 0,
                     "time": datetime.now().strftime("%H:%M:%S"),
-                    "mode": mode,
+                    "mode": route_mode,
                 })
                 continue
 
@@ -491,7 +491,7 @@ class AIClient:
                     "reason": "slow_response",
                     "elapsed": 0,
                     "time": datetime.now().strftime("%H:%M:%S"),
-                    "mode": mode,
+                    "mode": route_mode,
                 })
                 continue
 
@@ -506,7 +506,7 @@ class AIClient:
                         failover_details.append({
                             "from": None, "to": label, "type": "local",
                             "status_code": None, "reason": f"本地模型锁失败: {lock_err}",
-                            "elapsed": 0, "time": datetime.now().strftime("%H:%M:%S"), "mode": mode,
+                            "elapsed": 0, "time": datetime.now().strftime("%H:%M:%S"), "mode": route_mode,
                         })
                         continue
                     local_lock_status = "acquired+preloaded"
@@ -525,7 +525,7 @@ class AIClient:
                             failover_details.append({
                                 "from": label, "to": None, "type": "local",
                                 "status_code": 200, "reason": "empty_response_with_thinking",
-                                "elapsed": req_elapsed, "time": datetime.now().strftime("%H:%M:%S"), "mode": mode,
+                                "elapsed": req_elapsed, "time": datetime.now().strftime("%H:%M:%S"), "mode": route_mode,
                             })
                             content = None
                             continue
@@ -553,7 +553,7 @@ class AIClient:
                         failover_details.append({
                             "from": label, "to": None, "type": "online",
                             "status_code": 200, "reason": "empty_response_with_reasoning",
-                            "elapsed": req_elapsed, "time": datetime.now().strftime("%H:%M:%S"), "mode": mode,
+                            "elapsed": req_elapsed, "time": datetime.now().strftime("%H:%M:%S"), "mode": route_mode,
                         })
                         content = None
                         continue
@@ -614,7 +614,7 @@ class AIClient:
                         "reason": error_msg,
                         "elapsed": round(req_elapsed, 2),
                         "time": datetime.now().strftime("%H:%M:%S"),
-                        "mode": mode,
+                        "mode": route_mode,
                     })
                 else:
                     failover_log.append(f"{label} 失败({error_msg})")
@@ -622,7 +622,7 @@ class AIClient:
                         "from": label, "to": None, "type": mtype,
                         "status_code": status_code, "reason": error_msg,
                         "elapsed": round(req_elapsed, 2),
-                        "time": datetime.now().strftime("%H:%M:%S"), "mode": mode,
+                        "time": datetime.now().strftime("%H:%M:%S"), "mode": route_mode,
                     })
 
                 # 不可自动切换的错误：立即停止，显示明确错误
@@ -649,7 +649,7 @@ class AIClient:
             error=last_error,
             failover_details=failover_details,
             local_lock_status=local_lock_status,
-            mode=mode,
+            mode=route_mode,
         )
 
         if content:
@@ -679,7 +679,7 @@ class AIClient:
         used_label = None
         used_model = None
         last_error = None
-        mode = "manual" if manual_model else "auto"
+        route_mode = "manual" if manual_model else "auto"
         local_lock_status = None
 
         # 构建视觉链
@@ -786,7 +786,7 @@ class AIClient:
                         "from": label, "to": next_label, "type": mtype,
                         "status_code": status_code, "reason": error_msg,
                         "elapsed": round(req_elapsed, 2),
-                        "time": datetime.now().strftime("%H:%M:%S"), "mode": mode,
+                        "time": datetime.now().strftime("%H:%M:%S"), "mode": route_mode,
                     })
                 else:
                     failover_log.append(f"{label} 失败({error_msg})")
@@ -808,7 +808,7 @@ class AIClient:
             error=last_error,
             failover_details=failover_details,
             local_lock_status=local_lock_status,
-            mode=mode,
+            mode=route_mode,
         )
 
         if content:

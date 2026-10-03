@@ -11731,7 +11731,7 @@ elif page == "🤖 模型管理":
 elif page == "📋 今日待办":
     st.markdown("""
     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:16px;padding:24px;margin-bottom:20px;">
-    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · TODO</div>
+    <div style="color:#D4AF37;font-size:12px;letter-spacing:3px;">KAILIONCRAFTS · DAILY PLAN</div>
     <h2 style="color:#FFF3E0;font-size:26px;margin:8px 0;">今日待办</h2>
     <div style="color:rgba(255,243,224,.6);font-size:13px;">优先级 · 分类 · 截止日期 · AI智能生成</div>
     </div>

@@ -517,6 +517,7 @@ DOUBAO_MODEL_LITE={model_lite if provider == "doubao" else "doubao-lite-32k"}
 """
 
     ENV_FILE.write_text(content, encoding="utf-8")
+    os.chmod(ENV_FILE, 0o600)
 
     # 更新当前运行时的配置
     global AI_PROVIDER, DOUBAO_API_KEY, DOUBAO_BASE_URL, DOUBAO_MODEL, DOUBAO_MODEL_LITE

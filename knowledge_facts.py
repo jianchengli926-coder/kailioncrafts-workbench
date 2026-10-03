@@ -64,6 +64,7 @@ def _conn():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     c = sqlite3.connect(str(DB_PATH))
     c.row_factory = sqlite3.Row
+    c.execute("PRAGMA busy_timeout=5000")
     return c
 
 

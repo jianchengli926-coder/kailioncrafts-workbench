@@ -14815,9 +14815,8 @@ function manualRetryCampaignTask(taskId){
   if(currentView==='campaignDetail' || currentView==='dailyWork') renderView();
 }
 
-// 覆盖模块中的手动重试入口
-if(typeof window !== 'undefined'){
-  window.CampaignTaskResilience = window.CampaignTaskResilience || {};
+// 覆盖模块中的手动重试入口（仅在模块已加载时挂载，避免创建空对象导致检测失效）
+if(typeof window !== 'undefined' && window.CampaignTaskResilience){
   window.CampaignTaskResilience._manualRetryById = manualRetryCampaignTask;
 }
 
@@ -15228,13 +15227,13 @@ function openTemplateEditor(editIndex){
     '</div>' +
     '<div style="padding:20px;max-height:60vh;overflow-y:auto">' +
       '<div style="margin-bottom:12px"><label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">模板名称</label>' +
-      '<input id="tplName" type="text" class="form-control" value="' + (tpl.name||'') + '" placeholder="例如：德国客户初次开发信" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></div>' +
+      '<input id="tplName" type="text" class="form-control" value="' + esc(tpl.name||'') + '" placeholder="例如：德国客户初次开发信" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></div>' +
       '<div style="margin-bottom:12px"><label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">模板描述</label>' +
-      '<input id="tplDesc" type="text" class="form-control" value="' + (tpl.desc||'') + '" placeholder="简短描述这个模板的用途" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></div>' +
+      '<input id="tplDesc" type="text" class="form-control" value="' + esc(tpl.desc||'') + '" placeholder="简短描述这个模板的用途" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></div>' +
       '<div style="margin-bottom:12px"><label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">邮件主题</label>' +
-      '<input id="tplSubject" type="text" class="form-control" value="' + (tpl.subject||'') + '" placeholder="邮件主题行" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></div>' +
+      '<input id="tplSubject" type="text" class="form-control" value="' + esc(tpl.subject||'') + '" placeholder="邮件主题行" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></div>' +
       '<div style="margin-bottom:12px"><label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">邮件正文</label>' +
-      '<textarea id="tplBody" class="form-control" rows="8" placeholder="邮件正文内容，支持 [Name] [Company] [Product] 等变量" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-family:monospace">' + (tpl.body||'') + '</textarea></div>' +
+      '<textarea id="tplBody" class="form-control" rows="8" placeholder="邮件正文内容，支持 [Name] [Company] [Product] 等变量" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-family:monospace">' + esc(tpl.body||'') + '</textarea></div>' +
       '<div style="background:#f5f3ff;padding:10px;border-radius:6px;font-size:11px;color:#6b21a8;line-height:1.6">💡 支持变量：[Name] 客户姓名、[Company] 公司名、[Product] 产品、[Country] 国家</div>' +
     '</div>' +
     '<div style="padding:16px 20px;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px">' +
@@ -16530,7 +16529,7 @@ function viewSettings(root){
             <div><label class="text-sm">SMTP服务器</label><input type="text" id="smtp_host" placeholder="如：smtp.exmail.qq.com" value="${(S.smtpConfig&&S.smtpConfig.host)||''}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
             <div><label class="text-sm">端口</label><input type="text" id="smtp_port" placeholder="465或587" value="${(S.smtpConfig&&S.smtpConfig.port)||'465'}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
             <div><label class="text-sm">发件邮箱</label><input type="text" id="smtp_user" placeholder="yourname@yourcompany.com" value="${(S.smtpConfig&&S.smtpConfig.user)||''}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
-            <div><label class="text-sm">邮箱密码/授权码</label><input type="password" id="smtp_pass" placeholder="输入邮箱密码或SMTP授权码" value="${(S.smtpConfig&&S.smtpConfig.pass)||''}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
+            <div><label class="text-sm">邮箱密码/授权码</label><input type="password" id="smtp_pass" placeholder="${(S.smtpConfig&&S.smtpConfig.pass)?'已保存，留空则不修改':'输入邮箱密码或SMTP授权码'}" value="" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
             <div><label class="text-sm">发件人名称</label><input type="text" id="smtp_name" placeholder="如：KaiLionCrafts Sales" value="${(S.smtpConfig&&S.smtpConfig.name)||'KaiLionCrafts'}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
             <div><label class="text-sm">每日发送上限</label><input type="number" id="smtp_limit" value="${(S.smtpConfig&&S.smtpConfig.dailyLimit)||50}" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;margin-top:4px"></div>
           </div>
@@ -32902,11 +32901,12 @@ function generateLeadEmail(idx){
  * V29.0 开发信审核发送中心 + SMTP配置
  * ============================================================ */
 function saveSmtpConfig(){
+  const newPass = document.getElementById('smtp_pass').value;
   const cfg={
     host:document.getElementById('smtp_host').value.trim(),
     port:document.getElementById('smtp_port').value.trim(),
     user:document.getElementById('smtp_user').value.trim(),
-    pass:document.getElementById('smtp_pass').value,
+    pass: newPass ? newPass : (S.smtpConfig && S.smtpConfig.pass) || '',
     name:document.getElementById('smtp_name').value.trim(),
     dailyLimit:parseInt(document.getElementById('smtp_limit').value)||50
   };

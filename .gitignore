@@ -38,6 +38,7 @@ api_config.json
 
 # 访问密码配置（含密码，不进Git）
 access_config.json
+access_config.json.bak*
 __pycache__/
 
 # IDE 和编辑器

@@ -585,18 +585,21 @@ const STATIC_DENYLIST = [
 
 function isSensitiveStaticPath(filePath) {
   const normalized = filePath.replace(/\\/g, '/').toLowerCase();
+  const fileName = normalized.substring(normalized.lastIndexOf('/') + 1);
   for (const pattern of STATIC_DENYLIST) {
-    if (pattern.startsWith('*')) {
-      const keyword = pattern.substring(1).toLowerCase();
-      if (normalized.includes(keyword)) return true;
-    } else if (pattern.endsWith('*')) {
-      const prefix = pattern.substring(0, pattern.length - 1).toLowerCase();
-      if (normalized.includes(prefix)) return true;
+    const p = pattern.toLowerCase();
+    if (p.includes('*')) {
+      // glob模式：转义正则特殊字符后将*替换为.*
+      const regexStr = '^' + p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$';
+      if (new RegExp(regexStr).test(fileName)) return true;
+    } else if (p.includes('.')) {
+      // 带点的文件名：匹配完整文件名或路径末尾
+      if (fileName === p || normalized.endsWith('/' + p)) return true;
     } else {
-      if (normalized.includes('/' + pattern.toLowerCase()) || normalized.endsWith('/' + pattern.toLowerCase())) return true;
+      // 目录名/关键词：匹配路径中任意位置
+      if (normalized.includes('/' + p) || normalized.includes(p)) return true;
     }
   }
-  // 额外检查：.git目录及其子路径
   if (normalized.includes('/.git')) return true;
   return false;
 }
@@ -639,8 +642,12 @@ function serveStaticFile(req, res, filePath) {
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
     stream.on('error', () => {
-      res.writeHead(500);
-      res.end('读取文件失败');
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('读取文件失败');
+      } else {
+        res.end();
+      }
     });
   });
 }
@@ -734,7 +741,14 @@ const AsyncJobManager = {
 // ============ 创建HTTP服务器 ============
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
-  const pathname = decodeURIComponent(reqUrl.pathname);
+  let pathname;
+  try {
+    pathname = decodeURIComponent(reqUrl.pathname);
+  } catch(e) {
+    res.writeHead(400, {'Content-Type':'application/json; charset=utf-8'});
+    res.end(JSON.stringify({success:false, error:'Invalid URL encoding'}));
+    return;
+  }
 
   // CORS预检（同源策略，不使用通配符）
   if (req.method === 'OPTIONS') {
@@ -966,6 +980,11 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
       res.end(JSON.stringify({ valid: false, error: '尝试次数过多，请15分钟后再试' }));
       return;
     }
+    if (!checkAccessRateLimit(ip)) {
+      res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ valid: false, error: '请求过于频繁，请稍后再试' }));
+      return;
+    }
     try {
       const body = await readBody(req);
       const config = loadAccessConfig();
@@ -1191,6 +1210,7 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
         }, timeoutMs);
         dns.resolveMx(domain, (err, addresses) => {
           clearTimeout(timer);
+          if (res.writableEnded) return; // 防止超时后重复响应
           if (err) {
             if (err.code === 'ENOTFOUND' || err.code === 'ENODATA') {
               res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});

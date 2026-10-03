@@ -163,6 +163,15 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ============ 搜索引擎排除（noindex） ============
+# 内部工作台不应被搜索引擎收录。页面级 meta robots 作为尽力排除提示。
+# 注意：未配置 Cloudflare X-Robots-Tag Transform Rule；公网入口仍通过
+# Cloudflare Tunnel + 工作台密码页访问。搜索引擎排除不保证绝对不被收录。
+st.markdown(
+    '<meta name="robots" content="noindex, nofollow, noarchive">',
+    unsafe_allow_html=True,
+)
+
 # ============ 密码门 ============
 import hmac as _hmac_mod
 

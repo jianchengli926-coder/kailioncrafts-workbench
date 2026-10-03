@@ -44,24 +44,49 @@ python3 -m streamlit run app.py
 
 | 方式 | 适用场景 | 访问地址 |
 |------|----------|----------|
-| **本地单人使用** | 自己一个人用 | `http://localhost:8501` |
-| **局域网多人使用** | 办公室同事一起用 | `http://你的电脑IP:8501` |
-| **服务器部署** | 随时随地访问，外网可用 | 你的域名或服务器IP |
+| **本机单人使用** | 自己一个人用 | `http://localhost:8501` |
+| **局域网多人使用** | 办公室同事一起用 | `http://你的电脑IP:8501`（如 `http://192.168.1.116:8501`） |
+| **公网访问（Cloudflare Tunnel）** | 外出或远程同事访问 | `https://workbench.kailioncrafts.com` |
+
+> **安全说明**：三种访问方式均需通过工作台密码页验证。公网入口不使用 Cloudflare Access 邮箱验证，直接由工作台密码页保护。工作台已配置页面级 `noindex, nofollow, noarchive`，降低搜索引擎收录概率。
 
 ### 1. 局域网多人访问（推荐办公室使用）
-启动脚本已默认配置 `--server.address=0.0.0.0`，同事在同一WiFi/网络下可通过你的IP访问：
+桌面启动脚本已默认配置 `--server.address=0.0.0.0`，同事在同一 WiFi/网络下可通过你的 IP 访问：
 
 ```bash
-./run.sh
-# 启动后会显示局域网地址，例如：
-# 🌐 局域网访问: http://192.168.1.22:8501
+# 双击桌面「启动企业AI工作台（KaiLionCrafts）.command」
+# 启动后会显示三个地址：
+# 💻 本机访问:   http://localhost:8501
+# 🏠 局域网访问: http://192.168.1.116:8501
+# 🌍 公网访问:   https://workbench.kailioncrafts.com
 ```
 
-把这个地址发给同事，他们在浏览器打开即可使用。
+把局域网地址发给同事，他们在浏览器打开即可使用。
 
-**注意**：你的电脑需要保持开机和运行工作台，同事才能访问。
+**注意**：
+- 你的电脑需要保持开机和运行工作台，同事才能访问。
+- 工作台关闭或电脑休眠后，局域网和公网访问均不可用。
+- 启动脚本会自动检测并管理 Cloudflare Tunnel，不影响同 Tunnel 下的其他子域名（crm/creator/prospect）。
 
-### 2. 本地大模型接入
+### 2. 公网访问（Cloudflare Tunnel）
+工作台通过现有 Cloudflare Tunnel 提供公网 HTTPS 访问，无需开放路由器端口或 UPnP：
+
+- **公网地址**：`https://workbench.kailioncrafts.com`
+- **Tunnel 名称**：`kailion-workbench`（创建于 2026-09-13，不重建）
+- **配置文件**：`~/.cloudflared/config.yml`（含凭据路径，不纳入 Git）
+- **工作原理**：cloudflared 在本机建立到 Cloudflare 边缘的出站连接，公网 HTTPS 请求经 Tunnel 转发到 `localhost:8501`
+- **访问控制**：不使用 Cloudflare Access 邮箱验证，公网用户直接到达工作台密码页
+
+**安全措施**：
+- 页面级 `<meta name="robots" content="noindex, nofollow, noarchive">`（已在 app.py 中配置）
+- 未配置 Cloudflare `X-Robots-Tag` Transform Rule（如需可在 Cloudflare Dashboard 手动添加）
+- 建议配置 Cloudflare WAF Rate Limit（详见 `docs_cloudflare_waf_配置指南.md`）
+- 工作台密码页含失败锁定和会话超时
+- 不开放路由器端口，不直接暴露 8501 到公网
+
+**停止公网访问**：关闭工作台或停止 cloudflared 进程后，公网入口自然不可用（显示 Cloudflare 错误页）。
+
+### 3. 本地大模型接入
 工作台支持通过 **Ollama** 接入本地大模型，完全离线、免费、不消耗API额度：
 
 1. 安装 [Ollama](https://ollama.com/)
@@ -73,12 +98,19 @@ python3 -m streamlit run app.py
 
 支持的本地模型：千问2.5、Llama 3.1、DeepSeek、Mistral、Phi 3等所有Ollama支持的模型。
 
-### 3. 部署到服务器（可选）
-如果需要外网随时访问，可以部署到你的 Hostinger 服务器：
-- 需要支持Python的主机（Hostinger VPS或云主机）
-- 用 Nginx 反向代理到 Streamlit
-- 配置域名和HTTPS
-- 具体部署可以后续协助配置
+### 4. Cloudflare WAF / Rate Limit（建议手动配置）
+公网登录页可被互联网扫描，建议在 Cloudflare Dashboard 手动配置 Rate Limit 规则。详细步骤见 `docs_cloudflare_waf_配置指南.md`。
+
+核心规则：仅匹配 `workbench.kailioncrafts.com`，排除静态资源和 WebSocket，对非静态路径 50 次/10 秒触发 Managed Challenge。
+
+### 5. macOS 防火墙（当前关闭，可选启用）
+当前 macOS 防火墙为关闭状态。如需启用：
+- 系统设置 → 网络 → 防火墙 → 开启
+- 为运行 Streamlit 的 Python 可执行文件添加"允许传入连接"例外
+- 注意：macOS 内置防火墙是应用级，不支持按 IP 网段限制；如需仅允许私有网段访问，需额外配置 pf（packet filter），风险较高，暂不建议
+- 启用后需验证：localhost 可用、局域网设备可到登录页、Cloudflare Tunnel 公网仍可用
+
+**回滚**：系统设置 → 网络 → 防火墙 → 关闭，立即恢复。
 
 ## 知识库搜索
 

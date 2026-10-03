@@ -8,9 +8,23 @@
 
 ## 项目位置与启动
 - 根目录：`/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/00_AI标准化知识库/AI客户开发工作台/`
-- 启动：`python3 -m streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.headless true`
-- 日志：`/tmp/streamlit.log`
-- 公网：Cloudflare Tunnel，密码门 `（见本机安全配置）`
+- 启动：双击桌面「启动企业AI工作台（KaiLionCrafts）.command」（自动检查外置硬盘/Python/密码/Ollama/端口/Tunnel，显示三个地址）
+- 手动启动：`python3 -m streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.headless true`
+- 日志：`/tmp/streamlit_ai_workbench.log`
+- 本机：`http://localhost:8501`
+- 局域网：`http://192.168.1.116:8501`（IP 以启动时检测为准，en1 接口）
+- 公网：`https://workbench.kailioncrafts.com`（Cloudflare Tunnel，不使用 Access 邮箱验证，由工作台密码页保护）
+- 密码门：`~/.config/kailioncrafts/workbench.env`（chmod 600，变量 `WORKBENCH_ACCESS_PASSWORD`，不纳入 Git）
+- noindex：app.py 已添加页面级 `<meta name="robots" content="noindex, nofollow, noarchive">`；未配置 Cloudflare X-Robots-Tag Transform Rule
+
+## Cloudflare Tunnel（现有，不重建）
+- Tunnel 名称：`kailion-workbench`，ID `0df6566a-2cb5-4dbd-aaeb-30b7c973cc2b`，创建于 2026-09-13
+- 配置：`~/.cloudflared/config.yml`（含 credentials-file 路径，不纳入 Git）
+- Ingress：workbench→8501, crm→4188, creator→8766, prospect→8080, 默认→404
+- cloudflared 路径：`/opt/homebrew/bin/cloudflared`，版本 2026.9.1
+- 启动脚本会检测 cloudflared 是否运行，已运行则不启动第二个 connector（避免影响其他子域名）
+- 工作台关闭或电脑关机后，公网入口自然不可用
+- WAF/Rate Limit：未配置，建议手动配置（见 `docs_cloudflare_waf_配置指南.md`）
 
 ## 工作规矩（每次改代码必须遵守）
 1. 改前确认 git 干净（`git status`）

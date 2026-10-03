@@ -6902,22 +6902,47 @@ SKU格式：KL-品类-材质-款式号
                                         safe_text = display_text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
                                         html_copy = f"""
                                         <button onclick="
-                                            navigator.clipboard.writeText('{safe_text}').then(() => {{
-                                                this.textContent = '✅ 已复制!';
-                                                this.style.background = '#4caf50';
-                                                setTimeout(() => {{ this.textContent = '📋 复制当前Prompt'; this.style.background = '#ff4b4b'; }}, 2000);
-                                            }}).catch(err => {{
-                                                // 降级方案
+                                            var _txt = '{safe_text}';
+                                            var _btn = this;
+                                            function _reset() {{
+                                                setTimeout(function() {{
+                                                    _btn.textContent = '📋 复制当前Prompt';
+                                                    _btn.style.background = '#ff4b4b';
+                                                }}, 2000);
+                                            }}
+                                            function _ok() {{
+                                                _btn.textContent = '✅ 已复制!';
+                                                _btn.style.background = '#4caf50';
+                                                _reset();
+                                            }}
+                                            function _fail() {{
+                                                _btn.textContent = '❌ 复制失败，请手动全选复制';
+                                                _btn.style.background = '#f44336';
+                                                _reset();
+                                            }}
+                                            function _fallback() {{
                                                 var ta = document.createElement('textarea');
-                                                ta.value = arguments[0];
+                                                ta.value = _txt;
+                                                ta.style.position = 'fixed';
+                                                ta.style.left = '-9999px';
+                                                ta.style.top = '0';
                                                 document.body.appendChild(ta);
+                                                ta.focus();
                                                 ta.select();
-                                                document.execCommand('copy');
-                                                document.body.removeChild(ta);
-                                                this.textContent = '✅ 已复制!';
-                                                this.style.background = '#4caf50';
-                                                setTimeout(() => {{ this.textContent = '📋 复制当前Prompt'; this.style.background = '#ff4b4b'; }}, 2000);
-                                            }});
+                                                try {{
+                                                    var ok = document.execCommand('copy');
+                                                    document.body.removeChild(ta);
+                                                    if (ok) {{ _ok(); }} else {{ _fail(); }}
+                                                }} catch(e) {{
+                                                    document.body.removeChild(ta);
+                                                    _fail();
+                                                }}
+                                            }}
+                                            if (navigator.clipboard && window.isSecureContext) {{
+                                                navigator.clipboard.writeText(_txt).then(_ok).catch(_fallback);
+                                            }} else {{
+                                                _fallback();
+                                            }}
                                         " style="width:100%;padding:6px 12px;background:#ff4b4b;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">
                                             📋 复制当前Prompt
                                         </button>

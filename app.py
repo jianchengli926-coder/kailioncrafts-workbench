@@ -1101,9 +1101,12 @@ if page == "🏠 仪表盘":
                 st.success("已保存！")
                 st.rerun()
 
-        # 计算总数
+        # 计算总数（注意：此为手工维护的渠道分布合计，非 SQLite 实际客户数）
         total = sum(v["count"] for v in sources.values())
-        st.caption(f"客户总数：{total}")
+        real_total = stats.get("total", 0)
+        st.caption(f"手工维护渠道分布合计：{total}　｜　实际客户数（SQLite）：{real_total}")
+        if total != real_total:
+            st.info(f"⚠️ 渠道分布合计（{total}）与实际客户数（{real_total}）不一致。此图为手动编辑的渠道规划数据，不代表真实客户来源；真实客户来源以 prospects 表 source 字段为准。")
 
         # 横向条形图（11个渠道用条形图更清晰）
         import plotly.graph_objects as go

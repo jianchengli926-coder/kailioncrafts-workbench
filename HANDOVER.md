@@ -10,7 +10,7 @@
 - 根目录：`/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/00_AI标准化知识库/AI客户开发工作台/`
 - 启动：`python3 -m streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.headless true`
 - 日志：`/tmp/streamlit.log`
-- 公网：Cloudflare Tunnel，密码门 `441723`
+- 公网：Cloudflare Tunnel，密码门 `（见本机安全配置）`
 
 ## 工作规矩（每次改代码必须遵守）
 1. 改前确认 git 干净（`git status`）

@@ -32,3 +32,16 @@ __pycache__/
 # 备份文件
 *.bak_*
 *~
+
+# 运行时认证状态（含失败计数/锁定）
+data/auth_lock.json
+
+# 前端测试产物（含 test_password 字段、截图）
+frontend_deep_test_*.json
+frontend_test_*.json
+frontend_test_summary.md
+screenshots/
+_shots/
+
+# 临时测试数据库
+data/test_*.db

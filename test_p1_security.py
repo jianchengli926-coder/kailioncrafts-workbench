@@ -37,12 +37,13 @@ def run_test(name, func):
 
 # ============ 1. 访问密码环境变量测试 ============
 def test_password_hardcoded_removed():
-    """硬编码密码 441723 已从 app.py 移除"""
+    """访问密码必须从环境变量读取，不得硬编码字面量"""
+    import re
     with open("app.py", "r", encoding="utf-8") as f:
         content = f.read()
-    # 密码不应以硬编码比较形式存在
-    assert 'pwd == "441723"' not in content, "硬编码密码 441723 仍然存在"
-    assert "441723" not in content.replace("441723", ""), "密码字符串仍出现在代码中"
+    # 不得有 pwd == "字面量密码" 形式的硬编码比较
+    hardcoded = re.search(r'''pwd\s*==\s*["'][A-Za-z0-9]{4,}["']''', content)
+    assert not hardcoded, f"发现硬编码密码比较: {hardcoded.group(0)}"
     assert "WORKBENCH_ACCESS_PASSWORD" in content, "环境变量 WORKBENCH_ACCESS_PASSWORD 未使用"
 
 

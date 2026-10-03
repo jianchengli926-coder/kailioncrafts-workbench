@@ -224,7 +224,7 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
       </table>
 
       <h3>2. 登录</h3>
-      <p>打开工作台后，首先看到登录页面，输入访问密码 <code>441723</code>，点击「进 入」按钮即可。</p>
+      <p>打开工作台后，首先看到登录页面，输入访问密码 <code>（见本机安全配置）</code>，点击「进 入」按钮即可。</p>
       <div class="callout info"><b class="t">首次登录后建议先做三件事</b>
         <ul>
           <li>查看「仪表盘」的 AI 引擎状态，确认模型连接正常。</li>
@@ -382,12 +382,12 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
         <p class="purpose"><b>用途：</b>工作台的第一道安全屏障，输入密码后才能进入所有功能。</p>
         <figure>
           <div class="placeholder">📸 登录页面截图位置 — 公司Logo + 品牌名称 + 密码输入框 + 进入按钮</div>
-          <figcaption>登录页面：输入密码441723后点击进入</figcaption>
+          <figcaption>登录页面：输入密码（见本机安全配置）后点击进入</figcaption>
         </figure>
         <h3>操作步骤</h3>
         <div class="steps">
           <div class="step"><div class="step-num">1</div><div class="step-content">打开工作台地址，看到登录页面。</div></div>
-          <div class="step"><div class="step-num">2</div><div class="step-content">在密码输入框中输入 <code>441723</code>。</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-content">在密码输入框中输入 <code>（见本机安全配置）</code>。</div></div>
           <div class="step"><div class="step-num">3</div><div class="step-content">点击「进 入」按钮，密码正确则自动进入仪表盘。</div></div>
           <div class="step"><div class="step-num">4</div><div class="step-content">密码错误会提示「密码错误」，重新输入即可。</div></div>
         </div>
@@ -398,7 +398,7 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
           <li><b>防护范围</b>：密码是整个工作台的屏障，输入后所有功能照常使用。</li>
         </ul>
         <div class="callout warn"><b class="t">修改密码</b>
-          编辑 <code>app.py</code> 第151行的密码判断 <code>if pwd == "441723":</code>，将441723改为新密码，然后重启工作台。
+          编辑 <code>app.py</code> 第151行的密码判断 <code>if pwd == "（见本机安全配置）":</code>，将（见本机安全配置）改为新密码，然后重启工作台。
         </div>
       </div>
     </div>
@@ -1609,7 +1609,7 @@ WC_CONSUMER_SECRET=cs_...
       <p><strong>A:</strong> 支持。工作台运行在本地服务器上，同一局域网内的多台设备可以通过 http://你的IP:8501 同时访问。每个用户有独立的浏览器会话。</p>
 
       <h3>Q9: 忘记密码怎么办？</h3>
-      <p><strong>A:</strong> 访问密码是 441723。如果需要修改，编辑 app.py 第151行的密码判断，然后重启工作台。</p>
+      <p><strong>A:</strong> 访问密码是 （见本机安全配置）。如果需要修改，编辑 app.py 第151行的密码判断，然后重启工作台。</p>
 
       <h3>Q10: 如何重启工作台？</h3>
       <p><strong>A:</strong> 关闭终端窗口或按 Ctrl+C 停止服务，然后重新双击桌面的启动脚本。</p>

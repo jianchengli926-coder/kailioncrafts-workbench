@@ -434,7 +434,10 @@ def generate_content_draft(customer_id: str, draft_type: str,
         # 真实 AI 调用（需要 ai_client）
         try:
             import ai_client
-            ai = ai_client.AIClient()
+            # P1 修复：必须使用全局单例 ai_client.ai，而不是新建 AIClient()。
+            # 新建实例的 manual_text_model/manual_vision_model 永远为 None，
+            # 会绕过侧边栏/设置页的会话级手动模型选择，导致草稿生成与路由脱节。
+            ai = ai_client.ai
             # 传递 mode 参数：standard 关闭 thinking，reasoning 允许内部诊断
             response = ai.chat(user_prompt, system_prompt=system_prompt, temperature=0.7, mode=mode)
             # P1-1 修复：ai_client.chat() 返回纯字符串（正文内容），不是 dict。

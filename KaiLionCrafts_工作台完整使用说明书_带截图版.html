@@ -61,6 +61,15 @@ details[open] summary{background:#e8e8e8}
 </style>
 </head>
 <body>
+<div style="background:#d4edda;border:2px solid #28a745;padding:12px 16px;margin:10px 0;border-radius:6px;font-size:14px;">
+<b>✅ 模型配置已核对（2026-10-03）：</b>以下模型路由信息已与 <code>model_registry.py</code> 同步：
+文本链 GLM-4.7 Flash → GLM-4 Flash → qwen3.5:9b → qwen2.5:7b；
+视觉链 GLM-4.6V Flash → qwen3.5:9b → qwen2.5vl:7b；
+图像链 CogView-3 Flash → FLUX.2 Klein 4B（本地）；
+推理链 GLM-4.7 Flash → qwen3.5:9b → deepseek-r1:7b。
+旧版硅基流动（Xing4.0-29B、Qwen2.5-7B）已禁用，豆包 Seed-2.1-Turbo 不在自动路由链中。
+</div>
+
 
 <div class="hero">
   <h1>🔪 KaiLionCrafts AI工作台</h1>
@@ -257,21 +266,28 @@ const sections=[
 <p>左侧导航点「⚙️ 设置中心」，进入AI模型控制后台。</p>
 <div class="screenshot"><img src="manual_assets/04_settings.png" alt="设置中心"><div class="cap">设置中心 - 模型配置/AI调用统计/访问日志</div></div>
 <h4>故障转移链（重要）</h4>
-<p>工作台配置了9个AI模型，一个坏了自动切下一个，你无感知：</p>
-<table><tr><th>#</th><th>模型</th><th>类型</th><th>状态</th></tr>
-<tr><td>1</td><td>智谱GLM-4-Flash</td><td>在线免费</td><td>✅ 主力（0.57秒响应）</td></tr>
-<tr><td>2</td><td>智谱GLM-4.7-Flash</td><td>在线免费</td><td>✅ 深度思考</td></tr>
-<tr><td>3</td><td>硅基流动Xing4.0-29B</td><td>在线免费</td><td>❌ 余额不足（自动跳过）</td></tr>
-<tr><td>4</td><td>硅基流动Qwen2.5-7B</td><td>在线免费</td><td>❌ 余额不足（自动跳过）</td></tr>
-<tr><td>5</td><td>智谱GLM-4.6V-Flash</td><td>在线免费</td><td>✅ 视觉理解（图片分析）</td></tr>
-<tr><td>6</td><td>豆包Seed-2.1-Turbo</td><td>在线付费</td><td>✅ 备用</td></tr>
-<tr><td>7-9</td><td>Ollama本地模型×3</td><td>本地</td><td>✅ 断网兜底（qwen2.5/deepseek-r1/qwen2.5vl）</td></tr></table>
-<div class="tip">💡 硅基流动两个模型余额不足，不影响使用——故障转移会自动跳过它们。后续充值或换API即可。</div>
+<p>工作台配置了9个AI模型节点，按任务类型分链自动故障转移，一个坏了自动切下一个，你无感知：</p>
+<p><b>文本链（默认）：</b></p>
+<table><tr><th>#</th><th>模型</th><th>类型</th><th>角色</th></tr>
+<tr><td>1</td><td>智谱 GLM-4.7 Flash</td><td>在线免费</td><td>✅ 主力文本 + 深度思考</td></tr>
+<tr><td>2</td><td>智谱 GLM-4 Flash</td><td>在线免费</td><td>✅ 轻量快速文本</td></tr>
+<tr><td>3</td><td>qwen3.5:9b</td><td>Ollama 本地</td><td>本地首选（支持视觉）</td></tr>
+<tr><td>4</td><td>qwen2.5:7b</td><td>Ollama 本地</td><td>本地文本备用</td></tr></table>
+<p><b>视觉链（图片分析）：</b></p>
+<table><tr><th>#</th><th>模型</th><th>类型</th><th>角色</th></tr>
+<tr><td>1</td><td>智谱 GLM-4.6V Flash</td><td>在线免费</td><td>✅ 视觉理解（图片分析）</td></tr>
+<tr><td>2</td><td>qwen3.5:9b</td><td>Ollama 本地</td><td>本地视觉兜底</td></tr>
+<tr><td>3</td><td>qwen2.5vl:7b</td><td>Ollama 本地</td><td>本地视觉备用</td></tr></table>
+<p><b>图像生成链：</b></p>
+<table><tr><th>#</th><th>模型</th><th>类型</th><th>角色</th></tr>
+<tr><td>1</td><td>CogView-3 Flash</td><td>智谱在线</td><td>✅ AI作图主力</td></tr>
+<tr><td>2</td><td>FLUX.2 Klein 4B</td><td>Ollama 本地</td><td>本地生图兜底</td></tr></table>
+<div class="tip">已禁用供应商：硅基流动（Xing4.0-29B、Qwen2.5-7B）。豆包 Seed-2.1-Turbo 在注册表中存在但不在自动路由链中。当前路由以 model_registry.py 为准，在线模型失败后自动降级到本地 Ollama。手动选择本地模型时只调用 localhost:11434，不调用在线服务。</div>
 `},
 {id:"health-check",title:"一键健康检测",tags:["开箱即用"],content:`
 <p>在模型管理页面点「🔍 一键检测所有模型」，系统会逐个测试每个在线模型的连接速度。</p>
 <p>结果显示：✅正常(带响应时间) / ❌异常(带错误原因) / ⏭️跳过(本地模型)。</p>
-<div class="success">✅ 实测结果：4个在线模型正常，2个硅基流动402余额不足，3个本地模型跳过。</div>
+<div class="success">✅ 当前路由：智谱 GLM 在线优先 → Ollama 本地兜底。硅基流动已禁用。</div>
 `},
 {id:"ai-stats",title:"AI调用统计",tags:["开箱即用"],content:`
 <p>在设置中心点「📊 AI调用统计」，可以看到：</p>
@@ -310,7 +326,7 @@ const sections=[
 <details><summary>Q: 如何重启工作台？</summary><p>A: 双击桌面「关闭企业AI工作台」，再双击「启动企业AI工作台」。</p></details>
 <details><summary>Q: 忘记密码？</summary><p>A: 密码是 （见本机安全配置）。</p></details>
 <details><summary>Q: 局域网其他电脑怎么访问？</summary><p>A: 同一WiFi下浏览器打开 http://192.168.1.22:8501</p></details>
-<details><summary>Q: 硅基流动模型显示402怎么办？</summary><p>A: 余额不足，不影响使用（故障转移自动跳过）。后续充值或在设置中心换API即可。</p></details>
+<details><summary>Q: 模型调用失败怎么办？</summary><p>A: 工作台有多级故障转移机制，在线模型失败后自动切换到下一个，全部在线失败后降级到本地 Ollama。401/403 不触发降级。</p></details>
 <details><summary>Q: 本地Ollama模型怎么用？</summary><p>A: 确保Ollama已启动（终端运行 ollama serve），工作台会自动检测到3个本地模型作为兜底。断网时自动使用。</p></details>
 `},
 ]},

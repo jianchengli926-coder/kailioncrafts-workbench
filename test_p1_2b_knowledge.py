@@ -15,6 +15,9 @@ knowledge_facts.DB_PATH = TEST_DB
 
 
 def _cleanup():
+    # P1 测试隔离修复：pytest 先导入全部测试模块，knowledge_facts.DB_PATH 模块全局
+    # 会被后导入的测试文件覆盖。每个 setUp 前重新指向本文件专属 DB，保证隔离。
+    knowledge_facts.DB_PATH = TEST_DB
     if TEST_DB.exists():
         TEST_DB.unlink()
 

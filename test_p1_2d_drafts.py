@@ -20,6 +20,11 @@ cdg.DB_PATH = TEST_DB
 
 
 def _cleanup():
+    # P1 测试隔离修复：pytest 先导入全部测试模块，kf/pe/cdg 的 DB_PATH 模块全局
+    # 会被后导入的测试文件（如 test_p1_3c）覆盖。每个 setUp 前重新指向本文件专属 DB。
+    kf.DB_PATH = TEST_DB
+    pe.DB_PATH = TEST_DB
+    cdg.DB_PATH = TEST_DB
     if TEST_DB.exists():
         TEST_DB.unlink()
 
@@ -377,6 +382,13 @@ class TestDraftPersistence(unittest.TestCase):
 
 class TestNoRealDataModification(unittest.TestCase):
     """测试29: 不修改真实客户数据"""
+
+    def setUp(self):
+        # 与其它测试类一致：先重新指向本文件专属 DB，再断言隔离契约。
+        # （该断言类原本无 setUp，运行时 cdg.DB_PATH 已被后导入的 test_p1_3c 覆盖。）
+        kf.DB_PATH = TEST_DB
+        pe.DB_PATH = TEST_DB
+        cdg.DB_PATH = TEST_DB
 
     def test_uses_separate_test_db(self):
         self.assertIn('test_p1_2d', str(cdg.DB_PATH))

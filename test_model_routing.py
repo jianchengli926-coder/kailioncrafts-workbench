@@ -672,6 +672,181 @@ class TIntegration(unittest.TestCase):
     def test_qwen35_vision(self):
         self.assertTrue(build_model_registry()['qwen3.5:9b']['vision_capable'])
 
+
+def _online_ok(content="online_ok"):
+    r = MagicMock(); r.status_code = 200
+    r.json.return_value = {"choices": [{"message": {"content": content}}], "usage": {}}
+    return r
+
+def _local_ok(content="local_ok"):
+    r = MagicMock(); r.status_code = 200
+    r.json.return_value = {"message": {"content": content}, "eval_count": 5}
+    return r
+
+
+class TP15ManualRouting(unittest.TestCase):
+    """P1 模型路由自动化测试：自动链 / 手动本地 / 手动不被覆盖 / 切回自动 / 故障转移矩阵。
+
+    全部使用 unittest.mock 拦截 ai_client.requests.post 与
+    ai_client.local_model_manager.acquire/release，不调用真实 Ollama 或在线 API。
+    """
+
+    def setUp(self):
+        health._states = {}
+        import ai_client as _ac
+        _ac._slow_response_tracker = {}
+        self.c = AIClient()
+        self.c.manual_text_model = None
+
+    def _patch_http(self, mp):
+        """记录每次请求的 (url, model)，返回 (called_models, called_urls)。"""
+        models, urls = [], []
+        return models, urls
+
+    # 1. 自动模式走默认链
+    @patch('ai_client.requests.post')
+    @patch('ai_client.local_model_manager.release', return_value=(True, None))
+    @patch('ai_client.local_model_manager.acquire', return_value=True)
+    def test_auto_mode_follows_default_chain(self, macq, mrel, mp):
+        seen = []
+        def se(url, **kw):
+            m = kw.get('json', {}).get('model', '')
+            seen.append(m)
+            if m == 'glm-4.7-flash':
+                r = MagicMock(); r.status_code = 503; r.text = 'boom'; return r
+            if m == 'glm-4-flash':
+                r = MagicMock(); r.status_code = 503; r.text = 'boom'; return r
+            # 本地模型返回成功
+            return _local_ok("local_from_chain")
+        mp.side_effect = se
+        out = self.c.chat("hi", task_name="tp15_auto_chain")
+        self.assertIn("local_from_chain", out)
+        self.assertEqual(seen[:3], ['glm-4.7-flash', 'glm-4-flash', 'qwen3.5:9b'],
+                         f"自动链顺序不符: {seen}")
+
+    # 2. 手动本地模型选择生效，请求发到 localhost:11434
+    @patch('ai_client.requests.post')
+    @patch('ai_client.local_model_manager.release', return_value=(True, None))
+    @patch('ai_client.local_model_manager.acquire', return_value=True)
+    def test_manual_local_model_uses_ollama(self, macq, mrel, mp):
+        urls = []
+        def se(url, **kw):
+            urls.append(url)
+            return _local_ok("qwen_local_reply")
+        mp.side_effect = se
+        self.c.manual_text_model = 'qwen3.5:9b'
+        out = self.c.chat("hi", task_name="tp15_manual_local")
+        self.assertIn("qwen_local_reply", out)
+        self.assertEqual(len(urls), 1, "手动本地模型应只发一次请求")
+        self.assertIn("localhost:11434/api/chat", urls[0],
+                      f"本地模型应请求 Ollama /api/chat，实际: {urls[0]}")
+        # 不应调用在线 chat/completions
+        self.assertFalse(any('/chat/completions' in u for u in urls))
+
+    # 3. 手动模式不被自动路由覆盖（即使在线模型可用也不调用）
+    @patch('ai_client.requests.post')
+    @patch('ai_client.local_model_manager.release', return_value=(True, None))
+    @patch('ai_client.local_model_manager.acquire', return_value=True)
+    def test_manual_not_overridden_by_auto(self, macq, mrel, mp):
+        online_calls = []
+        def se(url, **kw):
+            if '/chat/completions' in url:
+                online_calls.append(url)
+                return _online_ok("should_not_be_used")
+            return _local_ok("manual_local_wins")
+        mp.side_effect = se
+        self.c.manual_text_model = 'qwen3.5:9b'
+        out = self.c.chat("hi", task_name="tp15_manual_pinned")
+        self.assertIn("manual_local_wins", out)
+        self.assertEqual(len(online_calls), 0,
+                         "手动选择本地模型时，不应调用任何在线 API")
+
+    # 4. 切回自动模式恢复默认链
+    @patch('ai_client.requests.post')
+    @patch('ai_client.local_model_manager.release', return_value=(True, None))
+    @patch('ai_client.local_model_manager.acquire', return_value=True)
+    def test_back_to_auto_restores_chain(self, macq, mrel, mp):
+        seen = []
+        def se(url, **kw):
+            m = kw.get('json', {}).get('model', '')
+            seen.append(m)
+            if '/chat/completions' in url and m == 'glm-4.7-flash':
+                return _online_ok("auto_first")
+            return _local_ok("local_reply")
+        mp.side_effect = se
+        # 先手动选本地
+        self.c.manual_text_model = 'qwen3.5:9b'
+        out1 = self.c.chat("hi", task_name="tp15_pin")
+        self.assertIn("local_reply", out1)
+        # 切回自动
+        self.c.manual_text_model = None
+        seen.clear()
+        out2 = self.c.chat("hi", task_name="tp15_auto")
+        self.assertIn("auto_first", out2)
+        self.assertEqual(seen[0], 'glm-4.7-flash',
+                         f"切回自动后应从链首 glm-4.7-flash 开始，实际首个: {seen[:3]}")
+
+    # 5. 401 不故障转移
+    @patch('ai_client.requests.post')
+    def test_401_no_failover(self, mp):
+        r = MagicMock(); r.status_code = 401; r.text = "Unauthorized"; mp.return_value = r
+        self.c.chat("hi", task_name="tp15_401")
+        self.assertEqual(mp.call_count, 1, "401 不应故障转移到下一个模型")
+
+    # 6. 429 故障转移
+    @patch('ai_client.requests.post')
+    def test_429_triggers_failover(self, mp):
+        calls = [0]
+        def se(url, **kw):
+            calls[0] += 1
+            if calls[0] == 1:
+                r = MagicMock(); r.status_code = 429; r.text = "rate limited"; return r
+            return _online_ok("second_model_ok")
+        mp.side_effect = se
+        out = self.c.chat("hi", task_name="tp15_429")
+        self.assertIn("second_model_ok", out)
+        self.assertEqual(calls[0], 2, "429 应故障转移到第二个模型")
+
+    # 7. 超时故障转移
+    @patch('ai_client.requests.post')
+    def test_timeout_triggers_failover(self, mp):
+        import requests as _req
+        calls = [0]
+        def se(url, **kw):
+            calls[0] += 1
+            if calls[0] == 1:
+                raise _req.exceptions.Timeout("timed out")
+            return _online_ok("after_timeout_ok")
+        mp.side_effect = se
+        out = self.c.chat("hi", task_name="tp15_timeout")
+        self.assertIn("after_timeout_ok", out)
+        self.assertEqual(calls[0], 2, "超时应故障转移到下一个模型")
+
+    # 8. 5xx 故障转移
+    @patch('ai_client.requests.post')
+    def test_5xx_triggers_failover(self, mp):
+        calls = [0]
+        def se(url, **kw):
+            calls[0] += 1
+            if calls[0] == 1:
+                r = MagicMock(); r.status_code = 500; r.text = "server err"; return r
+            return _online_ok("after_5xx_ok")
+        mp.side_effect = se
+        out = self.c.chat("hi", task_name="tp15_5xx")
+        self.assertIn("after_5xx_ok", out)
+        self.assertEqual(calls[0], 2, "5xx 应故障转移到下一个模型")
+
+    # 9. 手动选择不存在模型返回清晰错误
+    @patch('ai_client.requests.post')
+    def test_manual_nonexistent_model_error(self, mp):
+        self.c.manual_text_model = "no_such_model_zzz"
+        out = self.c.chat("hi", task_name="tp15_bad")
+        self.assertIsInstance(out, str)
+        self.assertIn("错误", out, f"应返回清晰错误，实际: {out[:120]}")
+        self.assertIn("no_such_model_zzz", out, "错误应包含所选模型名")
+        self.assertEqual(mp.call_count, 0, "模型不在注册表时不应发任何请求")
+
+
 def run_all():
     loader=unittest.TestLoader(); suite=unittest.TestSuite()
     for c in [T1Chain,T1RegistryDetail,T7HealthManager,T2Glm47to4,T3GlmToQwen35,T4CloudToQwen35,
@@ -679,7 +854,7 @@ def run_all():
               T11ManualFlux,T12Concurrent,T13OldUnloaded,T14PreloadConfirmed,T15NoResidual,
               T16TraceNoSecrets,TIntegration,TP11Chains,TP11ImageManual,TP11LocalOwnership,
               TP11SlowResponse,TP113EndToEndSlowFailover,TP12FluxRuntime,TP13CogViewEndpoint,
-              TP14LocalOwnershipExtended]:
+              TP14LocalOwnershipExtended,TP15ManualRouting]:
         suite.addTests(loader.loadTestsFromTestCase(c))
     r=unittest.TextTestRunner(verbosity=2).run(suite)
     print("\n"+"="*60)

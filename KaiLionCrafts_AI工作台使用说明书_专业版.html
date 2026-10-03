@@ -124,6 +124,15 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
 </style>
 </head>
 <body>
+<div style="background:#d4edda;border:2px solid #28a745;padding:12px 16px;margin:10px 0;border-radius:6px;font-size:14px;">
+<b>✅ 模型配置已核对（2026-10-03）：</b>以下模型路由信息已与 <code>model_registry.py</code> 同步：
+文本链 GLM-4.7 Flash → GLM-4 Flash → qwen3.5:9b → qwen2.5:7b；
+视觉链 GLM-4.6V Flash → qwen3.5:9b → qwen2.5vl:7b；
+图像链 CogView-3 Flash → FLUX.2 Klein 4B（本地）；
+推理链 GLM-4.7 Flash → qwen3.5:9b → deepseek-r1:7b。
+旧版硅基流动（Xing4.0-29B、Qwen2.5-7B）已禁用，豆包 Seed-2.1-Turbo 不在自动路由链中。
+</div>
+
 <div class="layout">
   <aside class="toc" id="toc">
     <div class="toc-brand">
@@ -202,7 +211,7 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
       <p>这份说明书按「左侧导航的每一个页面」逐页讲清楚：这一页是干什么用的、每一步怎么点、需要提前配置什么。特别地，凡是<b>需要连接 AI 模型才能见效</b>的功能，都会单独标注清楚，避免配了工具却用不出效果。</p>
       <div class="meta">
         <span>共 37 个页面</span><span>8 个导航分组</span>
-        <span>8 个AI模型</span><span>5个免费在线模型</span>
+        <span>9 个AI模型节点</span><span>在线模型优先</span>
         <span>故障自动转移</span><span>2026-09 版</span>
       </div>
     </div>
@@ -228,7 +237,7 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
       <div class="callout info"><b class="t">首次登录后建议先做三件事</b>
         <ul>
           <li>查看「仪表盘」的 AI 引擎状态，确认模型连接正常。</li>
-          <li>进「模型管理」点击「一键检测所有模型」，确认8个模型都能正常调用。</li>
+          <li>进「模型管理」点击「一键检测所有模型」，确认当前故障转移链模型都能正常调用。</li>
           <li>在侧边栏「AI快速问答」随便问一个问题，验证AI功能正常。</li>
         </ul>
       </div>
@@ -236,7 +245,7 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
       <h3>3. 界面通用约定</h3>
       <ul>
         <li><b>左侧导航</b>：8 个分组（入门与总览 / 客户开发中心 / 锴利自研AI工具库 / 独立站SEO中心 / 销售与客户管理 / 知识与协作 / 订单与经营 / 系统与模型）。</li>
-        <li><b>侧边栏顶部</b>：当前AI模型选择器，可手动切换8个模型。</li>
+        <li><b>侧边栏顶部</b>：当前AI模型选择器，可手动切换当前可用模型。</li>
         <li><b>侧边栏AI快速问答</b>：折叠面板，任何页面都能快速提问AI。</li>
         <li><b>AI按钮</b>：每个功能页面都有AI按钮，点击后等待3-15秒生成结果。</li>
         <li><b>数据存储</b>：所有数据本地JSON存储，不上传第三方服务器。</li>
@@ -330,40 +339,51 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
 
         <rect x="0" y="230" width="680" height="50" class="bx" style="fill:#fdf3e2;stroke:#f0dcb4"></rect>
         <text x="14" y="252" class="bt">支撑层：仪表盘 · 晨间简报 · 今日待办 · 公司知识库 · 团队工作空间 · 模型管理 · 设置中心</text>
-        <text x="14" y="270" class="bs">8节点故障转移 · 5个免费在线模型 · 本地Ollama兜底 · 所有AI功能自动故障转移</text>
+        <text x="14" y="270" class="bs">多级故障转移 · 在线模型优先 · 本地Ollama兜底 · 所有AI功能自动故障转移</text>
       </svg>
-      <p style="font-size:13.5px;color:var(--ink3);margin-top:2px">底层支撑：<b>8节点故障转移</b>保证AI永不中断；<b>5个免费在线模型</b>零成本使用；<b>本地Ollama</b>断网兜底。</p>
+      <p style="font-size:13.5px;color:var(--ink3);margin-top:2px">底层支撑：<b>多级故障转移</b>保证AI永不中断；<b>在线模型优先</b>零成本使用；<b>本地Ollama</b>断网兜底。</p>
     </section>
 
     <!-- AI模型配置总表 -->
     <section class="card" id="api">
       <h2><span class="n">③</span>AI模型配置总表</h2>
-      <p class="sub">这是整份说明书最重要的一张表。工作台本身开箱即用，但<b>想让「AI生成」「视觉分析」「图像生成」真正发挥作用，需要AI模型配置正确</b>。当前已配置8个模型，其中5个完全免费。</p>
+      <p class="sub">这是整份说明书最重要的一张表。工作台本身开箱即用，但<b>想让「AI生成」「视觉分析」「图像生成」真正发挥作用，需要AI模型配置正确</b>。当前已配置当前可用模型，其中在线模型优先。</p>
       <table>
-        <thead><tr><th style="width:5%">优先级</th><th style="width:18%">模型名称</th><th style="width:12%">供应商</th>
+        <thead><tr><th style="width:5%">链序</th><th style="width:18%">模型名称</th><th style="width:12%">供应商</th>
         <th style="width:8%">类型</th><th style="width:8%">费用</th><th style="width:23%">能力与用途</th><th>不配置会怎样</th></tr></thead>
         <tbody>
-          <tr><td>1</td><td><b>Xing4.0-29B</b></td><td>硅基流动</td><td>在线</td><td><span class="badge free">免费</span></td><td>29B MoE大模型，256K上下文，主力文本生成，日常思考工作首选</td><td>主力模型不可用，自动切换到下一个</td></tr>
-          <tr><td>2</td><td><b>Qwen2.5-7B</b></td><td>硅基流动</td><td>在线</td><td><span class="badge free">免费</span></td><td>7B轻量模型，响应速度快，use_lite模式使用</td><td>轻量模式不可用，自动切换</td></tr>
-          <tr><td>3</td><td><b>GLM-4.7-Flash</b></td><td>智谱</td><td>在线</td><td><span class="badge free">免费</span></td><td>深度思考，复杂推理和工具使用能力强</td><td>深度思考任务降级到其他模型</td></tr>
-          <tr><td>4</td><td><b>GLM-4-Flash</b></td><td>智谱</td><td>在线</td><td><span class="badge free">免费</span></td><td>文本生成，语义理解，多轮对话</td><td>文本生成任务降级</td></tr>
-          <tr><td>5</td><td><b>GLM-4.6V-Flash</b></td><td>智谱</td><td>在线</td><td><span class="badge free">免费</span></td><td>视觉理解，图片分析，多模态推理</td><td>所有图片AI分析功能不可用</td></tr>
-          <tr><td>6</td><td><b>Seed-2.1-Turbo</b></td><td>豆包</td><td>在线</td><td><span class="badge opt">付费</span></td><td>备用文本模型，3元入/15元出每百万tokens</td><td>付费备用，不影响免费功能</td></tr>
-          <tr><td>7</td><td><b>GPT-5.5中转</b></td><td>wawapi</td><td>在线</td><td><span class="badge opt">付费</span></td><td>第三方中转备用模型</td><td>付费备用，不影响免费功能</td></tr>
-          <tr><td>8</td><td><b>Qwen2.5:7b</b></td><td>Ollama本地</td><td>本地</td><td><span class="badge ok">本地</span></td><td>断网兜底，需本地安装Ollama并pull模型</td><td>所有在线模型失败时无兜底</td></tr>
+          <tr><td colspan="7" style="background:var(--dark);color:#fff;font-weight:600">📝 文本模型自动路由链（TEXT_CHAIN_IDS，按顺序）</td></tr>
+          <tr><td>T1</td><td><b>GLM-4.7 Flash</b></td><td>智谱</td><td>在线</td><td><span class="badge free">免费</span></td><td>主力文本生成，深度思考，复杂推理和工具调用</td><td>主力模型不可用，自动切换到下一个</td></tr>
+          <tr><td>T2</td><td><b>GLM-4 Flash</b></td><td>智谱</td><td>在线</td><td><span class="badge free">免费</span></td><td>轻量快速文本生成，语义理解，多轮对话</td><td>轻量模式不可用，自动切换</td></tr>
+          <tr><td>T3</td><td><b>qwen3.5:9b</b></td><td>Ollama 本地</td><td>本地</td><td><span class="badge free">免费</span></td><td>本地首选文本模型，已确认支持视觉</td><td>在线全部失败后降级到本地</td></tr>
+          <tr><td>T4</td><td><b>qwen2.5:7b</b></td><td>Ollama 本地</td><td>本地</td><td><span class="badge free">免费</span></td><td>本地文本备用，断网兜底</td><td>本地首选也不可用时无文本兜底</td></tr>
+          <tr><td colspan="7" style="background:var(--dark);color:#fff;font-weight:600">👁️ 视觉模型自动路由链（VISION_CHAIN_IDS）</td></tr>
+          <tr><td>V1</td><td><b>GLM-4.6V Flash</b></td><td>智谱</td><td>在线</td><td><span class="badge free">免费</span></td><td>视觉理解，图片分析，多模态推理</td><td>所有图片AI分析功能不可用</td></tr>
+          <tr><td>V2</td><td><b>qwen3.5:9b</b></td><td>Ollama 本地</td><td>本地</td><td><span class="badge free">免费</span></td><td>本地视觉兜底（已确认支持视觉）</td><td>在线视觉模型失败时无本地视觉兜底</td></tr>
+          <tr><td>V3</td><td><b>qwen2.5vl:7b</b></td><td>Ollama 本地</td><td>本地</td><td><span class="badge free">免费</span></td><td>本地视觉备用，专用VL模型</td><td>本地视觉链最后一级兜底</td></tr>
+          <tr><td colspan="7" style="background:var(--dark);color:#fff;font-weight:600">🎨 图像生成自动路由链（IMAGE_CHAIN_IDS）</td></tr>
+          <tr><td>I1</td><td><b>CogView-3 Flash</b></td><td>智谱</td><td>在线</td><td><span class="badge free">免费</span></td><td>AI作图主力，支持5种比例，1-4张批量生成</td><td>AI作图不可用，自动切换到本地FLUX</td></tr>
+          <tr><td>I2</td><td><b>FLUX.2 Klein 4B</b></td><td>Ollama 本地</td><td>本地</td><td><span class="badge free">免费</span></td><td>本地生图兜底，需Ollama运行时支持</td><td>在线生图失败时无本地生图能力</td></tr>
+          <tr><td colspan="7" style="background:var(--dark);color:#fff;font-weight:600">🧠 推理模型链（REASONING_CHAIN_IDS）</td></tr>
+          <tr><td>R1</td><td><b>GLM-4.7 Flash</b></td><td>智谱</td><td>在线</td><td><span class="badge free">免费</span></td><td>复杂推理、深度思考任务首选</td><td>推理任务降级到其他模型</td></tr>
+          <tr><td>R2</td><td><b>qwen3.5:9b</b></td><td>Ollama 本地</td><td>本地</td><td><span class="badge free">免费</span></td><td>本地推理首选</td><td>在线推理失败时切本地</td></tr>
+          <tr><td>R3</td><td><b>deepseek-r1:7b</b></td><td>Ollama 本地</td><td>本地</td><td><span class="badge free">免费</span></td><td>本地推理备用，专用R1模型</td><td>本地推理链最后一级兜底</td></tr>
         </tbody>
       </table>
       <div class="callout cfg"><b class="t">故障转移工作原理（重要）</b>
         <ul>
-          <li><b>自动转移</b>：调用AI时按优先级1→8逐个尝试，一个失败自动切下一个，用户无感知。</li>
-          <li><b>在线优先</b>：前7个都是在线模型，全部失败才切第8个本地模型。</li>
-          <li><b>手动切换</b>：侧边栏顶部可手动指定使用某个模型，适合特定场景。</li>
+          <li><b>自动转移</b>：调用AI时按对应链（文本/视觉/图像/推理）顺序逐个尝试，一个失败自动切下一个，用户无感知。</li>
+          <li><b>在线优先</b>：每条链的第一个节点都是在线模型，在线全部失败才切本地Ollama。</li>
+          <li><b>可故障转移错误</b>：408、429、500、502、503、504、超时、网络连接错误 → 自动切下一个。</li>
+          <li><b>不可故障转移错误</b>：401、403、400、422 → 立即停止并显示明确错误。</li>
+          <li><b>手动切换</b>：侧边栏顶部可手动指定使用某个模型；手动选择本地模型时只调用 localhost:11434，不调用在线服务。</li>
           <li><b>Trace记录</b>：每次调用（含故障转移）都记录在AI调用Trace页面，可追溯。</li>
         </ul>
       </div>
       <div class="callout info"><b class="t">图像生成专用模型</b>
         <ul>
-          <li><b>CogView-3-Flash</b>（智谱，免费）：AI作图工作台使用，支持5种比例，1-4张批量生成。</li>
+          <li><b>CogView-3 Flash</b>（智谱，免费）：AI作图工作台主力，支持5种比例，1-4张批量生成。</li>
+          <li><b>FLUX.2 Klein 4B</b>（本地 Ollama）：在线生图失败后自动切换到本地生图。</li>
           <li>图像生成独立于文本故障转移链，有自己的调用逻辑。</li>
         </ul>
       </div>
@@ -422,7 +442,7 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
           <tbody>
             <tr><td>今日数据概览</td><td>客户总数/待跟进/订单数/待办数 4个metric卡片</td></tr>
             <tr><td>AI引擎状态</td><td>当前模型/故障转移链节点数/调用数+成功率/平均响应时间</td></tr>
-            <tr><td>故障转移链可视化</td><td>8个模型标签云展示，按优先级排列</td></tr>
+            <tr><td>故障转移链可视化</td><td>故障转移链节点标签云展示，按优先级排列</td></tr>
             <tr><td>AI今日工作建议</td><td>综合客户/待办/订单数据，AI生成今日TOP3工作重点</td></tr>
             <tr><td>快捷入口</td><td>测试连接/进入模型管理/常用功能快速跳转</td></tr>
           </tbody>
@@ -930,8 +950,8 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
           <thead><tr><th>子功能</th><th>说明</th><th>AI模型</th></tr></thead>
           <tbody>
             <tr><td>AI作图生成</td><td>CogView-3-Flash生成产品图，5种比例，1-4张批量</td><td>CogView-3</td></tr>
-            <tr><td>AI详情文案</td><td>生成中英双语B2B详情页文案</td><td>Xing4.0-29B</td></tr>
-            <tr><td>AI视频脚本</td><td>生成分镜脚本（镜头/时长/画面/台词/运镜）</td><td>Xing4.0-29B</td></tr>
+            <tr><td>AI详情文案</td><td>生成中英双语B2B详情页文案</td><td>glm-4.7-flash</td></tr>
+            <tr><td>AI视频脚本</td><td>生成分镜脚本（镜头/时长/画面/台词/运镜）</td><td>glm-4.7-flash</td></tr>
             <tr><td>风格复刻</td><td>参考图→AI分析风格→生成提示词→生成同款图片</td><td>glm-4.6v + Xing</td></tr>
             <tr><td>工具箱-改尺寸</td><td>本地PIL处理，保持比例/LANCZOS重采样</td><td>本地</td></tr>
             <tr><td>工具箱-旋转翻转</td><td>90/180/270度旋转+水平/垂直翻转</td><td>本地</td></tr>
@@ -948,7 +968,7 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
           <div class="step"><div class="step-num">5</div><div class="step-content">生成的图片可下载或继续用工具箱处理。</div></div>
         </div>
         <h3>风格复刻闭环</h3>
-        <p>上传参考图 → glm-4.6v-flash分析色调/光影/构图/背景/角度 → Xing4.0-29B生成适用于用户产品的英文生图提示词 → CogView-3生成同款风格图片。形成"参考图→风格分析→提示词→生成图片"完整闭环。</p>
+        <p>上传参考图 → glm-4.6v-flash分析色调/光影/构图/背景/角度 → GLM-4.7 Flash生成适用于用户产品的英文生图提示词 → CogView-3生成同款风格图片。形成"参考图→风格分析→提示词→生成图片"完整闭环。</p>
         <div class="callout warn"><b class="t">画笔涂鸦和橡皮擦</b>
           画笔涂鸦和橡皮擦功能需要前端画布交互组件，Streamlit原生不支持，暂未实现。
         </div>
@@ -1437,14 +1457,14 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
         <p class="purpose"><b>用途：</b>AI系统的控制后台，管理API供应商、查看模型状态、检测健康度、查看调用统计。</p>
         <figure>
           <div class="placeholder">📸 模型管理截图位置 — 统计概览 + 故障转移链展示 + 健康检测按钮 + 调用统计 + 最近记录</div>
-          <figcaption>模型管理：8节点故障转移 + 一键健康检测 + 调用统计 + Trace</figcaption>
+          <figcaption>模型管理：多级故障转移 + 一键健康检测 + 调用统计 + Trace</figcaption>
         </figure>
         <h3>功能说明</h3>
         <table>
           <thead><tr><th>功能</th><th>说明</th></tr></thead>
           <tbody>
             <tr><td>统计概览</td><td>供应商总数/在线API/本地模型/当前使用</td></tr>
-            <tr><td>故障转移链展示</td><td>可视化展示8节点故障转移顺序</td></tr>
+            <tr><td>故障转移链展示</td><td>可视化展示多级故障转移顺序</td></tr>
             <tr><td>一键全模型健康检测</td><td>遍历所有在线模型发测试请求，展示状态+响应时间</td></tr>
             <tr><td>调用统计面板</td><td>每模型调用次数/成功率/平均耗时</td></tr>
             <tr><td>最近调用记录</td><td>最近15条Trace，可展开查看详情</td></tr>
@@ -1461,7 +1481,7 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
           <li>错误信息（如果失败）</li>
         </ul>
         <div class="callout cfg"><b class="t">故障转移链工作原理</b>
-          调用AI时按优先级1→8逐个尝试，一个失败自动切下一个，用户无感知。前7个在线模型全部失败才切第8个本地Ollama。
+          调用AI时按对应链（文本/视觉/图像）顺序逐个尝试，一个失败自动切下一个，用户无感知。在线模型全部失败后自动切本地Ollama。
         </div>
       </div>
     </div>
@@ -1544,11 +1564,10 @@ footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:26px 0 0}
 
       <h3>.env 关键配置项</h3>
       <div style="background:#1a1a2e;color:#D4AF37;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:13px;overflow-x:auto;margin:10px 0">
-AI_PROVIDER=siliconflow<br>
-OPENAI_MODEL=XingChenAGI/Xing4.0-29B<br>
-OPENAI_MODEL_LITE=Qwen/Qwen2.5-7B-Instruct<br>
-OPENAI_API_KEY=sk-...<br>
-OPENAI_API_BASE=https://api.siliconflow.cn/v1<br>
+# 在线模型凭证（由 provider_manager 从 data/ai_providers.json 加载）<br>
+# 当前在线供应商：智谱 GLM（glm-4.7-flash / glm-4-flash / glm-4.6v-flash / cogview-3-flash）<br>
+# 本地模型：Ollama（http://localhost:11434），见 model_registry.py LOCAL_MODELS<br>
+# 已禁用供应商：硅基流动（Xing4.0-29B、Qwen2.5-7B）<br>
 # WooCommerce配置（保留）<br>
 WC_CONSUMER_KEY=ck_...<br>
 WC_CONSUMER_SECRET=cs_...
@@ -1560,7 +1579,7 @@ WC_CONSUMER_SECRET=cs_...
         <tbody>
           <tr><td>ai.chat(prompt, use_lite, task_name)</td><td>prompt: 提示词<br>use_lite: 是否用轻量模型<br>task_name: 任务名称</td><td>文本生成，带故障转移</td></tr>
           <tr><td>ai.generate_image(prompt, size, n)</td><td>prompt: 生图提示词<br>size: 图片尺寸<br>n: 生成数量</td><td>图像生成（CogView-3）</td></tr>
-          <tr><td>ai.chat_with_image(image_url, prompt, task_name)</td><td>image_url: 图片base64或URL<br>prompt: 分析提示词</td><td>视觉理解（glm-4.6v）</td></tr>
+          <tr><td>ai.chat_with_image(image_url, prompt, task_name)</td><td>image_url: 图片base64或URL<br>prompt: 分析提示词</td><td>视觉理解（GLM-4.6V Flash）</td></tr>
           <tr><td>ai.test_connection()</td><td>-</td><td>测试当前模型连接</td></tr>
           <tr><td>ai.get_failover_chain()</td><td>-</td><td>获取故障转移链</td></tr>
           <tr><td>ai.get_recent_traces(limit)</td><td>limit: 返回条数</td><td>获取最近调用记录</td></tr>
@@ -1585,10 +1604,10 @@ WC_CONSUMER_SECRET=cs_...
       <p class="sub">使用过程中遇到问题，先在这里查找答案。</p>
 
       <h3>Q1: AI调用失败怎么办？</h3>
-      <p><strong>A:</strong> 工作台有8节点故障转移机制，一个模型失败会自动切换到下一个。如果所有在线模型都失败，会切换到本地Ollama模型。如果仍然失败，请检查网络连接。</p>
+      <p><strong>A:</strong> 工作台有多级故障转移机制，一个模型失败会自动切换到下一个。如果所有在线模型都失败，会切换到本地Ollama模型。如果仍然失败，请检查网络连接。</p>
 
       <h3>Q2: AI生成速度慢怎么办？</h3>
-      <p><strong>A:</strong> 可以在侧边栏手动切换到轻量模型（Qwen2.5-7B），响应速度更快。或者在调用时使用 use_lite=True 参数。</p>
+      <p><strong>A:</strong> 可以在侧边栏手动切换到本地轻量模型（qwen3.5:9b 或 qwen2.5:7b），响应速度更快。或者在调用时使用 use_lite=True 参数。</p>
 
       <h3>Q3: 图像生成失败怎么办？</h3>
       <p><strong>A:</strong> 图像生成使用智谱CogView-3-Flash模型，如果失败请检查：1）网络连接；2）API密钥是否有效；3）提示词是否包含违规内容。</p>
@@ -1618,10 +1637,10 @@ WC_CONSUMER_SECRET=cs_...
       <p><strong>A:</strong> 大部分AI功能都有「保存到知识库」按钮，点击后内容会保存到公司知识库对应分类。部分功能（如开发信）会自动保存到个人工作空间。</p>
 
       <h3>Q12: 本地Ollama模型如何安装？</h3>
-      <p><strong>A:</strong> 1）从 https://ollama.com 下载安装Ollama；2）执行 ollama pull qwen2.5:7b 下载模型；3）启动工作台后会自动检测本地模型。</p>
+      <p><strong>A:</strong> 1）从 https://ollama.com 下载安装Ollama；2）执行 <code>ollama pull qwen3.5:9b</code> 下载本地首选模型，再按需 pull <code>qwen2.5:7b</code>、<code>qwen2.5vl:7b</code>、<code>deepseek-r1:7b</code>、<code>x/flux2-klein:4b-fp4</code>；3）启动工作台后会自动检测本地模型。</p>
 
       <h3>Q13: 故障转移是怎么工作的？</h3>
-      <p><strong>A:</strong> 调用AI时，系统按优先级1→8逐个尝试模型。如果第一个返回错误或超时，自动切换到第二个，以此类推。只有前7个在线模型全部失败时，才切换到第8个本地Ollama模型。整个过程用户无感知。</p>
+      <p><strong>A:</strong> 调用AI时，系统按对应链（文本/视觉/图像）顺序逐个尝试模型。如果第一个返回错误或超时，自动切换到第二个，以此类推。只有在线模型全部失败后切本地Ollama。整个过程用户无感知。</p>
 
       <h3>Q14: 如何查看AI调用记录？</h3>
       <p><strong>A:</strong> 进入「AI调用Trace」页面，可以查看所有AI调用的详细日志，包括使用的模型、耗时、输入输出字符数、故障转移日志等。</p>
@@ -1629,7 +1648,7 @@ WC_CONSUMER_SECRET=cs_...
 
     <footer>
       <p>📖 KaiLionCrafts AI客户开发工作台 · 完整使用说明书</p>
-      <p>版本：最终完整版 | 更新日期：2026年9月25日 | 共37个页面 | 8个AI模型 | 5个免费在线模型</p>
+      <p>版本：最终完整版 | 更新日期：2026年9月25日 | 共37个页面 | 当前可用模型（在线+本地） | 在线模型优先</p>
       <p>如有问题，请联系工作台管理员</p>
     </footer>
   </main>

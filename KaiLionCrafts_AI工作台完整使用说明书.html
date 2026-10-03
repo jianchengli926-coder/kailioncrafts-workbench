@@ -180,6 +180,15 @@
     </style>
 </head>
 <body>
+<div style="background:#d4edda;border:2px solid #28a745;padding:12px 16px;margin:10px 0;border-radius:6px;font-size:14px;">
+<b>✅ 模型配置已核对（2026-10-03）：</b>以下模型路由信息已与 <code>model_registry.py</code> 同步：
+文本链 GLM-4.7 Flash → GLM-4 Flash → qwen3.5:9b → qwen2.5:7b；
+视觉链 GLM-4.6V Flash → qwen3.5:9b → qwen2.5vl:7b；
+图像链 CogView-3 Flash → FLUX.2 Klein 4B（本地）；
+推理链 GLM-4.7 Flash → qwen3.5:9b → deepseek-r1:7b。
+旧版硅基流动（Xing4.0-29B、Qwen2.5-7B）已禁用，豆包 Seed-2.1-Turbo 不在自动路由链中。
+</div>
+
 <div class="container">
 
 <div class="header">
@@ -224,8 +233,8 @@
     
     <h3>1.1 核心优势</h3>
     <ul>
-        <li><strong>多模型免费接入</strong>：接入智谱GLM、硅基流动Xing4.0等8个AI模型，其中6个完全免费</li>
-        <li><strong>故障自动转移</strong>：8节点故障转移链，一个模型用不了自动切换下一个，永不中断</li>
+        <li><strong>多模型免费接入</strong>：接入智谱GLM在线模型 + Ollama本地模型（在线+本地），全部9个模型节点均免费</li>
+        <li><strong>故障自动转移</strong>：多级故障转移链，一个模型用不了自动切换下一个，永不中断</li>
         <li><strong>9大自研AI工具</strong>：SKU命名、线稿生成、视觉矫正、提示词库等专为刀剪行业定制</li>
         <li><strong>全流程AI赋能</strong>：从客户开发到SEO到订单，每个环节都有AI辅助</li>
         <li><strong>团队协作</strong>：多成员独立工作空间，共享公司知识库</li>
@@ -357,7 +366,7 @@
     <table>
         <tr><th>区域</th><th>内容</th><th>说明</th></tr>
         <tr><td>顶部</td><td>工作台标题</td><td>KaiLionCrafts AI工作台</td></tr>
-        <tr><td>模型切换</td><td>当前AI模型选择</td><td>可手动切换8个模型</td></tr>
+        <tr><td>模型切换</td><td>当前AI模型选择</td><td>可手动切换当前可用模型</td></tr>
         <tr><td>AI快速问答</td><td>折叠面板</td><td>任何页面都能快速提问AI</td></tr>
         <tr><td>导航菜单</td><td>20+功能模块</td><td>按业务分类排列</td></tr>
         <tr><td>底部</td><td>版本信息</td><td>工作台版本号</td></tr>
@@ -366,16 +375,17 @@
     <h3>4.2 模型手动切换</h3>
     <p>在侧边栏顶部可以看到当前使用的AI模型，点击下拉菜单可以手动切换：</p>
     <ul>
-        <li>硅基流动·Xing4.0-29B（免费，主力推荐）</li>
-        <li>硅基流动·Qwen2.5-7B（免费，轻量快速）</li>
-        <li>智谱·GLM-4.7-Flash（免费，深度思考）</li>
-        <li>智谱·GLM-4-Flash（免费，文本生成）</li>
-        <li>智谱·GLM-4.6V-Flash（免费，视觉理解）</li>
-        <li>豆包·Seed-2.1-Turbo（付费）</li>
-        <li>wawapi·GPT中转（付费）</li>
-        <li>Ollama本地模型（免费，断网兜底）</li>
+        <li>智谱·GLM-4.7 Flash（在线免费，主力文本 + 深度思考）</li>
+        <li>智谱·GLM-4 Flash（在线免费，轻量快速文本）</li>
+        <li>智谱·GLM-4.6V Flash（在线免费，视觉理解/图片分析）</li>
+        <li>qwen3.5:9b（Ollama 本地，本地首选文本 + 视觉）</li>
+        <li>qwen2.5:7b（Ollama 本地，本地文本备用）</li>
+        <li>qwen2.5vl:7b（Ollama 本地，本地视觉备用）</li>
+        <li>deepseek-r1:7b（Ollama 本地，本地推理）</li>
+        <li>CogView-3 Flash（智谱在线，AI作图）</li>
+        <li>FLUX.2 Klein 4B（Ollama 本地，本地生图兜底）</li>
     </ul>
-    <div class="tip">一般情况下不需要手动切换，系统会自动使用故障转移链。只有当你想特定使用某个模型时才手动切换。</div>
+    <div class="tip">一般情况下不需要手动切换，系统会自动使用故障转移链。只有当你想特定使用某个模型时才手动切换。豆包 Seed-2.1-Turbo 在注册表中存在但不在自动路由链中，需手动指定才会调用。</div>
 
     <h3>4.3 AI快速问答</h3>
     <p>侧边栏有一个「AI快速问答」折叠面板，展开后可以在任何页面快速向AI提问，不需要切换到专门的页面。</p>
@@ -410,7 +420,7 @@
         <h4>📊 4个核心指标</h4>
         <ul>
             <li><strong>当前模型</strong>：显示当前使用的AI模型名称</li>
-            <li><strong>故障转移链节点数</strong>：显示配置了多少个备用模型（通常8个）</li>
+            <li><strong>故障转移链节点数</strong>：显示配置了多少个备用模型（共9个节点，按文本/视觉/图像/推理分链）</li>
             <li><strong>近期调用数+成功率</strong>：显示最近AI调用次数和成功比例</li>
             <li><strong>平均响应时间</strong>：显示AI平均响应速度（毫秒）</li>
         </ul>
@@ -811,7 +821,7 @@
     <table>
         <tr><th>功能</th><th>说明</th></tr>
         <tr><td>统计概览</td><td>供应商总数/在线API/本地模型/当前使用</td></tr>
-        <tr><td>故障转移链展示</td><td>可视化展示8节点故障转移顺序</td></tr>
+        <tr><td>故障转移链展示</td><td>可视化展示多级故障转移顺序</td></tr>
         <tr><td>一键全模型健康检测</td><td>遍历所有在线模型发测试请求，展示状态+响应时间</td></tr>
         <tr><td>调用统计面板</td><td>每模型调用次数/成功率/平均耗时</td></tr>
         <tr><td>最近调用记录</td><td>最近15条Trace，可展开查看详情</td></tr>
@@ -989,17 +999,22 @@
     
     <p>本章详细介绍工作台的AI模型配置，适合技术人员参考。</p>
 
-    <h3>21.1 已配置的8个模型</h3>
+    <h3>21.1 已配置的当前可用模型</h3>
     <table>
-        <tr><th>优先级</th><th>模型</th><th>供应商</th><th>类型</th><th>费用</th><th>用途</th></tr>
-        <tr><td>1</td><td>XingChenAGI/Xing4.0-29B</td><td>硅基流动</td><td>在线</td><td><span class="badge badge-free">免费</span></td><td>主力文本，29B MoE，256K上下文</td></tr>
-        <tr><td>2</td><td>Qwen/Qwen2.5-7B-Instruct</td><td>硅基流动</td><td>在线</td><td><span class="badge badge-free">免费</span></td><td>轻量快速，use_lite=True时使用</td></tr>
-        <tr><td>3</td><td>glm-4.7-flash</td><td>智谱</td><td>在线</td><td><span class="badge badge-free">免费</span></td><td>深度思考，复杂推理</td></tr>
-        <tr><td>4</td><td>glm-4-flash</td><td>智谱</td><td>在线</td><td><span class="badge badge-free">免费</span></td><td>文本生成，语义理解</td></tr>
-        <tr><td>5</td><td>glm-4.6v-flash</td><td>智谱</td><td>在线</td><td><span class="badge badge-free">免费</span></td><td>视觉理解，图片分析</td></tr>
-        <tr><td>6</td><td>doubao-seed-2-1-turbo-260628</td><td>豆包</td><td>在线</td><td><span class="badge badge-paid">付费</span></td><td>备用文本，3元入/15元出每百万tokens</td></tr>
-        <tr><td>7</td><td>gpt-5.5</td><td>wawapi中转</td><td>在线</td><td><span class="badge badge-paid">付费</span></td><td>第三方中转备用</td></tr>
-        <tr><td>8</td><td>qwen2.5:7b</td><td>Ollama本地</td><td>本地</td><td><span class="badge badge-local">本地</span></td><td>断网兜底，需本地安装Ollama</td></tr>
+        <tr><th>链序</th><th>模型</th><th>供应商</th><th>类型</th><th>费用</th><th>用途</th></tr>
+        <tr><td colspan="6" style="background:var(--dark);color:#fff;font-weight:600">📝 文本模型自动路由链</td></tr>
+        <tr><td>T1</td><td>GLM-4.7 Flash</td><td>智谱</td><td>在线</td><td>免费</td><td>主力文本生成，深度思考</td></tr>
+        <tr><td>T2</td><td>GLM-4 Flash</td><td>智谱</td><td>在线</td><td>免费</td><td>轻量快速文本生成</td></tr>
+        <tr><td>T3</td><td>qwen3.5:9b</td><td>Ollama 本地</td><td>本地</td><td>免费</td><td>本地首选文本/视觉模型</td></tr>
+        <tr><td>T4</td><td>qwen2.5:7b</td><td>Ollama 本地</td><td>本地</td><td>免费</td><td>本地文本备用</td></tr>
+        <tr><td colspan="6" style="background:var(--dark);color:#fff;font-weight:600">👁️ 视觉模型自动路由链</td></tr>
+        <tr><td>V1</td><td>GLM-4.6V Flash</td><td>智谱</td><td>在线</td><td>免费</td><td>视觉理解，图片分析</td></tr>
+        <tr><td>V2</td><td>qwen3.5:9b</td><td>Ollama 本地</td><td>本地</td><td>免费</td><td>本地视觉兜底</td></tr>
+        <tr><td>V3</td><td>qwen2.5vl:7b</td><td>Ollama 本地</td><td>本地</td><td>免费</td><td>本地视觉备用</td></tr>
+        <tr><td colspan="6" style="background:var(--dark);color:#fff;font-weight:600">🎨 图像生成链 / 🧠 推理链</td></tr>
+        <tr><td>I1</td><td>CogView-3 Flash</td><td>智谱</td><td>在线</td><td>免费</td><td>AI作图主力</td></tr>
+        <tr><td>I2</td><td>FLUX.2 Klein 4B</td><td>Ollama 本地</td><td>本地</td><td>免费</td><td>本地生图兜底</td></tr>
+        <tr><td>R3</td><td>deepseek-r1:7b</td><td>Ollama 本地</td><td>本地</td><td>免费</td><td>本地推理备用</td></tr>
     </table>
 
     <h3>21.2 配置文件位置</h3>
@@ -1013,11 +1028,10 @@
 
     <h3>21.3 .env 关键配置项</h3>
     <div class="code">
-AI_PROVIDER=siliconflow<br>
-OPENAI_MODEL=XingChenAGI/Xing4.0-29B<br>
-OPENAI_MODEL_LITE=Qwen/Qwen2.5-7B-Instruct<br>
-OPENAI_API_KEY=sk-...<br>
-OPENAI_API_BASE=https://api.siliconflow.cn/v1<br>
+# 在线模型凭证（由 provider_manager 从 data/ai_providers.json 加载）<br>
+# 当前在线供应商：智谱 GLM（glm-4.7-flash / glm-4-flash / glm-4.6v-flash / cogview-3-flash）<br>
+# 本地模型：Ollama（http://localhost:11434），见 model_registry.py LOCAL_MODELS<br>
+# 已禁用供应商：硅基流动（Xing4.0-29B、Qwen2.5-7B）<br>
 # WooCommerce配置（保留）<br>
 WC_CONSUMER_KEY=ck_...<br>
 WC_CONSUMER_SECRET=cs_...
@@ -1028,7 +1042,7 @@ WC_CONSUMER_SECRET=cs_...
         <tr><th>方法</th><th>参数</th><th>说明</th></tr>
         <tr><td>ai.chat(prompt, use_lite, task_name)</td><td>prompt: 提示词<br>use_lite: 是否用轻量模型<br>task_name: 任务名称（用于Trace）</td><td>文本生成，带故障转移</td></tr>
         <tr><td>ai.generate_image(prompt, size, n)</td><td>prompt: 生图提示词<br>size: 图片尺寸<br>n: 生成数量</td><td>图像生成（CogView-3）</td></tr>
-        <tr><td>ai.chat_with_image(image_url, prompt, task_name)</td><td>image_url: 图片base64或URL<br>prompt: 分析提示词</td><td>视觉理解（glm-4.6v）</td></tr>
+        <tr><td>ai.chat_with_image(image_url, prompt, task_name)</td><td>image_url: 图片base64或URL<br>prompt: 分析提示词</td><td>视觉理解（GLM-4.6V Flash）</td></tr>
         <tr><td>ai.test_connection()</td><td>-</td><td>测试当前模型连接</td></tr>
         <tr><td>ai.get_failover_chain()</td><td>-</td><td>获取故障转移链</td></tr>
         <tr><td>ai.get_recent_traces(limit)</td><td>limit: 返回条数</td><td>获取最近调用记录</td></tr>
@@ -1050,7 +1064,7 @@ WC_CONSUMER_SECRET=cs_...
     <h2>二十二、常见问题FAQ</h2>
 
     <h3>Q1: AI调用失败怎么办？</h3>
-    <p><strong>A:</strong> 工作台有8节点故障转移机制，一个模型失败会自动切换到下一个。如果所有在线模型都失败，会切换到本地Ollama模型。如果仍然失败，请检查网络连接。</p>
+    <p><strong>A:</strong> 工作台有多级故障转移机制，一个模型失败会自动切换到下一个。如果所有在线模型都失败，会切换到本地Ollama模型。如果仍然失败，请检查网络连接。</p>
 
     <h3>Q2: AI生成速度慢怎么办？</h3>
     <p><strong>A:</strong> 可以在侧边栏手动切换到轻量模型（Qwen2.5-7B），响应速度更快。或者在调用时使用 use_lite=True 参数。</p>
@@ -1083,7 +1097,7 @@ WC_CONSUMER_SECRET=cs_...
     <p><strong>A:</strong> 大部分AI功能都有「保存到知识库」按钮，点击后内容会保存到公司知识库对应分类。部分功能（如开发信）会自动保存到个人工作空间。</p>
 
     <h3>Q12: 本地Ollama模型如何安装？</h3>
-    <p><strong>A:</strong> 1）从 https://ollama.com 下载安装Ollama；2）执行 ollama pull qwen2.5:7b 下载模型；3）启动工作台后会自动检测本地模型。</p>
+    <p><strong>A:</strong> 1）从 https://ollama.com 下载安装Ollama；2）执行 <code>ollama pull qwen3.5:9b</code> 下载本地首选模型，再按需 pull <code>qwen2.5:7b</code>、<code>qwen2.5vl:7b</code>、<code>deepseek-r1:7b</code>、<code>x/flux2-klein:4b-fp4</code>；3）启动工作台后会自动检测本地模型。</p>
 </div>
 
 <div class="footer">

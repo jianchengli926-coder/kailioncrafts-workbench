@@ -582,7 +582,40 @@ with st.sidebar:
                     model = p['models'][0] if p['models'] else ''
                     save_config(provider=p['id'], api_key=p['api_key'], base_url=p['base_url'], model=model)
                     set_active_provider(p['id'])
-                    st.success(f"已切换：{p['name']}")
+                    # P1 修复：侧边栏“模型切换”过去只调用 set_active_provider()/save_config()，
+                    # 但 ai_client.chat() 只读会话级 manual_text_model，从不读 provider_manager.active_provider，
+                    # 导致切换形同虚设。这里把所选 provider 映射到活动注册表里的具体文本模型，
+                    # 写入 st.session_state['manual_text_model_id'] 并同步到全局 ai 单例，
+                    # 与设置页手动模型选择器（L11149 起）行为一致。
+                    # provider id -> 注册表文本模型 id（仅文本/聊天链）；视觉/无对应文本模型的 provider 映射为 None（回到自动链）。
+                    _PROVIDER_TO_TEXT_MODEL = {
+                        "zhipu_glm47_flash": "glm-4.7-flash",
+                        "zhipu_glm4_flash": "glm-4-flash",
+                        "doubao_seed2_turbo": "doubao-seed-2-1-turbo",
+                        "ollama_local": "qwen3.5:9b",
+                    }
+                    _manual_mid = _PROVIDER_TO_TEXT_MODEL.get(p['id'])
+                    try:
+                        from model_registry import build_model_registry as _bmr
+                        _reg = _bmr()
+                    except Exception:
+                        _reg = {}
+                    if _manual_mid and _manual_mid in _reg:
+                        st.session_state['manual_text_model_id'] = _manual_mid
+                        try:
+                            ai.manual_text_model = _manual_mid
+                        except Exception:
+                            pass
+                        _pin_label = _reg[_manual_mid].get('display_name', _manual_mid)
+                        st.success(f"已切换：{p['name']}（文本路由固定为 {_pin_label}，不再自动故障转移）")
+                    else:
+                        # 视觉模型 / 未知 provider：不固定文本模型，回到默认自动链
+                        st.session_state.pop('manual_text_model_id', None)
+                        try:
+                            ai.manual_text_model = None
+                        except Exception:
+                            pass
+                        st.success(f"已切换：{p['name']}（文本路由恢复自动故障转移链）")
                     st.rerun()
         if st.button("⚙️ 模型管理", use_container_width=True, key='goto_model_mgmt'):
             st.session_state["_show_model_mgmt"] = True

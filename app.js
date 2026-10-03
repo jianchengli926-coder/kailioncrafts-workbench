@@ -9692,6 +9692,14 @@ function executeBulkImport(){
         `${st.fileName} · 成功${result.importedCount} 跳过${result.skippedCount} 阻断${result.blockedCount} 失败${result.errorCount}`);
       if(result.success){
         toast(`✅ 导入完成：成功 ${result.importedCount} 家`);
+        // P1-2: 导入后自动运行线索质量评分（MX查询在后台异步进行）
+        if(typeof window.LeadQualityChecker !== 'undefined' && result.importedCustomers){
+          setTimeout(()=>{
+            result.importedCustomers.forEach(cid=>{
+              try { runCustomerQualityCheck(cid); } catch(e){}
+            });
+          }, 1000);
+        }
       } else {
         toast('导入失败: ' + (result.errors||[]).map(e=>e.error||e).join('; '), 'err');
       }
@@ -11941,10 +11949,14 @@ function viewCustomers(root){
       </div>
       <div id="groupedCustomerList"></div>
     </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="batchCheckAllCustomerQuality()">📊 批量线索质量评分</button>
+      <span class="text-sm text-muted" style="align-self:center">评分包含邮箱格式/MX记录/资料完整度/证据新鲜度/DNC状态，MX查询在后台自动进行</span>
+    </div>
     <div id="customerListView" class="card">
       <div class="table-wrap"><table class="tbl">
-        <colgroup><col style="width:4%"><col style="width:18%"><col style="width:6%"><col style="width:5%"><col style="width:13%"><col style="width:14%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:12%"></colgroup>
-        <thead><th><input type="checkbox" onchange="toggleAllCust(this.checked)"></th><th>公司</th><th>国家</th><th>等级</th><th>主营产品</th><th>决策人邮箱</th><th>距上次跟进</th><th>下次跟进</th><th>标签</th><th>状态</th></tr></thead>
+        <colgroup><col style="width:4%"><col style="width:16%"><col style="width:5%"><col style="width:5%"><col style="width:7%"><col style="width:12%"><col style="width:12%"><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:11%"></colgroup>
+        <thead><th><input type="checkbox" onchange="toggleAllCust(this.checked)"></th><th>公司</th><th>国家</th><th>等级</th><th>线索质量</th><th>主营产品</th><th>决策人邮箱</th><th>距上次跟进</th><th>下次跟进</th><th>标签</th><th>状态</th></tr></thead>
         <tbody>
         ${pageList.length? pageList.map(c=>`
           <tr style="cursor:pointer" onclick="openCustomerDetail('${c.id}')">
@@ -11952,6 +11964,7 @@ function viewCustomers(root){
             <td><b>${esc(c.company)}</b><div class="text-sm text-muted">${esc(c.website)}</div></td>
             <td>${esc(c.country)}</td>
             <td>${gradeBadge(c.scores.grade)} <span class="text-sm text-muted">${c.scores.total}</span></td>
+            <td>${renderCustomerQualityBadge(c)}</td>
             <td class="text-sm">${esc(c.products)}</td>
             <td class="text-sm mono">${esc(c.contact.email)}</td>
             <td>${followDaysBadge(c)}</td>
@@ -11959,7 +11972,7 @@ function viewCustomers(root){
             <td>${(c.tags||[]).slice(0,2).map(t=>`<span class="badge badge-gold" style="font-size:10px;padding:2px 6px;margin:1px">${t.length>6?t.substring(0,6)+"…":t}</span>`).join("")||"<span class='text-muted text-sm'>-</span>"}</td>
             <td><span class="badge ${c.status==='已回复'?'badge-a':c.status==='跟进中'?'badge-blue':c.status==='待跟进'?'badge-gold':'badge-gray'}">${esc(c.status)}</span>${!c.owner?'<button class="btn btn-gold btn-sm" style="margin-left:6px" onclick="event.stopPropagation();claimCust(\''+c.id+'\')">领取</button>':''}</td>
           </tr>`).join('')
-        : `<tr><td colspan="10"><div class="empty"><div class="big">🔍</div><p>没有符合条件的客户</p></div></td></tr>`}
+        : `<tr><td colspan="11"><div class="empty"><div class="big">🔍</div><p>没有符合条件的客户</p></div></td></tr>`}
         </tbody>
       </table></div>
       ${pager(list.length, custFilter.page, CUST_PAGE, 'gotoCustPage')}
@@ -13719,6 +13732,8 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   }).catch(e=>console.log('[AI配置] 读取失败:', e.message));
   try{ migrateData(); }catch(e){ console.error('数据迁移失败:', e); }
+  // P1-3: 初始化 Campaign Task 增强字段和逾期检查
+  try{ initCampaignTaskResilience(); }catch(e){ console.error('任务增强初始化失败:', e); }
   const welcomeShown = localStorage.getItem('kailion_welcome_shown');
   if(!welcomeShown){
     setTimeout(() => showWelcomeGuide(), 1000);
@@ -14405,6 +14420,7 @@ function viewDrafts(root){
       ${[['list','📋 草稿箱'],['short','✂️ 短开发信'],['multi','🌍 多语言生成'],['seq','🔁 跟进序列'],['send','📤 审核发送'],['stats','📊 效果分析'],['ab','🧪 A/B测试'],['tpl','📚 模板库']].map(([k,l])=>
         `<button class="btn ${draftTab===k?'btn-gold':'btn-outline'}" onclick="draftTab='${k}';renderView()">${l}</button>`).join('')}
       <button class="btn btn-gold" style="margin-left:auto" onclick="toast('A/B测试（演示）')">🧪 新建 A/B 测试</button>
+      <button class="btn btn-outline" onclick="batchCheckAllDraftsQuality()">📋 批量质检</button>
     </div>
     ${draftTab==='list'?draftList():draftTab==='short'?draftShort():draftTab==='multi'?draftMultiLang():draftTab==='seq'?draftSeq():draftTab==='send'?draftSend():draftTab==='stats'?draftStats():draftTab==='ab'?draftAB():draftTpl()}`;
 }
@@ -14659,18 +14675,193 @@ function countWords_old(){
 function draftList(){
   const list = S.drafts;
   return `<div class="card"><div class="table-wrap"><table class="tbl">
-    <colgroup><col style="width:26%"><col style="width:10%"><col style="width:8%"><col style="width:30%"><col style="width:12%"><col style="width:14%"></colgroup>
-    <thead><tr><th>客户</th><th>国家</th><th>语言</th><th>主题</th><th>状态</th><th>操作</th></tr></thead>
+    <colgroup><col style="width:22%"><col style="width:8%"><col style="width:6%"><col style="width:26%"><col style="width:10%"><col style="width:8%"><col style="width:20%"></colgroup>
+    <thead><tr><th>客户</th><th>国家</th><th>语言</th><th>主题</th><th>状态</th><th>质量</th><th>操作</th></tr></thead>
     <tbody>${list.length? list.map(d=>{
       const [cls,label] = DRAFT_STATUS[d.status]||['badge-gray',d.status];
+      const qr = d.qualityReport;
+      const qBadge = qr ? `<span class="badge" style="background:${qr.grade==='A'?'#dcfce7':qr.grade==='B'?'#dbeafe':qr.grade==='C'?'#fef9c3':'#fee2e2'};color:${qr.grade==='A'?'#166534':qr.grade==='B'?'#1e40af':qr.grade==='C'?'#854d0e':'#991b1b'};font-weight:700">${qr.score}分 ${qr.grade}</span>` : '<span class="badge badge-gray">未检</span>';
       return `<tr style="cursor:pointer" onclick="openDraftEditor('${d.id}')">
         <td><b>${esc(d.customerName)}</b></td><td>${esc(d.country)}</td><td>${esc(d.language)}</td>
         <td class="text-sm">${esc(d.subject)}</td>
         <td><span class="badge ${cls}">${label}</span></td>
-        <td><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openDraftEditor('${d.id}')">编辑</button></td></tr>`;
-    }).join('') : `<tr><td colspan="6"><div class="empty"><div class="big">✉️</div><p>暂无草稿</p></div></td></tr>`}</tbody>
+        <td>${qBadge}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openDraftEditor('${d.id}')">编辑</button> <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();runDraftQualityCheck('${d.id}')">质检</button></td></tr>`;
+    }).join('') : `<tr><td colspan="7"><div class="empty"><div class="big">✉️</div><p>暂无草稿</p></div></td></tr>`}</tbody>
   </table></div></div>`;
 }
+
+// ── P1-1 开发信质量检查器集成 ──────────────────────────────
+function runDraftQualityCheck(draftId){
+  if(typeof window.DraftQualityChecker === 'undefined'){ toast('质量检查器未加载','err'); return; }
+  const d = (S.drafts||[]).find(x=>x.id===draftId);
+  if(!d){ toast('草稿不存在','err'); return; }
+  const customer = (S.customers||[]).find(c=>c.id===d.customerId) || {};
+  const evidence = (S.websiteEvidence||[]).filter(e=>e.customerId===d.customerId);
+  const facts = S.knowledgeFacts || [];
+  const packs = S.knowledgePacks || [];
+  const allDrafts = S.drafts || [];
+  const communications = S.communications || [];
+  const report = window.DraftQualityChecker.checkDraft(d, {
+    customer: customer,
+    facts: facts,
+    evidence: evidence,
+    knowledgePacks: packs,
+    allDrafts: allDrafts,
+    communications: communications
+  });
+  d.qualityReport = report;
+  d.qualityCheckedAt = report.checkedAt;
+  persist();
+  const msg = report.blockingIssues.length>0
+    ? '质量分 '+report.score+' ('+report.grade+')，有 '+report.blockingIssues.length+' 个阻断问题'
+    : report.reviewWarnings.length>0
+      ? '质量分 '+report.score+' ('+report.grade+')，有 '+report.reviewWarnings.length+' 个警告'
+      : '质量分 '+report.score+' ('+report.grade+')，通过检查';
+  toast(msg, report.blockingIssues.length>0?'err':report.reviewWarnings.length>0?'':'ok');
+  if(currentView==='drafts') renderView();
+  return report;
+}
+
+function renderDraftQualityPanel(draftId){
+  if(typeof window.DraftQualityChecker === 'undefined') return '';
+  const d = (S.drafts||[]).find(x=>x.id===draftId);
+  if(!d) return '';
+  if(!d.qualityReport){
+    return `<div class="card card-pad mb16" style="background:#f8fafc;border:1px dashed #cbd5e1">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="text-sm text-muted">📋 开发信质量检查尚未运行</span>
+        <button class="btn btn-gold btn-sm" onclick="runDraftQualityCheck('${d.id}');setTimeout(()=>{const el=document.getElementById('draftQualityPanel_${d.id}');if(el){const r=(S.drafts||[]).find(x=>x.id==='${d.id}')?.qualityReport;el.innerHTML=window.DraftQualityChecker.renderQualityPanel(r);}},200)">运行检查</button>
+      </div></div>`;
+  }
+  return `<div id="draftQualityPanel_${d.id}">${window.DraftQualityChecker.renderQualityPanel(d.qualityReport)}</div>`;
+}
+
+function batchCheckAllDraftsQuality(){
+  if(typeof window.DraftQualityChecker === 'undefined'){ toast('质量检查器未加载','err'); return; }
+  const drafts = S.drafts||[];
+  let checked = 0, blocked = 0;
+  drafts.forEach(d=>{
+    const report = runDraftQualityCheck(d.id);
+    if(report){ checked++; if(report.blockingIssues.length>0) blocked++; }
+  });
+  toast('已检查 '+checked+' 封草稿，'+blocked+' 封有阻断问题', blocked>0?'err':'ok');
+  if(currentView==='drafts') renderView();
+}
+// ── P1-1 结束 ─────────────────────────────────────────────
+
+// ── P1-2 线索/邮箱质量评分集成 ────────────────────────────
+function runCustomerQualityCheck(customerId){
+  if(typeof window.LeadQualityChecker === 'undefined'){ toast('质量评分器未加载','err'); return null; }
+  const c = (S.customers||[]).find(x=>x.id===customerId);
+  if(!c){ toast('客户不存在','err'); return null; }
+  const evidence = (S.websiteEvidence||[]).filter(e=>e.customerId===customerId);
+  const report = window.LeadQualityChecker.evaluateLead(c, { evidence: evidence });
+  c.leadQuality = report;
+  c.leadQualityCheckedAt = report.checkedAt;
+  // 如果邮箱待查MX，异步入队
+  const email = c.contact?.email || c.email || '';
+  const domain = window.LeadQualityChecker.getEmailDomain(email);
+  if(domain && window.LeadQualityChecker.isValidEmailFormat(email) && report.mxStatus === 'not_checked'){
+    const priority = c.priorityTier === 'A' ? 2 : c.priorityTier === 'B' ? 1 : 0;
+    window.LeadQualityChecker.enqueueMxCheck(domain, priority, (mxResult)=>{
+      const updated = window.LeadQualityChecker.evaluateLead(c, { evidence: evidence, mxResult: mxResult });
+      c.leadQuality = updated;
+      c.leadQualityCheckedAt = updated.checkedAt;
+      persist();
+      if(currentView==='customers') renderView();
+    });
+  }
+  persist();
+  return report;
+}
+
+function batchCheckAllCustomerQuality(){
+  if(typeof window.LeadQualityChecker === 'undefined'){ toast('质量评分器未加载','err'); return; }
+  const customers = S.customers||[];
+  let checked = 0, aCount=0, dCount=0;
+  customers.forEach(c=>{
+    const report = runCustomerQualityCheck(c.id);
+    if(report){ checked++; if(report.leadQualityGrade==='A')aCount++; if(report.leadQualityGrade==='D')dCount++; }
+  });
+  toast('已评估 '+checked+' 个客户：A级'+aCount+'，D级'+dCount, dCount>0?'':'ok');
+  if(currentView==='customers') renderView();
+}
+
+function renderCustomerQualityBadge(c){
+  if(typeof window.LeadQualityChecker === 'undefined') return '';
+  if(!c.leadQuality) return '<span class="badge badge-gray" style="font-size:10px">未评</span>';
+  return window.LeadQualityChecker.renderQualityBadge(c.leadQuality);
+}
+// ── P1-2 结束 ─────────────────────────────────────────────
+
+// ── P1-3 Campaign Task 增强 + P2-1 SLA 计时集成 ──────────
+function initCampaignTaskResilience(){
+  if(typeof window.CampaignTaskResilience === 'undefined') return;
+  const tasks = S.campaignCustomerTasks || [];
+  window.CampaignTaskResilience.initAllTasks(tasks);
+  // 检查逾期
+  const overdueCount = window.CampaignTaskResilience.checkAllOverdue(tasks);
+  if(overdueCount > 0) console.log('[TaskResilience] 发现 '+overdueCount+' 个逾期任务');
+}
+
+function manualRetryCampaignTask(taskId){
+  if(typeof window.CampaignTaskResilience === 'undefined'){ toast('任务增强模块未加载','err'); return; }
+  const task = (S.campaignCustomerTasks||[]).find(t=>t.taskId===taskId);
+  if(!task){ toast('任务不存在','err'); return; }
+  window.CampaignTaskResilience.retryTaskManually(task, 'Leo');
+  persist();
+  toast('任务已重置为待执行');
+  if(currentView==='campaignDetail' || currentView==='dailyWork') renderView();
+}
+
+// 覆盖模块中的手动重试入口
+if(typeof window !== 'undefined'){
+  window.CampaignTaskResilience = window.CampaignTaskResilience || {};
+  window.CampaignTaskResilience._manualRetryById = manualRetryCampaignTask;
+}
+
+function getTaskResilienceStats(){
+  if(typeof window.CampaignTaskResilience === 'undefined') return null;
+  return window.CampaignTaskResilience.getTaskStats(S.campaignCustomerTasks || []);
+}
+
+function renderTaskResilienceBadge(task){
+  if(typeof window.CampaignTaskResilience === 'undefined') return '';
+  return window.CampaignTaskResilience.renderTaskStatusBadge(task);
+}
+
+function renderTaskResiliencePanel(task){
+  if(typeof window.CampaignTaskResilience === 'undefined') return '';
+  return window.CampaignTaskResilience.renderTaskResiliencePanel(task);
+}
+
+// SLA 集成
+function initInquirySla(inquiry){
+  if(typeof window.CampaignTaskResilience === 'undefined') return inquiry;
+  const type = inquiry.priority === 'high' || inquiry.qualityLevel === 'L1' ? 'high_priority_inquiry' : 'normal_inquiry';
+  return window.CampaignTaskResilience.initSlaFields(inquiry, type);
+}
+
+function refreshInquirySla(inquiry){
+  if(typeof window.CampaignTaskResilience === 'undefined') return inquiry;
+  return window.CampaignTaskResilience.refreshSla(inquiry);
+}
+
+function markInquiryResponded(inquiryId){
+  if(typeof window.CampaignTaskResilience === 'undefined') return;
+  const inquiry = (S.inquiries||[]).find(i=>i.id===inquiryId || i.inquiryId===inquiryId);
+  if(!inquiry) return;
+  window.CampaignTaskResilience.markFirstResponse(inquiry, 'Leo');
+  persist();
+  toast('已记录首次响应时间');
+}
+
+function renderSlaBadge(obj){
+  if(typeof window.CampaignTaskResilience === 'undefined') return '';
+  return window.CampaignTaskResilience.renderSlaBadge(obj);
+}
+// ── P1-3 + P2-1 结束 ─────────────────────────────────────
 function draftSeq(){
   // V75.3 3-7-7标准跟进序列模板
   const standardSeq = `
@@ -15183,6 +15374,10 @@ function openDraftEditor(did, isNew){
       <div style="margin-bottom:16px">
         ${renderDraftTraceabilityPanel(d)}
       </div>
+      <!-- P1-1 开发信质量检查面板 -->
+      <div style="margin-bottom:16px">
+        ${renderDraftQualityPanel(d.id)}
+      </div>
       <!-- P2.2D-3 人工发送交接包 -->
       <div style="margin-bottom:16px">
         ${renderOutreachHandoffPack(d)}
@@ -15211,6 +15406,20 @@ function openDraftEditor(did, isNew){
   setTimeout(()=>{
     const b=document.getElementById('dr_body'); if(b)b.style.height=b.scrollHeight+'px';
     renderOutreachKbContext(d.knowledgeContext, 'draftKbContextBox');
+    // P1-1: 自动运行质量检查（如果尚未检查或超过24小时）
+    if(typeof window.DraftQualityChecker !== 'undefined'){
+      const needCheck = !d.qualityReport || !d.qualityCheckedAt ||
+        (Date.now() - new Date(d.qualityCheckedAt).getTime() > 24*60*60*1000);
+      if(needCheck){
+        setTimeout(()=>{
+          const report = runDraftQualityCheck(d.id);
+          if(report){
+            const el = document.getElementById('draftQualityPanel_'+d.id);
+            if(el) el.innerHTML = window.DraftQualityChecker.renderQualityPanel(report);
+          }
+        }, 300);
+      }
+    }
   },50);
 }
 function saveDraft(did){
@@ -15266,6 +15475,17 @@ function saveDraft(did){
 }
 function markDraftReviewed(did){
   const d = S.drafts.find(x=>x.id===did); if(!d) return;
+
+  // P1-1: 质量门控 - 如有阻断问题，警告但允许人工确认后继续
+  if(d.qualityReport && d.qualityReport.blockingIssues && d.qualityReport.blockingIssues.length > 0){
+    const msg = '⚠️ 该草稿有 '+d.qualityReport.blockingIssues.length+' 个阻断问题（质量分 '+d.qualityReport.score+'）。\n\n'+
+      d.qualityReport.blockingIssues.map((b,i)=>(i+1)+'. '+b.message).join('\n')+
+      '\n\n是否仍要标记为已审核？（建议先修复阻断问题）';
+    if(!confirm(msg)) return;
+  } else if(!d.qualityReport){
+    // 未运行质量检查，自动运行一次
+    runDraftQualityCheck(did);
+  }
 
   // V79.0D1 修复：独占关联校验（fail-closed）
   const linkCheck = getExclusiveCampaignTaskByDraftId(did);
@@ -15862,16 +16082,21 @@ function viewInquiries(root){
       <button class="btn btn-primary" onclick="toast('手动录入询盘（演示）')">＋ 新建询盘</button>
     </div>
     <div class="card"><div class="table-wrap"><table class="tbl">
-      <colgroup><col style="width:10%"><col style="width:22%"><col style="width:18%"><col style="width:28%"><col style="width:10%"><col style="width:12%"></colgroup>
-      <thead><tr><th>来源</th><th>客户</th><th>产品</th><th>描述</th><th>优先级</th><th>状态</th></tr></thead>
-      <tbody>${S.inquiries.length? S.inquiries.map(i=>`
+      <colgroup><col style="width:9%"><col style="width:18%"><col style="width:15%"><col style="width:22%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:8%"></colgroup>
+      <thead><tr><th>来源</th><th>客户</th><th>产品</th><th>描述</th><th>优先级</th><th>SLA</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${S.inquiries.length? S.inquiries.map(i=>{
+        const sla = typeof window.CampaignTaskResilience!=='undefined' ? window.CampaignTaskResilience.calculateSla(initInquirySla(i)) : null;
+        return `
         <tr style="cursor:pointer" onclick="openInqDetail('${i.id}')">
           <td>${esc(i.source)}</td><td><b>${esc(i.customerName)}</b></td><td>${esc(i.product)}</td>
           <td class="text-sm text-muted">${esc(i.description)}</td>
           <td><span class="badge ${i.priority==='高'?'badge-red':i.priority==='中'?'badge-gold':'badge-gray'}">${i.priority}</span></td>
+          <td>${sla ? renderSlaBadge(i) : '-'}</td>
           <td><span class="badge ${INQ_STATUS[i.status][0]}">${i.status}</span></td>
-        </tr>`).join('')
-      : `<tr><td colspan="6"><div class="empty"><div class="big">📥</div><p>暂无询盘</p></div></td></tr>`}</tbody>
+          <td onclick="event.stopPropagation()"><button class="btn btn-xs btn-success" onclick="markInquiryResponded('${i.id}')">已响应</button></td>
+        </tr>`;
+      }).join('')
+      : `<tr><td colspan="8"><div class="empty"><div class="big">📥</div><p>暂无询盘</p></div></td></tr>`}</tbody>
     </table></div></div>`;
 }
 function openInqDetail(iid){
@@ -15881,6 +16106,28 @@ function openInqDetail(iid){
       <div class="text-sm text-muted">${esc(i.customerName)} · ${esc(i.product)} · ${esc(i.source)}</div></div>
       <span class="modal-close" onclick="closeDrawer()">×</span></div>
     <div class="drawer-body">
+      <!-- P2-1 SLA 计时面板 -->
+      ${(function(){
+        if(typeof window.CampaignTaskResilience === 'undefined') return '';
+        initInquirySla(i);
+        refreshInquirySla(i);
+        const sla = window.CampaignTaskResilience.calculateSla(i);
+        const slaColors = {on_track:'#dcfce7', due_soon:'#fef9c3', breached:'#fee2e2', met:'#dcfce7'};
+        const slaText = {on_track:'正常响应中', due_soon:'即将超时', breached:'已超时', met:'已响应'};
+        return `<div class="card card-pad mb16" style="background:${slaColors[sla.slaStatus]||'#f8fafc'}">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:700;font-size:13px">⏱️ 首次响应 SLA</div>
+              <div class="text-xs text-muted mt2">目标: ${i.slaTargetMinutes||240}分钟 · 收到: ${i.receivedAt?fmtDate(i.receivedAt):'-'}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:20px;font-weight:800">${slaText[sla.slaStatus]||sla.slaStatus}</div>
+              <div class="text-xs">${sla.remainingMinutes!==null&&sla.remainingMinutes>0?'剩余'+sla.remainingMinutes+'分钟':sla.elapsedMinutes>0?'已用'+sla.elapsedMinutes+'分钟':''}</div>
+            </div>
+          </div>
+          ${!i.firstRespondedAt ? '<button class="btn btn-success btn-sm mt8" onclick="markInquiryResponded(\''+i.id+'\')">✅ 标记已首次响应</button>' : '<div class="text-xs mt4" style="color:#166534">首次响应于 '+fmtDate(i.firstRespondedAt)+'，用时'+sla.elapsedMinutes+'分钟</div>'}
+        </div>`;
+      })()}
       <div class="card card-pad mb16"><div class="card-title">需求描述</div><p style="font-size:13.5px;line-height:1.8">${esc(i.description)}</p></div>
       <div class="card card-pad mb16"><div class="card-title">🤖 AI 回复建议</div>
         <ul style="padding-left:18px;line-height:2;font-size:13.5px">${i.aiSuggestions.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>
@@ -21241,6 +21488,7 @@ function viewReviewQueue(root){
               <th>模型</th>
               <th>Pack</th>
               <th>风险</th>
+              <th>质量</th>
               <th>创建时间</th>
               <th>操作</th>
             </tr>
@@ -21260,6 +21508,7 @@ function viewReviewQueue(root){
                   <td class="text-sm">${esc(d.model || '-')}${d.manual ? ' (手动)' : ''}</td>
                   <td class="text-sm">${pack ? esc(pack.name || pack.packId).substring(0,20) : '未绑定'}</td>
                   <td>${(d.riskFlags||[]).length > 0 ? `<span style="color:var(--red)">${d.riskFlags.length}项</span>` : '<span style="color:var(--green)">无</span>'}</td>
+                  <td>${d.qualityReport ? `<span class="badge" style="background:${d.qualityReport.grade==='A'?'#dcfce7':d.qualityReport.grade==='B'?'#dbeafe':d.qualityReport.grade==='C'?'#fef9c3':'#fee2e2'};color:${d.qualityReport.grade==='A'?'#166534':d.qualityReport.grade==='B'?'#1e40af':d.qualityReport.grade==='C'?'#854d0e':'#991b1b'};font-weight:700">${d.qualityReport.score}${d.qualityReport.blockingIssues.length>0?' ⚠':''}</span>` : '<span class="badge badge-gray">未检</span>'}</td>
                   <td class="text-sm">${fmtDay(d.createdAt || d.generatedAt)}</td>
                   <td>
                     <div class="flex gap4 flex-wrap">
@@ -21652,6 +21901,37 @@ function viewDailyWork(root){
         <div class="stat-card"><div class="stat-label">阻断客户</div><div class="stat-value" style="color:var(--red)">${view.counts.blockedCustomers}</div></div>
       </div>
     </div>
+
+    <!-- P1-3: 任务异常提醒（逾期/失败/待重试） -->
+    ${(function(){
+      if(typeof window.CampaignTaskResilience === 'undefined') return '';
+      const tasks = S.campaignCustomerTasks || [];
+      const stats = window.CampaignTaskResilience.getTaskStats(tasks);
+      const abnormalTasks = tasks.filter(t =>
+        t.taskStatus === 'overdue' || t.taskStatus === 'failed' || t.taskStatus === 'retry_scheduled'
+      );
+      if(abnormalTasks.length === 0) return '';
+      return `<div class="card card-pad mb16" style="border-left:4px solid #dc2626">
+        <div class="card-title" style="color:#991b1b">⚠️ 任务异常提醒（${abnormalTasks.length}）</div>
+        ${abnormalTasks.slice(0,10).map(t => {
+          const customer = (S.customers||[]).find(c=>c.id===t.customerId);
+          return `<div class="mb8 p10" style="background:#fef2f2;border-radius:6px">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+              <div><b>${esc(customer?customer.company:t.customerId||'未知客户')}</b>
+                <span class="text-xs text-muted ml8">${esc(t.stage||t.taskType||'任务')}</span></div>
+              ${renderTaskResilienceBadge(t)}
+            </div>
+            ${t.lastError ? `<div class="text-xs mt4" style="color:#991b1b">${esc(String(t.lastError).substring(0,120))}</div>` : ''}
+            <div class="mt6 flex gap4 flex-wrap">
+              ${t.taskStatus==='retry_scheduled' || t.taskStatus==='failed' ?
+                `<button class="btn btn-xs btn-gold" onclick="manualRetryCampaignTask('${t.taskId}')">立即重试</button>` : ''}
+              <button class="btn btn-xs btn-outline" onclick="currentView='campaignDetail';routeParams={id:'${t.campaignId}'};renderView()">查看Campaign</button>
+            </div>
+          </div>`;
+        }).join('')}
+        ${abnormalTasks.length > 10 ? `<div class="text-xs text-muted text-center mt8">还有 ${abnormalTasks.length-10} 个异常任务，请前往 Campaign 页面查看</div>` : ''}
+      </div>`;
+    })()}
 
     <!-- 区块1：今日待审核草稿 -->
     <div class="card card-pad mb16">

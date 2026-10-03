@@ -1169,6 +1169,50 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
     return;
   }
 
+  // P1-2: 邮箱域名 MX 记录查询（使用 Node.js 内置 dns 模块，免费，不调用付费 API）
+  if (pathname === '/api/lead-quality/mx-check' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const params = JSON.parse(body || '{}');
+        const domain = String(params.domain || '').trim().toLowerCase();
+        if (!domain) {
+          res.writeHead(400, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({success:false, error:'domain 必填'}));
+          return;
+        }
+        // 超时控制：5秒
+        const timeoutMs = 5000;
+        const timer = setTimeout(() => {
+          res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+          res.end(JSON.stringify({success:true, domain, mxStatus:'unknown', records:[], error:'timeout', checkedAt:new Date().toISOString()}));
+        }, timeoutMs);
+        dns.resolveMx(domain, (err, addresses) => {
+          clearTimeout(timer);
+          if (err) {
+            if (err.code === 'ENOTFOUND' || err.code === 'ENODATA') {
+              res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+              res.end(JSON.stringify({success:true, domain, mxStatus:'no_mx', records:[], error:err.code, checkedAt:new Date().toISOString()}));
+            } else {
+              res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+              res.end(JSON.stringify({success:true, domain, mxStatus:'unknown', records:[], error:err.code||err.message, checkedAt:new Date().toISOString()}));
+            }
+          } else {
+            const records = (addresses||[]).map(r => ({exchange:r.exchange, priority:r.priority}));
+            res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+            res.end(JSON.stringify({success:true, domain, mxStatus:'valid', records:records, checkedAt:new Date().toISOString()}));
+          }
+        });
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({success:false, error:'MX查询失败: '+e.message}));
+      }
+    });
+    return;
+  }
+
   // P2.2B-2: 模型生成（带故障转移）
   if (pathname === '/api/ai/generate' && req.method === 'POST') {
     if (!requireAuth(req, res)) return;

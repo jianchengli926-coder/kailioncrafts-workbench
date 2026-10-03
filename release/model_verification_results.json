@@ -1,0 +1,90 @@
+{
+  "online": {
+    "glm46": {
+      "model": "glm-4-flash",
+      "label": "GLM 4.6 Flash",
+      "taskType": "text",
+      "success": true,
+      "elapsedMs": 1159,
+      "response": "1+1等于2。",
+      "error": null,
+      "failover": false,
+      "attempt": 1
+    },
+    "glm47": {
+      "model": "glm-4.7-flash",
+      "label": "GLM 4.7 Flash",
+      "taskType": "text",
+      "success": false,
+      "elapsedMs": 90,
+      "response": null,
+      "error": "api_error: 该模型当前访问量过大，请您稍后再试",
+      "failover": false,
+      "attempt": 1
+    }
+  },
+  "local": {
+    "qwen3.5:9b": {
+      "model": "qwen3.5:9b",
+      "label": "Qwen3.5 9B (文本主力)",
+      "taskType": "text",
+      "success": true,
+      "elapsedMs": 7555,
+      "response": "1+1 等于 2。",
+      "error": null,
+      "failover": false,
+      "attempt": 1
+    },
+    "qwen2.5:7b": {
+      "model": "qwen2.5:7b",
+      "label": "Qwen2.5 7B (文本备用)",
+      "taskType": "text",
+      "success": true,
+      "elapsedMs": 4756,
+      "response": "1+1等于2。",
+      "error": null,
+      "failover": false,
+      "attempt": 1
+    },
+    "deepseek-r1:7b": {
+      "model": "deepseek-r1:7b",
+      "label": "DeepSeek R1 7B (推理)",
+      "taskType": "reasoning",
+      "success": true,
+      "elapsedMs": 28464,
+      "response": "<think>\n嗯，这个问题看起来有点儿意思，让我仔细想一想。题目是说，一个农夫有17只羊，除了9只以外都死了，还剩几只？首先，我需要明确问题的意思，然后一步步分析。\n\n首先，农夫有17只羊，这是一个明确的数量。然后，题目说除了9只以外都死了，也就是说，有9只羊没有死，剩下的都死了。那么，剩下的应该是9只，对吗？因为17减去死亡的，剩下的就是9只。\n\n不过，有时候这类题目可能会有陷阱，比如“除了”",
+      "error": null,
+      "failover": false,
+      "attempt": 1
+    },
+    "qwen2.5vl:7b": {
+      "model": "qwen2.5vl:7b",
+      "label": "Qwen2.5VL 7B (视觉)",
+      "taskType": "vision",
+      "success": true,
+      "elapsedMs": 12745,
+      "response": "1+1等于2。",
+      "error": null,
+      "failover": false,
+      "attempt": 1
+    }
+  },
+  "failover": {
+    "text": {
+      "success": true,
+      "modelUsed": "glm-4-flash",
+      "elapsedMs": 31246,
+      "attempt": 2,
+      "failover": true,
+      "response": "一加一等于二。",
+      "error": null
+    }
+  },
+  "image": {
+    "success": true,
+    "hasImage": false,
+    "elapsedMs": 14,
+    "responseLen": 0
+  },
+  "manual": {}
+}

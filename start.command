@@ -67,21 +67,40 @@ echo ""
 echo "=========================================="
 echo "  🌐 工作台访问地址"
 echo "=========================================="
-echo "  本地访问:  http://localhost:8080"
-echo "  局域网访问: http://$(ifconfig | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}'):8080"
-echo "  健康检查:  http://localhost:8080/api/health"
+LAN_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}')
+echo "  💻 本机访问:   http://localhost:8080"
+if [ -n "$LAN_IP" ]; then
+echo "  🏠 局域网访问: http://$LAN_IP:8080"
+else
+echo "  🏠 局域网访问: 未检测到局域网IP"
+fi
+echo "  🌐 公网访问:   https://prospect.kailioncrafts.com"
+echo "  🩺 健康检查:   http://localhost:8080/api/health"
 echo "=========================================="
 echo ""
 echo "💡 提示:"
-echo "  - 访问密码: 441723"
+echo "  - 所有访问均需输入工作台密码（密码不在此显示）"
 echo "  - 在线模型优先使用，全部失败时自动切换到本地模型"
-echo "  - 按 Ctrl+C 停止服务器"
+echo "  - 关闭此终端窗口或按 Ctrl+C 后，本机/局域网/公网访问全部失效"
+echo "  - 不配置 Cloudflare Access，公网运行期间登录页可见，请使用强密码并保留限速"
 echo ""
+
+# 端口检查
+if lsof -i :8080 -P -n | grep -q LISTEN; then
+    echo "⚠️  端口 8080 已被占用，可能已有工作台实例在运行"
+    echo "   如确认无其他实例，可先执行: lsof -ti :8080 | xargs kill"
+    read -p "仍要继续启动吗？(y/N): " confirm
+    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+        echo "已取消启动"
+        read -p "按回车键退出..."
+        exit 0
+    fi
+fi
 
 # 延迟2秒后打开浏览器
 (sleep 2 && open "http://localhost:8080") &
 
-# 启动服务器
+# 启动服务器（前台运行，关闭终端即停止）
 echo "🚀 启动服务器..."
 echo ""
 node server.js

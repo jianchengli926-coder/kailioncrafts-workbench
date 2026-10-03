@@ -40,9 +40,11 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // ============ 配置 ============
 const PORT = process.env.PORT || 8080;
-// Tunnel 展示默认只连接本机回环地址，避免局域网绕过 Cloudflare Access 直连服务。
-// 如确需局域网开发访问，必须显式设置 HOST=0.0.0.0，并承担相应暴露风险。
-const HOST = process.env.HOST || '127.0.0.1';
+// V77.4: 默认监听所有网络接口，支持本机、局域网和 Cloudflare Tunnel 公网访问。
+// 所有访问统一依靠工作台密码保护（scrypt哈希 + HttpOnly会话 + 失败限速）。
+// 不配置 Cloudflare Access 作为强制前置认证；noindex 仅防止搜索引擎索引，不是访问控制。
+// 如需仅本机访问，可显式设置 HOST=127.0.0.1。
+const HOST = process.env.HOST || '0.0.0.0';
 const ROOT_DIR = __dirname;
 const OLLAMA_URL = 'http://localhost:11434';
 // V77.0: 从 kb_config.json 读取知识库路径，不再硬编码旧目录

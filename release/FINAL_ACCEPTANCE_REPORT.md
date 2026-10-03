@@ -1,9 +1,9 @@
 # 最终验收报告
 
-> 项目：KaiLionCrafts 外贸获客AI工作台  
-> 版本：V77.3.1  
-> 验收日期：2026-10-03  
-> 验收阶段：第三阶段 - 交付前发布验收
+> 项目：KaiLionCrafts 外贸获客AI工作台
+> 版本：V77.3.2
+> 验收日期：2026-10-03
+> 验收阶段：最终交付完善阶段 - 公网受控展示验收
 
 ## 一、验收结论
 
@@ -11,8 +11,11 @@
 |----------|------|------|
 | 功能交付 | ✅ 通过 | 37个功能全部正常 |
 | 测试交付 | ✅ 通过 | 代码检查/浏览器测试/核心流程全部通过 |
-| 安全交付 | ⚠️ 有条件通过 | 当前代码无硬编码Key，但Git历史存在旧Key（Leo已知悉并接受） |
-| 公网部署 | ❌ 不建议 | 需完成Key轮换和历史清理后再部署 |
+| 安全交付 | ⚠️ 有条件通过 | 当前代码无硬编码Key，127.0.0.1绑定生效，noindex生效；Git历史存在旧Key（Leo已知悉并接受） |
+| 本地运行交付 | ✅ 通过 | localhost:8080 正常，局域网无法直接访问 |
+| 受控公网展示 | ❌ 暂不可上线 | Cloudflare Access 未配置，公网直接返回200无Access拦截 |
+| 展示数据安全 | ⚠️ 待处理 | localStorage含真实客户数据（42邮箱/30手机号），展示前必须切换演示数据 |
+| 公网部署 | ❌ 不建议 | 需完成Cloudflare Access配置 + 演示数据切换 + Key轮换后再考虑 |
 
 ## 二、功能验收
 
@@ -119,6 +122,10 @@
 | 桌面端和移动端均通过 | ✅ 通过 | 基本通过 |
 | 自动化测试通过 | ✅ 通过 | node --check全部通过 |
 | SECURITY.md与代码实际状态一致 | ✅ 通过 | 已更新 |
+| 默认绑定127.0.0.1 | ✅ 通过 | 局域网无法直接访问，仅localhost和Cloudflare Tunnel可达 |
+| noindex和robots.txt生效 | ✅ 通过 | X-Robots-Tag + meta noindex + robots.txt Disallow:/ |
+| Cloudflare Access前置层 | ❌ 未配置 | 公网直接返回200，无Access拦截，需Leo在Cloudflare控制台配置 |
+| 展示数据为演示数据 | ❌ 未切换 | localStorage含真实客户数据（42邮箱/30手机号），展示前必须切换 |
 
 ### 5.2 API Key风险接受声明
 
@@ -127,6 +134,25 @@
 - **历史提交**：可能存在曾经暴露的Key（15处）⚠️
 - **风险处理**：Leo已知悉，本轮暂不轮换，暂不清理Git历史
 - **交付影响**：不阻塞功能交付，但不建议将当前版本部署到公开或不可信环境
+
+### 5.3 公网受控展示验收
+
+| 检查项 | 结果 | 说明 |
+|--------|------|------|
+| Cloudflare Tunnel不暴露裸端口 | ✅ 通过 | 仅转发8080→127.0.0.1，Ollama 11434不暴露 |
+| Cloudflare Access已配置 | ❌ 未通过 | 公网https://prospect.kailioncrafts.com直接返回200，无Access重定向 |
+| 未授权不能加载index.html | ⚠️ 部分 | 工作台密码层可阻止进入，但Access应在前置层拦截HTML/JS |
+| 未授权不能访问业务API | ✅ 通过 | /api/kb/*、/api/ai/config全部401 |
+| /api/health不泄露内部信息 | ✅ 通过 | 仅返回status+timestamp |
+| /api/access/status不泄露密码 | ✅ 通过 | 仅返回hasPassword+authenticated |
+| 敏感静态文件返回403 | ✅ 通过 | server.js/model-router.js/api_config.json等全部403 |
+| Ollama不通过Tunnel暴露 | ✅ 通过 | 仅监听127.0.0.1:11434 |
+| robots禁止索引 | ✅ 通过 | X-Robots-Tag + meta noindex + robots.txt Disallow:/ |
+| 使用演示数据 | ❌ 未通过 | localStorage含真实客户数据，展示前必须切换 |
+| Access登录后仍需工作台密码 | ❌ 未实测 | Access未配置，无法验证双层认证 |
+| 桌面/手机通过Tunnel访问 | ✅ 通过 | HTTPS+HSTS正常，多视口验证通过 |
+
+**结论**：Cloudflare Access 外部策略未完成实测，公网受控展示暂不能标记为最终通过。需Leo在Cloudflare Zero Trust控制台配置Access策略后重新验收。
 
 ## 六、模型系统验收
 
@@ -215,6 +241,6 @@
 
 ---
 
-**验收人**：企业级AI工作台审计专家  
-**验收日期**：2026-10-03  
+**验收人**：企业级AI工作台审计专家
+**验收日期**：2026-10-03
 **报告版本**：Final V1.0

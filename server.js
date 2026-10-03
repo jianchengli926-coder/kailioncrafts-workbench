@@ -40,7 +40,9 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // ============ 配置 ============
 const PORT = process.env.PORT || 8080;
-const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 允许局域网访问
+// Tunnel 展示默认只连接本机回环地址，避免局域网绕过 Cloudflare Access 直连服务。
+// 如确需局域网开发访问，必须显式设置 HOST=0.0.0.0，并承担相应暴露风险。
+const HOST = process.env.HOST || '127.0.0.1';
 const ROOT_DIR = __dirname;
 const OLLAMA_URL = 'http://localhost:11434';
 // V77.0: 从 kb_config.json 读取知识库路径，不再硬编码旧目录
@@ -753,6 +755,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
   // CSP 已移除：某些浏览器扩展（uBlock/AdGuard 等）的 CSP 强制功能会与页面 CSP 冲突，
   // 导致整个页面被拦截为空白。本工作台为本地应用，XSS 防护通过 esc() 转义实现，
   // 公网访问经 Cloudflare Tunnel 保护，其他安全头（X-Frame-Options 等）保留。
@@ -766,6 +769,13 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
+    return;
+  }
+
+  // 受控展示环境禁止搜索引擎抓取。
+  if (pathname === '/robots.txt' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end('User-agent: *\nDisallow: /\n');
     return;
   }
 
@@ -3713,7 +3723,7 @@ server.listen(PORT, HOST, async () => {
   console.log('');
 
   log(`本地访问: http://localhost:${PORT}`, 'SUCCESS');
-  log(`局域网访问: http://<你的IP>:${PORT}`, 'INFO');
+  log(`本机绑定地址: http://${HOST}:${PORT}`, 'INFO');
   log(`工作台文件: ${ROOT_DIR}`, 'INFO');
   log(`Ollama服务: ${OLLAMA_URL}`, 'INFO');
   console.log('');

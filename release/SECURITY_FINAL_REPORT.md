@@ -1,9 +1,9 @@
 # 安全最终报告
 
-> 项目：KaiLionCrafts 外贸获客AI工作台  
-> 版本：V77.3.1  
-> 审计日期：2026-10-03  
-> 审计阶段：第三阶段 - 交付前安全验收
+> 项目：KaiLionCrafts 外贸获客AI工作台
+> 版本：V77.3.2
+> 审计日期：2026-10-03
+> 审计阶段：最终交付完善阶段 - 公网受控展示验收
 
 ## 一、安全交付状态
 
@@ -17,12 +17,46 @@
 | 数据导出安全 | ✅ 通过 | 脱敏导出 |
 | Trace安全 | ✅ 通过 | 敏感字段脱敏 |
 | 无自动外发 | ✅ 通过 | 不自动发送邮件/消息 |
+| 网络绑定安全 | ✅ 通过 | 默认127.0.0.1，局域网无法直连 |
+| 搜索引擎防护 | ✅ 通过 | noindex meta + X-Robots-Tag + robots.txt |
+| Cloudflare Access | ❌ 未配置 | 公网直接返回200，需Leo在Cloudflare控制台配置 |
+| 展示数据安全 | ⚠️ 待处理 | localStorage含真实客户数据，展示前须切换演示数据 |
 | Git历史安全 | ⚠️ 有风险 | 历史存在旧API Key |
 | API Key轮换 | ⚠️ 未完成 | Leo暂不轮换，已知悉风险 |
 
-**综合评级**：有条件通过（仅限本地/受信任环境使用，不建议公网部署）
+**综合评级**：有条件通过（本地/受信任环境可交付；公网受控展示需配置Cloudflare Access和切换演示数据后再上线）
 
 ## 二、已修复安全问题
+
+### 2.0 V77.3.2 公网受控展示安全加固
+
+#### P0：默认绑定127.0.0.1，防止局域网绕过Access
+
+**问题**：server.js原默认`HOST=0.0.0.0`，node监听所有网络接口。本机局域网IP（192.168.1.116:8080）可直接访问，完全绕过Cloudflare Tunnel和Cloudflare Access。
+
+**修复**：
+- server.js第45行：`const HOST = process.env.HOST || '127.0.0.1'`
+- 添加注释说明：Tunnel展示默认只连接本机回环地址
+- 如确需局域网开发，必须显式设置`HOST=0.0.0.0`并承担风险
+
+**验证**：
+- `lsof -i :8080`显示仅`127.0.0.1:8080`监听 ✅
+- localhost访问HTTP 200 ✅
+- 局域网IP访问连接被拒绝 ✅
+
+#### P1：全站noindex策略
+
+**问题**：原代码无robots.txt、无noindex meta、无X-Robots-Tag响应头，搜索引擎可能索引登录页和应用内容。
+
+**修复**：
+- server.js第758行：全局响应头`X-Robots-Tag: noindex, nofollow, noarchive`
+- server.js第776-780行：`/robots.txt`路由返回`User-agent: *\nDisallow: /`
+- index.html第13行：`<meta name="robots" content="noindex, nofollow, noarchive">`
+
+**验证**：
+- curl -I首页包含X-Robots-Tag ✅
+- /robots.txt返回正确内容 ✅
+- index.html包含noindex meta ✅
 
 ### 2.1 P0：前端硬编码API Key（已修复）
 

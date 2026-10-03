@@ -1,8 +1,42 @@
 # 变更日志
 
-> 项目：KaiLionCrafts 外贸获客AI工作台  
-> 版本：V77.3.1  
+> 项目：KaiLionCrafts 外贸获客AI工作台
+> 版本：V77.3.2
 > 最后更新：2026-10-03
+
+## [V77.3.2] - 2026-10-03
+
+### 最终交付完善阶段：公网受控展示验收
+
+#### 安全加固
+- **P0** server.js默认HOST改为127.0.0.1，防止局域网绕过Cloudflare Access直连服务
+- **P1** 添加X-Robots-Tag: noindex, nofollow, noarchive全局响应头
+- **P1** 添加/robots.txt路由返回User-agent: * / Disallow: /
+- **P1** index.html添加<meta name="robots" content="noindex, nofollow, noarchive">
+
+#### 外部验收
+- Cloudflare Tunnel配置验证：prospect.kailioncrafts.com → http://127.0.0.1:8080 ✅
+- Cloudflare Access验收：**未配置**，公网直接返回200无Access拦截 ❌
+- 展示数据安全检查：发现localStorage含真实客户数据（42邮箱/30手机号/客户70KB/开发信21KB），标记为展示前必须切换演示数据 ⚠️
+
+#### 测试验证
+- 37个功能页面全部通过（0 fallback，knowledgeFacts为空状态但功能正常）
+- 8个JS模块语法检查全部通过
+- git diff --check通过
+- 0处硬编码API Key
+- 敏感API未授权全部401，敏感静态文件全部403
+- 知识库588文档/9156切片正常
+
+#### 文档更新
+- README_RELEASE.md：更新版本V77.3.2，添加受控展示声明和127.0.0.1绑定说明
+- FINAL_ACCEPTANCE_REPORT.md：添加公网受控展示验收章节，更新验收结论
+- 版本号统一更新为V77.3.2
+
+#### 已知限制（不阻塞本地交付）
+- Cloudflare Access未配置，公网受控展示暂不可上线
+- 展示数据未切换为演示数据
+- Git历史存在旧API Key（Leo已知悉并接受，本轮暂不清理）
+- /api/ai/models返回HTTP 200但内容为未认证错误（P3，应返回401但内容安全）
 
 ## [V77.3.1] - 2026-10-03
 

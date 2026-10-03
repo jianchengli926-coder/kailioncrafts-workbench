@@ -118,7 +118,9 @@ Set-Cookie: kl_session=<token>; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800
 - ✅ 修改密码仅允许本机 + 已验证会话
 - ✅ 默认密码已修改（密码 441723，非默认值）
 - ✅ 登录失败有明确错误提示，不泄露具体原因
-- ⚠️ 建议：公网部署时增加 Cloudflare Access Zero Trust 作为第一道防线
+- ⚠️ 必须：公网 Tunnel 展示前配置 Cloudflare Access Zero Trust 作为第一道防线；工作台密码只能作为第二层保护
+- ✅ 默认监听 `127.0.0.1`，防止局域网设备绕过 Cloudflare Access 直连；仅显式设置 `HOST=0.0.0.0` 时开放局域网监听
+- ✅ 受控展示响应包含 `X-Robots-Tag: noindex, nofollow, noarchive`，并提供 `robots.txt` 禁止搜索引擎抓取
 
 ## 5. 知识库访问控制
 

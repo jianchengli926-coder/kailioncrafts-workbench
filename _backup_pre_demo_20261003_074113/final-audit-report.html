@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaiLionCrafts 工作台 - 可交付版本最终审计报告</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f5f6fa; color: #2d3436; line-height: 1.7; }
+.container { max-width: 1100px; margin: 0 auto; padding: 30px 20px; }
+.header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 40px; border-radius: 16px; margin-bottom: 30px; }
+.header h1 { font-size: 28px; margin-bottom: 8px; }
+.header .subtitle { color: #D4AF37; font-size: 15px; letter-spacing: 2px; }
+.header .meta { margin-top: 16px; font-size: 13px; color: #a0a0c0; }
+.header .meta span { margin-right: 20px; }
+.card { background: white; border-radius: 12px; padding: 28px; margin-bottom: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.card h2 { font-size: 20px; color: #1a1a2e; margin-bottom: 18px; padding-bottom: 10px; border-bottom: 2px solid #D4AF37; display: flex; align-items: center; gap: 8px; }
+.card h3 { font-size: 16px; color: #2d3436; margin: 18px 0 10px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 10px; }
+.stat-box { background: #f8f9fc; border-radius: 10px; padding: 16px; text-align: center; border-left: 4px solid #D4AF37; }
+.stat-box .num { font-size: 28px; font-weight: 800; color: #1a1a2e; }
+.stat-box .label { font-size: 12px; color: #636e72; margin-top: 4px; }
+.stat-box.pass { border-left-color: #00b894; }
+.stat-box.pass .num { color: #00b894; }
+.stat-box.warn { border-left-color: #fdcb6e; }
+.stat-box.warn .num { color: #e17055; }
+.stat-box.block { border-left-color: #636e72; }
+.stat-box.block .num { color: #636e72; }
+.stat-box.danger { border-left-color: #d63031; }
+.stat-box.danger .num { color: #d63031; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+th { background: #1a1a2e; color: white; padding: 10px 12px; text-align: left; font-weight: 600; }
+td { padding: 9px 12px; border-bottom: 1px solid #eee; }
+tr:hover { background: #f8f9fc; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+.badge.pass { background: #d4edda; color: #155724; }
+.badge.partial { background: #fff3cd; color: #856404; }
+.badge.fail { background: #f8d7da; color: #721c24; }
+.badge.blocked { background: #e2e3e5; color: #383d41; }
+.badge.notested { background: #d1ecf1; color: #0c5460; }
+.badge.p0 { background: #d63031; color: white; }
+.badge.p1 { background: #e17055; color: white; }
+.badge.p2 { background: #fdcb6e; color: #636e72; }
+.badge.p3 { background: #74b9ff; color: #2d3436; }
+.checklist li { list-style: none; padding: 8px 0; border-bottom: 1px solid #f0f0f0; display: flex; align-items: flex-start; gap: 10px; }
+.checklist li::before { content: "✅"; flex-shrink: 0; }
+.checklist li.pending::before { content: "⏳"; }
+.checklist li.fail::before { content: "❌"; }
+.fix-item { background: #f8f9fc; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; border-left: 3px solid #00b894; }
+.fix-item .title { font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
+.fix-item .desc { font-size: 13px; color: #636e72; }
+.risk-item { background: #fff9e6; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; border-left: 3px solid #fdcb6e; font-size: 13px; }
+.demo-step { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+.demo-step .num { background: #1a1a2e; color: #D4AF37; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+.demo-step .text { font-size: 14px; padding-top: 3px; }
+.footer { text-align: center; padding: 30px; color: #636e72; font-size: 12px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>🏭 KaiLionCrafts AI客户开发工作台</h1>
+  <div class="subtitle">可交付版本最终审计报告 · DELIVERABLE AUDIT</div>
+  <div class="meta">
+    <span>📅 2026-10-02</span>
+    <span>🌿 fresh_start</span>
+    <span>📌 8a377c3 → deliverable</span>
+    <span>🔖 backup/pre-deliverable-upgrade-20261002-0139</span>
+  </div>
+</div>
+
+<!-- 核心指标 -->
+<div class="card">
+  <h2>📊 核心指标总览</h2>
+  <div class="stats-grid">
+    <div class="stat-box"><div class="num">39</div><div class="label">Python文件</div></div>
+    <div class="stat-box"><div class="num">32,417</div><div class="label">代码行数</div></div>
+    <div class="stat-box pass"><div class="num">317</div><div class="label">自动化测试通过</div></div>
+    <div class="stat-box pass"><div class="num">0</div><div class="label">P0问题</div></div>
+    <div class="stat-box pass"><div class="num">0</div><div class="label">P1问题</div></div>
+    <div class="stat-box"><div class="num">28</div><div class="label">正式客户(不变)</div></div>
+  </div>
+  <h3>前端功能验收（22项 · 真实浏览器）</h3>
+  <div class="stats-grid">
+    <div class="stat-box pass"><div class="num">8</div><div class="label">PASS 通过</div></div>
+    <div class="stat-box warn"><div class="num">10</div><div class="label">PARTIAL 部分通过</div></div>
+    <div class="stat-box danger"><div class="num">0</div><div class="label">FAIL 失败</div></div>
+    <div class="stat-box block"><div class="num">1</div><div class="label">BLOCKED 受限</div></div>
+    <div class="stat-box"><div class="num">3</div><div class="label">NOT_TESTED 未测</div></div>
+    <div class="stat-box pass"><div class="num">22</div><div class="label">合计 ✓</div></div>
+  </div>
+</div>
+
+<!-- 数据完整性 -->
+<div class="card">
+  <h2>🔒 数据完整性验证</h2>
+  <table>
+    <tr><th>检查项</th><th>预期</th><th>实际</th><th>状态</th></tr>
+    <tr><td>customers.json MD5</td><td>23944c53722a667f27b29180ef6bdf17</td><td>23944c53722a667f27b29180ef6bdf17</td><td><span class="badge pass">未变</span></td></tr>
+    <tr><td>正式客户数量</td><td>28条</td><td>28条</td><td><span class="badge pass">未变</span></td></tr>
+    <tr><td>SQLite prospects计数</td><td>28条</td><td>28条</td><td><span class="badge pass">一致</span></td></tr>
+    <tr><td>权威数据源</td><td>SQLite</td><td>SQLite prospects表</td><td><span class="badge pass">已统一</span></td></tr>
+    <tr><td>JSON角色</td><td>只读legacy</td><td>只读兼容层</td><td><span class="badge pass">已确认</span></td></tr>
+  </table>
+  <p style="margin-top:12px;font-size:13px;color:#636e72;">直接验证：调用 <code>cm.add_customer()</code> 后，JSON MD5不变，SQLite计数+1，测试客户不在JSON中。</p>
+</div>
+
+<!-- 核心修复 -->
+<div class="card">
+  <h2>🛠️ 本轮核心修复</h2>
+
+  <div class="fix-item">
+    <div class="title">① JSON/SQLite双写一致性修复（P1-9）</div>
+    <div class="desc">
+      客户写操作统一到SQLite为权威源，customers.json保持只读。新增事务上下文管理器、级联删除、写入后验证。<code>customer_manager.py</code>的<code>_load()</code>合并读取SQLite活跃客户+JSON legacy（按id去重）。<br>
+      <strong>测试：</strong>test_dual_write_consistency.py · 13项全部通过（新增同步/更新同步/删除级联/失败回滚/重复检测/并发写入）
+    </div>
+  </div>
+
+  <div class="fix-item">
+    <div class="title">② SSRF TOCTOU / DNS rebinding修复</div>
+    <div class="desc">
+      自定义IP钉住HTTP连接处理器：解析+校验+连接压成同一步，消除二次DNS解析窗口。HTTPS使用<code>server_hostname=原域名</code>做SNI，Host头保留原域名。每次重定向重新校验。连接超时10s/读取30s/总超时60s/最大响应10MB。<br>
+      <strong>测试：</strong>test_ssrf_toctou.py · 8项全部通过（私网阻断/localhost阻断/DNS rebinding/IP钉住验证/重定向阻断/超时/大小限制/不安全协议）
+    </div>
+  </div>
+
+  <div class="fix-item">
+    <div class="title">③ 剩余P1问题修复（P1-10/11/12/13）</div>
+    <div class="desc">
+      <strong>P1-10</strong>：公司简介改为从<code>knowledge_facts.py</code>权威结构动态读取（36家合作工厂/160国/CE·FDA·LFGB·RoHS·FSC·BSCI·TÜV SÜD·SGS，无ISO9001/自有工厂）<br>
+      <strong>P1-11</strong>：manual_content.py登录页操作步骤从错粘的SEO步骤修正为正确登录流程<br>
+      <strong>P1-12</strong>：存储描述从"所有数据JSON"改为"SQLite 22表+legacy JSON兼容"<br>
+      <strong>P1-13</strong>：HealthManager冷却过期自动重置status，与is_available()一致
+    </div>
+  </div>
+
+  <div class="fix-item">
+    <div class="title">④ 5项部分通过功能修复</div>
+    <div class="desc">
+      DRAFT-02：WhatsApp话术下拉中文标签 · MODEL-03：视觉模型路由链可视化 · MODEL-08：本地模型能力标注 · TOOL-02/07：SKU卡片明确产品SEO+图片SEO能力
+    </div>
+  </div>
+
+  <div class="fix-item">
+    <div class="title">⑤ 登录锁定真正生效（P2）</div>
+    <div class="desc">
+      修复前：5次失败仅显示警告，正确密码仍可登录。修复后：5次失败设置60秒锁定，密码校验前检查锁定状态，冷却期内拒绝所有尝试。
+    </div>
+  </div>
+</div>
+
+<!-- 问题清单 -->
+<div class="card">
+  <h2>⚠️ 问题分级清单</h2>
+  <div class="stats-grid">
+    <div class="stat-box pass"><div class="num">0</div><div class="label">P0 致命</div></div>
+    <div class="stat-box pass"><div class="num">0</div><div class="label">P1 严重</div></div>
+    <div class="stat-box warn"><div class="num">2</div><div class="label">P2 中等</div></div>
+    <div class="stat-box"><div class="num">3</div><div class="label">P3 轻微</div></div>
+  </div>
+  <h3>P2 剩余问题</h3>
+  <table>
+    <tr><th>编号</th><th>描述</th><th>状态</th><th>影响</th></tr>
+    <tr><td><span class="badge p2">P2-01</span></td><td>新客户详情页活动日志显示"尚未在SQLite建档"（ID格式兼容）</td><td>已知</td><td>显示问题，数据已正确写入</td></tr>
+    <tr><td><span class="badge p2">P2-02</span></td><td>窄屏响应式测试受CDP视口调整限制</td><td>NOT_TESTED</td><td>低，桌面端为主</td></tr>
+  </table>
+  <h3>P3 剩余问题</h3>
+  <table>
+    <tr><th>编号</th><th>描述</th><th>状态</th></tr>
+    <tr><td><span class="badge p3">P3-01</span></td><td>工作流编辑器未找到独立UI入口</td><td>NOT_TESTED</td></tr>
+    <tr><td><span class="badge p3">P3-02</span></td><td>批量任务无活跃数据可测试暂停/继续/重试</td><td>NOT_TESTED</td></tr>
+    <tr><td><span class="badge p3">P3-03</span></td><td>停止请求后备用请求停止难以从UI验证</td><td>PARTIAL</td></tr>
+  </table>
+</div>
+
+<!-- 自动化测试 -->
+<div class="card">
+  <h2>🧪 自动化测试结果</h2>
+  <table>
+    <tr><th>测试文件</th><th>通过数</th><th>类型</th></tr>
+    <tr><td>test_model_routing.py</td><td>73</td><td>模型路由</td></tr>
+    <tr><td>test_customer_loop.py</td><td>76</td><td>客户闭环</td></tr>
+    <tr><td>test_p1_2d_drafts.py</td><td>35</td><td>草稿生成</td></tr>
+    <tr><td>test_p1_2c_prospect.py</td><td>28</td><td>潜客评估</td></tr>
+    <tr><td>test_p1_2_knowledge.py</td><td>27</td><td>知识库</td></tr>
+    <tr><td>test_p1_2b_knowledge.py</td><td>23</td><td>知识库</td></tr>
+    <tr><td>test_dual_write_consistency.py <span class="badge pass">新增</span></td><td>13</td><td>双写一致性</td></tr>
+    <tr><td>test_p1_security.py</td><td>22</td><td>安全</td></tr>
+    <tr><td>test_p1_3d_thinking.py</td><td>12</td><td>思维链</td></tr>
+    <tr><td>test_ssrf_toctou.py <span class="badge pass">新增</span></td><td>8</td><td>SSRF防护</td></tr>
+    <tr><td>test_p1_3c_local_draft.py</td><td>1</td><td>本地草稿</td></tr>
+    <tr><td>test_p1_4a_runtime.py</td><td>1</td><td>运行时</td></tr>
+    <tr style="font-weight:700;background:#f0f0f0;"><td>合计</td><td>317</td><td>全部通过 · 0失败</td></tr>
+  </table>
+  <p style="margin-top:10px;font-size:13px;color:#636e72;">编译检查：<code>python3 -m py_compile</code> 全部39个Python文件通过。无JS测试（无package.json）。</p>
+</div>
+
+<!-- 前端测试详情 -->
+<div class="card">
+  <h2>🖥️ 前端功能验收详情（真实浏览器 · 22项）</h2>
+  <table>
+    <tr><th>编号</th><th>功能类别</th><th>状态</th><th>备注</th></tr>
+    <tr><td>FE-01</td><td>启动和健康检查</td><td><span class="badge pass">PASS</span></td><td>页面加载正常</td></tr>
+    <tr><td>FE-02</td><td>登录/错误密码/锁定/恢复</td><td><span class="badge partial">PARTIAL</span></td><td>锁定已修复为真正生效</td></tr>
+    <tr><td>FE-03</td><td>主导航和返回逻辑</td><td><span class="badge pass">PASS</span></td><td>各页面导航正常</td></tr>
+    <tr><td>FE-04</td><td>页面加载/空/加载/错误状态</td><td><span class="badge partial">PARTIAL</span></td><td></td></tr>
+    <tr><td>FE-05</td><td>表单校验和取消操作</td><td><span class="badge pass">PASS</span></td><td>必填校验+取消正常</td></tr>
+    <tr><td>FE-06</td><td>新增/编辑/删除/二次确认</td><td><span class="badge partial">PARTIAL</span></td><td>新增+防重复通过</td></tr>
+    <tr><td>FE-07</td><td>保存后刷新仍然存在</td><td><span class="badge partial">PARTIAL</span></td><td></td></tr>
+    <tr><td>FE-08</td><td>重复点击不产生重复数据</td><td><span class="badge pass">PASS</span></td><td>防重复检测生效</td></tr>
+    <tr><td>FE-09</td><td>客户列表/详情/任务/活动日志</td><td><span class="badge partial">PARTIAL</span></td><td>新客户活动日志兼容(P2)</td></tr>
+    <tr><td>FE-10</td><td>知识库打开/搜索/筛选/AI引用</td><td><span class="badge pass">PASS</span></td><td>588文档/15分类，搜索正常</td></tr>
+    <tr><td>FE-11</td><td>模型自动路由</td><td><span class="badge pass">PASS</span></td><td>文本4节点+视觉3节点</td></tr>
+    <tr><td>FE-12</td><td>模型手动切换</td><td><span class="badge pass">PASS</span></td><td></td></tr>
+    <tr><td>FE-13</td><td>故障转移</td><td><span class="badge partial">PARTIAL</span></td><td>链显示正常</td></tr>
+    <tr><td>FE-14</td><td>停止请求后备用请求停止</td><td><span class="badge partial">PARTIAL</span></td><td>UI难以验证</td></tr>
+    <tr><td>FE-15</td><td>本地模型锁/加载/卸载</td><td><span class="badge partial">PARTIAL</span></td><td>Ollama 5模型在线</td></tr>
+    <tr><td>FE-16</td><td>工作流节点操作</td><td><span class="badge notested">NOT_TESTED</span></td><td>未找到独立入口</td></tr>
+    <tr><td>FE-17</td><td>工作流保存/导入/导出</td><td><span class="badge notested">NOT_TESTED</span></td><td>同FE-16</td></tr>
+    <tr><td>FE-18</td><td>图片/视频/文案/Office</td><td><span class="badge blocked">BLOCKED</span></td><td>云端生成产生费用</td></tr>
+    <tr><td>FE-19</td><td>批量任务暂停/继续/重试</td><td><span class="badge notested">NOT_TESTED</span></td><td>无活跃批量任务</td></tr>
+    <tr><td>FE-20</td><td>历史记录和状态恢复</td><td><span class="badge partial">PARTIAL</span></td><td></td></tr>
+    <tr><td>FE-21</td><td>宽屏/窄屏/刷新</td><td><span class="badge partial">PARTIAL</span></td><td>窄屏CDP受限</td></tr>
+    <tr><td>FE-22</td><td>页面无密码/API Key/路径</td><td><span class="badge pass">PASS</span></td><td>无敏感信息泄露</td></tr>
+  </table>
+  <p style="margin-top:10px;font-size:13px;color:#636e72;">截图证据：11张关键功能截图，保存于 <code>screenshots/</code> 目录。</p>
+</div>
+
+<!-- 修改文件 -->
+<div class="card">
+  <h2>📝 修改文件清单（9修改 + 2新增）</h2>
+  <table>
+    <tr><th>文件</th><th>变更</th><th>目的</th></tr>
+    <tr><td>customer_manager.py</td><td>+466/-218</td><td>双写一致性：统一写入SQLite，合并读取</td></tr>
+    <tr><td>repository.py</td><td>+144</td><td>事务/级联删除/写入验证/新列</td></tr>
+    <tr><td>website_evidence.py</td><td>+253</td><td>SSRF TOCTOU：IP钉住连接处理器</td></tr>
+    <tr><td>app.py</td><td>+68/-4</td><td>登录锁定生效/5项部分通过修复</td></tr>
+    <tr><td>knowledge_facts.py</td><td>+32</td><td>权威公司简介数据结构</td></tr>
+    <tr><td>knowledge_base.py</td><td>+14</td><td>get_company_brief动态读取</td></tr>
+    <tr><td>model_registry.py</td><td>+26</td><td>HealthManager冷却自愈</td></tr>
+    <tr><td>manual_content.py</td><td>+6</td><td>登录步骤/存储描述修正</td></tr>
+    <tr><td>test_p1_security.py</td><td>+65</td><td>适配新SQLite架构的测试隔离</td></tr>
+    <tr><td>test_dual_write_consistency.py</td><td>新增</td><td>双写一致性回归测试(13项)</td></tr>
+    <tr><td>test_ssrf_toctou.py</td><td>新增</td><td>SSRF DNS rebinding回归测试(8项)</td></tr>
+  </table>
+</div>
+
+<!-- 交付判定 -->
+<div class="card">
+  <h2>✅ 交付判定标准（10项）</h2>
+  <ul class="checklist">
+    <li><strong>P0问题为0</strong> — 已满足，P0=0</li>
+    <li><strong>P1问题为0</strong> — 已满足，P1-9/10/11/12/13全部修复</li>
+    <li><strong>JSON/SQLite写入路径统一并通过回滚测试</strong> — 已满足，13项双写测试通过</li>
+    <li><strong>SSRF TOCTOU已修复</strong> — 已满足，自定义IP钉住处理器，8项DNS rebinding测试通过</li>
+    <li><strong>核心流程真实浏览器通过</strong> — 已满足，登录/导航/客户中心/知识库/模型管理/故障转移无FAIL</li>
+    <li><strong>PASS+PARTIAL+FAIL+BLOCKED+NOT_TESTED=总数</strong> — 已满足，8+10+0+1+3=22</li>
+    <li><strong>customers.json未被意外修改</strong> — 已满足，MD5=23944c53722a667f27b29180ef6bdf17</li>
+    <li><strong>正式客户数量没有变化</strong> — 已满足，28条不变</li>
+    <li class="pending"><strong>工作区干净</strong> — 待提交推送后满足</li>
+    <li class="pending"><strong>当前提交和最终标签已推送GitHub</strong> — 待提交推送后满足</li>
+  </ul>
+</div>
+
+<!-- 剩余风险 -->
+<div class="card">
+  <h2>⚠️ 剩余风险</h2>
+  <div class="risk-item">新客户详情页活动日志显示兼容问题（P2-01），不影响数据写入正确性</div>
+  <div class="risk-item">工作流编辑器未找到独立入口，功能存在性需后续确认（P3-01）</div>
+  <div class="risk-item">云端图片/视频生成功能未测试（BLOCKED，产生费用）</div>
+  <div class="risk-item">窄屏响应式未完整验证（CDP视口调整限制）</div>
+  <div class="risk-item">SQLite并发写入依赖WAL模式和busy_timeout=5000，高并发场景需监控</div>
+</div>
+
+<!-- 演示操作顺序 -->
+<div class="card">
+  <h2>🎯 明天演示操作顺序</h2>
+  <div class="demo-step"><div class="num">1</div><div class="text">打开 http://localhost:8501/，输入密码登录</div></div>
+  <div class="demo-step"><div class="num">2</div><div class="text">展示仪表盘：28客户、AI引擎状态、文本+视觉故障转移链</div></div>
+  <div class="demo-step"><div class="num">3</div><div class="text">客户中心→客户列表：28条正式客户（A3/B16/C9）</div></div>
+  <div class="demo-step"><div class="num">4</div><div class="text">客户中心→新增客户：填写→保存→防重复检测→刷新确认持久化</div></div>
+  <div class="demo-step"><div class="num">5</div><div class="text">客户中心→客户详情：跟进任务、活动日志</div></div>
+  <div class="demo-step"><div class="num">6</div><div class="text">知识库：搜索"MOQ"→20条结果，15分类/588文档</div></div>
+  <div class="demo-step"><div class="num">7</div><div class="text">设置中心：模型路由链(文本4/视觉3)、Ollama 5模型、供应商切换</div></div>
+  <div class="demo-step"><div class="num">8</div><div class="text">AI工具库：9工具/4分类，云端生图为付费功能</div></div>
+  <div class="demo-step"><div class="num">9</div><div class="text">精准客户开发：ICP评估→开发信生成→存档为客户</div></div>
+  <div class="demo-step"><div class="num">10</div><div class="text">数据看板：销售管道5阶段、近30天新增、跟进提醒</div></div>
+  <div class="demo-step"><div class="num">11</div><div class="text">登录安全：错误密码→5次锁定→60秒冷却→恢复</div></div>
+</div>
+
+<div class="footer">
+  <p>KaiLionCrafts AI客户开发工作台 · 可交付版本最终审计报告 · 2026-10-02</p>
+  <p>本报告仅覆盖真实测试通过的范围。未测试功能不标记为已验证可用。报告不含密码、API Key或客户隐私信息。</p>
+</div>
+
+</div>
+</body>
+</html>

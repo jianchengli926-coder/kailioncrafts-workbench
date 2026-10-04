@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaiLionCrafts · 4K 独立站主图矩阵系统 (纯净画质无缝版)</title>
+<style>
+  :root {
+    --bg: #09090b; --surface: #121218; --panel: #181822; --border: #2c2c3e;
+    --gold: #c9a84c; --success: #3ecf8e; --danger: #ef4444; --info: #3b82f6; --text: #f4f4f7; --muted: #71717a; --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 30px; }
+  .container { max-width: 1750px; margin: 0 auto; }
+  
+  header { text-align: center; margin-bottom: 25px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+  header h1 { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+  header p { color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .highlight { color: var(--success); font-weight: bold; }
+
+  .upload-box { border: 2px dashed #444; background: var(--surface); padding: 45px; text-align: center; border-radius: var(--radius); cursor: pointer; transition: all 0.3s ease; margin-bottom: 25px; }
+  .upload-box:hover { border-color: var(--success); background: #161624; }
+  .upload-box p { font-size: 16px; color: #ccc; font-weight: 500; }
+  
+  .global-bar { display: flex; justify-content: space-between; align-items: center; background: var(--panel); padding: 15px 25px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 30px; gap: 15px; flex-wrap: wrap; }
+  .global-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  
+  .btn { background: #fff; color: #000; border: none; padding: 12px 22px; font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; }
+  .btn:hover { background: #e4e4e7; }
+  .btn:disabled { background: #27273a; color: #52525b; cursor: not-allowed; }
+  .btn-success { background: var(--success); color: #000; font-size: 15px; }
+  .btn-success:hover { background: #34b37a; }
+  .btn-outline { background: transparent; color: #fff; border: 1px solid var(--border); }
+  .btn-outline:hover { background: #222232; border-color: #666; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 25px; }
+  .card { background: var(--surface); border-radius: var(--radius); padding: 18px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; transition: all 0.2s ease; cursor: pointer; position: relative; overflow: hidden; }
+  .card.active-card { border-color: var(--success); box-shadow: 0 0 15px rgba(62, 207, 142, 0.2); }
+  
+  .card-header { display: flex; justify-content: space-between; align-items: center; background: #09090b; padding: 6px 10px; border-radius: 4px; border: 1px solid #1f1f2e; }
+  .card-title { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+  .card-category { font-size: 12px; font-weight: bold; color: var(--gold); background: rgba(201, 168, 76, 0.1); padding: 2px 6px; border-radius: 4px;}
+
+  .canvas-container { width: 100%; aspect-ratio: 1; background: #fff; border-radius: 8px; overflow: hidden; position: relative; border: 1px solid #000; user-select: none; }
+  .canvas-container canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+
+  .engine-selector { display: flex; background: #09090b; padding: 4px; border-radius: 6px; border: 1px solid var(--border); }
+  .engine-btn { flex: 1; background: transparent; border: none; color: var(--muted); padding: 8px 4px; font-size: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; transition: all 0.2s; }
+  .engine-btn.active { background: #222232; color: #fff; border: 1px solid #444; }
+
+  .control-ui { display: flex; flex-direction: column; gap: 10px; background: var(--panel); padding: 14px; border-radius: 8px; border: 1px solid #222232; width: 100%; overflow: hidden; }
+  .ui-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #d4d4d8; gap: 8px; width: 100%; }
+  .ui-row span { width: 105px; font-weight: 500; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ui-row input[type="range"] { flex: 1; min-width: 60px; accent-color: var(--success); height: 5px; cursor: pointer; }
+  
+  .val-input-box { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  .val-input { width: 58px; background: #09090b; border: 1px solid #3c3c54; color: var(--success); font-weight: bold; border-radius: 4px; padding: 3px 4px; text-align: right; font-family: monospace; font-size: 12px; outline: none; transition: all 0.2s; }
+  .val-input:focus { border-color: var(--success); background: #181822; }
+  .unit-text { color: var(--muted); font-size: 11px; font-weight: bold; width: 16px; text-align: center; }
+
+  .corner-details { background: #111118; border: 1px solid #282838; border-radius: 6px; padding: 10px; margin-top: 2px; width: 100%; }
+  .corner-summary { font-size: 12px; font-weight: bold; color: var(--gold); cursor: pointer; outline: none; padding: 2px 0; }
+  .corner-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; width: 100%; }
+
+  .btn-group { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
+  .btn-action { background: #222235; color: #f4f4f7; border: 1px solid #3c3c54; padding: 8px 2px; font-size: 11px; font-weight: 500; border-radius: 5px; cursor: pointer; transition: all 0.2s; text-align: center; }
+  .btn-action:hover { background: #2d2d44; border-color: #4f4f70; }
+
+  .global-scale-box { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #d4d4d8; background: #09090b; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border); }
+  .global-scale-box input[type="range"] { width: 140px; accent-color: var(--success); cursor: pointer; height: 5px; }
+  .global-scale-box input[type="number"] { width: 60px; background: #222232; border: 1px solid #444; color: var(--success); font-weight: bold; border-radius: 4px; padding: 4px; text-align: center; font-family: monospace; outline: none; transition: border 0.2s; }
+  .global-scale-box input[type="number"]:focus { border-color: var(--success); }
+  .global-scale-box .unit { color: var(--muted); font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>KaiLionCrafts · 4K 独立站主图矩阵系统</h1>
+        <p>🚀 完美升级：<span class="highlight">无缝覆盖算法已启用</span> ｜ 消除抗锯齿白线网格 ｜ 100% 纯净高保真 PNG 输出</p>
+    </header>
+
+    <div class="upload-box" onclick="document.getElementById('imageLoader').click()">
+        <p>📥 批量拖拽或点击上传图片（支持刀剪、托盘、勺子、打蛋器、夹子、锅具等全品类厨具）</p>
+        <input type="file" id="imageLoader" multiple accept="image/*" style="display: none" onchange="importImages(this.files)">
+    </div>
+
+    <div class="global-bar">
+        <div id="statusReport" style="font-size: 14px; font-weight: 500; color: #a1a1aa;">等待导入主图原画...</div>
+        <div class="global-controls">
+            <div class="global-scale-box">
+                <span>🔄 全局统一旋转:</span>
+                <input type="range" id="globalAngleSlider" min="-180" max="180" value="0" step="0.1" oninput="updateGlobalAngle(this.value, 'slider')">
+                <input type="number" id="globalAngleInput" min="-180" max="180" value="0" step="0.1" oninput="updateGlobalAngle(this.value, 'input')">
+                <span class="unit">°</span>
+            </div>
+            
+            <div class="global-scale-box">
+                <span>🎯 全局安全框:</span>
+                <input type="range" id="globalScaleSlider" min="10" max="150" value="88" oninput="updateGlobalScale(this.value, 'slider')">
+                <input type="number" id="globalScaleInput" min="10" max="150" value="88" oninput="updateGlobalScale(this.value, 'input')">
+                <span class="unit">%</span>
+            </div>
+            <button id="globalFlipBtn" class="btn btn-outline" disabled onclick="toggleGlobalFlipH()">全员强制：左右反转</button>
+            <button id="downloadPackBtn" class="btn btn-success" disabled onclick="exportAllImagesDirectly()">✨ 一键直接导出所有 4K 纯净 PNG</button>
+        </div>
+    </div>
+
+    <div class="grid" id="workspaceGrid"></div>
+</div>
+
+<script>
+let imageItems = [];
+const MASTER_SIZE = 4000; 
+const PREVIEW_SIZE = 800; 
+let globalTargetPercent = 88; 
+
+function updateGuidesToSafeBox(item) {
+    let currentTargetSize = MASTER_SIZE * (globalTargetPercent / 100);
+    let halfBox = currentTargetSize / 2;
+    let center = MASTER_SIZE / 2;
+    item.guides = {
+        top: center - halfBox,
+        bottom: center + halfBox,
+        left: center - halfBox,
+        right: center + halfBox
+    };
+}
+
+function removeNoiseAndWatermarks(points) {
+    if(points.length < 100) return points;
+    let sumX = 0, sumY = 0;
+    for(let i = 0; i < points.length; i++) { sumX += points[i].dx; sumY += points[i].dy; }
+    let meanX = sumX / points.length; let meanY = sumY / points.length;
+    let varX = 0, varY = 0;
+    for(let i = 0; i < points.length; i++) { varX += Math.pow(points[i].dx - meanX, 2); varY += Math.pow(points[i].dy - meanY, 2); }
+    let stdX = Math.sqrt(varX / points.length); let stdY = Math.sqrt(varY / points.length);
+    
+    let validPoints = [];
+    for(let i = 0; i < points.length; i++) {
+        if (Math.abs(points[i].dx - meanX) <= stdX * 4 && Math.abs(points[i].dy - meanY) <= stdY * 4) {
+            validPoints.push(points[i]);
+        }
+    }
+    return validPoints.length > 0 ? validPoints : points;
+}
+
+async function importImages(files) {
+    if (!files.length) return;
+    const grid = document.getElementById('workspaceGrid');
+    const downloadPackBtn = document.getElementById('downloadPackBtn');
+    const globalFlipBtn = document.getElementById('globalFlipBtn');
+    const statusReport = document.getElementById('statusReport');
+    
+    grid.innerHTML = ''; imageItems = [];
+    downloadPackBtn.disabled = true; globalFlipBtn.disabled = true;
+
+    // 重置全局旋转角度UI
+    document.getElementById('globalAngleSlider').value = 0;
+    document.getElementById('globalAngleInput').value = 0;
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+            statusReport.innerText = `⚙️ 正在执行全厨具识别与透视引擎... (${i + 1} / ${files.length})`;
+            const item = await processItemWithDualEngine(file);
+            imageItems.push(item); buildCardUI(item, grid);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+    
+    statusReport.innerText = `✅ 处理完毕！完美去网格算法已生效，支持直接拖拽金点或使用透视滑块。`;
+    downloadPackBtn.disabled = false; globalFlipBtn.disabled = false;
+}
+
+function processItemWithDualEngine(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const scanCanvas = document.createElement('canvas');
+                scanCanvas.width = img.width; scanCanvas.height = img.height;
+                const scanCtx = scanCanvas.getContext('2d'); scanCtx.drawImage(img, 0, 0);
+                const imgData = scanCtx.getImageData(0, 0, img.width, img.height).data;
+
+                let rawPoints = [];
+                const cx = img.width / 2; const cy = img.height / 2;
+                let pixelStep = img.width * img.height > 1000000 ? Math.ceil(Math.max(img.width, img.height) / 1200) : 1;
+                
+                for (let y = 0; y < img.height; y += pixelStep) {
+                    for (let x = 0; x < img.width; x += pixelStep) {
+                        const idx = (y * img.width + x) * 4;
+                        const r = imgData[idx], g = imgData[idx+1], b = imgData[idx+2], a = imgData[idx+3];
+                        const isBg = (r > 240 && g > 240 && b > 240);
+                        if (a > 40 && !isBg) rawPoints.push({ dx: x - cx, dy: y - cy });
+                    }
+                }
+                if(rawPoints.length === 0) rawPoints.push({dx:-10,dy:-10},{dx:10,dy:10}); 
+                const points = removeNoiseAndWatermarks(rawPoints);
+
+                const anglePCA = calculatePCAAngle(points);
+                const angleMinBox = calculateMinHeightAngle(points);
+
+                const item = {
+                    file: file, img: img, points: points,
+                    anglePCA: anglePCA, angleMinBox: angleMinBox,
+                    currentEngine: 'box', 
+                    bestAngle: 0, rcx: 0, rcy: 0, scale: 1, localScaleModifier: 100, 
+                    baseLength: 0, baseHeight: 0, 
+                    angle: 0, 
+                    macroPerspective: { vert: 0, horiz: 0, skew: 0 },
+                    corners: {
+                        tl: { x: 0, y: 0 },
+                        tr: { x: 0, y: 0 },
+                        bl: { x: 0, y: 0 },
+                        br: { x: 0, y: 0 }
+                    },
+                    offsetX: 0, offsetY: 0, flipH: false, flipV: false, showGuides: true, categoryTag: '未分类',
+                    canvas: document.createElement('canvas'),
+                    guidesCustomized: false,
+                    guides: { top: 0, bottom: 0, left: 0, right: 0 },
+                    uiRef: null
+                };
+                item.canvas.width = PREVIEW_SIZE; item.canvas.height = PREVIEW_SIZE;
+                updateGuidesToSafeBox(item);
+                
+                executeEngineRecompute(item); resolve(item);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function calculatePCAAngle(points) {
+    let mX = 0, mY = 0;
+    for (let i = 0; i < points.length; i++) { mX += points[i].dx; mY += points[i].dy; }
+    mX /= points.length; mY /= points.length;
+    let cXX = 0, cXY = 0, cYY = 0;
+    for (let i = 0; i < points.length; i++) {
+        let x = points[i].dx - mX; let y = points[i].dy - mY;
+        cXX += x * x; cXY += x * y; cYY += y * y;
+    }
+    return -0.5 * Math.atan2(2 * cXY, cXX - cYY) * (180 / Math.PI);
+}
+
+function calculateMinHeightAngle(points) {
+    let minH = Infinity; let bestAngle = 0;
+    let step = Math.max(1, Math.floor(points.length / 800));
+    for (let a = -90; a < 90; a += 1) {
+        let rad = (a * Math.PI) / 180;
+        let cos = Math.cos(rad), sin = Math.sin(rad);
+        let minRy = Infinity, maxRy = -Infinity;
+        for (let k = 0; k < points.length; k += step) {
+            let ry = points[k].dx * sin + points[k].dy * cos;
+            if (ry < minRy) minRy = ry; if (ry > maxRy) maxRy = ry;
+        }
+        if (maxRy - minRy < minH) { minH = maxRy - minRy; bestAngle = a; }
+    }
+    return bestAngle;
+}
+
+// 💡 核心新增函数：根据当前手动旋转角度，动态计算铺满 88% 安全框所需的基准缩放比
+function calculateRotatedScale(item) {
+    let currentTargetSize = MASTER_SIZE * (globalTargetPercent / 100);
+    let radBest = (item.bestAngle * Math.PI) / 180;
+    let cosB = Math.cos(radBest), sinB = Math.sin(radBest);
+    
+    let radMan = (item.angle * Math.PI) / 180;
+    let cosM = Math.cos(radMan), sinM = Math.sin(radMan);
+    
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    
+    for (let i = 0; i < item.points.length; i++) {
+        let p = item.points[i];
+        let rx = p.dx * cosB - p.dy * sinB - item.rcx;
+        let ry = p.dx * sinB + p.dy * cosB - item.rcy;
+        
+        let rotX = rx * cosM - ry * sinM;
+        let rotY = rx * sinM + ry * cosM;
+        
+        if (rotX < minX) minX = rotX;
+        if (rotX > maxX) maxX = rotX;
+        if (rotY < minY) minY = rotY;
+        if (rotY > maxY) maxY = rotY;
+    }
+    
+    let rotW = maxX - minX;
+    let rotH = maxY - minY;
+    let maxDim = Math.max(rotW, rotH);
+    
+    return maxDim > 0 ? (currentTargetSize / maxDim) : 1;
+}
+
+function updateGlobalScale(val, source) {
+    let numVal = parseFloat(val);
+    if (isNaN(numVal)) return;
+    globalTargetPercent = numVal;
+
+    if (source === 'slider') {
+        document.getElementById('globalScaleInput').value = numVal;
+    } else if (source === 'input') {
+        document.getElementById('globalScaleSlider').value = numVal;
+    }
+
+    if (!imageItems.length) return;
+    
+    requestAnimationFrame(() => {
+        imageItems.forEach(item => {
+            item.scale = calculateRotatedScale(item);
+            if (!item.guidesCustomized) {
+                updateGuidesToSafeBox(item);
+            }
+            executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false);
+        });
+    });
+}
+
+// ✨ 新增逻辑：全局统一修改旋转角度
+function updateGlobalAngle(val, source) {
+    let numVal = parseFloat(val);
+    if (isNaN(numVal)) return;
+
+    if (source === 'slider') {
+        document.getElementById('globalAngleInput').value = numVal;
+    } else if (source === 'input') {
+        document.getElementById('globalAngleSlider').value = numVal;
+    }
+
+    if (!imageItems.length) return;
+    
+    requestAnimationFrame(() => {
+        imageItems.forEach(item => {
+            item.angle = numVal;
+            // 同步更新每张卡片内的UI滑块状态
+            if (item.uiRef) {
+                updateSliderValue(item.uiRef, '🔄 角度平面旋转', numVal);
+            }
+            executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false);
+        });
+    });
+}
+
+function executeEngineRecompute(item) {
+    item.bestAngle = (item.currentEngine === 'pca') ? item.anglePCA : item.angleMinBox;
+    
+    let rad = (item.bestAngle * Math.PI) / 180;
+    let cos = Math.cos(rad), sin = Math.sin(rad);
+    
+    let minRx = Infinity, maxRx = -Infinity, minRy = Infinity, maxRy = -Infinity;
+    for (let i = 0; i < item.points.length; i++) {
+        let rx = item.points[i].dx * cos - item.points[i].dy * sin;
+        let ry = item.points[i].dx * sin + item.points[i].dy * cos;
+        if (rx < minRx) minRx = rx; if (rx > maxRx) maxRx = rx;
+        if (ry < minRy) minRy = ry; if (ry > maxRy) maxRy = ry;
+    }
+
+    item.rcx = (minRx + maxRx) / 2; item.rcy = (minRy + maxRy) / 2;
+    item.baseLength = maxRx - minRx;
+    item.baseHeight = maxRy - minRy;
+    
+    let aspectRatio = item.baseLength / item.baseHeight; 
+    let zone5 = item.baseLength * 0.05; let zone20 = item.baseLength * 0.20;
+    
+    let l5 = {minY: Infinity, maxY: -Infinity}, l20 = {minY: Infinity, maxY: -Infinity, count: 0};
+    let r5 = {minY: Infinity, maxY: -Infinity}, r20 = {minY: Infinity, maxY: -Infinity, count: 0};
+
+    for (let i = 0; i < item.points.length; i++) {
+        let rx = item.points[i].dx * cos - item.points[i].dy * sin;
+        let ry = item.points[i].dx * sin + item.points[i].dy * cos;
+        
+        if (rx <= minRx + zone5) { if(ry < l5.minY) l5.minY = ry; if(ry > l5.maxY) l5.maxY = ry; }
+        if (rx <= minRx + zone20) { if(ry < l20.minY) l20.minY = ry; if(ry > l20.maxY) l20.maxY = ry; l20.count++; }
+        
+        if (rx >= maxRx - zone5) { if(ry < r5.minY) r5.minY = ry; if(ry > r5.maxY) r5.maxY = ry; }
+        if (rx >= maxRx - zone20) { if(ry < r20.minY) r20.minY = ry; if(ry > r20.maxY) r20.maxY = ry; r20.count++; }
+    }
+
+    let hL5 = l5.maxY === -Infinity ? 0 : (l5.maxY - l5.minY);
+    let hL20 = l20.maxY === -Infinity ? 0 : (l20.maxY - l20.minY);
+    let hR5 = r5.maxY === -Infinity ? 0 : (r5.maxY - r5.minY);
+    let hR20 = r20.maxY === -Infinity ? 0 : (r20.maxY - r20.minY);
+
+    let taperL = hL20 > 0 ? (hL5 / hL20) : 1;
+    let taperR = hR20 > 0 ? (hR5 / hR20) : 1;
+
+    let handleIsLeft = false;
+
+    if (aspectRatio >= 2.0) {
+        if (taperL > 0.55 && taperR > 0.55) { handleIsLeft = hL20 < hR20; } else { handleIsLeft = taperL > taperR; }
+        if (Math.abs(hL20 - hR20) / Math.max(hL20, hR20) > 0.35) {
+            item.categoryTag = '🔪 厨刀/户外刀 (水平)';
+        } else {
+            item.categoryTag = '🥄 长条厨具(勺/打蛋器/夹) (水平)';
+        }
+    } else if (aspectRatio >= 1.25 && aspectRatio < 2.0) {
+        item.categoryTag = '🥔 削皮刀/剪刀 (水平)';
+        if (taperL > 0.55 && taperR > 0.55) { handleIsLeft = hL20 > hR20; } else { handleIsLeft = taperL > taperR; }
+    } else {
+        item.categoryTag = '🍳 厨房锅具/托盘/配件 (垂直/长方)';
+        handleIsLeft = false;
+    }
+
+    item.flipH = handleIsLeft;
+    item.scale = calculateRotatedScale(item);
+
+    executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false);
+}
+
+function getEffectiveCorners(item) {
+    const v = item.macroPerspective.vert * 4; 
+    const h = item.macroPerspective.horiz * 4; 
+    const s = item.macroPerspective.skew * 3;  
+
+    return {
+        tl: { x: item.corners.tl.x - v + s, y: item.corners.tl.y - h },
+        tr: { x: item.corners.tr.x + v + s, y: item.corners.tr.y + h },
+        bl: { x: item.corners.bl.x + v - s, y: item.corners.bl.y - h },
+        br: { x: item.corners.br.x - v - s, y: item.corners.br.y + h }
+    };
+}
+
+function drawPerspectiveMesh(ctx, item, effCorners, gridN = 16) {
+    const img = item.img;
+    let HW = item.baseLength ? (item.baseLength / 2) : (img.width / 2);
+    let HH = item.baseHeight ? (item.baseHeight / 2) : (img.height / 2);
+
+    const cTL = { x: -HW + effCorners.tl.x, y: -HH + effCorners.tl.y };
+    const cTR = { x:  HW + effCorners.tr.x, y: -HH + effCorners.tr.y };
+    const cBL = { x: -HW + effCorners.bl.x, y:  HH + effCorners.bl.y };
+    const cBR = { x:  HW + effCorners.br.x, y:  HH + effCorners.br.y };
+
+    function getTargetPt(s, t) {
+        return {
+            x: (1 - s) * (1 - t) * cTL.x + s * (1 - t) * cTR.x + (1 - s) * t * cBL.x + s * t * cBR.x,
+            y: (1 - s) * (1 - t) * cTL.y + s * (1 - t) * cTR.y + (1 - s) * t * cBL.y + s * t * cBR.y
+        };
+    }
+
+    function drawTri(p0, p1, p2, q0, q1, q2) {
+        const denom = (p1.x - p0.x) * (p2.y - p0.y) - (p2.x - p0.x) * (p1.y - p0.y);
+        if (Math.abs(denom) < 1e-6) return;
+
+        const a = ((q1.x - q0.x) * (p2.y - p0.y) - (q2.x - q0.x) * (p1.y - p0.y)) / denom;
+        const b = ((q1.y - q0.y) * (p2.y - p0.y) - (q2.y - q0.y) * (p1.y - p0.y)) / denom;
+        const c = ((p1.x - p0.x) * (q2.x - q0.x) - (p2.x - p0.x) * (q1.x - q0.x)) / denom;
+        const d = ((p1.x - p0.x) * (q2.y - q0.y) - (p2.x - p0.x) * (q1.y - q0.y)) / denom;
+        const e = q0.x - a * p0.x - c * p0.y;
+        const f = q0.y - b * p0.x - d * p0.y;
+
+        const cx = (q0.x + q1.x + q2.x) / 3;
+        const cy = (q0.y + q1.y + q2.y) / 3;
+        const inflateAmount = 0.75; 
+
+        function inflate(p) {
+            const dx = p.x - cx;
+            const dy = p.y - cy;
+            const len = Math.hypot(dx, dy);
+            if (len === 0) return p;
+            return {
+                x: p.x + (dx / len) * inflateAmount,
+                y: p.y + (dy / len) * inflateAmount
+            };
+        }
+
+        const iq0 = inflate(q0);
+        const iq1 = inflate(q1);
+        const iq2 = inflate(q2);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(iq0.x, iq0.y);
+        ctx.lineTo(iq1.x, iq1.y);
+        ctx.lineTo(iq2.x, iq2.y);
+        ctx.closePath();
+        ctx.clip();
+
+        ctx.transform(a, b, c, d, e, f);
+        ctx.drawImage(img, 0, 0);
+        ctx.restore();
+    }
+
+    const rad = -(item.bestAngle || 0) * Math.PI / 180;
+    const cosB = Math.cos(rad);
+    const sinB = Math.sin(rad);
+    const cx = img.width / 2;
+    const cy = img.height / 2;
+
+    function getSourcePt(s, t) {
+        const u = -HW + s * (2 * HW);
+        const v = -HH + t * (2 * HH);
+
+        const rx = u + item.rcx;
+        const ry = v + item.rcy;
+
+        const dx = rx * cosB - ry * sinB;
+        const dy = rx * sinB + ry * cosB;
+
+        return { x: dx + cx, y: dy + cy };
+    }
+
+    for (let i = 0; i < gridN; i++) {
+        const s0 = i / gridN, s1 = (i + 1) / gridN;
+        for (let j = 0; j < gridN; j++) {
+            const t0 = j / gridN, t1 = (j + 1) / gridN;
+
+            const p0 = getSourcePt(s0, t0);
+            const p1 = getSourcePt(s1, t0);
+            const p2 = getSourcePt(s0, t1);
+            const p3 = getSourcePt(s1, t1);
+
+            const q0 = getTargetPt(s0, t0);
+            const q1 = getTargetPt(s1, t0);
+            const q2 = getTargetPt(s0, t1);
+            const q3 = getTargetPt(s1, t1);
+
+            drawTri(p0, p1, p2, q0, q1, q2);
+            drawTri(p1, p3, p2, q1, q3, q2);
+        }
+    }
+}
+
+function executeRenderPipeline(item, targetCanvas, canvasSize, isExport = false) {
+    // 💡 关键机制：在渲染前根据旋转角更新基准 scale，使其时刻保持 88% 铺满状态
+    item.scale = calculateRotatedScale(item);
+
+    const ctx = targetCanvas.getContext('2d');
+    ctx.fillStyle = '#FFFFFF'; 
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+    ctx.save();
+    const ratio = canvasSize / MASTER_SIZE; 
+    ctx.scale(ratio, ratio); 
+
+    ctx.save();
+    ctx.translate(MASTER_SIZE / 2 + item.offsetX, MASTER_SIZE / 2 + item.offsetY);
+    ctx.rotate(item.angle * Math.PI / 180);
+    
+    if (item.flipH) ctx.scale(-1, 1);
+    if (item.flipV) ctx.scale(1, -1);
+    
+    let finalRenderScale = item.scale * (item.localScaleModifier / 100);
+    ctx.scale(finalRenderScale, finalRenderScale);
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = isExport ? 'high' : 'medium';
+    
+    const effCorners = getEffectiveCorners(item);
+
+    drawPerspectiveMesh(ctx, item, effCorners, isExport ? 24 : 16);
+
+    if (item.showGuides && !isExport) {
+        let HW = item.baseLength ? (item.baseLength / 2) : (item.img.width / 2);
+        let HH = item.baseHeight ? (item.baseHeight / 2) : (item.img.height / 2);
+
+        const cTL = { x: -HW + effCorners.tl.x, y: -HH + effCorners.tl.y };
+        const cTR = { x:  HW + effCorners.tr.x, y: -HH + effCorners.tr.y };
+        const cBL = { x: -HW + effCorners.bl.x, y:  HH + effCorners.bl.y };
+        const cBR = { x:  HW + effCorners.br.x, y:  HH + effCorners.br.y };
+
+        ctx.strokeStyle = '#c9a84c';
+        ctx.lineWidth = 3 / finalRenderScale;
+        ctx.setLineDash([10 / finalRenderScale, 6 / finalRenderScale]);
+        ctx.beginPath();
+        ctx.moveTo(cTL.x, cTL.y); ctx.lineTo(cTR.x, cTR.y);
+        ctx.lineTo(cBR.x, cBR.y); ctx.lineTo(cBL.x, cBL.y);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const handlePts = [
+            { pt: cTL, name: 'TL' }, { pt: cTR, name: 'TR' },
+            { pt: cBL, name: 'BL' }, { pt: cBR, name: 'BR' }
+        ];
+
+        handlePts.forEach(h => {
+            ctx.beginPath();
+            ctx.arc(h.pt.x, h.pt.y, 16 / finalRenderScale, 0, Math.PI * 2);
+            ctx.fillStyle = '#c9a84c';
+            ctx.fill();
+            ctx.lineWidth = 3 / finalRenderScale;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(h.pt.x, h.pt.y, 6 / finalRenderScale, 0, Math.PI * 2);
+            ctx.fillStyle = '#000000';
+            ctx.fill();
+        });
+    }
+
+    ctx.restore();
+
+    if (item.showGuides && !isExport) {
+        let currentTargetSize = MASTER_SIZE * (globalTargetPercent / 100);
+
+        ctx.lineWidth = 6; 
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)'; 
+        ctx.setLineDash([20, 15]); 
+        ctx.beginPath(); 
+        ctx.moveTo(0, MASTER_SIZE / 2); ctx.lineTo(MASTER_SIZE, MASTER_SIZE / 2); 
+        ctx.moveTo(MASTER_SIZE / 2, 0); ctx.lineTo(MASTER_SIZE / 2, MASTER_SIZE); 
+        ctx.stroke();
+
+        let radBest = (item.bestAngle * Math.PI) / 180;
+        let cosB = Math.cos(radBest), sinB = Math.sin(radBest);
+        let radMan = (item.angle * Math.PI) / 180;
+        let cosM = Math.cos(radMan), sinM = Math.sin(radMan);
+        let flipHFactor = item.flipH ? -1 : 1;
+        let flipVFactor = item.flipV ? -1 : 1;
+        let baseCy = MASTER_SIZE / 2 + item.offsetY;
+
+        let dynamicMinY = Infinity, dynamicMaxY = -Infinity;
+        for(let i=0, len=item.points.length; i<len; i++) {
+            let p = item.points[i];
+            let rx = (p.dx * cosB - p.dy * sinB - item.rcx) * finalRenderScale * flipHFactor;
+            let ry = (p.dx * sinB + p.dy * cosB - item.rcy) * finalRenderScale * flipVFactor;
+            let canvasY = baseCy + rx * sinM + ry * cosM;
+            if(canvasY < dynamicMinY) dynamicMinY = canvasY;
+            if(canvasY > dynamicMaxY) dynamicMaxY = canvasY;
+        }
+
+        ctx.setLineDash([12, 8]); 
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)'; 
+        ctx.lineWidth = 3; 
+
+        ctx.beginPath();
+        ctx.moveTo(80, dynamicMinY); ctx.lineTo(MASTER_SIZE - 80, dynamicMinY);
+        ctx.moveTo(80, dynamicMaxY); ctx.lineTo(MASTER_SIZE - 80, dynamicMaxY);
+        ctx.stroke();
+        
+        ctx.setLineDash([]); 
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.9)'; 
+        ctx.font = 'bold 32px sans-serif'; 
+        ctx.fillText('▼ 产品最高点 (实时追踪)', 100, dynamicMinY - 15);
+        ctx.fillText('▲ 产品最低点 (实时追踪)', 100, dynamicMaxY + 40);
+
+        ctx.strokeStyle = 'rgba(62, 207, 142, 0.25)'; ctx.lineWidth = 6; 
+        ctx.strokeRect(MASTER_SIZE/2 - currentTargetSize/2, MASTER_SIZE/2 - currentTargetSize/2, currentTargetSize, currentTargetSize);
+        ctx.fillStyle = 'rgba(62, 207, 142, 0.9)'; ctx.font = 'bold 38px sans-serif'; 
+        ctx.fillText(`✅ 安全居中框 ${globalTargetPercent}%`, 200, 180);
+
+        ctx.setLineDash([10, 6]);
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#ef4444';
+
+        ctx.beginPath();
+        ctx.moveTo(0, item.guides.top); ctx.lineTo(MASTER_SIZE, item.guides.top);
+        ctx.moveTo(0, item.guides.bottom); ctx.lineTo(MASTER_SIZE, item.guides.bottom);
+        ctx.moveTo(item.guides.left, 0); ctx.lineTo(item.guides.left, MASTER_SIZE);
+        ctx.moveTo(item.guides.right, 0); ctx.lineTo(item.guides.right, MASTER_SIZE);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 28px sans-serif';
+        let topYLabel = item.guides.top - 12 > 30 ? item.guides.top - 12 : item.guides.top + 35;
+        let botYLabel = item.guides.bottom + 35 < MASTER_SIZE - 20 ? item.guides.bottom + 35 : item.guides.bottom - 12;
+        ctx.fillText(`↔ 顶参考线 Y: ${Math.round(item.guides.top)}`, 30, topYLabel);
+        ctx.fillText(`↔ 底参考线 Y: ${Math.round(item.guides.bottom)}`, 30, botYLabel);
+        ctx.fillText(`↕ 左参考线 X: ${Math.round(item.guides.left)}`, item.guides.left + 10, MASTER_SIZE - 80);
+        ctx.fillText(`↕ 右参考线 X: ${Math.round(item.guides.right)}`, item.guides.right - 300, MASTER_SIZE - 80);
+    }
+    ctx.restore(); 
+}
+
+function canvasToLocalCoord(item, cx, cy) {
+    let x = cx - (MASTER_SIZE / 2 + item.offsetX);
+    let y = cy - (MASTER_SIZE / 2 + item.offsetY);
+
+    let radMan = -item.angle * Math.PI / 180;
+    let rx = x * Math.cos(radMan) - y * Math.sin(radMan);
+    let ry = x * Math.sin(radMan) + y * Math.cos(radMan);
+
+    if (item.flipH) rx = -rx;
+    if (item.flipV) ry = -ry;
+
+    let finalRenderScale = item.scale * (item.localScaleModifier / 100);
+    rx /= finalRenderScale;
+    ry /= finalRenderScale;
+
+    return { x: rx, y: ry };
+}
+
+function setupCanvasGuidesInteraction(item) {
+    const canvas = item.canvas;
+    let activeGuide = null;
+    let activeCorner = null;
+
+    function getCanvasCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            x: (clientX - rect.left) * (MASTER_SIZE / rect.width),
+            y: (clientY - rect.top) * (MASTER_SIZE / rect.height)
+        };
+    }
+
+    function detectCornerHit(pos) {
+        const localPos = canvasToLocalCoord(item, pos.x, pos.y);
+        const finalRenderScale = item.scale * (item.localScaleModifier / 100);
+        const hitRadius = 40 / finalRenderScale;
+
+        let HW = item.baseLength ? (item.baseLength / 2) : (item.img.width / 2);
+        let HH = item.baseHeight ? (item.baseHeight / 2) : (item.img.height / 2);
+
+        const effCorners = getEffectiveCorners(item);
+
+        const cornersMap = [
+            { key: 'tl', x: -HW + effCorners.tl.x, y: -HH + effCorners.tl.y },
+            { key: 'tr', x:  HW + effCorners.tr.x, y: -HH + effCorners.tr.y },
+            { key: 'bl', x: -HW + effCorners.bl.x, y:  HH + effCorners.bl.y },
+            { key: 'br', x:  HW + effCorners.br.x, y:  HH + effCorners.br.y }
+        ];
+
+        for (let c of cornersMap) {
+            let dist = Math.hypot(localPos.x - c.x, localPos.y - c.y);
+            if (dist <= hitRadius) return c.key;
+        }
+        return null;
+    }
+
+    function detectGuideHit(pos) {
+        const tolerance = 90;
+        if (Math.abs(pos.y - item.guides.top) < tolerance) return 'top';
+        if (Math.abs(pos.y - item.guides.bottom) < tolerance) return 'bottom';
+        if (Math.abs(pos.x - item.guides.left) < tolerance) return 'left';
+        if (Math.abs(pos.x - item.guides.right) < tolerance) return 'right';
+        return null;
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+        const pos = getCanvasCoords(e);
+        
+        if (!activeCorner && !activeGuide) {
+            const cornerHit = detectCornerHit(pos);
+            if (cornerHit) {
+                canvas.style.cursor = 'grab';
+                return;
+            }
+            const guideHit = detectGuideHit(pos);
+            if (guideHit === 'top' || guideHit === 'bottom') canvas.style.cursor = 'ns-resize';
+            else if (guideHit === 'left' || guideHit === 'right') canvas.style.cursor = 'ew-resize';
+            else canvas.style.cursor = 'default';
+        } else if (activeCorner) {
+            canvas.style.cursor = 'grabbing';
+            const localPos = canvasToLocalCoord(item, pos.x, pos.y);
+            let HW = item.baseLength ? (item.baseLength / 2) : (item.img.width / 2);
+            let HH = item.baseHeight ? (item.baseHeight / 2) : (item.img.height / 2);
+            const eff = getEffectiveCorners(item);
+
+            if (activeCorner === 'tl') {
+                item.corners.tl.x += Math.round(localPos.x - (-HW + eff.tl.x));
+                item.corners.tl.y += Math.round(localPos.y - (-HH + eff.tl.y));
+            } else if (activeCorner === 'tr') {
+                item.corners.tr.x += Math.round(localPos.x - (HW + eff.tr.x));
+                item.corners.tr.y += Math.round(localPos.y - (-HH + eff.tr.y));
+            } else if (activeCorner === 'bl') {
+                item.corners.bl.x += Math.round(localPos.x - (-HW + eff.bl.x));
+                item.corners.bl.y += Math.round(localPos.y - (HH + eff.bl.y));
+            } else if (activeCorner === 'br') {
+                item.corners.br.x += Math.round(localPos.x - (HW + eff.br.x));
+                item.corners.br.y += Math.round(localPos.y - (HH + eff.br.y));
+            }
+
+            syncAllCornerUIValues(item);
+            executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false);
+        } else if (activeGuide) {
+            if (activeGuide === 'top' || activeGuide === 'bottom') {
+                item.guides[activeGuide] = Math.max(0, Math.min(MASTER_SIZE, pos.y));
+            } else if (activeGuide === 'left' || activeGuide === 'right') {
+                item.guides[activeGuide] = Math.max(0, Math.min(MASTER_SIZE, pos.x));
+            }
+            item.guidesCustomized = true;
+            executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false);
+        }
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+        const pos = getCanvasCoords(e);
+        const cornerHit = detectCornerHit(pos);
+        if (cornerHit) {
+            activeCorner = cornerHit;
+            canvas.style.cursor = 'grabbing';
+            e.preventDefault();
+            return;
+        }
+        const guideHit = detectGuideHit(pos);
+        if (guideHit) { activeGuide = guideHit; e.preventDefault(); }
+    });
+
+    window.addEventListener('mouseup', () => { activeCorner = null; activeGuide = null; });
+
+    canvas.addEventListener('touchstart', (e) => {
+        const pos = getCanvasCoords(e);
+        const cornerHit = detectCornerHit(pos);
+        if (cornerHit) { activeCorner = cornerHit; e.preventDefault(); return; }
+        const guideHit = detectGuideHit(pos);
+        if (guideHit) { activeGuide = guideHit; e.preventDefault(); }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+        const pos = getCanvasCoords(e);
+        if (activeCorner) {
+            const localPos = canvasToLocalCoord(item, pos.x, pos.y);
+            let HW = item.baseLength ? (item.baseLength / 2) : (item.img.width / 2);
+            let HH = item.baseHeight ? (item.baseHeight / 2) : (item.img.height / 2);
+            const eff = getEffectiveCorners(item);
+
+            if (activeCorner === 'tl') {
+                item.corners.tl.x += Math.round(localPos.x - (-HW + eff.tl.x));
+                item.corners.tl.y += Math.round(localPos.y - (-HH + eff.tl.y));
+            } else if (activeCorner === 'tr') {
+                item.corners.tr.x += Math.round(localPos.x - (HW + eff.tr.x));
+                item.corners.tr.y += Math.round(localPos.y - (-HH + eff.tr.y));
+            } else if (activeCorner === 'bl') {
+                item.corners.bl.x += Math.round(localPos.x - (-HW + eff.bl.x));
+                item.corners.bl.y += Math.round(localPos.y - (HH + eff.bl.y));
+            } else if (activeCorner === 'br') {
+                item.corners.br.x += Math.round(localPos.x - (HW + eff.br.x));
+                item.corners.br.y += Math.round(localPos.y - (HH + eff.br.y));
+            }
+
+            syncAllCornerUIValues(item);
+            executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false);
+            e.preventDefault();
+        } else if (activeGuide) {
+            if (activeGuide === 'top' || activeGuide === 'bottom') {
+                item.guides[activeGuide] = Math.max(0, Math.min(MASTER_SIZE, pos.y));
+            } else if (activeGuide === 'left' || activeGuide === 'right') {
+                item.guides[activeGuide] = Math.max(0, Math.min(MASTER_SIZE, pos.x));
+            }
+            item.guidesCustomized = true;
+            executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false);
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => { activeCorner = null; activeGuide = null; });
+}
+
+function buildCardUI(item, grid) {
+    const card = document.createElement('div'); card.className = 'card';
+    card.onclick = () => { document.querySelectorAll('.card').forEach(c => c.classList.remove('active-card')); card.classList.add('active-card'); };
+
+    const header = document.createElement('div'); header.className = 'card-header';
+    const title = document.createElement('div'); title.className = 'card-title'; title.innerText = item.file.name;
+    const tag = document.createElement('div'); tag.className = 'card-category'; tag.innerText = item.categoryTag;
+    header.appendChild(title); header.appendChild(tag); card.appendChild(header);
+
+    const canvasContainer = document.createElement('div'); canvasContainer.className = 'canvas-container';
+    canvasContainer.appendChild(item.canvas); card.appendChild(canvasContainer);
+
+    setupCanvasGuidesInteraction(item);
+
+    const engSel = document.createElement('div'); engSel.className = 'engine-selector';
+    const bBox = document.createElement('button'); bBox.className = `engine-btn ${item.currentEngine==='box'?'active':''}`; bBox.innerText = '📏 几何对齐 (推荐)';
+    const bPCA = document.createElement('button'); bPCA.className = `engine-btn ${item.currentEngine==='pca'?'active':''}`; bPCA.innerText = '🤖 视觉重心';
+    
+    bBox.onclick = () => { if(item.currentEngine==='box') return; item.currentEngine='box'; bBox.classList.add('active'); bPCA.classList.remove('active'); executeEngineRecompute(item); };
+    bPCA.onclick = () => { if(item.currentEngine==='pca') return; item.currentEngine='pca'; bPCA.classList.add('active'); bBox.classList.remove('active'); executeEngineRecompute(item); };
+    engSel.appendChild(bBox); engSel.appendChild(bPCA); card.appendChild(engSel);
+
+    const ui = document.createElement('div'); ui.className = 'control-ui'; item.uiRef = ui;
+    createSliderRow(ui, '🔄 角度平面旋转', -180, 180, item.angle, 0.1, '°', (val) => { item.angle = parseFloat(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(ui, '🔍 单个物理缩放', 10, 200, item.localScaleModifier, 1, '%', (val) => { item.localScaleModifier = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(ui, '↔️ 水平左右平移', -4000, 4000, item.offsetX, 1, 'px', (val) => { item.offsetX = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(ui, '↕️ 垂直上下平移', -4000, 4000, item.offsetY, 1, 'px', (val) => { item.offsetY = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+
+    const details = document.createElement('details'); details.className = 'corner-details'; details.open = true;
+    const summary = document.createElement('summary'); summary.className = 'corner-summary'; summary.innerText = '📐 直觉透视矫正 (拖拽金点 / 滑块调节)';
+    details.appendChild(summary);
+
+    const cornerGrid = document.createElement('div'); cornerGrid.className = 'corner-grid';
+    
+    createSliderRow(cornerGrid, '🔺 垂直透视 (梯形)', -100, 100, item.macroPerspective.vert, 1, '', (val) => { item.macroPerspective.vert = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(cornerGrid, '◀️ 水平透视 (梯形)', -100, 100, item.macroPerspective.horiz, 1, '', (val) => { item.macroPerspective.horiz = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(cornerGrid, '↗️ 平行倾斜 (斜切)', -100, 100, item.macroPerspective.skew, 1, '', (val) => { item.macroPerspective.skew = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+
+    const subDetails = document.createElement('details'); subDetails.style.marginTop = "6px";
+    const subSummary = document.createElement('summary'); subSummary.style.cssText = "font-size:11px; color:#a1a1aa; cursor:pointer; font-weight:bold;"; subSummary.innerText = "⚙️ 展开 4 角绝对像素坐标";
+    subDetails.appendChild(subSummary);
+
+    const subGrid = document.createElement('div'); subGrid.className = 'corner-grid'; subGrid.style.marginTop = "6px";
+    createSliderRow(subGrid, '↖️ 左上 X', -1000, 1000, item.corners.tl.x, 1, 'px', (val) => { item.corners.tl.x = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(subGrid, '↖️ 左上 Y', -1000, 1000, item.corners.tl.y, 1, 'px', (val) => { item.corners.tl.y = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(subGrid, '↗️ 右上 X', -1000, 1000, item.corners.tr.x, 1, 'px', (val) => { item.corners.tr.x = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(subGrid, '↗️ 右上 Y', -1000, 1000, item.corners.tr.y, 1, 'px', (val) => { item.corners.tr.y = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(subGrid, '↙️ 左下 X', -1000, 1000, item.corners.bl.x, 1, 'px', (val) => { item.corners.bl.x = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(subGrid, '↙️ 左下 Y', -1000, 1000, item.corners.bl.y, 1, 'px', (val) => { item.corners.bl.y = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(subGrid, '↘️ 右下 X', -1000, 1000, item.corners.br.x, 1, 'px', (val) => { item.corners.br.x = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+    createSliderRow(subGrid, '↘️ 右下 Y', -1000, 1000, item.corners.br.y, 1, 'px', (val) => { item.corners.br.y = parseInt(val); executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+
+    subDetails.appendChild(subGrid);
+    cornerGrid.appendChild(subDetails);
+    details.appendChild(cornerGrid); 
+    ui.appendChild(details);
+
+    const btnGroup = document.createElement('div'); btnGroup.className = 'btn-group';
+    
+    const flipH = document.createElement('button'); btnGroup.appendChild(flipH); flipH.className = 'btn-action'; flipH.innerText = '⇄ 左右反向';
+    flipH.onclick = () => { item.flipH = !item.flipH; executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); };
+    
+    const flipV = document.createElement('button'); btnGroup.appendChild(flipV); flipV.className = 'btn-action'; flipV.innerText = '⇅ 上下翻转';
+    flipV.onclick = () => { item.flipV = !item.flipV; executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); };
+    
+    const rotate90 = document.createElement('button'); btnGroup.appendChild(rotate90); rotate90.className = 'btn-action'; rotate90.innerText = '📐 90°横竖切换';
+    rotate90.onclick = () => {
+        let newAngle = (item.angle + 90) % 360;
+        if (newAngle > 180) newAngle -= 360;
+        item.angle = newAngle;
+        updateSliderValue(ui, '🔄 角度平面旋转', item.angle);
+        executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false);
+    };
+
+    const reset = document.createElement('button'); btnGroup.appendChild(reset); reset.className = 'btn-action'; reset.innerText = '🔄 复位清零';
+    reset.onclick = () => {
+        item.angle = 0; 
+        item.macroPerspective = { vert: 0, horiz: 0, skew: 0 };
+        item.corners = { tl: {x:0,y:0}, tr: {x:0,y:0}, bl: {x:0,y:0}, br: {x:0,y:0} };
+        item.offsetX = 0; item.offsetY = 0; item.flipV = false; item.localScaleModifier = 100;
+        item.guidesCustomized = false;
+        updateGuidesToSafeBox(item);
+        
+        updateSliderValue(ui, '🔄 角度平面旋转', 0);
+        updateSliderValue(ui, '🔍 单个物理缩放', 100); 
+        updateSliderValue(ui, '↔️ 水平左右平移', 0); 
+        updateSliderValue(ui, '↕️ 垂直上下平移', 0);
+        updateSliderValue(ui, '🔺 垂直透视 (梯形)', 0);
+        updateSliderValue(ui, '◀️ 水平透视 (梯形)', 0);
+        updateSliderValue(ui, '↗️ 平行倾斜 (斜切)', 0);
+        syncAllCornerUIValues(item);
+
+        executeEngineRecompute(item);
+    };
+
+    ui.appendChild(btnGroup); card.appendChild(ui); grid.appendChild(card);
+}
+
+function createSliderRow(parent, label, min, max, value, step, unit, callback) {
+    const row = document.createElement('div'); row.className = 'ui-row'; row.setAttribute('data-label', label);
+    const text = document.createElement('span'); text.innerText = label;
+    
+    const input = document.createElement('input'); 
+    input.type = 'range'; input.min = min; input.max = max; input.value = value; input.step = step;
+    
+    const valBox = document.createElement('div'); valBox.className = 'val-input-box';
+    const numInput = document.createElement('input');
+    numInput.type = 'number'; numInput.className = 'val-input';
+    numInput.min = min; numInput.max = max; numInput.value = value; numInput.step = step;
+
+    const unitSpan = document.createElement('span'); unitSpan.className = 'unit-text'; unitSpan.innerText = unit;
+
+    input.oninput = function() {
+        numInput.value = this.value;
+        callback(this.value);
+    };
+
+    numInput.oninput = function() {
+        let val = parseFloat(this.value);
+        if (isNaN(val)) return;
+        input.value = val;
+        callback(val);
+    };
+
+    valBox.appendChild(numInput);
+    valBox.appendChild(unitSpan);
+
+    row.appendChild(text); row.appendChild(input); row.appendChild(valBox);
+    parent.appendChild(row);
+}
+
+function updateSliderValue(parent, label, value) {
+    const row = parent.querySelector(`[data-label="${label}"]`);
+    if (row) {
+        const input = row.querySelector('input[type="range"]');
+        const numInput = row.querySelector('.val-input');
+        if (input) input.value = value;
+        if (numInput) numInput.value = Math.round(value * 10) / 10;
+    }
+}
+
+function syncAllCornerUIValues(item) {
+    if (!item.uiRef) return;
+    updateSliderValue(item.uiRef, '↖️ 左上 X', item.corners.tl.x);
+    updateSliderValue(item.uiRef, '↖️ 左上 Y', item.corners.tl.y);
+    updateSliderValue(item.uiRef, '↗️ 右上 X', item.corners.tr.x);
+    updateSliderValue(item.uiRef, '↗️ 右上 Y', item.corners.tr.y);
+    updateSliderValue(item.uiRef, '↙️ 左下 X', item.corners.bl.x);
+    updateSliderValue(item.uiRef, '↙️ 左下 Y', item.corners.bl.y);
+    updateSliderValue(item.uiRef, '↘️ 右下 X', item.corners.br.x);
+    updateSliderValue(item.uiRef, '↘️ 右下 Y', item.corners.br.y);
+}
+
+function toggleGlobalFlipH() {
+    if (!imageItems.length) return;
+    imageItems.forEach(item => { item.flipH = !item.flipH; executeRenderPipeline(item, item.canvas, PREVIEW_SIZE, false); });
+}
+
+async function exportAllImagesDirectly() {
+    const statusReport = document.getElementById('statusReport');
+    statusReport.innerText = `🚀 启动后台透视渲染引擎，正在拉取 4000x4000px 无损原画...`;
+    
+    for (let i = 0; i < imageItems.length; i++) {
+        const item = imageItems[i];
+        statusReport.innerText = `导出中... (${i + 1} / ${imageItems.length}) 正在生成独立站 4K 纯净 PNG`;
+        
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = MASTER_SIZE; exportCanvas.height = MASTER_SIZE;
+        executeRenderPipeline(item, exportCanvas, MASTER_SIZE, true); 
+        
+        const dataUrl = exportCanvas.toDataURL('image/png'); 
+        const outName = item.file.name.replace(/\.[^/.]+$/, "") + "_4K_Master.png";
+        
+        const link = document.createElement('a'); link.href = dataUrl; link.download = outName;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        
+        if (imageItems.length > 1) await new Promise(resolve => setTimeout(resolve, 300)); 
+    }
+    statusReport.innerText = `✅ 所有 4K 高保真纯净主图均已完美导出！`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaiLionCrafts 企业 AI 工作台 — 最终独立审计报告</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background:#f5f6fa; color:#2c3e50; line-height:1.7; }
+  .container { max-width:1200px; margin:0 auto; padding:24px; }
+  h1 { font-size:28px; color:#1a1a2e; border-bottom:3px solid #D4AF37; padding-bottom:12px; margin-bottom:8px; }
+  h2 { font-size:22px; color:#1a1a2e; margin:32px 0 16px; padding-left:12px; border-left:4px solid #D4AF37; }
+  h3 { font-size:17px; color:#34495e; margin:20px 0 10px; }
+  .meta { color:#7f8c8d; font-size:14px; margin-bottom:24px; }
+  .card { background:#fff; border-radius:10px; padding:20px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:16px 0; }
+  .stat-box { text-align:center; padding:16px; border-radius:8px; color:#fff; }
+  .stat-box .num { font-size:32px; font-weight:800; }
+  .stat-box .label { font-size:13px; opacity:0.9; }
+  .bg-pass { background:#27ae60; }
+  .bg-fail { background:#e74c3c; }
+  .bg-warn { background:#f39c12; }
+  .bg-info { background:#3498db; }
+  .bg-p0 { background:#c0392b; }
+  .bg-p1 { background:#e67e22; }
+  .bg-p2 { background:#f1c40f; color:#2c3e50; }
+  .bg-p3 { background:#95a5a6; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:13px; }
+  th { background:#1a1a2e; color:#fff; padding:10px 8px; text-align:left; font-weight:600; }
+  td { padding:8px; border-bottom:1px solid #ecf0f1; vertical-align:top; }
+  tr:hover { background:#f8f9fa; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+  .tag-pass { background:#d4edda; color:#155724; }
+  .tag-fail { background:#f8d7da; color:#721c24; }
+  .tag-partial { background:#fff3cd; color:#856404; }
+  .tag-untested { background:#e2e3e5; color:#383d41; }
+  .tag-p0 { background:#f8d7da; color:#721c24; }
+  .tag-p1 { background:#ffe5b4; color:#7a4f00; }
+  .tag-p2 { background:#fff3cd; color:#856404; }
+  .tag-p3 { background:#e2e3e5; color:#383d41; }
+  .tag-fixed { background:#d4edda; color:#155724; }
+  .tag-open { background:#f8d7da; color:#721c24; }
+  .code { background:#2c3e50; color:#ecf0f1; padding:12px 16px; border-radius:6px; font-family:"SF Mono",Monaco,Consolas,monospace; font-size:12px; overflow-x:auto; margin:8px 0; white-space:pre-wrap; }
+  .flow-diagram { background:#fff; border:2px solid #D4AF37; border-radius:10px; padding:24px; text-align:center; margin:16px 0; }
+  .flow-node { display:inline-block; background:#1a1a2e; color:#fff; padding:10px 18px; border-radius:6px; margin:4px; font-size:13px; font-weight:600; }
+  .flow-arrow { color:#D4AF37; font-size:20px; font-weight:800; margin:0 4px; }
+  .flow-local { background:#27ae60; }
+  .flow-unsupported { background:#95a5a6; text-decoration:line-through; }
+  .warning-box { background:#fff3cd; border-left:4px solid #f39c12; padding:12px 16px; border-radius:4px; margin:12px 0; }
+  .success-box { background:#d4edda; border-left:4px solid #27ae60; padding:12px 16px; border-radius:4px; margin:12px 0; }
+  .danger-box { background:#f8d7da; border-left:4px solid #e74c3c; padding:12px 16px; border-radius:4px; margin:12px 0; }
+  .toc { background:#fff; border-radius:10px; padding:20px; margin-bottom:24px; }
+  .toc ol { padding-left:20px; }
+  .toc li { margin:4px 0; }
+  .toc a { color:#2980b9; text-decoration:none; }
+  .toc a:hover { text-decoration:underline; }
+  .screenshot-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; margin:12px 0; }
+  .screenshot-item { background:#ecf0f1; border-radius:6px; padding:8px; font-size:12px; text-align:center; }
+  .footer { text-align:center; color:#95a5a6; font-size:12px; margin-top:40px; padding:20px; border-top:1px solid #ecf0f1; }
+  .fix-file { font-family:monospace; background:#ecf0f1; padding:2px 6px; border-radius:3px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🔍 KaiLionCrafts 企业 AI 工作台 — 最终独立审计报告</h1>
+<div class="meta">
+  审计日期：2026-10-02 ｜ 审计方式：后端全代码静态审计 + 内部浏览器真实功能测试 + 自动化测试验证<br>
+  项目分支：fresh_start ｜ 基线提交：690a516 ｜ 基线标签：release/final-demo-20261002-v2<br>
+  备份标签：backup/pre-final-independent-audit-20261002-0047
+</div>
+
+<!-- ===== 总体统计 ===== -->
+<div class="card">
+<h2 style="margin-top:0;border:none;padding:0;">📊 审计总体统计</h2>
+<div class="stats-grid">
+  <div class="stat-box bg-info"><div class="num">21</div><div class="label">后端审计文件数</div></div>
+  <div class="stat-box bg-info"><div class="num">29,426</div><div class="label">审计代码行数</div></div>
+  <div class="stat-box bg-p0"><div class="num">6</div><div class="label">P0 问题</div></div>
+  <div class="stat-box bg-p1"><div class="num">14</div><div class="label">P1 问题</div></div>
+  <div class="stat-box bg-p2"><div class="num">30</div><div class="label">P2 问题</div></div>
+  <div class="stat-box bg-p3"><div class="num">17</div><div class="label">P3 问题</div></div>
+</div>
+<div class="stats-grid">
+  <div class="stat-box bg-pass"><div class="num">43</div><div class="label">前端功能通过</div></div>
+  <div class="stat-box bg-warn"><div class="num">5</div><div class="label">部分通过</div></div>
+  <div class="stat-box bg-fail"><div class="num">1</div><div class="label">失败（已修复）</div></div>
+  <div class="stat-box bg-info"><div class="num">9</div><div class="label">未测试（约束豁免）</div></div>
+  <div class="stat-box bg-pass"><div class="num">296</div><div class="label">自动化测试通过</div></div>
+  <div class="stat-box bg-pass"><div class="num">10</div><div class="label">修复文件数</div></div>
+</div>
+</div>
+
+<!-- ===== 目录 ===== -->
+<div class="toc">
+<h3>📋 报告目录</h3>
+<ol>
+  <li><a href="#s1">项目版本与备份信息</a></li>
+  <li><a href="#s2">后端文件清单与审计结果</a></li>
+  <li><a href="#s3">前端功能完整清单与测试结果</a></li>
+  <li><a href="#s4">失败项与修复详情</a></li>
+  <li><a href="#s5">模型路由图</a></li>
+  <li><a href="#s6">知识库结构与测试结果</a></li>
+  <li><a href="#s7">密码保护专项检查</a></li>
+  <li><a href="#s8">数据安全检查</a></li>
+  <li><a href="#s9">自动化测试命令与输出</a></li>
+  <li><a href="#s10">截图证据索引</a></li>
+  <li><a href="#s11">未完成事项与已知限制</a></li>
+  <li><a href="#s12">明天演示操作顺序</a></li>
+</ol>
+</div>
+
+<!-- ===== 1. 项目版本 ===== -->
+<h2 id="s1">1. 项目版本与备份信息</h2>
+<div class="card">
+<table>
+<tr><th style="width:200px;">项目</th><th>详情</th></tr>
+<tr><td>Git 分支</td><td>fresh_start</td></tr>
+<tr><td>基线提交</td><td>690a516 — fix(deep-scan): 演示前最后深度扫描修复30个bug</td></tr>
+<tr><td>基线标签</td><td>release/final-demo-20261002-v2</td></tr>
+<tr><td>远程仓库</td><td>https://github.com/jianchengli926-coder/kailioncrafts-workbench.git</td></tr>
+<tr><td>审计前备份标签</td><td>backup/pre-final-independent-audit-20261002-0047（已推送）</td></tr>
+<tr><td>审计后提交</td><td>fix(workbench): complete independent audit fixes（待提交）</td></tr>
+<tr><td>最终标签</td><td>release/final-audit-20261002（待创建）</td></tr>
+<tr><td>工作区状态（审计前）</td><td>干净，无未提交修改</td></tr>
+<tr><td>customers.json MD5</td><td>23944c53722a667f27b29180ef6bdf17（审计前后一致，未修改）</td></tr>
+<tr><td>正式客户数</td><td>28条（prospects表，审计前后不变）</td></tr>
+</table>
+</div>
+
+<!-- ===== 2. 后端审计 ===== -->
+<h2 id="s2">2. 后端文件清单与审计结果</h2>
+
+<h3>2.1 审计文件清单（21个主文件 + 10个测试文件）</h3>
+<div class="card">
+<table>
+<tr><th>文件</th><th>行数</th><th>审计组</th><th>发现问题</th></tr>
+<tr><td class="fix-file">app.py</td><td>14,047</td><td>A组-核心应用</td><td>P1×1, P2×6, P3×6</td></tr>
+<tr><td class="fix-file">ai_client.py</td><td>1,031</td><td>A组-核心应用</td><td>P3×1（边界判空）</td></tr>
+<tr><td class="fix-file">config.py</td><td>548</td><td>A组-核心应用</td><td>P0×1（创始人姓名）, P3×1</td></tr>
+<tr><td class="fix-file">prompts.py</td><td>724</td><td>A组-核心应用</td><td>无问题</td></tr>
+<tr><td class="fix-file">model_registry.py</td><td>540</td><td>B组-模型路由</td><td>P1×1, P2×1, P3×2</td></tr>
+<tr><td class="fix-file">local_model_manager.py</td><td>423</td><td>B组-模型路由</td><td>P0×1（锁释放）, P2×2, P3×1</td></tr>
+<tr><td class="fix-file">provider_manager.py</td><td>280</td><td>B组-模型路由</td><td>P2×1（静默吞错）</td></tr>
+<tr><td class="fix-file">website_evidence.py</td><td>786</td><td>B组-模型路由</td><td>P0×2（SSRF TOCTOU/robots超时）, P1×1, P2×2, P3×1</td></tr>
+<tr><td class="fix-file">customer_manager.py</td><td>528</td><td>C组-客户CRM</td><td>P0×1（_load清空风险）, P1×1, P2×4, P3×1</td></tr>
+<tr><td class="fix-file">prospect_evaluator.py</td><td>894</td><td>C组-客户CRM</td><td>P1×1（自匹配重复）, P2×1, P3×2</td></tr>
+<tr><td class="fix-file">content_draft_generator.py</td><td>779</td><td>C组-客户CRM</td><td>P3×2</td></tr>
+<tr><td class="fix-file">customer_status.py</td><td>158</td><td>C组-客户CRM</td><td>P3×1</td></tr>
+<tr><td class="fix-file">repository.py</td><td>1,593</td><td>C组-客户CRM</td><td>P0×1（测试污染/无隔离）, P1×3（DNC绕过/邮箱dup/双写）, P2×3, P3×2</td></tr>
+<tr><td class="fix-file">knowledge_base.py</td><td>370</td><td>D组-知识库</td><td>P1×2（虚假认证/源头工厂）, P2×1</td></tr>
+<tr><td class="fix-file">knowledge_facts.py</td><td>1,251</td><td>D组-知识库</td><td>P2×1（无版本留痕）</td></tr>
+<tr><td class="fix-file">company_kb_content.py</td><td>352</td><td>D组-知识库</td><td>无问题</td></tr>
+<tr><td class="fix-file">feishu_client.py</td><td>134</td><td>D组-知识库</td><td>P2×2（错误吞掉/测试副作用）</td></tr>
+<tr><td class="fix-file">finance_db.py</td><td>244</td><td>D组-知识库</td><td>P2×1（COUNT撞UNIQUE）</td></tr>
+<tr><td class="fix-file">social_db.py</td><td>207</td><td>D组-知识库</td><td>P2×1（COUNT撞UNIQUE）</td></tr>
+<tr><td class="fix-file">manual_content.py</td><td>1,155</td><td>D组-知识库</td><td>P1×2（错粘内容/存储描述错误）</td></tr>
+<tr><td class="fix-file">test_*.py（10个）</td><td>4,139</td><td>全部</td><td>1个测试需适配新安全行为</td></tr>
+<tr><th>合计</th><th>29,426</th><th>—</th><th>P0×6, P1×14, P2×30, P3×17</th></tr>
+</table>
+</div>
+
+<h3>2.2 P0 问题详情（数据丢失/安全/无法启动）</h3>
+<div class="card">
+<table>
+<tr><th style="width:60px;">编号</th><th>文件:行号</th><th>问题描述</th><th style="width:80px;">状态</th></tr>
+<tr>
+  <td><span class="tag tag-p0">P0-1</span></td>
+  <td class="fix-file">config.py:117</td>
+  <td>创始人硬编码为"李建成"，但权威文件明确要求"利建成（Leo Li）——不写'李建成'"。该字段注入所有AI Prompt，对外生成内容带错名。</td>
+  <td><span class="tag tag-fixed">已修复</span></td>
+</tr>
+<tr>
+  <td><span class="tag tag-p0">P0-2</span></td>
+  <td class="fix-file">repository.py:23 / prospect_evaluator.py:50 / content_draft_generator.py:36</td>
+  <td>DB_PATH硬编码，WORKBENCH_DB_PATH环境变量无人读取。测试以为隔离了但实际写入生产库，导致evaluations表253+条测试脏数据污染正式统计。</td>
+  <td><span class="tag tag-fixed">已修复</span></td>
+</tr>
+<tr>
+  <td><span class="tag tag-p0">P0-3</span></td>
+  <td class="fix-file">customer_manager.py:130-141</td>
+  <td>_load()读取失败返回[]，后续add_customer会把28条正式客户全量覆写为单条记录。外置盘抖动时可触发。</td>
+  <td><span class="tag tag-fixed">已修复</span></td>
+</tr>
+<tr>
+  <td><span class="tag tag-p0">P0-4</span></td>
+  <td class="fix-file">local_model_manager.py:208-216</td>
+  <td>release()无条件释放全局锁，acquire失败后误调release会抛RuntimeError；跨线程误释放可导致两个本地模型同时加载，M4 16GB OOM。</td>
+  <td><span class="tag tag-fixed">已修复</span></td>
+</tr>
+<tr>
+  <td><span class="tag tag-p0">P0-5</span></td>
+  <td class="fix-file">website_evidence.py:312-315</td>
+  <td>robots.txt读取无超时（注释写"限制超时"但实际rp.read()无timeout），服务端accept后不回数据可永久阻塞抓取协程。</td>
+  <td><span class="tag tag-fixed">已修复</span></td>
+</tr>
+<tr>
+  <td><span class="tag tag-p0">P0-6</span></td>
+  <td class="fix-file">website_evidence.py:156-163, 260-262</td>
+  <td>SSRF校验存在TOCTOU：DNS校验通过后urllib再次独立解析，恶意权威DNS可对第一次返回公网IP、第二次返回169.254.169.254绕过。</td>
+  <td><span class="tag tag-open">已知限制</span></td>
+</tr>
+</table>
+<div class="warning-box">
+  <strong>⚠️ P0-6 说明：</strong>SSRF TOCTOU修复需要钉住IP的自定义HTTP Handler（在socket层直连已校验IP并设置Host头），改动量较大且可能影响正常抓取。当前实现为RFC级别防护，面对恶意权威DNS不能完全防御。建议后续迭代修复，本次审计记录为已知安全限制。
+</div>
+</div>
+
+<h3>2.3 P1 问题详情（核心功能不可用/安全绕过）</h3>
+<div class="card">
+<table>
+<tr><th style="width:60px;">编号</th><th>文件:行号</th><th>问题描述</th><th style="width:80px;">状态</th></tr>
+<tr><td><span class="tag tag-p1">P1-1</span></td><td class="fix-file">config.py / app.py:187</td><td>密码文件~/.config/kailioncrafts/workbench.env从未被代码加载，仅app.py用os.environ.get读取。经run.sh全新启动时密码为空→fail-closed锁死。</td><td><span class="tag tag-fixed">已修复</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-2</span></td><td class="fix-file">repository.py:740-784</td><td>DNC屏蔽查询用AND连接字段（website AND email AND company_name），屏蔽记录通常只存website→永不命中→DNC客户可被触达。<strong>安全绕过</strong>。</td><td><span class="tag tag-fixed">已修复</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-3</span></td><td class="fix-file">customer_manager.py:280-292</td><td>move_stage绕过状态机，终态(dnc/invalid/closed_won)客户可被看板拖拽复活，DNC阻断被解除。</td><td><span class="tag tag-fixed">已修复</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-4</span></td><td class="fix-file">prospect_evaluator.py:577</td><td>重新评估已存在客户时，detect_duplicate_customer必然匹配到自己→触发duplicate hard blocker→永久卡eligible。无exclude_customer_id参数。</td><td><span class="tag tag-fixed">已修复</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-5</span></td><td class="fix-file">repository.py:710</td><td>邮箱重复检测用email in cust.get("emails")，但emails是dict列表[{email:...,type:...}]不是字符串列表→恒为False→邮箱dup完全失效。</td><td><span class="tag tag-fixed">已修复</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-6</span></td><td class="fix-file">knowledge_base.py:120</td><td>硬编码认证含"ISO9001"，但权威认证清单（TÜV SÜD/SGS/FDA/RoHS/CE/FSC/BSCI）未含ISO9001，属虚假认证风险。</td><td><span class="tag tag-fixed">已修复</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-7</span></td><td class="fix-file">knowledge_base.py:119</td><td>写"阳江源头工厂"，违反红线"不说自有工厂"（真实口径是36家合作工厂网络+4家家族深度绑定）。同时编造"MOQ 50把起"。</td><td><span class="tag tag-fixed">已修复</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-8</span></td><td class="fix-file">website_evidence.py:492-526</td><td>save_evidence入库时生成evidence_id，但返回evidence.get("evidence_id","")，调用方不传id时返回空字符串→入库成功但id丢失。</td><td><span class="tag tag-fixed">已修复</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-9</span></td><td class="fix-file">customer_manager.py / repository.py</td><td>JSON与SQLite分裂双写无同步：CustomerManager.add_customer只写JSON不写prospects表；看板/评估只读SQLite→新加客户看板看不到。</td><td><span class="tag tag-open">待规划</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-10</span></td><td class="fix-file">knowledge_base.py:110-121</td><td>get_company_brief()整段硬编码，未从05a_对外材料最新版动态读取，9.26已更新的数字（工厂4→36、出口国130→160）Prompt仍用旧值。</td><td><span class="tag tag-open">待规划</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-11</span></td><td class="fix-file">manual_content.py:16</td><td>"登录页-操作步骤"内容错粘成SEO表格生成步骤。</td><td><span class="tag tag-open">待修复</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-12</span></td><td class="fix-file">manual_content.py:11/138</td><td>声称"所有数据本地JSON存储"，实际订单/社媒/事实都在SQLite（22张表）。</td><td><span class="tag tag-open">待修复</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-13</span></td><td class="fix-file">model_registry.py:367-383</td><td>HealthManager冷却过期后status仍为rate_limited，is_available返回True但UI显示"限流"，状态不一致。</td><td><span class="tag tag-open">待修复</span></td></tr>
+<tr><td><span class="tag tag-p1">P1-14</span></td><td class="fix-file">model_registry.py:438-448</td><td>check_ollama_image_gen_support每次冷探测真实触发FLUX图像生成推理，绕过_global_lock抢内存。</td><td><span class="tag tag-open">待优化</span></td></tr>
+</table>
+</div>
+
+<h3>2.4 P2/P3 问题摘要</h3>
+<div class="card">
+<p><strong>P2（30项）：</strong>主要包括大量<code>except Exception: pass</code>静默吞错（app.py 31处、local_model_manager 3处、provider_manager 2处、website_evidence 3处）、松散子串匹配可能误判模型、finance_db/social_db用COUNT生成单号删除后撞UNIQUE、feishu_client不检查code!=0且test_connection有副作用、knowledge_facts.review无版本留痕、search()全量rglob无缓存、app.py假按钮（复制域名/加入客户分析）、IP黑名单装饰性功能、密码无限速、添加知识同名覆盖等。</p>
+<p><strong>P3（17项）：</strong>主要包括约3000行不可达死页面分支（app.py中12个elif分支不在nav_options内）、重复设置页、硬编码绝对路径、run.sh加载.env方式脆弱、datetime.utcnow() deprecated、rollback_migration级联删除不全、get_today_tasks含逾期任务、save_customer_evaluation空壳等技术债务。</p>
+<div class="success-box">
+  <strong>✅ 审计通过项：</strong>无硬编码API Key/密码、密码输入框type=password、认证门位置正确（st.stop在业务页面前）、无重复widget key、无st.rerun死循环、JSON原子写入正确、SQLite WAL+busy_timeout+foreign_keys ON、hard blocker优先级高于ICP分、DNC状态机定义完整、AI草稿绝不自动批准/发送、28条客户迁移正确且幂等。
+</div>
+</div>
+
+<!-- ===== 3. 前端功能清单 ===== -->
+<h2 id="s3">3. 前端功能完整清单与测试结果</h2>
+<div class="card">
+<p>测试方式：豆包内部浏览器真实打开 http://localhost:8501，登录后逐一操作。共测试 <strong>58项</strong>功能。</p>
+<div class="stats-grid">
+  <div class="stat-box bg-pass"><div class="num">43</div><div class="label">✅ 通过</div></div>
+  <div class="stat-box bg-warn"><div class="num">5</div><div class="label">🟡 部分通过</div></div>
+  <div class="stat-box bg-fail"><div class="num">1</div><div class="label">❌ 失败（已修复）</div></div>
+  <div class="stat-box bg-info"><div class="num">9</div><div class="label">⚪ 未测试</div></div>
+</div>
+</div>
+
+<h3>3.1 认证与仪表盘（5项，全部通过）</h3>
+<div class="card">
+<table>
+<tr><th>编号</th><th>功能</th><th>实际结果</th><th>状态</th></tr>
+<tr><td>AUTH-01</td><td>登录页/密码框类型</td><td>密码框确为[type=password]，带眼睛切换</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>AUTH-02</td><td>正确密码登录</td><td>进入工作台，侧边栏导航出现</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>AUTH-03</td><td>错误密码提示</td><td>显示"密码错误"，无正确密码泄露</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>AUTH-04</td><td>未登录拦截</td><td>新会话直连显示登录页，业务页不可见</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>DASH-01</td><td>仪表盘统计</td><td>总客户28、A级3、均分53/100、故障转移链显示正确</td><td><span class="tag tag-pass">通过</span></td></tr>
+</table>
+</div>
+
+<h3>3.2 客户中心 CRM（16项，全部通过）</h3>
+<div class="card">
+<table>
+<tr><th>编号</th><th>功能</th><th>实际结果</th><th>状态</th></tr>
+<tr><td>CRM-01</td><td>数据总览</td><td>28客户、A3/B16/C9、销售漏斗、3个导出按钮</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-02</td><td>数据看板</td><td>来源线索、等级分布、销售阶段、漏斗指标、Plotly图表</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-03</td><td>客户列表</td><td>"筛选结果：28个客户"，分页12行/页</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-04</td><td>客户详情</td><td>Costco详情显示公司/国家/等级/阶段/官网</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-05</td><td>跟进序列</td><td>"新客户7天跟进"模板3步骤，CRUD按钮齐全</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-06</td><td>线索分层</td><td>A3(10.7%)/B16(57.1%)/C9(32.1%)/D0</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-07</td><td>客户公池</td><td>公池28、我名下0、自动清洗规则</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-08</td><td>客户看板</td><td>5阶段列(线索28/已联系0/沟通中0/已报价0/已成交0)，卡片带推进按钮</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-09</td><td>待办提醒</td><td>各类0计数，显示"✅无"空状态</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-10</td><td>新增客户表单</td><td>公司名*/国家*/来源/类型/等级+Excel批量导入(XLSX/CSV)</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-11</td><td>筛选排序</td><td>搜索"Costco"回车后过滤为1条，筛选生效</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-12</td><td>详情5区域</td><td>基本信息/跟进任务/活动日志/网站证据/评估历史/草稿历史齐全</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-13</td><td>跟进任务CRUD</td><td>"＋记一条跟进"表单(渠道/内容/几天后/保存)存在</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-14</td><td>活动日志</td><td>"暂无活动日志"+新增活动表单</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-15</td><td>状态等级显示</td><td>每行显示A/B级、线索/新线索、评分</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>CRM-16</td><td>数据看板图表</td><td>Plotly图表控件(下载/缩放/平移)与统计表格正常</td><td><span class="tag tag-pass">通过</span></td></tr>
+</table>
+</div>
+
+<h3>3.3 精准客户开发 & AI草稿（8项）</h3>
+<div class="card">
+<table>
+<tr><th>编号</th><th>功能</th><th>实际结果</th><th>状态</th></tr>
+<tr><td>EVAL-01</td><td>开发页加载</td><td>ICP评估表单(公司名*/网站*/买家类型/Knowledge Pack)正常</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>EVAL-02</td><td>重复客户检测</td><td>需提交触发，为避免写入未点"开始评估"</td><td><span class="tag tag-untested">未测试</span></td></tr>
+<tr><td>EVAL-03</td><td>DNC阻断逻辑</td><td>需DNC客户样本+提交触发，未验证</td><td><span class="tag tag-untested">未测试</span></td></tr>
+<tr><td>EVAL-04</td><td>网站证据抓取</td><td>需运行"开始评估"(写入+可能超时)，未执行</td><td><span class="tag tag-untested">未测试</span></td></tr>
+<tr><td>EVAL-05</td><td>AI背调界面</td><td>需付费API</td><td><span class="tag tag-untested">未测试</span></td></tr>
+<tr><td>DRAFT-01</td><td>开发信生成界面</td><td>草稿类型默认first_email、模式/语言/Mock选项齐全</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>DRAFT-02</td><td>WhatsApp话术界面</td><td>草稿类型下拉存在，WhatsApp选项未展开确认</td><td><span class="tag tag-partial">部分通过</span></td></tr>
+<tr><td>DRAFT-03</td><td>草稿保存/审核/拒绝/重生成</td><td>历史草稿为空，按钮需生成后验证</td><td><span class="tag tag-untested">未测试</span></td></tr>
+</table>
+</div>
+
+<h3>3.4 公司知识库（7项 + 2个特殊按钮）</h3>
+<div class="card">
+<table>
+<tr><th>编号</th><th>功能</th><th>实际结果</th><th>状态</th></tr>
+<tr><td>KB-01</td><td>知识库首页</td><td>v7.2/15分类/588文档，6个二级标签正常</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>KB-02</td><td>产品知识库品类</td><td>产品术语/规格/SKU数据等模块入口存在</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>KB-03</td><td>公司事实/FAQ/谈判/邮件技巧</td><td>公司简介/FAQ/谈客户技巧/谈判报价/邮件模板齐全</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>KB-04</td><td>搜索/筛选</td><td>搜索浏览页+知识库来源单选+8类筛选器</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>KB-05</td><td>AI回复引用知识库</td><td>快速问答界面存在，未实际提问(避免API调用)</td><td><span class="tag tag-untested">未测试</span></td></tr>
+<tr><td>KB-06</td><td>导出保存</td><td>"导出完整CSV"/"导出经营报表"按钮存在</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>KB-07</td><td>缺失/损坏友好错误</td><td>未触发该场景</td><td><span class="tag tag-untested">未测试</span></td></tr>
+</table>
+<h3>⭐ 特殊按钮验证</h3>
+<table>
+<tr><th>按钮</th><th>位置</th><th>实测结果</th><th>结论</th></tr>
+<tr><td>📋 复制域名</td><td>竞品资源库每行</td><td>点击后弹出"已复制: yjgangrong.com"</td><td><span class="tag tag-pass">有效</span></td></tr>
+<tr><td>🎯 加入客户分析</td><td>潜在客户站行</td><td><strong>修复前：</strong>点击后无提示/无跳转/表单不预填。<strong>修复后：</strong>跳转精准客户开发页并预填公司名+官网</td><td><span class="tag tag-fixed">已修复</span></td></tr>
+</table>
+</div>
+
+<h3>3.5 模型管理（8项）</h3>
+<div class="card">
+<table>
+<tr><th>编号</th><th>功能</th><th>实际结果</th><th>状态</th></tr>
+<tr><td>MODEL-01</td><td>模型页加载</td><td>供应商7、在线API6、本地1，各供应商在线状态</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>MODEL-02</td><td>文本路由链</td><td>仪表盘显示 GLM-4.7 Flash→GLM-4 Flash→qwen3.5:9b→qwen2.5:7b</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>MODEL-03</td><td>视觉模型路由链</td><td>GLM-4.6V-Flash列出，但视觉专用路由链未可视化</td><td><span class="tag tag-partial">部分通过</span></td></tr>
+<tr><td>MODEL-04</td><td>图像生成路由</td><td>CogView-3-Flash未在模型页/工具库界面显示</td><td><span class="tag tag-untested">未测试</span></td></tr>
+<tr><td>MODEL-05</td><td>手动模型选择</td><td>每个供应商"✅切换到此供应商"按钮存在</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>MODEL-06</td><td>故障转移说明</td><td>仪表盘显示"故障转移链4节点、2在线+2本地"</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>MODEL-07</td><td>本地模型互斥锁/卸载</td><td>界面未显示互斥锁与卸载状态</td><td><span class="tag tag-untested">未测试</span></td></tr>
+<tr><td>MODEL-08</td><td>Ollama图像不可用标注</td><td>Ollama本地5模型列出，但"不支持图像生成"未明确标注</td><td><span class="tag tag-partial">部分通过</span></td></tr>
+</table>
+</div>
+
+<h3>3.6 AI工具库（9项）</h3>
+<div class="card">
+<table>
+<tr><th>编号</th><th>功能</th><th>实际结果</th><th>状态</th></tr>
+<tr><td>TOOL-01</td><td>工具库主页</td><td>工具总数9、已上线9、分类4，全部卡片渲染</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>TOOL-02</td><td>产品SEO工具</td><td>无独立卡片，SEO功能并入SKU命名工具</td><td><span class="tag tag-partial">部分通过</span></td></tr>
+<tr><td>TOOL-03</td><td>SKU命名工具</td><td>点击"打开工作台"成功，SKU产品列表完整(KL-KN/OD/SC系列)</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>TOOL-04</td><td>线稿工具</td><td>"产品线稿工具"卡片已上线</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>TOOL-05</td><td>白平衡工具</td><td>"白平衡校正工具"卡片已上线</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>TOOL-06</td><td>场景反推工具</td><td>"场景图反推"卡片已上线</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>TOOL-07</td><td>图片SEO</td><td>由SKU工具的ALT Text/SEO关键词覆盖</td><td><span class="tag tag-partial">部分通过</span></td></tr>
+<tr><td>TOOL-08</td><td>AI作图工作台</td><td>"AI作图工作台"卡片已上线</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>TOOL-09</td><td>快速问答</td><td>仪表盘"AI快速问答"框存在、显示"AI已连接"</td><td><span class="tag tag-pass">通过(界面)</span></td></tr>
+</table>
+</div>
+
+<h3>3.7 设置与稳定性（4项，全部通过）</h3>
+<div class="card">
+<table>
+<tr><th>编号</th><th>功能</th><th>实际结果</th><th>状态</th></tr>
+<tr><td>SETTING-01</td><td>API Key脱敏</td><td>新增供应商API Key带visibility显示/隐藏切换；现有供应商仅显示endpoint不暴露key</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>STABILITY-01</td><td>刷新/导航</td><td>侧边栏12个页面切换流畅；服务器重启后重新登录正常</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>STABILITY-02</td><td>空数据状态</td><td>多处友好空状态："暂无活动日志""✅无""你名下暂时没有客户"</td><td><span class="tag tag-pass">通过</span></td></tr>
+<tr><td>STABILITY-03</td><td>错误/超时处理</td><td>全程未触发错误页；控制台无JS报错</td><td><span class="tag tag-pass">通过</span></td></tr>
+</table>
+</div>
+
+<!-- ===== 4. 修复详情 ===== -->
+<h2 id="s4">4. 失败项与修复详情</h2>
+<div class="card">
+<h3>4.1 本次实际修复清单（10个文件，175行新增）</h3>
+<table>
+<tr><th>文件</th><th>修复内容</th><th>对应问题</th><th>严重度</th></tr>
+<tr><td class="fix-file">config.py</td><td>①创始人"李建成"→"利建成"；②添加workbench.env自动加载（dotenv+手动解析fallback）</td><td>P0-1, P1-1</td><td><span class="tag tag-p0">P0</span></td></tr>
+<tr><td class="fix-file">customer_manager.py</td><td>①_load()文件存在但损坏时raise RuntimeError而非返回[]（防清空28客户）；②move_stage增加终态保护（dnc/invalid/closed_won不可拖拽复活）</td><td>P0-3, P1-3</td><td><span class="tag tag-p0">P0</span></td></tr>
+<tr><td class="fix-file">repository.py</td><td>①DB_PATH读取WORKBENCH_DB_PATH环境变量（测试隔离）；②DNC查询AND→OR（修复DNC绕过）；③邮箱dup检测兼容dict列表；④添加import os</td><td>P0-2, P1-2, P1-5</td><td><span class="tag tag-p0">P0</span></td></tr>
+<tr><td class="fix-file">prospect_evaluator.py</td><td>①DB_PATH环境变量；②detect_duplicate_customer增加exclude_customer_id参数排除自身；③添加import os</td><td>P0-2, P1-4</td><td><span class="tag tag-p0">P0</span></td></tr>
+<tr><td class="fix-file">content_draft_generator.py</td><td>①DB_PATH环境变量；②添加import os</td><td>P0-2</td><td><span class="tag tag-p0">P0</span></td></tr>
+<tr><td class="fix-file">website_evidence.py</td><td>①robots.txt改用带timeout的手动抓取（防永久阻塞）；②save_evidence先生成确定eid，入库和返回用同一值</td><td>P0-5, P1-8</td><td><span class="tag tag-p0">P0</span></td></tr>
+<tr><td class="fix-file">local_model_manager.py</td><td>release()增加_global_lock.locked()检查，避免释放未持有的锁</td><td>P0-4</td><td><span class="tag tag-p0">P0</span></td></tr>
+<tr><td class="fix-file">knowledge_base.py</td><td>get_company_brief()：①"阳江源头工厂"→"阳江36家合作工厂网络"；②去除编造的"MOQ 50把起"；③认证去除ISO9001，改为CE/FDA/LFGB/RoHS/FSC/BSCI并注明"以具体产品为准"</td><td>P1-6, P1-7</td><td><span class="tag tag-p1">P1</span></td></tr>
+<tr><td class="fix-file">app.py</td><td>①密码比较改用hmac.compare_digest（常量时间）；②登录失败计数+5次后冷却提示+失败写日志；③"加入客户分析"按钮真正跳转精准客户开发页并预填公司名+官网</td><td>P2(密码安全), 前端失败项</td><td><span class="tag tag-p1">P1</span></td></tr>
+<tr><td class="fix-file">test_p1_security.py</td><td>损坏恢复测试适配新安全行为（预期raise RuntimeError而非返回[]）</td><td>测试适配</td><td>—</td></tr>
+</table>
+
+<h3>4.2 生产库测试数据清理</h3>
+<div class="danger-box">
+  <strong>清理前：</strong>evaluations表303条测试脏数据（cust_gen/cust_safe/cust_xss/p1_4a_test_customer_001等），content_drafts 1条，customer_pack_bindings 1条，prospect_evaluations 3条。<br>
+  <strong>清理后：</strong>上述表全部清空测试数据，prospects表28条真实客户完好。<br>
+  <strong>备份：</strong>清理前已备份 workbench.db.pre_audit_cleanup.bak
+</div>
+
+<h3>4.3 未修复问题（待后续迭代）</h3>
+<table>
+<tr><th>问题</th><th>原因</th><th>建议</th></tr>
+<tr><td>P0-6 SSRF TOCTOU</td><td>需钉住IP的自定义HTTP Handler，改动大</td><td>后续迭代，当前为RFC级防护</td></tr>
+<tr><td>P1-9 JSON/SQLite双写不同步</td><td>需确立单一主存储，架构决策</td><td>建议以SQLite为唯一主存储，JSON仅导出</td></tr>
+<tr><td>P1-10 get_company_brief硬编码</td><td>需动态读取最新对外材料</td><td>后续从05a_对外材料最新版动态加载</td></tr>
+<tr><td>P1-11/12 manual_content错粘</td><td>文案错误，需逐页核对</td><td>下次内容更新时修正</td></tr>
+<tr><td>P1-13 HealthManager状态不自愈</td><td>需调用方请求成功后set_status兜底</td><td>在ai_client.py请求成功路径补调用</td></tr>
+<tr><td>P1-14 Ollama探测副作用</td><td>需改用/api/show或/api/version判断</td><td>避免真实推理探测</td></tr>
+<tr><td>P2 大量except:pass</td><td>30+处静默吞错，需逐一加日志</td><td>技术债务批量清理</td></tr>
+<tr><td>P3 3000行死代码</td><td>12个不可达elif分支</td><td>确认无外部入口后删除</td></tr>
+</table>
+</div>
+
+<!-- ===== 5. 模型路由图 ===== -->
+<h2 id="s5">5. 模型路由图</h2>
+<div class="card">
+<h3>5.1 文本模型路由（4节点）</h3>
+<div class="flow-diagram">
+  <span class="flow-node">GLM-4.7 Flash</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-node">GLM-4 Flash</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-node flow-local">qwen3.5:9b (本地)</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-node flow-local">qwen2.5:7b (本地)</span>
+</div>
+<p style="text-align:center;font-size:13px;color:#7f8c8d;">故障转移触发：429限流 / 超时 / 5xx服务端错误 ｜ 不触发：401/403认证错误 / 参数错误</p>
+
+<h3>5.2 视觉模型路由（3节点）</h3>
+<div class="flow-diagram">
+  <span class="flow-node">GLM-4.6V Flash</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-node flow-local">qwen3.5:9b (本地)</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-node flow-local">qwen2.5vl:7b (本地)</span>
+</div>
+
+<h3>5.3 图像生成路由</h3>
+<div class="flow-diagram">
+  <span class="flow-node">CogView-3 Flash (在线)</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-node flow-unsupported">FLUX x/flux2-klein:4b-fp4 (Ollama不支持图像生成，已标记runtime_unsupported)</span>
+</div>
+
+<h3>5.4 本地模型互斥锁机制</h3>
+<div class="success-box">
+  <strong>✅ 已验证：</strong>LocalModelManager使用threading.Lock()全局互斥锁，acquire时先卸载owned旧模型再加载新模型，release时卸载并确认。本次修复增加了锁释放安全检查（P0-4）。<br>
+  <strong>⚠️ 已知：</strong>模型管理页面未展示互斥锁和卸载状态（MODEL-07未测试/未展示）。
+</div>
+
+<h3>5.5 模型路由自动化测试</h3>
+<p><code>test_model_routing.py</code> — 73项测试全部通过，覆盖：路由顺序、故障转移、手动选择不被覆盖、慢响应触发、Ollama运行时不支持检测、本地模型所有权、CogView端点等。</p>
+</div>
+
+<!-- ===== 6. 知识库 ===== -->
+<h2 id="s6">6. 知识库结构与测试结果</h2>
+<div class="card">
+<h3>6.1 知识库目录结构</h3>
+<p>位置：<code>data/company_kb_v7/</code> — 13个子目录，588+文档</p>
+<table>
+<tr><th>目录</th><th>内容</th><th>状态</th></tr>
+<tr><td>00_导航与规范</td><td>知识库导航、术语规范、话术红线</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>01_公司与品牌</td><td>公司简介、品牌故事、创始人（利建成Leo Li）</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>02_产品知识库</td><td>四大品类（厨房刀具/专业剪刀/户外刀具/厨房用品）、规格、SKU</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>03_客户开发与CRM</td><td>开发流程、跟进模板、客户分层</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>04_国家地区开发指南</td><td>各市场开发策略</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>05_独立站与SEO</td><td>SEO指南、关键词、竞品分析</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>06_海外仓与订单物流</td><td>物流、海外仓、订单流程</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>07_营销与社媒</td><td>营销策略、社媒内容</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>08_AI工作流与工具</td><td>AI工具使用指南</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>09_行业知识与培训</td><td>行业知识、培训材料</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>10_项目路演与政府材料</td><td>路演、政府申报材料</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>11_订单与财务</td><td>订单、财务流程</td><td><span class="tag tag-pass">存在</span></td></tr>
+<tr><td>13_外部知识层</td><td>外部参考资料</td><td><span class="tag tag-pass">存在</span></td></tr>
+</table>
+
+<h3>6.2 知识库关键内容核验</h3>
+<table>
+<tr><th>检查项</th><th>结果</th></tr>
+<tr><td>OEM/ODM内容</td><td>239文件命中 ✅</td></tr>
+<tr><td>Private Label内容</td><td>58文件命中 ✅</td></tr>
+<tr><td>质量控制/三段式QC</td><td>齐全 ✅</td></tr>
+<tr><td>出口支持/报关退税</td><td>单证齐全 ✅</td></tr>
+<tr><td>FAQ/谈判技巧/邮件技巧</td><td>模块齐全 ✅</td></tr>
+<tr><td>创始人姓名权威口径</td><td>利建成（Leo Li），不写"李建成" ✅（已修复config.py）</td></tr>
+<tr><td>认证清单</td><td>TÜV SÜD/SGS/FDA/RoHS/CE/FSC/amfori BSCI，无ISO9001 ✅（已修复knowledge_base.py）</td></tr>
+<tr><td>工厂表述</td><td>36家合作工厂网络+4家家族深度绑定，不说"源头工厂" ✅（已修复knowledge_base.py）</td></tr>
+</table>
+
+<h3>6.3 知识库测试结果</h3>
+<div class="success-box">
+  KB-01~04, KB-06 通过（首页/产品/公司事实/搜索/导出）。KB-05(AI引用)和KB-07(损坏错误)因避免API调用和未触发场景标记为未测试。<br>
+  <strong>重要修复：</strong>审计发现config.py创始人姓名错误和knowledge_base.py虚假认证/源头工厂/编造MOQ，已全部修复。AI Prompt注入的公司简介现在使用准确口径。
+</div>
+</div>
+
+<!-- ===== 7. 密码保护 ===== -->
+<h2 id="s7">7. 密码保护专项检查</h2>
+<div class="card">
+<table>
+<tr><th>检查项</th><th>结果</th><th>详情</th></tr>
+<tr><td>未登录不能访问业务页面</td><td><span class="tag tag-pass">通过</span></td><td>AUTH-04验证：新会话直连显示登录页，st.stop()在业务页面前</td></tr>
+<tr><td>错误密码不泄露正确密码</td><td><span class="tag tag-pass">通过</span></td><td>仅显示"密码错误"，无系统信息泄露</td></tr>
+<tr><td>密码输入框type=password</td><td><span class="tag tag-pass">通过</span></td><td>DOM确认为[type=password]</td></tr>
+<tr><td>密码不出现在源码/URL/日志/Trace</td><td><span class="tag tag-pass">通过</span></td><td>grep无硬编码密码，仅从环境变量读取</td></tr>
+<tr><td>密码未硬编码到Python/HTML/Shell/README</td><td><span class="tag tag-pass">通过</span></td><td>密码存储于~/.config/kailioncrafts/workbench.env（权限600）</td></tr>
+<tr><td>启动脚本加载环境变量</td><td><span class="tag tag-fixed">已修复</span></td><td>原config.py未加载workbench.env，已添加自动加载（dotenv+手动解析fallback）</td></tr>
+<tr><td>常量时间密码比较</td><td><span class="tag tag-fixed">已修复</span></td><td>原pwd==_access_pwd，已改为hmac.compare_digest</td></tr>
+<tr><td>连续失败限制/冷却</td><td><span class="tag tag-fixed">已修复</span></td><td>新增失败计数，5次后显示"已连续失败N次，请稍后再试"，失败写auth_log.json</td></tr>
+</table>
+<div class="warning-box">
+  <strong>⚠️ 已知限制：</strong>①IP黑名单功能为装饰性（登录IP硬编码"local"，不读取真实客户端IP，黑名单不生效）— P2-1，待修复。②服务监听0.0.0.0（局域网可达），建议仅在可信内网使用。③失败冷却为前端提示级，非真正锁定（Streamlit无服务端会话锁定）。
+</div>
+</div>
+
+<!-- ===== 8. 数据安全 ===== -->
+<h2 id="s8">8. 数据安全检查</h2>
+<div class="card">
+<table>
+<tr><th>检查项</th><th>结果</th><th>详情</th></tr>
+<tr><td>正式客户数量不变</td><td><span class="tag tag-pass">通过</span></td><td>审计前28条 → 审计后28条（prospects表）</td></tr>
+<tr><td>customers.json MD5不变</td><td><span class="tag tag-pass">通过</span></td><td>23944c53722a667f27b29180ef6bdf17（前后一致）</td></tr>
+<tr><td>workbench.db无测试污染</td><td><span class="tag tag-fixed">已清理</span></td><td>清理303条evaluations等测试脏数据，已备份</td></tr>
+<tr><td>未新增/删除真实客户</td><td><span class="tag tag-pass">通过</span></td><td>前端测试未提交任何客户表单</td></tr>
+<tr><td>未发送客户消息</td><td><span class="tag tag-pass">通过</span></td><td>无邮件/WhatsApp/LinkedIn/飞书发送操作</td></tr>
+<tr><td>未自动批准AI内容</td><td><span class="tag tag-pass">通过</span></td><td>草稿仅生成needs_review状态，无自动批准代码</td></tr>
+<tr><td>测试数据库隔离</td><td><span class="tag tag-fixed">已修复</span></td><td>三模块DB_PATH现已读取WORKBENCH_DB_PATH环境变量</td></tr>
+<tr><td>API Key/密码未提交Git</td><td><span class="tag tag-pass">通过</span></td><td>.gitignore覆盖.env/ai_providers.json/workbench.db/customers.json</td></tr>
+<tr><td>HTML报告不含敏感信息</td><td><span class="tag tag-pass">通过</span></td><td>本报告无密码/API Key/客户隐私/完整客户资料</td></tr>
+</table>
+</div>
+
+<!-- ===== 9. 自动化测试 ===== -->
+<h2 id="s9">9. 自动化测试命令与真实输出</h2>
+<div class="card">
+<h3>9.1 编译检查</h3>
+<div class="code">python3 -m py_compile app.py ai_client.py model_registry.py local_model_manager.py provider_manager.py customer_manager.py prospect_evaluator.py content_draft_generator.py customer_status.py repository.py website_evidence.py knowledge_base.py knowledge_facts.py feishu_client.py config.py prompts.py finance_db.py social_db.py manual_content.py company_kb_content.py
+# 结果：py_compile ALL 20 FILES PASSED</div>
+
+<h3>9.2 模型路由测试（73项）</h3>
+<div class="code">python3 test_model_routing.py
+# Ran 73 tests in 52.803s
+# OK
+# 总数:73 通过:73 失败:0 错误:0</div>
+
+<h3>9.3 安全测试（22项）</h3>
+<div class="code">python3 test_p1_security.py
+# 测试总数: 22  通过: 22  失败: 0
+# 覆盖：访问密码环境变量、原子JSON写入、JSON损坏恢复、客户ID唯一性、删除确认、CSV中文导出、API Key脱敏</div>
+
+<h3>9.4 客户闭环测试（76项）</h3>
+<div class="code">python3 test_customer_loop.py
+# Ran 76 tests in 0.282s
+# OK
+# 覆盖：客户CRUD、状态迁移(15状态)、DNC终态、非法转移拒绝、网站抓取超时/大小限制</div>
+
+<h3>9.5 其他测试套件</h3>
+<table>
+<tr><th>测试文件</th><th>结果</th></tr>
+<tr><td>test_p1_2_knowledge.py</td><td>27 passed</td></tr>
+<tr><td>test_p1_2b_knowledge.py</td><td>23 passed</td></tr>
+<tr><td>test_p1_2c_prospect.py</td><td>28 passed</td></tr>
+<tr><td>test_p1_2d_drafts.py</td><td>35 passed</td></tr>
+<tr><td>test_p1_3c_local_draft.py</td><td>运行时测试通过（测试后自动删除临时DB）</td></tr>
+<tr><td>test_p1_3d_thinking.py</td><td>12 passed</td></tr>
+<tr><td>test_p1_4a_runtime.py</td><td>运行时测试通过</td></tr>
+<tr><th>合计</th><th>296项标准测试 + 2项运行时测试，全部通过</th></tr>
+</table>
+
+<h3>9.6 测试类型区分</h3>
+<table>
+<tr><th>类型</th><th>数量</th><th>说明</th></tr>
+<tr><td>自动化测试（Mock/单元）</td><td>296</td><td>全部test_*.py，无真实API调用</td></tr>
+<tr><td>真实浏览器测试</td><td>58功能项</td><td>内部浏览器实际操作，43通过+5部分+1失败(已修复)+9未测试</td></tr>
+<tr><td>真实网络测试</td><td>0</td><td>未进行外部API调用（避免付费/限流）</td></tr>
+<tr><td>运行时集成测试</td><td>2</td><td>test_p1_3c_local_draft.py, test_p1_4a_runtime.py（使用临时DB）</td></tr>
+<tr><td>未执行测试</td><td>0</td><td>所有test_*.py均已执行</td></tr>
+</table>
+</div>
+
+<!-- ===== 10. 截图证据 ===== -->
+<h2 id="s10">10. 截图证据索引</h2>
+<div class="card">
+<p>共20张证据截图，位于 <code>/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/验收测试截图/</code></p>
+<div class="screenshot-grid">
+  <div class="screenshot-item">01_登录页.png</div>
+  <div class="screenshot-item">02_错误密码提示.png</div>
+  <div class="screenshot-item">03_登录成功.png</div>
+  <div class="screenshot-item">04_未登录拦截.png</div>
+  <div class="screenshot-item">05_仪表盘.png</div>
+  <div class="screenshot-item">06_客户中心首页.png</div>
+  <div class="screenshot-item">07_数据总览.png</div>
+  <div class="screenshot-item">08_数据看板.png</div>
+  <div class="screenshot-item">09_客户列表.png</div>
+  <div class="screenshot-item">10_客户详情.png</div>
+  <div class="screenshot-item">11_客户看板.png</div>
+  <div class="screenshot-item">12_新增客户表单.png</div>
+  <div class="screenshot-item">13_精准客户开发.png</div>
+  <div class="screenshot-item">14_内容草稿界面.png</div>
+  <div class="screenshot-item">15_知识库首页.png</div>
+  <div class="screenshot-item">16_复制域名成功提示.png ⭐</div>
+  <div class="screenshot-item">17_加入客户分析_无反馈.png ❌→✅</div>
+  <div class="screenshot-item">18_模型管理.png</div>
+  <div class="screenshot-item">19_AI工具库主页.png</div>
+  <div class="screenshot-item">20_SKU命名工具.png</div>
+</div>
+</div>
+
+<!-- ===== 11. 未完成事项 ===== -->
+<h2 id="s11">11. 未完成事项与已知限制</h2>
+<div class="card">
+<div class="warning-box">
+<h3>🔴 高优先级（建议演示前关注）</h3>
+<ol>
+  <li><strong>SSRF TOCTOU（P0-6）</strong>：当前为RFC级防护，面对恶意权威DNS可能绕过。演示环境为内网，风险可控，但需记录。</li>
+  <li><strong>JSON/SQLite双写不同步（P1-9）</strong>：通过CustomerManager新增的客户不会出现在SQLite看板中。当前28条客户两边一致，演示时不要新增客户。</li>
+  <li><strong>Ollama图像生成不支持标注（MODEL-08）</strong>：界面未明确显示FLUX不可用，用户点击AI作图可能困惑。演示时说明CogView为唯一图像生成路径。</li>
+</ol>
+
+<h3>🟡 中优先级</h3>
+<ol>
+  <li>AI回复是否真正引用知识库（KB-05）未实测——快速问答界面存在但未实际提问验证。</li>
+  <li>草稿审核/拒绝/重新生成流程（DRAFT-03）未端到端测试。</li>
+  <li>网站证据抓取（EVAL-04）和AI背调（EVAL-05）未实测。</li>
+  <li>HealthManager冷却后状态不自愈（P1-13），UI可能显示"限流"但实际可用。</li>
+  <li>IP黑名单功能装饰性（P2-1），设置中心的拉黑操作无实际效果。</li>
+</ol>
+
+<h3>🟢 低优先级（技术债务）</h3>
+<ol>
+  <li>约3000行不可达死代码（12个elif分支），可安全删除。</li>
+  <li>30+处except Exception: pass静默吞错，需加日志。</li>
+  <li>manual_content.py两处文案错误（错粘SEO步骤/存储描述错误）。</li>
+  <li>finance_db/social_db用COUNT生成单号，删除后可能撞UNIQUE。</li>
+  <li>config.py硬编码外接卷绝对路径，换机器需修改。</li>
+</ol>
+</div>
+</div>
+
+<!-- ===== 12. 明天演示 ===== -->
+<h2 id="s12">12. 明天演示操作顺序</h2>
+<div class="card">
+<div class="success-box">
+<h3>🚀 推荐演示流程（约15分钟）</h3>
+<ol>
+  <li><strong>启动工作台</strong>：双击桌面"启动企业AI工作台（KaiLionCrafts）.command"，浏览器自动打开 http://localhost:8501</li>
+  <li><strong>登录</strong>：输入访问密码进入（密码已配置，启动脚本自动加载）</li>
+  <li><strong>仪表盘</strong>：展示28客户统计、AI引擎状态、故障转移链（GLM-4.7→GLM-4→qwen3.5→qwen2.5）</li>
+  <li><strong>客户中心</strong>：
+    <ul>
+      <li>数据总览 → 28客户/A3/B16/C9分布</li>
+      <li>客户列表 → 搜索"Costco"演示筛选</li>
+      <li>客户详情 → 展示5区域（基本信息/跟进/活动/证据/评估）</li>
+      <li>客户看板 → 5阶段拖拽视图（注意：终态客户不可拖拽，已修复）</li>
+    </ul>
+  </li>
+  <li><strong>精准客户开发</strong>：展示ICP评估表单结构，说明Knowledge Pack驱动评估（不实际提交，避免写入）</li>
+  <li><strong>公司知识库</strong>：
+    <ul>
+      <li>首页 → v7.2/15分类/588文档</li>
+      <li>竞品与资源库 → 演示"📋复制域名"按钮（有效）和"🎯加入客户分析"按钮（已修复，会跳转并预填）</li>
+      <li>搜索浏览 → 演示知识库搜索筛选</li>
+    </ul>
+  </li>
+  <li><strong>模型管理</strong>：展示7供应商、Ollama本地5模型、手动切换按钮</li>
+  <li><strong>AI工具库</strong>：展示9个工具，打开SKU命名工具演示产品列表</li>
+  <li><strong>设置中心</strong>：展示API Key脱敏（visibility切换）、供应商管理</li>
+</ol>
+
+<h3>⚠️ 演示注意事项</h3>
+<ul>
+  <li>不要在演示时新增客户（JSON/SQLite双写不同步问题尚未修复）</li>
+  <li>不要点击"开始评估"（会写入数据+可能触发网站抓取超时）</li>
+  <li>AI作图工具说明使用CogView-3 Flash（在线付费），Ollama本地不支持图像生成</li>
+  <li>快速问答如需演示，先准备一个简单问题，GLM-4.7 Flash可能限流，会自动故障转移到GLM-4 Flash</li>
+  <li>如果GLM模型全部限流，会自动切换到本地qwen3.5:9b（需Ollama运行中）</li>
+  <li>外置固态硬盘（Kingston NVMe）必须保持连接，工作台和数据都在上面</li>
+</ul>
+
+<h3>🔧 演示前检查清单</h3>
+<ul>
+  <li>✅ 外置盘已连接，工作台目录可访问</li>
+  <li>✅ 密码文件 ~/.config/kailioncrafts/workbench.env 存在且权限600</li>
+  <li>✅ Ollama 已启动（本地模型故障转移需要）</li>
+  <li>✅ 网络正常（在线模型需要）</li>
+  <li>✅ 浏览器已打开 http://localhost:8501</li>
+  <li>✅ 28条客户数据完好</li>
+</ul>
+</div>
+</div>
+
+<div class="footer">
+  KaiLionCrafts 企业 AI 工作台 · 最终独立审计报告 · 2026-10-02<br>
+  本报告不含密码、API Key、客户隐私或完整客户资料 · 审计结果基于真实代码审查和浏览器测试
+</div>
+
+</div>
+</body>
+</html>

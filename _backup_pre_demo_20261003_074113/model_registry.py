@@ -138,20 +138,19 @@ def _get_cred(creds, provider_id, fallback_url="", fallback_key=""):
 
 # ============ 活动模型注册表 ============
 # 文本模型自动路由顺序（普通文本/聊天/Agent/工具调用）
-# 严格4节点：GLM-4 Flash（可用）-> GLM-4.7 Flash（额度紧张时降级）-> qwen3.5:9b -> qwen2.5:7b
+# 严格4节点：GLM-4.7 -> GLM-4 -> qwen3.5:9b -> qwen2.5:7b
 TEXT_CHAIN_IDS = [
-    "glm-4-flash",         # 1. GLM-4 Flash（当前可用在线首选）
-    "glm-4.7-flash",       # 2. GLM-4.7 Flash（额度紧张时第二顺位）
-    "qwen3.5:9b",          # 3. qwen3.5:9b（本地推理首选）
-    "qwen2.5:7b",          # 4. qwen2.5:7b（本地文本备用，快）
+    "glm-4.7-flash",       # 1. GLM-4.7 Flash
+    "glm-4-flash",         # 2. GLM-4 Flash
+    "qwen3.5:9b",          # 3. qwen3.5:9b（默认本地首选）
+    "qwen2.5:7b",          # 4. qwen2.5:7b（本地文本备用）
 ]
 
-# 推理任务链（GLM-4 Flash → GLM-4.7 → qwen3.5 → deepseek-r1）
+# 推理任务链（GLM → qwen3.5 → deepseek-r1）
 REASONING_CHAIN_IDS = [
-    "glm-4-flash",         # 1. GLM-4 Flash（当前可用在线首选）
-    "glm-4.7-flash",       # 2. GLM-4.7 Flash（额度紧张时第二顺位）
-    "qwen3.5:9b",          # 3. qwen3.5:9b
-    "deepseek-r1:7b",      # 4. deepseek-r1:7b（本地推理备用）
+    "glm-4.7-flash",       # 1. GLM-4.7 Flash
+    "qwen3.5:9b",          # 2. qwen3.5:9b
+    "deepseek-r1:7b",      # 3. deepseek-r1:7b（推理备用）
 ]
 
 # 本地模型顺序（文本故障转移）

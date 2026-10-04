@@ -1,0 +1,47 @@
+# 环境变量与密钥
+.env
+.env.*
+.streamlit/secrets.toml
+
+# API 供应商配置（含真实 Key）
+data/ai_providers.json
+
+# 运行时日志与 Trace
+data/auth_log.json
+data/trace/
+
+# 生成图片
+data/generated_images/
+
+# 客户与业务数据
+data/customers.json
+data/competitor_sites.csv
+data/company_profile.json
+data/company_kb_v7/
+company_kb_content.py
+
+# 订单与财务中心
+*.db
+data/workbench.db
+_backup/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 备份文件
+*.bak_*
+*~
+
+# 运行时认证状态（含失败计数/锁定）
+data/auth_lock.json
+
+# 前端测试产物（含 test_password 字段、截图）
+frontend_deep_test_*.json
+frontend_test_*.json
+frontend_test_summary.md
+screenshots/
+_shots/
+
+# 临时测试数据库
+data/test_*.db

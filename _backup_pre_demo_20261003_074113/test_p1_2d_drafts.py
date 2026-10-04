@@ -416,12 +416,12 @@ class TestGlobalChainConsistency(unittest.TestCase):
 
     def test_standard_mode_excludes_doubao_and_vision(self):
         chain = cdg.get_draft_model_chain('standard')
-        self.assertEqual(chain, ['glm-4-flash', 'glm-4.7-flash', 'qwen3.5:9b', 'qwen2.5:7b'])
+        self.assertEqual(chain, ['glm-4.7-flash', 'glm-4-flash', 'qwen3.5:9b', 'qwen2.5:7b'])
 
     def test_reasoning_mode_includes_deepseek(self):
         chain = cdg.get_draft_model_chain('reasoning')
         self.assertIn('deepseek-r1:7b', chain)
-        self.assertEqual(chain, ['glm-4-flash', 'glm-4.7-flash', 'qwen3.5:9b', 'deepseek-r1:7b'])
+        self.assertEqual(chain, ['glm-4.7-flash', 'qwen3.5:9b', 'deepseek-r1:7b'])
 
     def test_no_chain_drift_between_modules(self):
         """model_registry 和 content_draft_generator 不会出现链路漂移"""

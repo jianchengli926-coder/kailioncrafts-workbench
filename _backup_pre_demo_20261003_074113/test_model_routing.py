@@ -31,7 +31,7 @@ class T1Chain(unittest.TestCase):
     def test_4models(self): self.assertEqual(len(get_text_chain()), 4)
     def test_order(self):
         ids = [m['id'] for m in get_text_chain()]
-        self.assertEqual(ids, ['glm-4-flash','glm-4.7-flash','qwen3.5:9b','qwen2.5:7b'])
+        self.assertEqual(ids, ['glm-4.7-flash','glm-4-flash','qwen3.5:9b','qwen2.5:7b'])
     def test_doubao_not_in_text_chain(self): self.assertNotIn('doubao-seed-2-1-turbo', [m['id'] for m in get_text_chain()])
     def test_deepseek_not_in_text_chain(self): self.assertNotIn('deepseek-r1:7b', [m['id'] for m in get_text_chain()])
     def test_qwen25vl_not_in_text_chain(self): self.assertNotIn('qwen2.5vl:7b', [m['id'] for m in get_text_chain()])
@@ -112,19 +112,19 @@ class T7HealthManager(unittest.TestCase):
         self.assertTrue(health.is_available('glm-4.6v-flash'))
 
 
-class T2Glm4to47(unittest.TestCase):
+class T2Glm47to4(unittest.TestCase):
     def setUp(self): health._states={}; self.c=AIClient()
     @patch('ai_client.requests.post')
     def test(self, mp):
         ms=[]
         def se(u,**k):
             m=k.get('json',{}).get('model',''); ms.append(m); r=MagicMock()
-            if 'glm-4-flash' in m: r.status_code=500; r.text='e'
-            else: r.status_code=200; r.json.return_value={"choices":[{"message":{"content":"GLM47"}}],"usage":{}}
+            if 'glm-4.7' in m: r.status_code=500; r.text='e'
+            else: r.status_code=200; r.json.return_value={"choices":[{"message":{"content":"GLM4"}}],"usage":{}}
             return r
         mp.side_effect=se
-        self.assertIn("GLM47", self.c.chat("hi",task_name="t2"))
-        self.assertIn('glm-4-flash',ms); self.assertIn('glm-4.7-flash',ms)
+        self.assertIn("GLM4", self.c.chat("hi",task_name="t2"))
+        self.assertIn('glm-4.7-flash',ms); self.assertIn('glm-4-flash',ms)
 
 class T3GlmToQwen35(unittest.TestCase):
     def setUp(self): health._states={}; self.c=AIClient()
@@ -369,14 +369,14 @@ class T16TraceNoSecrets(unittest.TestCase):
 class TP11Chains(unittest.TestCase):
     def test_text_4(self):
         self.assertEqual([m['id'] for m in get_text_chain()],
-            ['glm-4-flash','glm-4.7-flash','qwen3.5:9b','qwen2.5:7b'])
+            ['glm-4.7-flash','glm-4-flash','qwen3.5:9b','qwen2.5:7b'])
     def test_local_text_2(self):
         from model_registry import get_local_text_chain
         self.assertEqual([m['id'] for m in get_local_text_chain()],
             ['qwen3.5:9b','qwen2.5:7b'])
     def test_reasoning(self):
         from model_registry import get_reasoning_chain
-        self.assertEqual([m['id'] for m in get_reasoning_chain()], ['glm-4-flash','glm-4.7-flash','qwen3.5:9b','deepseek-r1:7b'])
+        self.assertEqual([m['id'] for m in get_reasoning_chain()], ['glm-4.7-flash','qwen3.5:9b','deepseek-r1:7b'])
     def test_vision(self): self.assertEqual([m['id'] for m in get_vision_chain()], ['glm-4.6v-flash','qwen3.5:9b','qwen2.5vl:7b'])
     def test_image_filters_runtime_unsupported(self):
         # FLUX运行时不支持时，图像链只含CogView
@@ -430,12 +430,12 @@ class TP11SlowResponse(unittest.TestCase):
         import ai_client; ai_client._slow_response_tracker={}
     def test_single_30s_recorded(self):
         import ai_client
-        r=ai_client._is_slow_response("glm-4-flash",35.0)
-        self.assertIn("glm-4-flash", ai_client._slow_response_tracker)
+        r=ai_client._is_slow_response("glm-4.7-flash",35.0)
+        self.assertIn("glm-4.7-flash", ai_client._slow_response_tracker)
     def test_consecutive_15s_triggers(self):
         import ai_client
-        self.assertFalse(ai_client._is_slow_response("glm-4-flash",16.0))
-        self.assertTrue(ai_client._is_slow_response("glm-4-flash",18.0))
+        self.assertFalse(ai_client._is_slow_response("glm-4.7-flash",16.0))
+        self.assertTrue(ai_client._is_slow_response("glm-4.7-flash",18.0))
     def test_no_failover_codes(self):
         for c in [401,403,400,422]: self.assertFalse(_classify_error(Exception("t"),c)[0])
     def test_can_failover_codes(self):
@@ -462,7 +462,7 @@ class TP113EndToEndSlowFailover(unittest.TestCase):
             if 'localhost' in u or '11434' in u:
                 call_order.append(m)
                 r.status_code=200; r.json.return_value={"message":{"content":"qwen35_result"},"eval_count":5}
-            elif 'glm-4-flash' in m:
+            elif 'glm-4.7' in m:
                 call_order.append(m)
                 import time as _t; _t.sleep(0.001)
                 r.status_code=200; r.json.return_value={"choices":[{"message":{"content":"slow_glm_result"}}],"usage":{}}
@@ -502,7 +502,7 @@ class TP113EndToEndSlowFailover(unittest.TestCase):
             if 'localhost' in u or '11434' in u:
                 call_order.append(m)
                 r.status_code=200; r.json.return_value={"message":{"content":"qwen35_result"},"eval_count":5}
-            elif 'glm-4-flash' in m:
+            elif 'glm-4.7' in m:
                 call_order.append(m)
                 r.status_code=200; r.json.return_value={"choices":[{"message":{"content":"glm_result"}}],"usage":{}}
             else:
@@ -511,8 +511,8 @@ class TP113EndToEndSlowFailover(unittest.TestCase):
         map_.side_effect=se
         # 模拟两次慢响应
         import ai_client
-        ai_client._is_slow_response("glm-4-flash", 18.0)
-        ai_client._is_slow_response("glm-4-flash", 20.0)
+        ai_client._is_slow_response("glm-4.7-flash", 18.0)
+        ai_client._is_slow_response("glm-4.7-flash", 20.0)
         # 下一次调用应该跳过glm-4.7
         call_order.clear()
         r=self.c.chat("hi",task_name="p113c")
@@ -531,7 +531,7 @@ class TP113EndToEndSlowFailover(unittest.TestCase):
             return r
         mp.side_effect=se
         # 先记录慢响应状态
-        ai_client._is_slow_response("glm-4-flash", 35.0)
+        ai_client._is_slow_response("glm-4.7-flash", 35.0)
         # 手动选择glm-4.7
         r=self.c.chat("hi",task_name="p113d",manual_model="glm-4.7-flash")
         self.assertIn("manual_glm", r)
@@ -552,7 +552,7 @@ class TP113EndToEndSlowFailover(unittest.TestCase):
             return r
         map_.side_effect=se
         import ai_client
-        ai_client._is_slow_response("glm-4-flash", 35.0)
+        ai_client._is_slow_response("glm-4.7-flash", 35.0)
         # 触发chat并获取last_trace
         self.c.chat("hi",task_name="p113e")
         # 检查last_trace中的failover_details包含slow_response
@@ -712,16 +712,16 @@ class TP15ManualRouting(unittest.TestCase):
         def se(url, **kw):
             m = kw.get('json', {}).get('model', '')
             seen.append(m)
-            if m == 'glm-4-flash':
-                r = MagicMock(); r.status_code = 503; r.text = 'boom'; return r
             if m == 'glm-4.7-flash':
+                r = MagicMock(); r.status_code = 503; r.text = 'boom'; return r
+            if m == 'glm-4-flash':
                 r = MagicMock(); r.status_code = 503; r.text = 'boom'; return r
             # 本地模型返回成功
             return _local_ok("local_from_chain")
         mp.side_effect = se
         out = self.c.chat("hi", task_name="tp15_auto_chain")
         self.assertIn("local_from_chain", out)
-        self.assertEqual(seen[:3], ['glm-4-flash', 'glm-4.7-flash', 'qwen3.5:9b'],
+        self.assertEqual(seen[:3], ['glm-4.7-flash', 'glm-4-flash', 'qwen3.5:9b'],
                          f"自动链顺序不符: {seen}")
 
     # 2. 手动本地模型选择生效，请求发到 localhost:11434
@@ -770,7 +770,7 @@ class TP15ManualRouting(unittest.TestCase):
         def se(url, **kw):
             m = kw.get('json', {}).get('model', '')
             seen.append(m)
-            if '/chat/completions' in url and m == 'glm-4-flash':
+            if '/chat/completions' in url and m == 'glm-4.7-flash':
                 return _online_ok("auto_first")
             return _local_ok("local_reply")
         mp.side_effect = se
@@ -783,8 +783,8 @@ class TP15ManualRouting(unittest.TestCase):
         seen.clear()
         out2 = self.c.chat("hi", task_name="tp15_auto")
         self.assertIn("auto_first", out2)
-        self.assertEqual(seen[0], 'glm-4-flash',
-                         f"切回自动后应从链首 glm-4-flash 开始，实际首个: {seen[:3]}")
+        self.assertEqual(seen[0], 'glm-4.7-flash',
+                         f"切回自动后应从链首 glm-4.7-flash 开始，实际首个: {seen[:3]}")
 
     # 5. 401 不故障转移
     @patch('ai_client.requests.post')

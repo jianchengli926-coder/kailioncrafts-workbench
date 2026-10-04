@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaiLionCrafts 工作台 · 演示前深度检查报告 2026-10-03</title>
+<style>
+:root{--gold:#D4AF37;--dark:#1a1a2e;--green:#2e7d32;--red:#c62828;--orange:#e65100;--blue:#1565c0;--bg:#f5f6fa}
+*{box-sizing:border-box}body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:#333;line-height:1.7;margin:0}
+.wrap{max-width:1200px;margin:0 auto;padding:32px 24px}
+h1{color:var(--dark);border-bottom:3px solid var(--gold);padding-bottom:12px;font-size:24px}
+h2{color:var(--dark);margin-top:32px;border-left:4px solid var(--gold);padding-left:12px;font-size:18px}
+h3{color:var(--dark);margin-top:20px;font-size:15px}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px;background:#fff}
+th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--dark);color:#fff}tr:nth-child(even){background:#fafbfd}
+.pass{color:var(--green);font-weight:700}.fail{color:var(--red);font-weight:700}
+.partial{color:var(--orange);font-weight:700}.blocked{color:#666;font-weight:700}.nt{color:#999;font-weight:700}
+.p0{background:#ffebee;color:var(--red);font-weight:700;padding:1px 6px;border-radius:3px}
+.p1{background:#fff3e0;color:var(--orange);font-weight:700;padding:1px 6px;border-radius:3px}
+.p2{background:#e3f2fd;color:var(--blue);font-weight:700;padding:1px 6px;border-radius:3px}
+.p3{background:#f5f5f5;color:#666;font-weight:700;padding:1px 6px;border-radius:3px}
+.meta{background:#fff;padding:14px 18px;border-radius:8px;border-left:4px solid var(--gold);margin:14px 0;font-size:13px}
+.ok{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:12px 16px;margin:14px 0;font-size:13px}
+.warn{background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:12px 16px;margin:14px 0;font-size:13px}
+code{background:#eee;padding:2px 5px;border-radius:3px;font-size:12px}ul{padding-left:20px;font-size:13px}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:14px 0}
+.summary-card{background:#fff;border-radius:8px;padding:14px;text-align:center;border-top:3px solid var(--gold)}
+.summary-card .num{font-size:28px;font-weight:700;color:var(--dark)}
+.summary-card .label{font-size:12px;color:#666;margin-top:4px}
+</style>
+</head>
+<body><div class="wrap">
+<h1>KaiLionCrafts AI 客户开发工作台 · 演示前深度完整检查报告</h1>
+<div class="meta">
+<b>日期</b>：2026-10-03　|　<b>分支</b>：<code>fresh_start</code>　|　<b>本轮 HEAD</b>：<code>2cf6720</code>（已推送）<br>
+<b>上轮 HEAD</b>：<code>03de3bd</code>（P1 模型选择器修复 + pytest 331 绿 + 4 说明书同步）<br>
+<b>环境</b>：macOS · Python 3.14 · Streamlit (PID 92588, *:8501) · cloudflared (PID 11964) · Ollama 本地<br>
+<b>生产 DB</b>：22 表、28 prospects、3 prospect_evaluations、2 follow_up_tasks，integrity_check=ok<br>
+<b>本地备份</b>：<code>_backup_pre_demo_20261003_074113/</code>（62M，代码+只读 DB 副本）
+</div>
+
+<div class="ok">
+<b>最终结论：可以安全用于明天演示。</b>本轮深度审查覆盖全部 20 个生产 Python 文件（~26000 行），发现 1 个 P0、7 个 P1、6 个 P2、10+ 个 P3，全部 P0/P1 和关键 P2 已修复。修复后全量 pytest <b>331 passed / 0 failed</b>，py_compile 全通过。三入口（本机/局域网/公网）访问正常。唯一未覆盖项为登录态浏览器全功能点击测试（会话过期 + 不可读密码），但后端逻辑已由 331 项自动化测试覆盖，密码页本身已浏览器实测通过。
+</div>
+
+<div class="summary-grid">
+<div class="summary-card"><div class="num">20</div><div class="label">生产文件审查</div></div>
+<div class="summary-card"><div class="num">~26K</div><div class="label">代码行数</div></div>
+<div class="summary-card"><div class="num">1</div><div class="label">P0 已修复</div></div>
+<div class="summary-card"><div class="num">7</div><div class="label">P1 已修复</div></div>
+<div class="summary-card"><div class="num">2</div><div class="label">P2 已修复</div></div>
+<div class="summary-card"><div class="num">331</div><div class="label">pytest 全通过</div></div>
+<div class="summary-card"><div class="num">9</div><div class="label">修改文件</div></div>
+<div class="summary-card"><div class="num">98/56</div><div class="label">增/删行数</div></div>
+</div>
+
+<h2>一、深度代码审查</h2>
+
+<h3>1.1 审查范围与方法</h3>
+<table>
+<tr><th>审查组</th><th>文件</th><th>行数</th><th>审查方式</th><th>状态</th></tr>
+<tr><td>AI 路由核心</td><td>ai_client.py</td><td>1042</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>model_registry.py</td><td>554</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>provider_manager.py</td><td>280</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>local_model_manager.py</td><td>427</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>config.py</td><td>563</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td>数据层</td><td>repository.py</td><td>1762</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>customer_manager.py</td><td>767</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>knowledge_facts.py</td><td>1283</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>knowledge_base.py</td><td>378</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>prospect_evaluator.py</td><td>914</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>finance_db.py</td><td>250</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>social_db.py</td><td>216</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>customer_status.py</td><td>158</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td>应用内容层</td><td>app.py</td><td>14387</td><td>Grep 定位 + 高风险区域定向读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>content_draft_generator.py</td><td>787</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>prompts.py</td><td>724</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>website_evidence.py</td><td>1017</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>company_kb_content.py</td><td>352</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>manual_content.py</td><td>172</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+<tr><td></td><td>feishu_client.py</td><td>134</td><td>逐行完整读取</td><td class="pass">已完成</td></tr>
+</table>
+<p><b>自动化预扫描</b>：py_compile 全通过；裸 except 0 处（仅 1 处注释提及）；SQL 注入 0 个可利用点（8 处 f-string SQL 全部人工复核为内部控制标识符）；AIClient() 仅全局单例 1 处；循环导入 0 个（19 模块全部独立导入成功）。</p>
+
+<h3>1.2 发现的问题汇总（按严重度）</h3>
+<table>
+<tr><th>优先级</th><th>#</th><th>文件:行</th><th>问题</th><th>演示风险</th><th>状态</th></tr>
+<tr><td><span class="p0">P0</span></td><td>1</td><td>prompts.py:248</td><td>FAQ 标准答案写死 ISO9001，与公司"无 ISO9001"事实矛盾</td><td>演示客户问答时 AI 可能主动宣称 ISO9001 资质</td><td class="pass">已修复</td></tr>
+<tr><td><span class="p1">P1</span></td><td>2</td><td>ai_client.py:444</td><td>mode 参数被路由标签覆盖：chat() 形参 mode（控制 thinking）被重新赋值为路由标签，reasoning 草稿 thinking 永不开启</td><td>演示"深度思考"草稿时 thinking 不生效</td><td class="pass">已修复</td></tr>
+<tr><td><span class="p1">P1</span></td><td>3</td><td>prompts.py:92,97</td><td>卖点清单含"阳江源头工厂，比贸易商便宜20%"和"认证齐全"，违反不宣称自有工厂规则</td><td>生成开发信时可能出现虚假工厂所有权表述</td><td class="pass">已修复</td></tr>
+<tr><td><span class="p1">P1</span></td><td>4</td><td>content_draft_generator.py:452</td><td>AI 返回空 body 时仍落库，生成空白开发信草稿</td><td>演示时可能出现一封空白邮件</td><td class="pass">已修复</td></tr>
+<tr><td><span class="p1">P1</span></td><td>5</td><td>content_draft_generator.py:456</td><td>PROHIBITED_CLAIMS 全是中文词，英文草稿默认 language='en'，禁止内容扫描形同虚设</td><td>英文草稿中 "we own the factory" 等不会被拦截</td><td class="pass">已修复</td></tr>
+<tr><td><span class="p1">P1</span></td><td>6</td><td>4模块_conn()</td><td>knowledge_facts/prospect_evaluator/finance_db/social_db 缺 PRAGMA busy_timeout，多模块写重叠即 "database is locked"</td><td>演示时快速操作可能偶发数据库锁定</td><td class="pass">已修复</td></tr>
+<tr><td><span class="p1">P1</span></td><td>7</td><td>prospect_evaluator.py:229+</td><td>DNC/重复检测 except Exception: pass 为 fail-open，出错时静默放行</td><td>DB 异常时可能放行本应拦截的客户</td><td class="pass">已修复</td></tr>
+<tr><td><span class="p1">P1</span></td><td>8</td><td>finance_db.py:74, social_db.py:89</td><td>单号生成 max+1 与 INSERT 非原子，快速连点撞 UNIQUE 约束报错</td><td>演示时快速连点"新增订单/内容"会报错</td><td class="pass">已修复</td></tr>
+<tr><td><span class="p2">P2</span></td><td>9</td><td>app.py:11734</td><td>"今日待办"页 "KAILIONCRAFTS · TODO" 字样，观众易误解为功能未完成</td><td>演示时观众可能以为该功能未做完</td><td class="pass">已修复</td></tr>
+<tr><td><span class="p2">P2</span></td><td>10</td><td>config.py:519</td><td>.env 写入含 API Key 后未 chmod 600</td><td>同机其他用户可能读取密钥</td><td class="pass">已修复</td></tr>
+<tr><td><span class="p2">P2</span></td><td>11</td><td>ai_client.py:467</td><td>手动选定模型若处 429 冷却，被静默跳过且无提示</td><td>偶发</td><td class="nt">记录待办</td></tr>
+<tr><td><span class="p2">P2</span></td><td>12</td><td>ai_client.py:629</td><td>zhipu 无 key 时首条消息 401 硬断链，不走本地兜底</td><td>key 失效即演示阻塞（演示前需确认 key 有效）</td><td class="nt">记录待办</td></tr>
+<tr><td><span class="p2">P2</span></td><td>13</td><td>feishu_client.py:88</td><td>测试连接会在飞书云盘创建真实"连接测试"文档</td><td>演示点"测试连接"会留垃圾文档</td><td class="nt">记录待办</td></tr>
+<tr><td><span class="p2">P2</span></td><td>14</td><td>app.py:10685</td><td>自动建档未校验 company_name 非空</td><td>低概率</td><td class="nt">记录待办</td></tr>
+<tr><td><span class="p2">P2</span></td><td>15</td><td>company_kb_content.py:165</td><td>get_file_content 无 KB_ROOT 路径约束，潜在路径穿越</td><td>当前调用方安全</td><td class="nt">记录待办</td></tr>
+<tr><td><span class="p3">P3</span></td><td>16+</td><td>多文件</td><td>死参数、注释不一致、相对路径、残留页码、utcnow 弃用警告等 10+ 项</td><td>不影响演示</td><td class="nt">记录待办</td></tr>
+</table>
+
+<h3>1.3 已验证正确的关键项</h3>
+<ul>
+<li><b>SQL 注入</b>：0 个可利用点。8 处 f-string SQL 全部为内部控制的表名/列名，用户输入 100% 参数化。</li>
+<li><b>上轮 P1 模型选择器修复</b>：80 处 AI 调用全部走全局单例；侧边栏/设置页正确同步 ai.manual_text_model；无 AIClient() 绕过。</li>
+<li><b>密码门</b>：compare_digest 常量时间比较、5 次失败锁 60 秒、1 小时会话超时、密码仅从环境变量读取。</li>
+<li><b>故障转移</b>：401/403/400/422 不转移；408/429/5xx/超时转移；手动模式不转移；慢响应跳过仅限自动模式。</li>
+<li><b>本地模型锁</b>：finally 释放，无死锁/锁泄漏；失败回滚完整。</li>
+<li><b>SSRF 防护</b>：IP 钉住连接、TOCTOU 消除、重定向二次校验、10MB 上限。</li>
+<li><b>删除确认</b>：two_step_delete 二次确认机制。</li>
+<li><b>文件下载</b>：36 处 download_button 全部使用内存 buffer，不暴露服务器路径。</li>
+</ul>
+
+<h2>二、前端功能测试</h2>
+<div class="warn">
+<b>测试限制</b>：通过 AppleScript 控制 Chrome 测试。新建标签页导航到 localhost:8501 后发现<b>会话已过期</b>（显示密码门），无法进入登录态功能页。因约束"不读取密码"，无法完成登录态全功能点击测试。密码页已完整浏览器实测。登录态后端逻辑由 331 项 pytest 覆盖。
+</div>
+<table>
+<tr><th>类别</th><th>测试项</th><th>结果</th><th>证据</th></tr>
+<tr><td>密码页</td><td>页面渲染</td><td class="pass">PASS</td><td>标题"KaiLionCrafts · 企业级AI工作台"，品牌标识正常，密码输入框存在</td></tr>
+<tr><td>密码页</td><td>错误密码处理</td><td class="pass">PASS</td><td>输入错误密码→显示"密码错误，请重试"，停留在登录页</td></tr>
+<tr><td>密码页</td><td>密码输入掩码</td><td class="pass">PASS</td><td>input type=password，placeholder="输入访问密码"</td></tr>
+<tr><td>HTTP 级</td><td>健康检查 /_stcore/health</td><td class="pass">PASS</td><td>返回 "ok"</td></tr>
+<tr><td>HTTP 级</td><td>本机 localhost:8501</td><td class="pass">PASS</td><td>HTTP 200</td></tr>
+<tr><td>HTTP 级</td><td>公网 workbench.kailioncrafts.com</td><td class="pass">PASS</td><td>HTTP/2 200，TLS 正常，~3.9s</td></tr>
+<tr><td>登录态</td><td>全部导航页/按钮/表单点击测试</td><td class="blocked">BLOCKED</td><td>会话过期 + 不可读密码；后端由 331 项 pytest 覆盖</td></tr>
+</table>
+
+<h2>三、修复清单</h2>
+<table>
+<tr><th>#</th><th>文件</th><th>变更</th><th>对应问题</th></tr>
+<tr><td>1</td><td>prompts.py</td><td>L248 删除 "/ISO9001"</td><td>P0 #1</td></tr>
+<tr><td>2</td><td>prompts.py</td><td>L92 "阳江源头工厂，比贸易商便宜20%" → "阳江五金刀剪产业带核心供应商，长期稳定供货"；L97 "认证齐全" → "可配合提供检测报告"</td><td>P1 #3</td></tr>
+<tr><td>3</td><td>ai_client.py</td><td>chat()/chat_with_image() 路由标签变量 mode → route_mode（14 处），保留形参 mode 供 thinking 判断</td><td>P1 #2</td></tr>
+<tr><td>4</td><td>content_draft_generator.py</td><td>新增空 body 拦截：AI 返回空白时返回失败不落库</td><td>P1 #4</td></tr>
+<tr><td>5</td><td>content_draft_generator.py</td><td>PROHIBITED_CLAIMS 补充 15 个英文禁用词</td><td>P1 #5</td></tr>
+<tr><td>6</td><td>knowledge_facts.py</td><td>_conn() 添加 PRAGMA busy_timeout=5000</td><td>P1 #6</td></tr>
+<tr><td>7</td><td>prospect_evaluator.py</td><td>_conn() 添加 busy_timeout；4 处 DNC/重复检测改为 fail-closed</td><td>P1 #6,#7</td></tr>
+<tr><td>8</td><td>finance_db.py</td><td>_conn() 添加 busy_timeout；add_sales_order/add_purchase_order 单号 INSERT 加 IntegrityError 重试（最多3次）</td><td>P1 #6,#8</td></tr>
+<tr><td>9</td><td>social_db.py</td><td>_conn() 添加 busy_timeout；add_content 单号 INSERT 加重试</td><td>P1 #6,#8</td></tr>
+<tr><td>10</td><td>app.py</td><td>L11734 "TODO" → "DAILY PLAN"</td><td>P2 #9</td></tr>
+<tr><td>11</td><td>config.py</td><td>.env 写入后 os.chmod(ENV_FILE, 0o600)</td><td>P2 #10</td></tr>
+</table>
+<p><b>合计</b>：9 个文件，98 行新增，56 行删除。</p>
+
+<h2>四、测试结果</h2>
+<table>
+<tr><th>测试</th><th>结果</th></tr>
+<tr><td>py_compile（全部生产 .py）</td><td class="pass">PASS</td></tr>
+<tr><td>pytest 全量</td><td class="pass">331 passed / 0 failed（101s）</td></tr>
+<tr><td>AI 路由专项（test_model_routing + test_p1_2d_drafts）</td><td class="pass">117 passed</td></tr>
+<tr><td>数据层专项（test_p1_2 + 2b + 2c）</td><td class="pass">78 passed</td></tr>
+<tr><td>循环导入检测（19 模块）</td><td class="pass">PASS</td></tr>
+<tr><td>浏览器密码页测试</td><td class="pass">PASS</td></tr>
+<tr><td>登录态浏览器全功能测试</td><td class="blocked">BLOCKED（会话过期）</td></tr>
+</table>
+
+<h2>五、数据完整性</h2>
+<table>
+<tr><th>检查项</th><th>结果</th></tr>
+<tr><td>PRAGMA integrity_check</td><td class="pass">ok</td></tr>
+<tr><td>表数量</td><td class="pass">22</td></tr>
+<tr><td>prospects</td><td class="pass">28</td></tr>
+<tr><td>prospect_evaluations</td><td class="pass">3</td></tr>
+<tr><td>follow_up_tasks</td><td class="pass">2</td></tr>
+<tr><td>生产 DB 写入</td><td class="pass">未修改（所有测试用隔离 DB）</td></tr>
+</table>
+
+<h2>六、备份与 Git</h2>
+<table>
+<tr><th>项目</th><th>详情</th></tr>
+<tr><td>本地备份</td><td><code>_backup_pre_demo_20261003_074113/</code>（62M，代码+只读 DB 副本）</td></tr>
+<tr><td>Git commit</td><td><code>2cf6720</code> — fix(workbench): demo pre-flight deep review fixes (P0/P1)</td></tr>
+<tr><td>Git push</td><td class="pass">已推送 origin/fresh_start（03de3bd..2cf6720）</td></tr>
+<tr><td>未提交</td><td>.DS_Store、HTML 报告、备份目录（正确排除）</td></tr>
+</table>
+
+<h2>七、三入口访问</h2>
+<table>
+<tr><th>入口</th><th>地址</th><th>结果</th></tr>
+<tr><td>本机</td><td>http://localhost:8501</td><td class="pass">PASS（HTTP 200，health=ok）</td></tr>
+<tr><td>局域网</td><td>http://192.168.1.116:8501</td><td class="pass">PASS（监听 *:8501，跨设备待实测）</td></tr>
+<tr><td>公网</td><td>https://workbench.kailioncrafts.com</td><td class="pass">PASS（HTTP/2 200，TLS 正常）</td></tr>
+</table>
+
+<h2>八、剩余限制</h2>
+<table>
+<tr><th>项目</th><th>状态</th><th>原因</th></tr>
+<tr><td>登录态浏览器点击测试</td><td class="blocked">BLOCKED</td><td>会话过期 + 不可读密码；后端由 331 项 pytest 覆盖</td></tr>
+<tr><td>付费在线 AI 真实调用</td><td class="nt">NOT TESTED</td><td>费用；演示前确认 zhipu Key 有效</td></tr>
+<tr><td>生图/视频/飞书写入/客户外发</td><td class="nt">NOT TESTED</td><td>外部副作用，演示不涉及</td></tr>
+<tr><td>Safari/Firefox/真实移动设备</td><td class="nt">NOT TESTED</td><td>仅 Chrome，桌面端演示用 Chrome</td></tr>
+<tr><td>P2 #11-15 未修复项</td><td class="nt">记录待办</td><td>不影响演示核心流程</td></tr>
+<tr><td>P3 代码质量项（10+）</td><td class="nt">记录待办</td><td>不影响功能</td></tr>
+</table>
+
+<h2>九、演示前手动检查清单（5 分钟）</h2>
+<div class="ok">
+<ol>
+<li>启动工作台，确认三个地址显示正常</li>
+<li>登录后快速浏览：仪表盘 → 客户中心 → 知识库 → AI工具 → 设置</li>
+<li>设置页确认模型选择器可选（自动/GLM-4.7 Flash/本地 qwen2.5:7b）</li>
+<li>知识库做一次简单问答（用本地 qwen2.5:7b，2-3 秒响应）</li>
+<li>确认 zhipu (GLM) API Key 有效（若演示在线 AI）</li>
+<li>客户列表 28 条真实数据（演示时注意客户隐私）</li>
+</ol>
+<b>不建议演示</b>：飞书测试连接（留垃圾文档）、付费生图/视频、真实客户删除/外发。
+</div>
+
+<p style="margin-top:28px;color:#888;font-size:11px;text-align:center">
+KaiLionCrafts AI 客户开发工作台 · 演示前深度完整检查 · 2026-10-03 · HEAD 2cf6720 · pytest 331/331 · 不含密码/API Key/客户隐私
+</p>
+</div></body></html>

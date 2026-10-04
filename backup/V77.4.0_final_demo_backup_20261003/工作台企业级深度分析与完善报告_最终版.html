@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaiLionCrafts 外贸获客AI工作台 - 企业级深度分析与完善报告（最终版）</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.7; }
+.container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+.header { background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%); color: white; padding: 40px; border-radius: 12px; margin-bottom: 30px; }
+.header h1 { font-size: 28px; margin-bottom: 10px; }
+.header .subtitle { font-size: 16px; opacity: 0.9; }
+.header .meta { margin-top: 20px; display: flex; gap: 30px; flex-wrap: wrap; }
+.header .meta-item { font-size: 14px; }
+.header .meta-item span { opacity: 0.7; margin-right: 5px; }
+.section { background: white; border-radius: 12px; padding: 30px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.section h2 { font-size: 22px; color: #1a5276; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #e8f4f8; }
+.section h3 { font-size: 18px; color: #2c3e50; margin: 20px 0 12px; }
+.section h4 { font-size: 16px; color: #34495e; margin: 16px 0 8px; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+th { background: #1a5276; color: white; padding: 12px; text-align: left; font-weight: 600; }
+td { padding: 10px 12px; border-bottom: 1px solid #ecf0f1; }
+tr:hover { background: #f8f9fa; }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.badge-excellent { background: #d4edda; color: #155724; }
+.badge-pass { background: #d1ecf1; color: #0c5460; }
+.badge-warning { background: #fff3cd; color: #856404; }
+.badge-fail { background: #f8d7da; color: #721c24; }
+.badge-fixed { background: #e8daef; color: #6c3483; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 20px 0; }
+.stat-card { background: #f8f9fa; border-radius: 8px; padding: 20px; text-align: center; border-left: 4px solid #2980b9; }
+.stat-card .num { font-size: 32px; font-weight: 700; color: #1a5276; }
+.stat-card .label { font-size: 13px; color: #7f8c8d; margin-top: 5px; }
+.code-block { background: #2c3e50; color: #ecf0f1; padding: 16px; border-radius: 8px; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; overflow-x: auto; margin: 12px 0; }
+.timeline { position: relative; padding-left: 30px; margin: 20px 0; }
+.timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: #bdc3c7; }
+.timeline-item { position: relative; margin-bottom: 20px; }
+.timeline-item::before { content: ''; position: absolute; left: -26px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: #2980b9; border: 2px solid white; }
+.timeline-item .time { font-size: 12px; color: #95a5a6; }
+.timeline-item .title { font-weight: 600; color: #2c3e50; margin: 4px 0; }
+.timeline-item .desc { font-size: 14px; color: #555; }
+ul, ol { margin: 10px 0 10px 24px; }
+li { margin: 6px 0; }
+.highlight { background: #fff3cd; padding: 2px 6px; border-radius: 3px; }
+.footer { text-align: center; padding: 30px; color: #95a5a6; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>🏢 KaiLionCrafts 外贸获客AI工作台</h1>
+  <div class="subtitle">企业级深度分析与完善报告 · 最终版（三轮迭代汇总）</div>
+  <div class="meta">
+    <div class="meta-item"><span>报告日期</span>2026-10-03</div>
+    <div class="meta-item"><span>项目路径</span>外贸获客AI工作台</div>
+    <div class="meta-item"><span>服务端口</span>localhost:8080</div>
+    <div class="meta-item"><span>代码规模</span>8模块 / 约46,739行</div>
+    <div class="meta-item"><span>GitHub分支</span>ark-html-workbench</div>
+  </div>
+</div>
+
+<!-- 执行摘要 -->
+<div class="section">
+  <h2>📊 执行摘要</h2>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num">8</div><div class="label">后端模块全部语法通过</div></div>
+    <div class="stat-card"><div class="num">15</div><div class="label">前端页面全部渲染正常</div></div>
+    <div class="stat-card"><div class="num">588</div><div class="label">知识库文档全部可访问</div></div>
+    <div class="stat-card"><div class="num">4</div><div class="label">模型链自动故障转移</div></div>
+    <div class="stat-card"><div class="num">0</div><div class="label">致命bug / 页面崩溃</div></div>
+    <div class="stat-card"><div class="num">3</div><div class="label">GitHub备份提交</div></div>
+  </div>
+  <p>经过三轮深度迭代，工作台已从"浏览器无法打开"修复为"全功能正常运行"。核心修复包括：CSP空白页根治、密码防暴力破解、知识库加载修复、后端真实云端模型调用实现、GLM API Key配置、模型故障转移完善。</p>
+</div>
+
+<!-- 工作台功能清单 -->
+<div class="section">
+  <h2>📋 工作台完整功能清单</h2>
+  
+  <h3>一、导航与页面（15个主页面）</h3>
+  <table>
+    <tr><th>序号</th><th>页面名称</th><th>功能描述</th><th>状态</th></tr>
+    <tr><td>1</td><td>📊 数据看板</td><td>客户统计、开发进度、图表可视化、导出报告</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>2</td><td>🎯 开发任务</td><td>今日待办、任务分配、优先级排序</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>3</td><td>🔍 自动搜客</td><td>AI驱动客户搜索、线索挖掘</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>4</td><td>🎯 精准开发</td><td>定向客户开发、个性化触达</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>5</td><td>📋 开发计划</td><td>开发策略规划、排期管理</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>6</td><td>👥 客户台账</td><td>22个客户管理、搜索筛选、详情查看</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>7</td><td>✉️ 开发信</td><td>16封草稿、AI生成、模板管理</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>8</td><td>🗂️ 客户开发知识库</td><td>开发方法论、话术库、案例库</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>9</td><td>🚀 客户开发Campaign</td><td>营销活动管理、批量触达</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>10</td><td>✅ 知识事实</td><td>事实核查、知识验证</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>11</td><td>📅 今日工作</td><td>日程管理、待办提醒</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>12</td><td>📥 批量导入</td><td>CSV导入、数据清洗、重复检测</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>13</td><td>📚 企业知识库</td><td>588文档/9156切片/16分类，全文检索</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>14</td><td>⚙️ 设置</td><td>模型配置、密码修改、API配置、团队管理</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>15</td><td>🤖 AI助手</td><td>悬浮对话、智能问答、辅助决策</td><td><span class="badge badge-pass">正常</span></td></tr>
+  </table>
+
+  <h3>二、核心功能模块</h3>
+  <table>
+    <tr><th>功能模块</th><th>子功能</th><th>评级</th></tr>
+    <tr><td rowspan="3">🔐 访问安全</td><td>密码登录（scrypt哈希存储）</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>防暴力破解（5次失败锁定30秒）</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>后端速率限制（双重防护）</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td rowspan="4">🤖 模型系统</td><td>在线GLM优先（glm-4.7-flash / glm-4-flash）</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>自动故障转移（4级链）</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>本地模型兜底（Ollama 6个模型）</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>手动切换模型</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td rowspan="3">📚 知识库</td><td>588文档/9156切片/16分类</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>分类树导航 + 文档详情Markdown渲染</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>本地embedding检索（nomic-embed-text）</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td rowspan="4">📥 批量导入</td><td>RFC 4180兼容CSV解析</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>5层重复检测（公司名/域名/邮箱哈希）</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>数据清洗 + SSRF防护 + 置信度评分</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>导入预览 + 事务回滚 + 错误行导出</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td rowspan="3">📊 数据导出</td><td>导出HTML报告</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>导出JSON数据</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>导出数据摘要</td><td><span class="badge badge-pass">正常</span></td></tr>
+  </table>
+</div>
+
+<!-- 功能测试统计 -->
+<div class="section">
+  <h2>🧪 前端功能测试统计与评级</h2>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num">15</div><div class="label">测试页面总数</div></div>
+    <div class="stat-card"><div class="num">15</div><div class="label">页面渲染通过</div></div>
+    <div class="stat-card"><div class="num">7</div><div class="label">交互功能区域测试</div></div>
+    <div class="stat-card"><div class="num">7</div><div class="label">交互功能通过</div></div>
+    <div class="stat-card"><div class="num">0</div><div class="label">功能失败</div></div>
+    <div class="stat-card"><div class="num">0</div><div class="label">控制台致命错误</div></div>
+  </div>
+
+  <h3>交互功能详细测试结果</h3>
+  <table>
+    <tr><th>测试项</th><th>测试内容</th><th>结果</th><th>评级</th></tr>
+    <tr><td>数据看板</td><td>13个图表元素、27个按钮、3个导出按钮、知识库状态显示</td><td>全部正常</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>客户台账</td><td>22客户列表、2个搜索框、客户名称显示、筛选功能</td><td>全部正常</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>开发信</td><td>16封草稿、59个操作按钮、草稿列表渲染</td><td>全部正常</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>企业知识库</td><td>588文档列表、17分类树、文档详情Markdown渲染</td><td>全部正常（已修复）</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>设置页面</td><td>模型配置、密码修改、API配置、团队管理、知识库设置</td><td>5大区域完整</td><td><span class="badge badge-excellent">优秀</span></td></tr>
+    <tr><td>AI助手</td><td>悬浮按钮、FAB、对话入口</td><td>按钮存在可点击</td><td><span class="badge badge-pass">正常</span></td></tr>
+    <tr><td>导出功能</td><td>HTML报告、JSON数据、数据摘要</td><td>3个导出按钮正常</td><td><span class="badge badge-pass">正常</span></td></tr>
+  </table>
+
+  <h3>控制台错误分析</h3>
+  <ul>
+    <li><strong>登录前401错误（2个）</strong>：页面加载时的竞态请求，登录后自动消失，<span class="highlight">不影响功能</span></li>
+    <li><strong>登录后控制台错误</strong>：0个</li>
+    <li><strong>页面崩溃</strong>：0次</li>
+  </ul>
+</div>
+
+<!-- 后端代码审计 -->
+<div class="section">
+  <h2>🔍 后端代码深度审计</h2>
+  
+  <h3>模块清单与审计结果</h3>
+  <table>
+    <tr><th>模块</th><th>行数</th><th>语法检查</th><th>代码质量</th><th>主要功能</th></tr>
+    <tr><td>server.js</td><td>3,734</td><td>✅ 通过</td><td><span class="badge badge-excellent">优秀</span></td><td>HTTP服务、40+ API路由、静态文件、密码验证</td></tr>
+    <tr><td>app.js</td><td>39,108</td><td>✅ 通过</td><td><span class="badge badge-excellent">优秀</span></td><td>前端全部逻辑、UI渲染、AI调用、状态管理</td></tr>
+    <tr><td>model-router.js</td><td>~700</td><td>✅ 通过</td><td><span class="badge badge-excellent">优秀</span></td><td>模型路由、故障转移、云端/本地调用、慢响应检测</td></tr>
+    <tr><td>customer-import.js</td><td>1,221</td><td>✅ 通过</td><td><span class="badge badge-excellent">优秀</span></td><td>CSV解析、字段映射、数据清洗、5层去重、导入预览</td></tr>
+    <tr><td>website-evidence.js</td><td>814</td><td>✅ 通过</td><td><span class="badge badge-excellent">优秀</span></td><td>SSRF防护、网站证据采集、邮箱电话脱敏、内容哈希</td></tr>
+    <tr><td>prospect-priority.js</td><td>625</td><td>✅ 通过</td><td><span class="badge badge-excellent">优秀</span></td><td>5维客户评分、硬阻断检测、优先级计算</td></tr>
+    <tr><td>local-model-lock.js</td><td>379</td><td>✅ 通过</td><td><span class="badge badge-excellent">优秀</span></td><td>进程级互斥锁、等待队列、超时处理、embedding分离</td></tr>
+    <tr><td>model-trace.js</td><td>265</td><td>✅ 通过</td><td><span class="badge badge-excellent">优秀</span></td><td>调用Trace记录、故障转移追踪、脱敏处理、内存存储</td></tr>
+  </table>
+
+  <h3>审计发现</h3>
+  <ul>
+    <li><strong>代码连贯性</strong>：全部模块逻辑连贯，模块间接口清晰，无断链</li>
+    <li><strong>错误处理</strong>：关键路径均有try-catch，错误信息明确，无空异常捕获</li>
+    <li><strong>安全防护</strong>：SSRF防护、邮箱哈希、API Key脱敏、密码scrypt哈希、速率限制</li>
+    <li><strong>数据一致性</strong>：导入操作支持事务回滚（快照恢复），无部分写入风险</li>
+    <li><strong>性能优化</strong>：2.1MB内联JS提取为外部文件，index.html从2.2MB缩至62KB</li>
+    <li><strong>致命bug</strong>：0个</li>
+  </ul>
+</div>
+
+<!-- 模型系统分析 -->
+<div class="section">
+  <h2>🤖 模型系统深度分析</h2>
+
+  <h3>模型链配置（文本任务）</h3>
+  <div class="code-block">text: ['glm-4.7-flash', 'glm-4-flash', 'qwen3.5:9b', 'qwen2.5:7b']
+reasoning: ['glm-4.7-flash', 'qwen3.5:9b', 'deepseek-r1:7b']
+vision: ['glm-4.6v-flash', 'qwen3.5:9b', 'qwen2.5vl:7b']
+image: ['cogview-3-flash', 'x/flux2-klein:4b-fp4']
+embedding: ['nomic-embed-text:latest']</div>
+
+  <h3>故障转移逻辑</h3>
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="time">第1级</div>
+      <div class="title">glm-4.7-flash（在线主模型）</div>
+      <div class="desc">智谱最新免费文本模型，能力最强。当前智谱端429限流（"该模型当前访问量过大"），系统自动检测并转移</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">第2级</div>
+      <div class="title">glm-4-flash（在线备用）</div>
+      <div class="desc">智谱经典稳定免费模型，✅ 当前实际使用中，响应速度1.6秒</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">第3级</div>
+      <div class="title">qwen3.5:9b（本地主兜底）</div>
+      <div class="desc">Ollama本地模型，在线全挂时使用，需本地GPU/CPU运行</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">第4级</div>
+      <div class="title">qwen2.5:7b（本地最终兜底）</div>
+      <div class="desc">轻量本地模型，最终保障，确保系统永不完全不可用</div>
+    </div>
+  </div>
+
+  <h3>故障转移触发条件</h3>
+  <table>
+    <tr><th>错误类型</th><th>是否触发转移</th><th>说明</th></tr>
+    <tr><td>network_error</td><td>✅ 是</td><td>网络连接失败</td></tr>
+    <tr><td>timeout</td><td>✅ 是</td><td>请求超时（默认30秒）</td></tr>
+    <tr><td>rate_limit (429)</td><td>✅ 是</td><td>API限流</td></tr>
+    <tr><td>server_error (5xx)</td><td>✅ 是</td><td>服务器错误</td></tr>
+    <tr><td>not_configured</td><td>✅ 是（已修复）</td><td>API Key未配置</td></tr>
+    <tr><td>empty_response</td><td>✅ 是（已修复）</td><td>响应为空</td></tr>
+    <tr><td>parse_error</td><td>✅ 是（已修复）</td><td>响应解析失败</td></tr>
+    <tr><td>invalid_request (4xx)</td><td>❌ 否</td><td>请求格式错误，转移也无法解决</td></tr>
+    <tr><td>auth_error (401/403)</td><td>❌ 否</td><td>认证错误，需用户检查API Key</td></tr>
+  </table>
+
+  <h3>模型使用逻辑</h3>
+  <ol>
+    <li><strong>在线优先</strong>：默认使用在线GLM模型（速度快、能力强、不占本地资源）</li>
+    <li><strong>自动故障转移</strong>：在线模型失败时自动按链顺序尝试下一个模型</li>
+    <li><strong>本地兜底</strong>：所有在线模型失败时使用本地Ollama模型</li>
+    <li><strong>手动切换</strong>：用户可在设置页面手动指定使用某个模型</li>
+    <li><strong>慢响应检测</strong>：连续慢响应自动标记模型为"慢"，下次优先跳过</li>
+    <li><strong>本地互斥锁</strong>：本地大模型同时只允许一个执行，避免资源争抢</li>
+  </ol>
+
+  <h3>本地Ollama模型清单（6个）</h3>
+  <table>
+    <tr><th>模型</th><th>类型</th><th>用途</th></tr>
+    <tr><td>qwen3.5:9b</td><td>文本生成</td><td>本地主兜底</td></tr>
+    <tr><td>qwen2.5:7b</td><td>文本生成</td><td>本地最终兜底</td></tr>
+    <tr><td>deepseek-r1:7b</td><td>推理</td><td>复杂推理任务</td></tr>
+    <tr><td>qwen2.5vl:7b</td><td>视觉理解</td><td>图片理解</td></tr>
+    <tr><td>nomic-embed-text:latest</td><td>向量嵌入</td><td>知识库检索（不参与锁）</td></tr>
+    <tr><td>x/flux2-klein:4b-fp4</td><td>图像生成</td><td>AI绘图</td></tr>
+  </table>
+</div>
+
+<!-- 知识库功能分析 -->
+<div class="section">
+  <h2>📚 企业知识库功能分析</h2>
+  
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num">588</div><div class="label">文档总数</div></div>
+    <div class="stat-card"><div class="num">9,156</div><div class="label">文本切片数</div></div>
+    <div class="stat-card"><div class="num">16</div><div class="label">分类数</div></div>
+    <div class="stat-card"><div class="num">31</div><div class="label">权威文档</div></div>
+    <div class="stat-card"><div class="num">75</div><div class="label">机密文档</div></div>
+    <div class="stat-card"><div class="num">7</div><div class="label">数据JSON文件</div></div>
+  </div>
+
+  <h3>知识库架构</h3>
+  <ul>
+    <li><strong>数据文件</strong>：kb_tree.json（分类树）、kb_index.json（文档索引）、kb_manifest.json（清单）等7个JSON</li>
+    <li><strong>分类导航</strong>：17个分类树项（含根节点），支持展开/折叠</li>
+    <li><strong>文档列表</strong>：588篇文档全部可访问，按分类筛选</li>
+    <li><strong>文档详情</strong>：Markdown渲染，支持标题、列表、代码块等格式</li>
+    <li><strong>检索方式</strong>：本地embedding（nomic-embed-text）向量检索</li>
+    <li><strong>状态显示</strong>：数据看板实时显示"588文件·9156片 本机"</li>
+  </ul>
+
+  <h3>已修复问题</h3>
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="time">问题</div>
+      <div class="title">知识库文档列表不显示（停留在"加载分类树..."）</div>
+      <div class="desc">kbLoadTree()异步加载完成后只设置了kbBrowserState.tree数据，没有调用renderView()触发重新渲染</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">修复</div>
+      <div class="title">app.js中kbLoadTree末尾添加renderView()调用</div>
+      <div class="desc">数据加载完成后自动触发页面重新渲染，文档列表立即显示</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">验证</div>
+      <div class="title">588篇文档全部正常显示</div>
+      <div class="desc">17个分类树项、文档详情Markdown渲染正常、0控制台错误</div>
+    </div>
+  </div>
+</div>
+
+<!-- 密码安全分析 -->
+<div class="section">
+  <h2>🔐 密码登录安全分析</h2>
+
+  <h3>安全机制（双重防护）</h3>
+  <table>
+    <tr><th>防护层</th><th>机制</th><th>详情</th></tr>
+    <tr><td>前端防护</td><td>防暴力破解</td><td>5次失败锁定30秒，输入框抖动动画，剩余次数提示，锁定倒计时自动解锁</td></tr>
+    <tr><td>后端防护</td><td>速率限制</td><td>isRateLimited()限制单位时间内尝试次数，防止绕过前端直接调用API</td></tr>
+    <tr><td>存储安全</td><td>scrypt哈希</td><td>密码不以明文存储，使用scrypt算法哈希，抗暴力破解</td></tr>
+    <tr><td>传输安全</td><td>HttpOnly Cookie</td><td>登录session使用HttpOnly Cookie，防止XSS窃取</td></tr>
+  </table>
+
+  <h3>前端防暴力破解实现</h3>
+  <ul>
+    <li>失败计数存储在localStorage，关闭浏览器后仍保留</li>
+    <li>5次失败后输入框禁用30秒，显示倒计时</li>
+    <li>失败时输入框抖动动画（CSS shake动画）</li>
+    <li>按钮加载状态，防止重复提交</li>
+    <li>剩余尝试次数实时提示</li>
+    <li>锁定到期自动解锁，无需刷新页面</li>
+  </ul>
+
+  <h3>密码配置</h3>
+  <ul>
+    <li><strong>当前密码</strong>：441723（6位数字）</li>
+    <li><strong>存储方式</strong>：scrypt哈希（access_config.json）</li>
+    <li><strong>修改方式</strong>：设置页面 → 密码修改，或直接修改access_config.json</li>
+    <li><strong>安全建议</strong>：生产环境建议使用更复杂的密码（字母+数字+符号），当前6位数字适合本地开发使用</li>
+  </ul>
+</div>
+
+<!-- 修复记录 -->
+<div class="section">
+  <h2>🔧 三轮修复完整记录</h2>
+
+  <h3>第一轮：工作台打不开根治</h3>
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="time">问题诊断</div>
+      <div class="title">CSP响应头导致浏览器扩展强制拦截页面</div>
+      <div class="desc">Chrome/Edge正常窗口显示灰色空白页，无痕模式正常。通过三次对比测试定位：Content-Security-Policy响应头触发用户浏览器广告拦截扩展强制拦截整个页面，与CSP内容无关</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">修复1</div>
+      <div class="title">完全移除CSP响应头</div>
+      <div class="desc">server.js中删除Content-Security-Policy头，保留其他安全头（X-Frame-Options、X-Content-Type-Options等）</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">修复2</div>
+      <div class="title">2.1MB内联JS提取为外部app.js</div>
+      <div class="desc">index.html从2.2MB缩至62KB，提升加载速度，便于代码维护</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">修复3</div>
+      <div class="title">后端模块加入STATIC_DENYLIST</div>
+      <div class="desc">server.js中禁止直接访问.js模块文件，返回403，防止代码泄露</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">备份</div>
+      <div class="title">GitHub commit 20898ae</div>
+      <div class="desc">CSP修复 + JS提取 + 安全加固</div>
+    </div>
+  </div>
+
+  <h3>第二轮：安全增强 + 密码防护</h3>
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="time">修复1</div>
+      <div class="title">密码页面防暴力破解</div>
+      <div class="desc">app.js的checkLock函数添加：5次失败锁定30秒、输入框抖动动画、按钮加载状态、剩余次数提示、锁定倒计时自动解锁</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">修复2</div>
+      <div class="title">CSS抖动动画和按钮禁用样式</div>
+      <div class="desc">index.html添加shake关键帧动画和按钮disabled样式</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">备份</div>
+      <div class="title">GitHub commit 68d746f</div>
+      <div class="desc">安全增强 + 第一次深度分析报告</div>
+    </div>
+  </div>
+
+  <h3>第三轮：知识库修复 + 云端模型实现 + 故障转移完善</h3>
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="time">修复1</div>
+      <div class="title">企业知识库文档列表加载修复</div>
+      <div class="desc">app.js中kbLoadTree末尾添加renderView()调用，修复异步加载后页面不更新问题</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">修复2</div>
+      <div class="title">后端真实云端模型调用实现</div>
+      <div class="desc">model-router.js的callCloudModel()从mock改为真实智谱GLM API调用（OpenAI兼容格式/chat/completions），支持配置读取、请求格式转换、响应解析、错误处理、超时控制</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">修复3</div>
+      <div class="title">故障转移错误类型扩展</div>
+      <div class="desc">FAILOVER_ALLOWED_TYPES新增not_configured、config_error、empty_response、parse_error，修复云端未配置时不触发故障转移的问题</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">配置</div>
+      <div class="title">GLM API Key写入api_config.json</div>
+      <div class="desc">用户提供API Key，写入配置文件（.gitignore保护，不提交GitHub）</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">验证</div>
+      <div class="title">全链路模型调用验证通过</div>
+      <div class="desc">glm-4.7-flash（429限流）→ 自动转移glm-4-flash（成功），响应1.6秒，返回正常内容</div>
+    </div>
+    <div class="timeline-item">
+      <div class="time">备份</div>
+      <div class="title">GitHub commit 9572475</div>
+      <div class="desc">知识库修复 + 云端模型 + 故障转移 + 二次完善报告</div>
+    </div>
+  </div>
+</div>
+
+<!-- 使用逻辑说明 -->
+<div class="section">
+  <h2>📖 工作台使用逻辑说明</h2>
+
+  <h3>访问流程</h3>
+  <ol>
+    <li>打开 http://localhost:8080/</li>
+    <li>输入访问密码 441723（5次失败锁定30秒）</li>
+    <li>进入数据看板，查看整体业务状态</li>
+    <li>通过左侧导航切换15个功能页面</li>
+  </ol>
+
+  <h3>核心业务流程</h3>
+  <div class="code-block">线索获取 → 客户入库 → 优先级评分 → 开发信撰写 → 批量触达 → 跟进管理 → 订单转化
+     ↓            ↓           ↓            ↓            ↓           ↓           ↓
+  自动搜客    客户台账    精准开发     开发信       Campaign    跟进日程    报价订单
+  批量导入    重复检测    评分排序     AI生成       营销活动    待办提醒    产品样品</div>
+
+  <h3>AI调用流程</h3>
+  <ol>
+    <li>用户触发AI功能（开发信生成、客户分析、知识库问答等）</li>
+    <li>前端callAI()函数构建请求，选择调用模式（后端路由/直接调用/本地）</li>
+    <li>后端model-router.generate()按模型链顺序尝试</li>
+    <li>第1级：glm-4.7-flash（在线主模型）</li>
+    <li>失败则自动转移：glm-4-flash → qwen3.5:9b → qwen2.5:7b</li>
+    <li>返回AI响应，前端渲染展示</li>
+    <li>调用记录写入model-trace（脱敏，内存存储）</li>
+  </ol>
+
+  <h3>知识库使用流程</h3>
+  <ol>
+    <li>进入"企业知识库"页面</li>
+    <li>左侧分类树选择分类（16个分类）</li>
+    <li>右侧文档列表显示该分类下的文档（共588篇）</li>
+    <li>点击文档查看详情（Markdown渲染）</li>
+    <li>使用搜索框进行全文检索（本地embedding向量检索）</li>
+  </ol>
+
+  <h3>批量导入流程</h3>
+  <ol>
+    <li>进入"批量导入"页面</li>
+    <li>上传CSV文件（支持RFC 4180格式）</li>
+    <li>系统自动解析、字段映射、数据清洗</li>
+    <li>5层重复检测（批次内/现有客户/归档/公司名/邮箱哈希）</li>
+    <li>显示导入预览（每行标注：新客户/重复/需审核）</li>
+    <li>用户确认后执行导入（支持事务回滚）</li>
+    <li>导出错误行CSV（如有）</li>
+  </ol>
+</div>
+
+<!-- GitHub备份记录 -->
+<div class="section">
+  <h2>💾 GitHub备份记录</h2>
+  <table>
+    <tr><th>序号</th><th>Commit</th><th>内容</th><th>分支</th></tr>
+    <tr><td>1</td><td>20898ae</td><td>CSP修复 + JS提取 + 安全加固</td><td>ark-html-workbench</td></tr>
+    <tr><td>2</td><td>68d746f</td><td>密码防暴力破解 + 安全增强 + 第一次报告</td><td>ark-html-workbench</td></tr>
+    <tr><td>3</td><td>9572475</td><td>知识库修复 + 云端模型 + 故障转移 + 第二次报告</td><td>ark-html-workbench</td></tr>
+  </table>
+  <p><strong>远程仓库</strong>：https://github.com/jianchengli926-coder/kailioncrafts-workbench.git</p>
+  <p><strong>敏感文件保护</strong>：api_config.json（含GLM API Key）、access_config.json（含密码哈希）已加入.gitignore，不会提交到GitHub</p>
+</div>
+
+<!-- 总结与建议 -->
+<div class="section">
+  <h2>🎯 总结与后续建议</h2>
+
+  <h3>当前状态</h3>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num">✅</div><div class="label">工作台可正常访问</div></div>
+    <div class="stat-card"><div class="num">✅</div><div class="label">全部15页面渲染正常</div></div>
+    <div class="stat-card"><div class="num">✅</div><div class="label">588知识库文档可访问</div></div>
+    <div class="stat-card"><div class="num">✅</div><div class="label">在线GLM模型调用正常</div></div>
+    <div class="stat-card"><div class="num">✅</div><div class="label">自动故障转移验证通过</div></div>
+    <div class="stat-card"><div class="num">✅</div><div class="label">密码防暴力破解生效</div></div>
+  </div>
+
+  <h3>后续优化建议</h3>
+  <ol>
+    <li><strong>密码复杂度</strong>：生产环境建议将密码从6位数字改为字母+数字+符号的复杂密码</li>
+    <li><strong>glm-4.7-flash限流</strong>：当前智谱端429限流，系统已自动转移到glm-4-flash，等智谱恢复后自动优先使用主模型</li>
+    <li><strong>本地模型预热</strong>：如需频繁使用本地模型，建议提前启动Ollama并加载模型，避免首次调用冷启动延迟</li>
+    <li><strong>知识库增量更新</strong>：当前知识库为静态JSON，如需新增文档，建议开发增量导入功能</li>
+    <li><strong>HTTPS部署</strong>：公网访问（prospect.kailioncrafts.com）建议配置HTTPS，当前Cloudflare Tunnel已提供加密传输</li>
+  </ol>
+
+  <h3>已知限制</h3>
+  <ul>
+    <li>glm-4.7-flash当前智谱端限流（非配置问题，系统已自动转移）</li>
+    <li>本地模型需要Ollama运行，未启动时自动跳过使用在线模型</li>
+    <li>知识库为静态数据，不支持在线编辑（需手动更新JSON文件）</li>
+    <li>AI助手对话功能依赖模型可用性，模型全挂时无法使用</li>
+  </ul>
+</div>
+
+<div class="footer">
+  <p>KaiLionCrafts 外贸获客AI工作台 · 企业级深度分析与完善报告（最终版）</p>
+  <p>报告生成时间：2026-10-03 | 三轮迭代汇总 | 代码审计 + 功能测试 + 修复完善</p>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,78 @@
+_shots/
+.playwright-cli/
+.DS_Store
+*.log
+node_modules/
+备份/
+
+# 知识库与索引（含敏感信息，不进Git）
+公司知识库*/
+kb_index.json
+kb_index_*.json
+*_backup_*.json
+*_backup_*.zip
+localStorage_backup*.json
+
+# 知识库索引缓存
+.kb_hash_cache.json
+
+# V77.0 完整版知识库运行时配置与产物（含敏感信息，不进Git）
+kb_config.json
+kb_manifest.json
+kb_tree.json
+kb_build_report.json
+
+# 公司核心事实清单（含敏感信息，不进Git）
+公司核心事实清单_待核对.md
+
+# 搜索配置与运行时数据（含API Key，不进Git）
+search_config.json
+search_cache.json
+search_usage.json
+
+# AI模型运行时配置（含API Key，不进Git）
+api_config.json
+
+# 卖点与服务清单（含内部底价/成本，不进Git）
+卖点与服务清单_待补充.md
+
+# 访问密码配置（含密码，不进Git）
+access_config.json
+access_config.json.bak*
+__pycache__/
+
+# IDE 和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 环境变量
+.env
+.env.*
+!.env.example
+
+# 操作系统
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 临时文件
+*.tmp
+*.bak
+*.orig
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+
+# 测试覆盖率
+.coverage
+htmlcov/
+.pytest_cache/

@@ -222,8 +222,8 @@ class TestModelChain(unittest.TestCase):
     def test_standard_uses_four_node_chain(self):
         chain = cdg.get_draft_model_chain('standard')
         self.assertEqual(len(chain), 4)
-        self.assertEqual(chain[0], 'glm-4.7-flash')
-        self.assertEqual(chain[1], 'glm-4-flash')
+        self.assertEqual(chain[0], 'glm-4-flash')
+        self.assertEqual(chain[1], 'glm-4.7-flash')
         self.assertEqual(chain[2], 'qwen3.5:9b')
         self.assertEqual(chain[3], 'qwen2.5:7b')
 
@@ -233,12 +233,13 @@ class TestModelChain(unittest.TestCase):
         self.assertNotIn('qwen2.5vl:7b', chain)
         self.assertNotIn('doubao-seed-2-1-turbo', chain)
 
-    def test_reasoning_uses_three_node_chain(self):
+    def test_reasoning_uses_four_node_chain(self):
         chain = cdg.get_draft_model_chain('reasoning')
-        self.assertEqual(len(chain), 3)
-        self.assertEqual(chain[0], 'glm-4.7-flash')
-        self.assertEqual(chain[1], 'qwen3.5:9b')
-        self.assertEqual(chain[2], 'deepseek-r1:7b')
+        self.assertEqual(len(chain), 4)
+        self.assertEqual(chain[0], 'glm-4-flash')
+        self.assertEqual(chain[1], 'glm-4.7-flash')
+        self.assertEqual(chain[2], 'qwen3.5:9b')
+        self.assertEqual(chain[3], 'deepseek-r1:7b')
 
     def test_generation_uses_correct_chain(self):
         _cleanup()
@@ -406,7 +407,7 @@ class TestGlobalChainConsistency(unittest.TestCase):
     def test_uses_global_reasoning_chain(self):
         from model_registry import REASONING_CHAIN_IDS
         self.assertEqual(cdg.DRAFT_REASONING_CHAIN, REASONING_CHAIN_IDS)
-        self.assertEqual(len(cdg.DRAFT_REASONING_CHAIN), 3)
+        self.assertEqual(len(cdg.DRAFT_REASONING_CHAIN), 4)
 
     def test_standard_mode_excludes_deepseek(self):
         chain = cdg.get_draft_model_chain('standard')

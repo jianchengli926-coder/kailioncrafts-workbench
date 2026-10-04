@@ -1,0 +1,227 @@
+{
+  "scan_time": "2026-10-04 00:57:50",
+  "workbench_root": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/00_AI标准化知识库/AI客户开发工作台",
+  "python_interpreter": "/Users/a123/Library/Application Support/Doubao/sandbox_runtime/bases/98670218a5f0d8bc9b9ebf3f70881304/bin/python3",
+  "syntax_check": {
+    "tool": "python -m py_compile",
+    "files_checked": 33,
+    "passed": 33,
+    "failed": 0
+  },
+  "files_read_deeply": [
+    "app.py (14387行，分段+grep定位)",
+    "ai_client.py (1042行)",
+    "model_registry.py (555行)",
+    "config.py (564行)",
+    "local_model_manager.py (427行)",
+    "provider_manager.py (280行)",
+    "repository.py (1762行)",
+    "knowledge_base.py (378行)",
+    "knowledge_facts.py (1284行，grep扫描)",
+    "customer_manager.py (767行)",
+    "customer_status.py (158行)",
+    "finance_db.py (269行)",
+    "social_db.py (226行)",
+    "prospect_evaluator.py (915行，grep扫描)",
+    "content_draft_generator.py (797行，关键段)",
+    "prompts.py (724行)",
+    "website_evidence.py (1017行，grep扫描)",
+    "feishu_client.py (134行)",
+    "manual_content.py (172行)",
+    "company_kb_content.py (352行)"
+  ],
+  "round2_verification": {
+    "R2-001_skip_dirs_backup": {
+      "status": "FIXED",
+      "evidence": "config.py L106-107 skip_dirs 已含 '备份','_backup','AI客户开发工作台_' 等"
+    },
+    "R2-003_dead_buttons": {
+      "status": "FIXED",
+      "evidence": "wb_import_btn/wb_batch_auto 现为 disabled=True + help='批量功能暂未开放'，不再是点击无反应"
+    },
+    "R2-004_delete_no_confirm": {
+      "status": "FIXED",
+      "evidence": "客户删除 L9351、清空待办 L11943 均使用 two_step_delete() 两步确认"
+    },
+    "R2-005_eyedropper_perma_disabled": {
+      "status": "FIXED",
+      "evidence": "grep eyedrop/eyedropper 全工程 0 结果"
+    },
+    "R2-006_csv_double_save": {
+      "status": "FIXED",
+      "evidence": "L4459/L10438/L7529 均使用内存缓冲区 (.encode()/.getvalue())，无磁盘二次保存"
+    },
+    "R2-007_ai_result_markdown": {
+      "status": "PARTIAL",
+      "evidence": "36 处 st.markdown(result) 仍在，但 Streamlit 默认 unsafe_allow_html=False，XSS 风险低"
+    }
+  },
+  "issue_count": {
+    "BLOCKER": 0,
+    "CRITICAL": 2,
+    "MAJOR": 5,
+    "MINOR": 9
+  },
+  "issues": [
+    {
+      "id": "F-001",
+      "severity": "CRITICAL",
+      "file": "config.py",
+      "line": 145,
+      "category": "数据事实错误",
+      "description": "TEAM_MEMBERS 中 leo 的 name_cn 写为「李建成」，但同文件 L132 founder 写为「利建成 (Leo Li)」。创始人真实姓名是「利建成」，同文件内自相矛盾，且与 AGENTS.md 全局指令冲突。",
+      "code_snippet": "\"founder\": \"利建成 (Leo Li)\"   # L132 正确\n\"name_cn\": \"李建成\"                  # L145 错误（应为 利建成）",
+      "fix_suggestion": "将 L145 name_cn 改为「利建成」。检查 jason/owen 是否也应姓「利」还是确实姓「李」。"
+    },
+    {
+      "id": "F-002",
+      "severity": "CRITICAL",
+      "file": "app.py",
+      "line": 9591,
+      "category": "硬编码路径错误",
+      "description": "EXAMPLE_DIR 硬编码为 /Volumes/Kingston 1TB NV1 40Gbps/独立站SEO项目/Codex-工作流Skill，但实际项目根目录是 /Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/（路径中缺少「豆包」二字）。三个案例 HTML 文件路径全部失效，点「在工作台内预览」会全部报「文件不存在」。",
+      "code_snippet": "EXAMPLE_DIR = Path(\"/Volumes/Kingston 1TB NV1 40Gbps/独立站SEO项目/Codex-工作流Skill\")",
+      "fix_suggestion": "修正路径为 /Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/Codex-工作流Skill，或改为基于 __file__ 的相对路径。"
+    },
+    {
+      "id": "F-003",
+      "severity": "MAJOR",
+      "file": "local_model_manager.py",
+      "line": 113,
+      "category": "资源管理/外部模型冲突",
+      "description": "acquire() 中当 current == model_id（目标模型已在 Ollama 内存中）时，跳过 L114-138 的 owned/external 检查，直接 L169 把 model_id 加入 _owned_models。后续 release() 会调用 ollama stop 卸载该模型——即使它是被另一个外部程序（Ollama GUI / 其他进程）加载的。单人场景概率低，但一旦并发会打断外部会话。",
+      "code_snippet": "current = self._get_running_large_model()\nif current != model_id:    # 只有 != 时才检查 owned/external\n    ...\n# current == model_id 时直接落到 L141，不检查 owned\nself._owned_models.add(model_id)  # L169",
+      "fix_suggestion": "在 current == model_id 分支也检查 _is_owned_model(current)；若非 owned，不加入 _owned_models，release 时不卸载。"
+    },
+    {
+      "id": "F-004",
+      "severity": "MAJOR",
+      "file": "repository.py",
+      "line": 69,
+      "category": "时间时区不一致",
+      "description": "repository._now() 使用 datetime.now(timezone.utc).isoformat() 生成带 Z 后缀的 UTC 时间戳；但 finance_db.py、social_db.py、app.py 大量使用 datetime.now()（本地 CST 时间，不带时区后缀）。跨模块时间字段无法直接比较，repository L1720 用 rstrip('Z') 兼容解析，但两套时间混在同一数据库里会导致「今日/本周」统计偏差。",
+      "code_snippet": "# repository.py L69\ndef _now(): return datetime.now(timezone.utc).isoformat()\n# finance_db.py / social_db.py / app.py\ndatetime.now().strftime('%Y-%m-%d %H:%M:%S')   # 本地时间，无时区",
+      "fix_suggestion": "统一为本地时间带时区，或全部 UTC；至少在 README 注明写入侧约定，统计侧按同一口径过滤。"
+    },
+    {
+      "id": "F-005",
+      "severity": "MAJOR",
+      "file": "knowledge_base.py",
+      "line": 187,
+      "category": "性能",
+      "description": "kb_search() 每次调用都对 iterdir() 下每个目录 rglob('*.md') 并 read_text() 全量读入内存做关键词计数。feishu 知识库有 16000+ md 文件，单次搜索可能读取数十 MB 文本，Streamlit 每 rerun 都触发，页面会卡顿数秒到数十秒。",
+      "code_snippet": "for ext in ALLOWED_EXTS:\n    for filepath in kb_path.rglob(f'*{ext}'):\n        text = filepath.read_text(encoding='utf-8', errors='ignore')\n        ...",
+      "fix_suggestion": "建立一次性索引（文件名+首行标题+关键词倒排表缓存到 JSON），搜索时只查索引；或用 SQLite FTS5。"
+    },
+    {
+      "id": "F-006",
+      "severity": "MAJOR",
+      "file": "finance_db.py",
+      "line": 250,
+      "category": "财务计算精度",
+      "description": "dashboard_profit() 注释承认「折人民币简化：按各自 amount 汇总原币，这里做 USD 为主近似」。如果订单表存在 EUR/GBP 等非 USD 金额，毛利润会被错误地按 USD 求和，导致经营分析数据失真。",
+      "code_snippet": "# 注释：折人民币简化：按各自 amount 汇总原币，这里做 USD 为主近似\nincome = sum(float(o.get('amount',0)) for o in orders if o.get('direction')=='income')",
+      "fix_suggestion": "在 orders 表增加 currency 字段，dashboard 按汇率表换算到 CNY；或至少在 UI 标注「仅 USD 汇总」。"
+    },
+    {
+      "id": "F-007",
+      "severity": "MAJOR",
+      "file": "repository.py",
+      "line": 1538,
+      "category": "类型不安全",
+      "description": "迁移代码中 primary_email = emails[0] if isinstance(emails,list) and emails else None。如果历史数据里 emails[0] 是 dict（如 {'email': 'a@b.com'}）而非字符串，primary_email 会变成 dict，写入 SQLite TEXT 列时抛 InterfaceError。",
+      "code_snippet": "primary_email = emails[0] if isinstance(emails, list) and emails else None\n# 未判断 emails[0] 是 str 还是 dict",
+      "fix_suggestion": "primary_email = emails[0].get('email') if isinstance(emails[0], dict) else emails[0]"
+    },
+    {
+      "id": "F-008",
+      "severity": "MINOR",
+      "file": "ai_client.py",
+      "line": 898,
+      "category": "文件名竞态",
+      "description": "本地 FLUX 图像生成文件名 flux_{timestamp}_{idx}.png，timestamp 精确到秒。同一秒内两次生成（idx 均为本地兜底=1）会覆盖第一次结果。",
+      "code_snippet": "img_path = tmp_dir / f'flux_{timestamp}_{idx}.png'",
+      "fix_suggestion": "timestamp 改用微秒（datetime.now().strftime('%H%M%S_%f')）或加 uuid 后缀。"
+    },
+    {
+      "id": "F-009",
+      "severity": "MINOR",
+      "file": "ai_client.py",
+      "line": 575,
+      "category": "冗余逻辑",
+      "description": "if idx > 0 or manual_model is None: 外层条件在自动模式恒真、手动模式恒假（手动模式 idx 永远=0），实际等价于 if True:（自动）。逻辑虽能工作但可读性差。",
+      "code_snippet": "if idx > 0 or manual_model is None:\n    if idx > 0:\n        failover_log.append(...)",
+      "fix_suggestion": "简化为 if idx > 0: failover_log.append(...)（自动模式手动模式都成立）。"
+    },
+    {
+      "id": "F-010",
+      "severity": "MINOR",
+      "file": "customer_manager.py",
+      "line": 641,
+      "category": "功能不完整",
+      "description": "pipeline_summary() 汇总 c.get('estimated_value', 0)，但 _row_to_customer_dict 不输出 estimated_value 字段，导致管道总价值永远为 0。",
+      "code_snippet": "pipeline_value = sum(float(c.get('estimated_value', 0) or 0) for c in all)",
+      "fix_suggestion": "要么在 customers 表加 estimated_value 列，要么在 UI 隐藏「管道总价值」指标。"
+    },
+    {
+      "id": "F-011",
+      "severity": "MINOR",
+      "file": "customer_manager.py",
+      "line": 167,
+      "category": "封装破坏",
+      "description": "直接调用 repository 私有方法 repo._connect() 并手动 close，绕过了 repository.transaction() 上下文管理器。",
+      "code_snippet": "conn = repo._connect()\ntry: ... finally: conn.close()",
+      "fix_suggestion": "改为 with repo.transaction() as conn: 复用事务上下文。"
+    },
+    {
+      "id": "F-012",
+      "severity": "MINOR",
+      "file": "feishu_client.py",
+      "line": 102,
+      "category": "相对路径依赖 CWD",
+      "description": "local_dir = Path('data/feishu_docs') 是相对路径，若 streamlit 启动时 CWD 不是工作台根目录，会写到错误位置。",
+      "code_snippet": "local_dir = Path('data/feishu_docs')",
+      "fix_suggestion": "改为 Path(__file__).parent / 'data' / 'feishu_docs'。"
+    },
+    {
+      "id": "F-013",
+      "severity": "MINOR",
+      "file": "config.py",
+      "line": 519,
+      "category": "非原子写入",
+      "description": "save_config() 直接 ENV_FILE.write_text(content)，写入中途崩溃会损坏 .env（含 API Key）。",
+      "code_snippet": "ENV_FILE.write_text(content, encoding='utf-8')",
+      "fix_suggestion": "改用 tempfile + os.replace 原子写，与 _atomic_write_json 一致。"
+    },
+    {
+      "id": "F-014",
+      "severity": "MINOR",
+      "file": "app.py",
+      "line": 1906,
+      "category": "AI输出渲染（R2-007残留）",
+      "description": "全 app.py 共 36 处 st.markdown(result) / st.markdown(ai.chat(...)) 直接渲染 AI 返回文本。Streamlit 默认 unsafe_allow_html=False，XSS 风险低；但 AI 返回包含不闭合 markdown / 恶意链接时 UI 会错乱。",
+      "code_snippet": "st.markdown(result)   # 36 处同款模式",
+      "fix_suggestion": "对用户可见的 AI 结果统一走一个 sanitize() 包装：剥离 <script>、javascript: 链接；或用 st.write() 代替 st.markdown()。"
+    },
+    {
+      "id": "F-015",
+      "severity": "MINOR",
+      "file": "app.py",
+      "line": 11918,
+      "category": "删除无确认",
+      "description": "单个待办删除按钮 todo_del_{idx} 直接 todos.pop + rerun，无两步确认。清空全部（L11942）已用 two_step_delete，但单条删除没有。",
+      "code_snippet": "if st.button('🗑', key=f'todo_del_{orig_idx}', help='删除'):\n    todos.pop(orig_idx)",
+      "fix_suggestion": "单条删除风险低，可接受；如需严格，改用 two_step_delete。"
+    },
+    {
+      "id": "F-016",
+      "severity": "MINOR",
+      "file": "prospect_evaluator.py",
+      "line": 48,
+      "category": "空异常吞噬",
+      "description": "全文件 11 处 except Exception: pass（L48/83/112/230/279/325/344/552/757/873 等）。website_evidence.py 8 处、content_draft_generator.py L418 1 处同类。抓取/解析失败时静默降级为「证据缺失」，用户看不到失败原因。",
+      "code_snippet": "except Exception:\n    pass",
+      "fix_suggestion": "至少 logger.warning(...) 或 traceback.print_exc()，让失败可追溯。"
+    }
+  ]
+}

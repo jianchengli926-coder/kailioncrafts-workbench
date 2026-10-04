@@ -142,7 +142,7 @@ COMPANY = {
 TEAM_MEMBERS = {
     "leo": {
         "name": "Leo Li",
-        "name_cn": "李建成",
+        "name_cn": "利建成",
         "role": "创始人 / CEO",
         "role_en": "Founder & CEO",
         "category": "户外刀具",

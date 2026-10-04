@@ -748,7 +748,7 @@ const AsyncJobManager = {
     try {
       const LocalModelLock = require('./local-model-lock.js');
       LocalModelLock.forceReleaseAll();
-    } catch(e) { log('取消任务时释放模型锁失败: ' + e.message, 'WARN'); }
+    } catch(e) {}
     return { success: true, message: '任务已取消，本地模型锁已释放' };
   }
 };
@@ -872,7 +872,7 @@ const server = http.createServer(async (req, res) => {
       if (fs.existsSync(ACCESS_CONFIG_FILE)) {
         return JSON.parse(fs.readFileSync(ACCESS_CONFIG_FILE, 'utf-8'));
       }
-    } catch(e) { log('access_config读取失败: ' + e.message, 'WARN'); }
+    } catch(e) {}
     // 首次运行：生成随机密码并立即哈希存储
     const randomPassword = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
     const salt = crypto.randomBytes(16);
@@ -883,13 +883,13 @@ const server = http.createServer(async (req, res) => {
       changed: false,
       tempPassword: randomPassword // 仅首次生成时保留，供用户在终端查看
     };
-    try { fs.writeFileSync(ACCESS_CONFIG_FILE, JSON.stringify(config, null, 2)); } catch(e) { log('access_config首次写入失败: ' + e.message, 'ERROR'); }
+    try { fs.writeFileSync(ACCESS_CONFIG_FILE, JSON.stringify(config, null, 2)); } catch(e) {}
     console.log('\n🔐 首次运行临时密码（请立即修改）: ' + randomPassword + '\n');
     return config;
   }
 
   function saveAccessConfig(config) {
-    try { fs.writeFileSync(ACCESS_CONFIG_FILE, JSON.stringify(config, null, 2)); return true; } catch(e) { log('access_config保存失败: ' + e.message, 'ERROR'); return false; }
+    try { fs.writeFileSync(ACCESS_CONFIG_FILE, JSON.stringify(config, null, 2)); return true; } catch(e) { return false; }
   }
 
   function getClientIp(req) {
@@ -2195,7 +2195,7 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
       keys.sort((a,b) => searchCache[a].timestamp - searchCache[b].timestamp);
       for (let i = 0; i < keys.length - 500; i++) delete searchCache[keys[i]];
     }
-    try { fs.writeFileSync(SEARCH_CACHE_FILE, JSON.stringify(searchCache), 'utf-8'); } catch(e) { log('搜索缓存写入失败: ' + e.message, 'WARN'); }
+    try { fs.writeFileSync(SEARCH_CACHE_FILE, JSON.stringify(searchCache), 'utf-8'); } catch(e) {}
   }
 
   // 额度使用统计
@@ -2218,7 +2218,7 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
     usageData.monthly[month][provider] = (usageData.monthly[month][provider] || 0) + credits;
     usageData.monthly[month].totalQueries++;
     usageData.monthly[month].lastQuery = query.substring(0, 100);
-    try { fs.writeFileSync(USAGE_FILE, JSON.stringify(usageData, null, 2), 'utf-8'); } catch(e) { log('用量统计写入失败: ' + e.message, 'WARN'); }
+    try { fs.writeFileSync(USAGE_FILE, JSON.stringify(usageData, null, 2), 'utf-8'); } catch(e) {}
   }
 
   // ============ SSRF防护（升级版：连接层IP校验 + DNS重绑定防御） ============
@@ -2661,26 +2661,11 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
   function readBody(req) {
     return new Promise((resolve, reject) => {
       let body = '';
-      let tooLarge = false;
-      req.on('data', (chunk) => {
-        if (tooLarge) return; // already over limit, ignore further chunks
-        body += chunk;
-        if (body.length > 1e6) {
-          tooLarge = true;
-          // S5: destroy the request stream immediately so data stops flowing and memory is freed
-          req.destroy();
-          reject(new Error('请求体过大'));
-        }
-      });
+      req.on('data', (chunk) => { body += chunk; if (body.length > 1e6) reject(new Error('请求体过大')); });
       req.on('end', () => {
-        if (tooLarge) return;
         try { resolve(body ? JSON.parse(body) : {}); } catch(e) { reject(new Error('JSON解析失败: ' + e.message)); }
       });
-      req.on('error', (err) => {
-        // Suppress the abort error caused by our own req.destroy() on oversized bodies
-        if (tooLarge && (err.code === 'ECONNRESET' || err.message === 'aborted')) return;
-        reject(err);
-      });
+      req.on('error', reject);
     });
   }
 
@@ -3192,7 +3177,7 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
             info.countryEvidence = 'ccTLD .' + tld + ' -> ' + info.country + ' (弱信号)';
             info.countryEvidenceUrl = url;
           }
-        } catch(e) { log('ccTLD解析失败: ' + e.message, 'DEBUG'); }
+        } catch(e) {}
       }
 
       // 6. 页面普通正文出现国家名称（low，仅在主内容区，排除配送/货币/语言选择器）
@@ -3555,7 +3540,7 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
                   blockedPages.push({ url: page.url, type: page.type, label: page.label, status: 'robots_blocked', error: 'robots.txt禁止抓取: ' + pagePath });
                   continue;
                 }
-              } catch(e) { log('robots路径检查失败: ' + e.message, 'WARN'); }
+              } catch(e) {}
             }
             await new Promise(r => setTimeout(r, crawlDelay)); // 使用robots.txt的crawl-delay
             const result = await fetchUrl(page.url, { timeout: 15000, maxSize: 2*1024*1024 });
@@ -3761,7 +3746,7 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
     const scope = getAccessScope(req);
     if (denyIfPublic(req, res, scope)) return;
     searchCache = {};
-    try { fs.writeFileSync(SEARCH_CACHE_FILE, '{}', 'utf-8'); } catch(e) { log('缓存重置写入失败: ' + e.message, 'WARN'); }
+    try { fs.writeFileSync(SEARCH_CACHE_FILE, '{}', 'utf-8'); } catch(e) {}
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ success: true, message: '搜索缓存已清除' }));
     return;
@@ -3792,48 +3777,6 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
   log(`${req.method} ${pathname}`, 'REQUEST');
   serveStaticFile(req, res, filePath);
 });
-
-// ============ Periodic memory cleanup (S3: prevent Map memory leaks) ============
-// Runs every 10 minutes to evict expired sessions, stale async jobs, and old failed-attempt records.
-setInterval(() => {
-  const now = Date.now();
-  let cleanedSessions = 0;
-  let cleanedJobs = 0;
-  let cleanedAttempts = 0;
-
-  // Clean expired sessions
-  for (const [sid, sess] of activeSessions) {
-    if (sess.expiresAt < now) {
-      activeSessions.delete(sid);
-      cleanedSessions++;
-    }
-  }
-
-  // Clean stale async jobs (older than 1 hour; completed jobs already self-delete via setTimeout)
-  const ONE_HOUR = 60 * 60 * 1000;
-  for (const [jid, job] of asyncJobs) {
-    const refStr = job.completedAt || job.createdAt;
-    if (refStr) {
-      const refTime = new Date(refStr).getTime();
-      if (!isNaN(refTime) && now - refTime > ONE_HOUR) {
-        asyncJobs.delete(jid);
-        cleanedJobs++;
-      }
-    }
-  }
-
-  // Clean old failed attempts (older than 1 hour)
-  for (const [ip, rec] of failedAttempts) {
-    if (rec.firstFailTime && now - rec.firstFailTime > ONE_HOUR) {
-      failedAttempts.delete(ip);
-      cleanedAttempts++;
-    }
-  }
-
-  if (cleanedSessions > 0 || cleanedJobs > 0 || cleanedAttempts > 0) {
-    log(`Periodic cleanup: sessions=${cleanedSessions}, jobs=${cleanedJobs}, failedAttempts=${cleanedAttempts}`, 'INFO');
-  }
-}, 10 * 60 * 1000);
 
 // ============ 启动服务器 ============
 server.listen(PORT, HOST, async () => {

@@ -537,11 +537,11 @@ async function generate(options = {}) {
       const model = chain[attempt];
       const startTime = Date.now();
 
-      // 自动模式下检查慢响应 (M1: check on every attempt, not just the first)
-      if (!isManual && isModelSlow(model)) {
+      // 自动模式下检查慢响应
+      if (!isManual && attempt === 0 && isModelSlow(model)) {
         // 跳过慢模型，直接尝试下一个
         ModelTrace.updateTrace(trace.traceId, {
-          targetModel: chain[attempt + 1] || model,
+          targetModel: chain[1] || model,
           reason: 'model_marked_slow',
           attempt: attempt + 1
         });

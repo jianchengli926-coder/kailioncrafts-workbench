@@ -19,7 +19,6 @@ const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 const crypto = require('crypto');
-const net = require('net');
 
 // ============== 配置 ==============
 const CONFIG = {
@@ -106,8 +105,8 @@ function validateUrl(urlString) {
     if (isPrivateIp(hostname)) {
       return { valid: false, error: '禁止访问私有 IP: ' + hostname };
     }
-    if (hostname === '0.0.0.0' || hostname === '::' || hostname === '[::1]' || hostname === '::1') {
-      return { valid: false, error: '禁止访问 0.0.0.0 / :: / ::1' };
+    if (hostname === '0.0.0.0' || hostname === '::') {
+      return { valid: false, error: '禁止访问 0.0.0.0' };
     }
   }
 
@@ -118,13 +117,11 @@ function validateUrl(urlString) {
  * 判断是否为 IP 地址
  */
 function isIpAddress(hostname) {
-  // Strip brackets for IPv6
-  const cleaned = hostname.replace(/^\[|\]$/g, '');
   // IPv4
   const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (ipv4Regex.test(cleaned)) return true;
-  // IPv6 (proper validation via Node.js net module)
-  if (net.isIPv6(cleaned)) return true;
+  if (ipv4Regex.test(hostname)) return true;
+  // IPv6 (简化检查)
+  if (hostname.includes(':') && hostname.includes('::') || /^[0-9a-f:]+$/.test(hostname)) return true;
   return false;
 }
 
@@ -132,11 +129,9 @@ function isIpAddress(hostname) {
  * 判断是否为私有 IP
  */
 function isPrivateIp(ip) {
-  // Strip IPv6 brackets first (e.g. [fc00::1] -> fc00::1)
-  ip = ip.replace(/^\[|\]$/g, '');
   // IPv4 私有范围
   const ipv4Parts = ip.split('.').map(Number);
-  if (ipv4Parts.length === 4 && ipv4Parts.every(n => !isNaN(n))) {
+  if (ipv4Parts.length === 4) {
     // 10.0.0.0/8
     if (ipv4Parts[0] === 10) return true;
     // 172.16.0.0/12

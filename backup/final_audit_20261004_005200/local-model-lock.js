@@ -116,14 +116,12 @@ async function acquireLock(model, options = {}) {
   const waitTimeout = options.waitTimeout || DEFAULT_WAIT_TIMEOUT;
   const lockTimeout = options.lockTimeout || DEFAULT_LOCK_TIMEOUT;
 
-  // Reentrant lock disabled: same owner acquiring twice would cause double-release bug.
-  // Business logic is serial (no nested lock acquisition for the same model), so we error out.
+  // 如果锁已被当前所有者持有，直接返回
   if (lockState.locked && lockState.lockOwner === owner) {
     return {
-      success: false,
-      lockAcquired: false,
-      reason: 'reentrant_acquire_not_allowed',
-      message: 'Same owner already holds the lock. Nested acquire is not supported to prevent double-release.',
+      success: true,
+      lockAcquired: true,
+      reason: 'lock_already_held_by_owner',
       model,
       owner
     };
@@ -179,17 +177,8 @@ async function acquireLock(model, options = {}) {
  * @returns {Object} 释放结果
  */
 function releaseLock(owner) {
-  // If lock is not held, reject (prevents double-release)
-  if (!lockState.locked) {
-    return {
-      success: false,
-      reason: 'lock_not_held',
-      message: 'Lock is already free; cannot release.'
-    };
-  }
-
   // 如果不是当前所有者，拒绝释放
-  if (lockState.lockOwner !== owner) {
+  if (lockState.locked && lockState.lockOwner !== owner) {
     return {
       success: false,
       reason: 'not_lock_owner',

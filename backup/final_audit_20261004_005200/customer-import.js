@@ -1136,14 +1136,7 @@
       // 5. 回滚
       result.errors.push({ fatal: true, error: e.message });
       CustomerImport.rollbackImport(snapshot, S);
-      try { persistFn(); } catch (pe) {
-        // S4: Persist after rollback failed. Memory state is rolled back, but disk may still
-        // contain partial import data. On next restart the disk version will be loaded and
-        // the rollback will be lost. This is a data-inconsistency event that must not be silent.
-        console.error('[IMPORT ROLLBACK] FATAL: persist after rollback failed:', pe.message);
-        console.error('[IMPORT ROLLBACK] Data inconsistency detected - memory rolled back but disk may have partial import. Manual intervention required.');
-        result.rollbackPersistError = pe.message;
-      }
+      try { persistFn(); } catch (pe) { /* ignore */ }
     } finally {
       context._importInProgress = false;
     }

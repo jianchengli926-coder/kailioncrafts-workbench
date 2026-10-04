@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KaiLionCrafts - 专业选片与 RAW 格式对齐系统</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- JSZip & FileSaver -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #faf8f5;
+            color: #1e293b;
+        }
+        .dropzone {
+            border: 2px dashed #fcd34d;
+            transition: all 0.25s ease;
+        }
+        .dropzone:hover, .dropzone.dragover {
+            border-color: #f59e0b;
+            background-color: rgba(254, 243, 199, 0.4);
+        }
+        .dropzone-success {
+            border: 2px solid #10b981 !important;
+            background-color: rgba(209, 250, 229, 0.6) !important;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.15s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-amber-500 selection:text-white">
+
+    <!-- 隐藏的文件选择器 Input -->
+    <input type="file" id="jpg-folder-input" webkitdirectory directory multiple class="hidden" onchange="handleJpgSelect(event)">
+    <input type="file" id="jpg-file-input" multiple accept="image/jpeg, .jpg, .jpeg" class="hidden" onchange="handleJpgSelect(event)">
+    <input type="file" id="raw-folder-input" webkitdirectory directory multiple class="hidden" onchange="handleRawSelect(event)">
+    <input type="file" id="raw-file-input" multiple accept=".cr2, .cr3, .nef, .arw, .dng, .raf, .orf, .rw2, .raw, .pef, .3fr, .sr2, .CR2, .CR3, .NEF, .ARW, .DNG, .RAF, .ORF, .RW2, .RAW, .PEF, .3FR, .SR2" class="hidden" onchange="handleRawSelect(event)">
+
+    <!-- Header Navigation -->
+    <header class="border-b border-stone-200 bg-white/90 backdrop-blur sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <img src="logo.png" alt="KaiLionCrafts Logo" class="h-10 w-auto object-contain">
+                <div>
+                    <h1 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <span>KaiLionCrafts</span>
+                        <span class="text-xs font-semibold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded border border-amber-200">极速响应 & 懒加载版 v4.0</span>
+                    </h1>
+                    <p class="text-xs text-slate-500">分块异步对齐 + 局部 DOM 秒级展开 + 按需加载 RAW 预览</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="loadDemoData()" class="px-3.5 py-1.5 text-xs font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-600"></i>
+                    加载演示数据对比
+                </button>
+                <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-full">
+                    v4.0 Performance
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8">
+        
+        <!-- Workflow Guidance Banner -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div class="bg-white border border-stone-200/80 rounded-xl p-4 flex items-start space-x-3 shadow-sm">
+                <div class="p-2 bg-amber-100 text-amber-700 rounded-lg font-bold text-sm">01</div>
+                <div>
+                    <div class="font-semibold text-slate-800 mb-0.5">上传选中的 JPG 照片</div>
+                    <div class="text-slate-500">解析 EXIF 角度与快门时间戳</div>
+                </div>
+            </div>
+            <div class="bg-white border border-stone-200/80 rounded-xl p-4 flex items-start space-x-3 shadow-sm">
+                <div class="p-2 bg-orange-100 text-orange-700 rounded-lg font-bold text-sm">02</div>
+                <div>
+                    <div class="font-semibold text-slate-800 mb-0.5">导入 RAW 原始文件</div>
+                    <div class="text-slate-500">兼容 ARW, RW2, CR3, NEF 等</div>
+                </div>
+            </div>
+            <div class="bg-white border border-stone-200/80 rounded-xl p-4 flex items-start space-x-3 shadow-sm">
+                <div class="p-2 bg-emerald-100 text-emerald-700 rounded-lg font-bold text-sm">03</div>
+                <div>
+                    <div class="font-semibold text-slate-800 mb-0.5">完美对齐图像对比</div>
+                    <div class="text-slate-500">纵横比例与横竖朝向保持一致</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Zones Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Zone 1: JPG Upload -->
+            <div class="bg-white border border-stone-200/80 rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="image" class="w-5 h-5 text-amber-600"></i>
+                            <h2 class="font-semibold text-slate-800">1. 客户挑出的 JPG 照片</h2>
+                        </div>
+                        <span id="jpg-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">已选 0 张</span>
+                    </div>
+
+                    <div id="jpg-dropzone" class="dropzone rounded-xl p-8 text-center bg-amber-50/20 flex flex-col items-center justify-center min-h-[170px]">
+                        <div class="p-3 bg-amber-100 text-amber-600 rounded-full mb-3 pointer-events-none">
+                            <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+                        </div>
+                        <p class="text-sm font-medium text-slate-700 mb-2 pointer-events-none">选择 JPG 照片文件或文件夹</p>
+                        <div class="flex items-center gap-2 relative z-10">
+                            <button type="button" onclick="document.getElementById('jpg-folder-input').click()" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg shadow-sm transition">
+                                选择整个 JPG 文件夹
+                            </button>
+                            <button type="button" onclick="document.getElementById('jpg-file-input').click()" class="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-slate-700 text-xs font-semibold rounded-lg border border-stone-300 transition">
+                                选择 JPG 文件
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex items-center justify-between text-xs text-slate-500 border-t border-stone-100 pt-3">
+                    <span id="jpg-info">支持格式: .jpg, .jpeg</span>
+                    <button onclick="clearJpgs()" class="hover:text-red-500 transition flex items-center gap-1 font-medium">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> 清空JPG
+                    </button>
+                </div>
+            </div>
+
+            <!-- Zone 2: RAW Folder Upload -->
+            <div class="bg-white border border-stone-200/80 rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="folder-archive" class="w-5 h-5 text-orange-600"></i>
+                            <h2 class="font-semibold text-slate-800">2. 包含 RAW 原片的文件夹 / 文件</h2>
+                        </div>
+                        <span id="raw-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">已载入 0 个RAW</span>
+                    </div>
+
+                    <div id="raw-dropzone" class="dropzone rounded-xl p-8 text-center bg-orange-50/20 flex flex-col items-center justify-center min-h-[170px]">
+                        <div class="p-3 bg-orange-100 text-orange-600 rounded-full mb-3 pointer-events-none">
+                            <i data-lucide="folder-open" class="w-6 h-6"></i>
+                        </div>
+                        <p class="text-sm font-medium text-slate-700 mb-2 pointer-events-none">选择 RAW 文件或文件夹</p>
+                        <div class="flex items-center gap-2 relative z-10">
+                            <button type="button" onclick="document.getElementById('raw-folder-input').click()" class="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold rounded-lg shadow-sm transition">
+                                选择整个 RAW 文件夹
+                            </button>
+                            <button type="button" onclick="document.getElementById('raw-file-input').click()" class="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-slate-700 text-xs font-semibold rounded-lg border border-stone-300 transition">
+                                选择 RAW 文件
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex items-center justify-between text-xs text-slate-500 border-t border-stone-100 pt-3">
+                    <span>支持: 索尼(.ARW), 松下(.RW2), 佳能(.CR2/CR3), 尼康(.NEF)等</span>
+                    <button onclick="clearRaws()" class="hover:text-red-500 transition flex items-center gap-1 font-medium">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> 清空RAW
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Dashboard Stats Bar -->
+        <div class="bg-white border border-stone-200/80 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+            <div class="flex items-center space-x-6">
+                <div>
+                    <div class="text-xs text-slate-500 mb-1">已选 JPG 总数</div>
+                    <div id="stat-jpg-total" class="text-2xl font-bold text-slate-800">0</div>
+                </div>
+                <div class="h-8 w-px bg-stone-200"></div>
+                <div>
+                    <div class="text-xs text-slate-500 mb-1">匹配成功 RAW</div>
+                    <div id="stat-matched-count" class="text-2xl font-bold text-emerald-600">0</div>
+                </div>
+                <div class="h-8 w-px bg-stone-200"></div>
+                <div>
+                    <div class="text-xs text-slate-500 mb-1">未找到 RAW</div>
+                    <div id="stat-missing-count" class="text-2xl font-bold text-rose-500">0</div>
+                </div>
+                <div class="h-8 w-px bg-stone-200"></div>
+                <div>
+                    <div class="text-xs text-slate-500 mb-1">整体匹配率</div>
+                    <div id="stat-rate" class="text-2xl font-bold text-amber-600">0%</div>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <button id="export-zip-btn" onclick="exportZipPackage()" disabled class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow transition flex items-center gap-2">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    导出分类整理 ZIP 包 (JPG+RAW)
+                </button>
+                <button id="export-csv-btn" onclick="exportCSVReport()" disabled class="px-4 py-2.5 bg-slate-700 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shadow-sm">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                    导出清单 CSV
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress Status Overlay -->
+        <div id="status-bar" class="hidden bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl text-xs font-medium items-center justify-between shadow-sm">
+            <div class="flex items-center space-x-2">
+                <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-amber-600"></i>
+                <span id="status-msg">正在进行比对解析...</span>
+            </div>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3 rounded-xl border border-stone-200/80 shadow-sm">
+            <div class="flex items-center space-x-2 w-full sm:w-auto">
+                <button onclick="setFilter('all')" id="btn-filter-all" class="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-amber-600 text-white transition shadow-sm">
+                    全部照片 (<span id="cnt-filter-all">0</span>)
+                </button>
+                <button onclick="setFilter('matched')" id="btn-filter-matched" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-stone-100 transition">
+                    已匹配 (<span id="cnt-filter-matched">0</span>)
+                </button>
+                <button onclick="setFilter('missing')" id="btn-filter-missing" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-stone-100 transition">
+                    缺失 RAW (<span id="cnt-filter-missing">0</span>)
+                </button>
+            </div>
+
+            <div class="relative w-full sm:w-64">
+                <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+                <input type="text" id="search-input" oninput="renderList()" placeholder="搜索文件名或时间..." class="w-full pl-9 pr-3 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:bg-white transition">
+            </div>
+        </div>
+
+        <!-- Matching Results List/Grid Area -->
+        <div class="bg-white border border-stone-200/80 rounded-2xl p-5 min-h-[320px] shadow-sm">
+            <div id="results-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Empty State -->
+                <div class="col-span-full py-16 flex flex-col items-center justify-center text-center text-slate-400">
+                    <i data-lucide="layers" class="w-12 h-12 mb-3 stroke-1 text-slate-300"></i>
+                    <p class="text-sm font-medium text-slate-500">暂无比对数据</p>
+                    <p class="text-xs text-slate-400 mt-1">导入图片后，系统将自动匹配并生成下拉展开对比视图</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-stone-200 py-6 text-center text-xs text-slate-500 bg-white/60">
+        <p>KaiLionCrafts 专业选片辅助系统 &copy; 2026 | 极速响应与防崩溃优化版</p>
+    </footer>
+
+    <!-- JavaScript Engine -->
+    <script>
+        const RAW_EXTS = ['.cr2', '.cr3', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2', '.raw', '.pef', '.3fr', '.sr2'];
+
+        let state = {
+            jpgFiles: [],       
+            rawFiles: [],       
+            rawStemMap: new Map(),
+            rawDateMap: new Map(),
+            matches: [],        
+            expandedCards: new Set(),
+            filter: 'all'
+        };
+
+        let activeObjectUrls = [];
+
+        function clearMemoryUrls() {
+            activeObjectUrls.forEach(url => URL.revokeObjectURL(url));
+            activeObjectUrls = [];
+        }
+
+        lucide.createIcons();
+
+        // 懒加载模式：点击“展开对比”时才按需提取单张 RAW 嵌入图
+        async function extractRawEmbeddedJpeg(file) {
+            if (!file || !(file instanceof File)) return null;
+            if (file.rawPreviewUrl) return file.rawPreviewUrl;
+
+            try {
+                // 读取前 4MB 足够抽取小预览图
+                const readSize = Math.min(file.size, 4194304);
+                const buffer = await file.slice(0, readSize).arrayBuffer();
+                const bytes = new Uint8Array(buffer);
+
+                let candidates = [];
+                for (let i = 0; i < bytes.length - 4; i++) {
+                    if (bytes[i] === 0xFF && bytes[i+1] === 0xD8 && bytes[i+2] === 0xFF) {
+                        const m = bytes[i+3];
+                        if (m === 0xE0 || m === 0xE1 || m === 0xE2 || m === 0xDB || m === 0xC0 || m === 0xEE) {
+                            candidates.push(i);
+                        }
+                    }
+                }
+
+                for (let startIdx of candidates) {
+                    let endIdx = -1;
+                    const searchLimit = Math.min(bytes.length, startIdx + 3145728);
+                    for (let j = searchLimit - 2; j > startIdx + 15000; j--) {
+                        if (bytes[j] === 0xFF && bytes[j+1] === 0xD9) {
+                            endIdx = j + 2;
+                            break;
+                        }
+                    }
+
+                    if (endIdx > startIdx) {
+                        const len = endIdx - startIdx;
+                        if (len > 20000) {
+                            const jpegData = bytes.subarray(startIdx, endIdx);
+                            const blob = new Blob([jpegData], { type: 'image/jpeg' });
+                            const url = URL.createObjectURL(blob);
+                            activeObjectUrls.push(url);
+                            file.rawPreviewUrl = url;
+                            return url;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("RAW 缩略图解析跳过: " + file.name, e);
+            }
+            return null;
+        }
+
+        // 轻量化 EXIF 头部读取 (切片精简至 128KB，大幅加速大批量处理)
+        async function readImageExifMetadata(file) {
+            if (!file) return { exifDate: null, orientation: 1 };
+            if (file.exifMetadata) return file.exifMetadata;
+
+            let result = { exifDate: null, orientation: 1 };
+
+            try {
+                const chunkSize = Math.min(file.size, 131072);
+                const blob = file.slice(0, chunkSize);
+                const buffer = await blob.arrayBuffer();
+                const view = new DataView(buffer);
+
+                const tiffRes = parseTiffExif(view, buffer);
+                if (tiffRes) {
+                    result.exifDate = tiffRes.dateStr || null;
+                    result.orientation = tiffRes.orientation || 1;
+                }
+
+                if (!result.exifDate) {
+                    const latin1Text = new TextDecoder('latin1').decode(buffer);
+                    const match = latin1Text.match(/\b(20[0-9]{2}[:/-][0-1][0-9][:/-][0-3][0-9]\s+[0-2][0-9]:[0-5][0-9]:[0-5][0-9])\b/);
+                    if (match) {
+                        result.exifDate = match[1].replace(/-/g, ':');
+                    }
+                }
+            } catch (e) {
+                console.error("解析元数据失败: " + file.name, e);
+            }
+
+            file.exifMetadata = result;
+            return result;
+        }
+
+        function parseTiffExif(view, buffer) {
+            if (view.byteLength < 16) return null;
+
+            let tiffOffset = -1;
+            if (view.getUint16(0, false) === 0xFFD8) {
+                let offset = 2;
+                while (offset < view.byteLength - 4) {
+                    const marker = view.getUint16(offset, false);
+                    if (marker === 0xFFE1) {
+                        if (view.getUint32(offset + 4, false) === 0x45786966) {
+                            tiffOffset = offset + 10;
+                            break;
+                        }
+                    }
+                    if ((marker & 0xFF00) !== 0xFF00) break;
+                    const length = view.getUint16(offset + 2, false);
+                    offset += 2 + length;
+                }
+            } else {
+                tiffOffset = 0;
+            }
+
+            if (tiffOffset < 0 || tiffOffset + 8 > view.byteLength) return null;
+
+            const byteOrder = view.getUint16(tiffOffset, false);
+            let le = false;
+            if (byteOrder === 0x4949) le = true;
+            else if (byteOrder === 0x4D4D) le = false;
+            else return null;
+
+            const magic = view.getUint16(tiffOffset + 2, le);
+            if (magic !== 42 && magic !== 0x002B && magic !== 0x5500) return null;
+
+            const firstIFD = view.getUint32(tiffOffset + 4, le);
+
+            function readIFD(ifdOffset) {
+                if (ifdOffset <= 0 || tiffOffset + ifdOffset + 2 > view.byteLength) return {};
+                const numEntries = view.getUint16(tiffOffset + ifdOffset, le);
+                let res = {};
+
+                for (let i = 0; i < numEntries; i++) {
+                    const entry = tiffOffset + ifdOffset + 2 + (i * 12);
+                    if (entry + 12 > view.byteLength) break;
+
+                    const tag = view.getUint16(entry, le);
+                    const count = view.getUint32(entry + 4, le);
+
+                    if (tag === 0x0112) {
+                        res.orientation = view.getUint16(entry + 8, le);
+                    } else if (tag === 0x8769) {
+                        res.exifSubOffset = view.getUint32(entry + 8, le);
+                    } else if (tag === 0x9003 || tag === 0x0132 || tag === 0x9004) {
+                        let valOffset = entry + 8;
+                        if (count > 4) {
+                            valOffset = tiffOffset + view.getUint32(entry + 8, le);
+                        }
+                        if (valOffset + count <= view.byteLength) {
+                            let str = "";
+                            for (let c = 0; c < count - 1; c++) {
+                                const ch = view.getUint8(valOffset + c);
+                                if (ch === 0) break;
+                                str += String.fromCharCode(ch);
+                            }
+                            str = str.trim();
+                            if (str.length >= 10) {
+                                if (tag === 0x9003) res.dateTimeOriginal = str;
+                                else if (!res.dateTime) res.dateTime = str;
+                            }
+                        }
+                    }
+                }
+                return res;
+            }
+
+            try {
+                let ifd0 = readIFD(firstIFD);
+                let dateStr = ifd0.dateTimeOriginal || ifd0.dateTime || null;
+                let orientation = ifd0.orientation || 1;
+
+                if (!dateStr && ifd0.exifSubOffset) {
+                    let subIfd = readIFD(ifd0.exifSubOffset);
+                    dateStr = subIfd.dateTimeOriginal || subIfd.dateTime || null;
+                    if (!orientation && subIfd.orientation) orientation = subIfd.orientation;
+                }
+
+                return { dateStr, orientation };
+            } catch(e) {}
+
+            return null;
+        }
+
+        function updateJpgDropzoneUI() {
+            const dropzone = document.getElementById('jpg-dropzone');
+            if (state.jpgFiles.length > 0) {
+                dropzone.classList.add('dropzone-success');
+                dropzone.innerHTML = `
+                    <div class="p-3 bg-emerald-100 text-emerald-600 rounded-full mb-2 pointer-events-none">
+                        <i data-lucide="check-circle-2" class="w-7 h-7"></i>
+                    </div>
+                    <p class="text-sm font-bold text-emerald-700 mb-2 pointer-events-none">✅ 已加载 ${state.jpgFiles.length} 张 JPG 照片</p>
+                    <div class="flex items-center gap-2 relative z-10">
+                        <button type="button" onclick="document.getElementById('jpg-folder-input').click()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shadow-sm">
+                            重新选择文件夹
+                        </button>
+                        <button type="button" onclick="document.getElementById('jpg-file-input').click()" class="px-3 py-1.5 bg-white hover:bg-stone-100 text-slate-700 text-xs font-semibold rounded-lg border border-stone-300 transition">
+                            重新选择文件
+                        </button>
+                    </div>
+                `;
+            } else {
+                dropzone.classList.remove('dropzone-success');
+                dropzone.innerHTML = `
+                    <div class="p-3 bg-amber-100 text-amber-600 rounded-full mb-3 pointer-events-none">
+                        <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+                    </div>
+                    <p class="text-sm font-medium text-slate-700 mb-2 pointer-events-none">选择 JPG 照片文件或文件夹</p>
+                    <div class="flex items-center gap-2 relative z-10">
+                        <button type="button" onclick="document.getElementById('jpg-folder-input').click()" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg shadow-sm transition">
+                            选择整个 JPG 文件夹
+                        </button>
+                        <button type="button" onclick="document.getElementById('jpg-file-input').click()" class="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-slate-700 text-xs font-semibold rounded-lg border border-stone-300 transition">
+                            选择 JPG 文件
+                        </button>
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        function updateRawDropzoneUI(rawCount) {
+            const dropzone = document.getElementById('raw-dropzone');
+            if (rawCount > 0) {
+                dropzone.classList.add('dropzone-success');
+                dropzone.innerHTML = `
+                    <div class="p-3 bg-emerald-100 text-emerald-600 rounded-full mb-2 pointer-events-none">
+                        <i data-lucide="check-circle-2" class="w-7 h-7"></i>
+                    </div>
+                    <p class="text-sm font-bold text-emerald-700 mb-3 pointer-events-none">✅ 已加载 ${rawCount} 个 RAW 原始文件</p>
+                    <div class="flex items-center gap-2 relative z-10">
+                        <button type="button" onclick="document.getElementById('raw-folder-input').click()" class="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold rounded-lg transition shadow-sm">
+                            重新选择 RAW 文件夹
+                        </button>
+                        <button type="button" onclick="document.getElementById('raw-file-input').click()" class="px-3 py-1.5 bg-white hover:bg-stone-100 text-slate-700 text-xs font-semibold rounded-lg border border-stone-300 transition">
+                            重新选择 RAW 文件
+                        </button>
+                    </div>
+                `;
+            } else {
+                dropzone.classList.remove('dropzone-success');
+                dropzone.innerHTML = `
+                    <div class="p-3 bg-orange-100 text-orange-600 rounded-full mb-3 pointer-events-none">
+                        <i data-lucide="folder-open" class="w-6 h-6"></i>
+                    </div>
+                    <p class="text-sm font-medium text-slate-700 mb-2 pointer-events-none">选择 RAW 文件或文件夹</p>
+                    <div class="flex items-center gap-2 relative z-10">
+                        <button type="button" onclick="document.getElementById('raw-folder-input').click()" class="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold rounded-lg shadow-sm transition">
+                            选择整个 RAW 文件夹
+                        </button>
+                        <button type="button" onclick="document.getElementById('raw-file-input').click()" class="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-slate-700 text-xs font-semibold rounded-lg border border-stone-300 transition">
+                            选择 RAW 文件
+                        </button>
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        async function handleJpgSelect(e) {
+            const fileList = e.target.files || (e.dataTransfer && e.dataTransfer.files);
+            if (!fileList) return;
+
+            const files = Array.from(fileList).filter(f => 
+                f.type.startsWith('image/') || 
+                f.name.toLowerCase().endsWith('.jpg') || 
+                f.name.toLowerCase().endsWith('.jpeg')
+            );
+
+            if (e.target) e.target.value = '';
+            if (files.length === 0) return;
+
+            state.jpgFiles = files;
+            document.getElementById('jpg-badge').textContent = `已选 ${files.length} 张`;
+            document.getElementById('jpg-info').textContent = `已导入 ${files.length} 个 JPG 文件`;
+            
+            updateJpgDropzoneUI();
+            await runMatching();
+        }
+
+        async function handleRawSelect(e) {
+            const fileList = e.target.files || (e.dataTransfer && e.dataTransfer.files);
+            if (!fileList) return;
+
+            const files = Array.from(fileList);
+            if (e.target) e.target.value = '';
+
+            state.rawFiles = [];
+            state.rawStemMap.clear();
+
+            let rawCount = 0;
+            files.forEach(file => {
+                const ext = getExtension(file.name).toLowerCase();
+                if (RAW_EXTS.includes(ext)) {
+                    state.rawFiles.push(file);
+                    const stem = getStem(file.name).toLowerCase();
+                    const cleanStem = stem.split('_')[0].split('-')[0];
+                    state.rawStemMap.set(stem, file);
+                    if (cleanStem !== stem) {
+                        state.rawStemMap.set(cleanStem, file);
+                    }
+                    rawCount++;
+                }
+            });
+
+            document.getElementById('raw-badge').textContent = `已载入 ${rawCount} 个RAW`;
+            updateRawDropzoneUI(rawCount);
+            await runMatching();
+        }
+
+        // 异步分块运行比对（绝对防止主线程卡死）
+        async function runMatching() {
+            if (state.jpgFiles.length === 0 && state.rawFiles.length === 0) return;
+
+            showStatusBar("正在开始智能分析...");
+            clearMemoryUrls();
+            state.matches = [];
+            state.rawDateMap.clear();
+
+            // 1. 异步分块提取 RAW EXIF 拍摄时间
+            const rawTotal = state.rawFiles.length;
+            for (let i = 0; i < rawTotal; i++) {
+                const rawFile = state.rawFiles[i];
+                if (rawFile instanceof File) {
+                    const meta = await readImageExifMetadata(rawFile);
+                    if (meta.exifDate) {
+                        state.rawDateMap.set(meta.exifDate, rawFile);
+                    }
+                } else if (rawFile.exifDate) {
+                    state.rawDateMap.set(rawFile.exifDate, rawFile);
+                }
+
+                // 每处理 15 个文件让出一次主线程，更新进度条
+                if (i % 15 === 0) {
+                    const pct = rawTotal > 0 ? Math.round((i / rawTotal) * 40) : 40;
+                    showStatusBar(`正在解析 RAW 元数据信息 (${pct}%)...`);
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+
+            // 2. 异步分块匹配 JPG 并生成匹配项
+            const jpgTotal = state.jpgFiles.length;
+            for (let i = 0; i < jpgTotal; i++) {
+                const jpgFile = state.jpgFiles[i];
+                const jpgName = jpgFile.name;
+                const jpgStem = getStem(jpgName).toLowerCase();
+                const cleanStem = jpgStem.split('_')[0].split('-')[0];
+
+                let matchedRaw = state.rawStemMap.get(jpgStem) || state.rawStemMap.get(cleanStem);
+                let matchType = matchedRaw ? 'name' : null;
+
+                let jpgMeta = { exifDate: null, orientation: 1 };
+                if (jpgFile instanceof File) {
+                    jpgMeta = await readImageExifMetadata(jpgFile);
+                } else if (jpgFile.exifDate) {
+                    jpgMeta = { exifDate: jpgFile.exifDate, orientation: jpgFile.orientation || 1 };
+                }
+
+                if (!matchedRaw && jpgMeta.exifDate) {
+                    matchedRaw = state.rawDateMap.get(jpgMeta.exifDate);
+                    if (matchedRaw) matchType = 'exif';
+                }
+
+                let previewUrl = null;
+                if (jpgFile.previewUrl) {
+                    previewUrl = jpgFile.previewUrl;
+                } else if (jpgFile instanceof File) {
+                    previewUrl = URL.createObjectURL(jpgFile);
+                    activeObjectUrls.push(previewUrl);
+                }
+
+                state.matches.push({
+                    jpgFile: jpgFile,
+                    rawFile: matchedRaw || null,
+                    jpgName: jpgName,
+                    rawName: matchedRaw ? matchedRaw.name : null,
+                    stem: jpgStem,
+                    isMatched: !!matchedRaw,
+                    matchType: matchType,
+                    jpgExifDate: jpgMeta.exifDate || null,
+                    orientation: jpgMeta.orientation || 1,
+                    previewUrl: previewUrl,
+                    rawPreviewUrl: null, // 按需延迟提取
+                    rawPreviewLoaded: false
+                });
+
+                if (i % 15 === 0) {
+                    const pct = jpgTotal > 0 ? 40 + Math.round((i / jpgTotal) * 60) : 100;
+                    showStatusBar(`正在建立 JPG/RAW 精准匹配对齐 (${pct}%)...`);
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+
+            hideStatusBar();
+            updateStats();
+            renderList();
+        }
+
+        function showStatusBar(msg) {
+            const bar = document.getElementById('status-bar');
+            document.getElementById('status-msg').textContent = msg;
+            bar.classList.remove('hidden');
+            bar.classList.add('flex');
+        }
+
+        function hideStatusBar() {
+            const bar = document.getElementById('status-bar');
+            bar.classList.add('hidden');
+            bar.classList.remove('flex');
+        }
+
+        function getExtension(filename) {
+            return filename.substring(filename.lastIndexOf('.'));
+        }
+
+        function getStem(filename) {
+            const lastDot = filename.lastIndexOf('.');
+            return lastDot === -1 ? filename : filename.substring(0, lastDot);
+        }
+
+        function formatBytes(bytes, decimals = 1) {
+            if (!bytes || bytes === 0) return '0 B';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        function getOrientationTransformStyle(orientation) {
+            switch(orientation) {
+                case 6: // 90度 顺时针
+                    return 'transform: rotate(90deg) scale(0.72); transform-origin: center center;';
+                case 8: // 270度 顺时针
+                    return 'transform: rotate(270deg) scale(0.72); transform-origin: center center;';
+                case 3: // 180度
+                    return 'transform: rotate(180deg); transform-origin: center center;';
+                default:
+                    return '';
+            }
+        }
+
+        function updateStats() {
+            const total = state.matches.length;
+            const matched = state.matches.filter(m => m.isMatched).length;
+            const missing = total - matched;
+            const rate = total > 0 ? Math.round((matched / total) * 100) : 0;
+
+            document.getElementById('stat-jpg-total').textContent = total;
+            document.getElementById('stat-matched-count').textContent = matched;
+            document.getElementById('stat-missing-count').textContent = missing;
+            document.getElementById('stat-rate').textContent = rate + '%';
+
+            document.getElementById('cnt-filter-all').textContent = total;
+            document.getElementById('cnt-filter-matched').textContent = matched;
+            document.getElementById('cnt-filter-missing').textContent = missing;
+
+            const exportZipBtn = document.getElementById('export-zip-btn');
+            const exportCsvBtn = document.getElementById('export-csv-btn');
+            if (total > 0) {
+                exportZipBtn.disabled = false;
+                exportCsvBtn.disabled = false;
+            } else {
+                exportZipBtn.disabled = true;
+                exportCsvBtn.disabled = true;
+            }
+        }
+
+        function setFilter(mode) {
+            state.filter = mode;
+            ['all', 'matched', 'missing'].forEach(m => {
+                const btn = document.getElementById(`btn-filter-${m}`);
+                if (m === mode) {
+                    btn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-medium bg-amber-600 text-white transition shadow-sm';
+                } else {
+                    btn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-stone-100 transition';
+                }
+            });
+            renderList();
+        }
+
+        // 【关键修复 1】：局部 DOM 秒级展开，无需重新渲染整个列表
+        async function toggleCardDetail(idx) {
+            const panel = document.getElementById(`detail-panel-${idx}`);
+            const chevron = document.getElementById(`chevron-icon-${idx}`);
+            const labelText = document.getElementById(`toggle-label-${idx}`);
+            
+            if (!panel) return;
+
+            const isHidden = panel.classList.contains('hidden');
+            if (isHidden) {
+                panel.classList.remove('hidden');
+                if (chevron) chevron.style.transform = 'rotate(180deg)';
+                if (labelText) labelText.textContent = '收起图像属性对比面板';
+                state.expandedCards.add(idx);
+
+                // 【关键修复 2】：懒加载 RAW 预览图（点击展开时才提取当前这 1 张）
+                await loadRawPreviewIfNeeded(idx);
+            } else {
+                panel.classList.add('hidden');
+                if (chevron) chevron.style.transform = 'rotate(0deg)';
+                if (labelText) labelText.textContent = '展开图像预览与属性对比面板';
+                state.expandedCards.delete(idx);
+            }
+        }
+
+        // 懒加载执行器
+        async function loadRawPreviewIfNeeded(idx) {
+            const m = state.matches[idx];
+            if (!m || !m.isMatched || m.rawPreviewLoaded) return;
+
+            const imgEl = document.getElementById(`raw-img-${idx}`);
+            const loaderEl = document.getElementById(`raw-loader-${idx}`);
+
+            if (!m.rawPreviewUrl && m.rawFile) {
+                if (m.rawFile instanceof File) {
+                    m.rawPreviewUrl = await extractRawEmbeddedJpeg(m.rawFile);
+                } else if (m.rawFile.previewUrl) {
+                    m.rawPreviewUrl = m.rawFile.previewUrl;
+                }
+            }
+
+            m.rawPreviewLoaded = true;
+
+            if (imgEl && (m.rawPreviewUrl || m.previewUrl)) {
+                imgEl.src = m.rawPreviewUrl || m.previewUrl;
+                if (loaderEl) loaderEl.classList.add('hidden');
+                imgEl.classList.remove('hidden');
+            }
+        }
+
+        function renderList() {
+            const container = document.getElementById('results-container');
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+
+            let filtered = state.matches.filter(m => {
+                if (state.filter === 'matched' && !m.isMatched) return false;
+                if (state.filter === 'missing' && m.isMatched) return false;
+                if (searchTerm) {
+                    const inJpg = m.jpgName.toLowerCase().includes(searchTerm);
+                    const inRaw = m.rawName ? m.rawName.toLowerCase().includes(searchTerm) : false;
+                    const inExif = m.jpgExifDate ? m.jpgExifDate.toLowerCase().includes(searchTerm) : false;
+                    return inJpg || inRaw || inExif;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-slate-400">
+                        <p class="text-sm font-medium">没有找到符合条件的对齐记录</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map((m, idx) => {
+                const isExpanded = state.expandedCards.has(idx);
+                const rotStyle = getOrientationTransformStyle(m.orientation);
+
+                return `
+                <div class="bg-white border ${m.isMatched ? 'border-emerald-300/80 hover:border-emerald-500' : 'border-rose-200 hover:border-rose-400'} rounded-xl p-4 flex flex-col justify-between transition shadow-sm hover:shadow-md">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-semibold px-2.5 py-0.5 rounded-md ${m.isMatched ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'} flex items-center gap-1">
+                                ${m.isMatched ? 
+                                    `<i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i> 对齐成功 (${m.matchType === 'exif' ? '拍摄时间元数据' : '文件名'})` : 
+                                    `<i data-lucide="alert-circle" class="w-3.5 h-3.5 text-rose-500"></i> 缺失 RAW`
+                                }
+                            </span>
+                            <span class="text-[10px] text-slate-400 font-mono">#${idx + 1}</span>
+                        </div>
+
+                        <!-- 基础摘要卡片块 -->
+                        <div class="flex items-start space-x-3">
+                            <div class="w-16 h-16 bg-stone-100 rounded-lg overflow-hidden flex-shrink-0 border border-stone-200 relative flex items-center justify-center">
+                                ${m.previewUrl ? 
+                                    `<img src="${m.previewUrl}" class="w-full h-full object-cover" alt="preview">` : 
+                                    `<div class="w-full h-full flex items-center justify-center text-slate-400"><i data-lucide="image" class="w-6 h-6"></i></div>`
+                                }
+                            </div>
+                            
+                            <div class="flex-1 min-w-0 text-xs">
+                                <div class="mb-2">
+                                    <div class="text-[10px] uppercase font-bold text-amber-700 tracking-wider">JPG 照片</div>
+                                    <div class="font-semibold text-slate-800 truncate" title="${m.jpgName}">${m.jpgName}</div>
+                                    <div class="text-[10px] text-slate-400">${m.jpgFile ? formatBytes(m.jpgFile.size) : '15.7 MB'} | ⏱️ ${m.jpgExifDate || '未提取'}</div>
+                                </div>
+
+                                <div>
+                                    <div class="text-[10px] uppercase font-bold text-orange-700 tracking-wider">RAW 原始文件</div>
+                                    ${m.isMatched ? 
+                                        `<div class="font-bold text-emerald-700 truncate" title="${m.rawName}">${m.rawName}</div>
+                                         <div class="text-[10px] text-slate-400">${m.rawFile ? formatBytes(m.rawFile.size) : '24.1 MB'}</div>` : 
+                                        `<div class="text-rose-500 italic">未找到相同拍摄时间原片</div>`
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 0 延迟展开控制按钮 -->
+                        <div class="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between">
+                            <button onclick="toggleCardDetail(${idx})" class="w-full text-xs text-slate-600 hover:text-amber-700 font-medium py-1 px-2 rounded hover:bg-stone-50 flex items-center justify-between transition">
+                                <span class="flex items-center gap-1.5">
+                                    <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-amber-600"></i>
+                                    <span id="toggle-label-${idx}">${isExpanded ? '收起图像属性对比面板' : '展开图像预览与属性对比面板'}</span>
+                                </span>
+                                <i id="chevron-icon-${idx}" data-lucide="chevron-down" class="w-4 h-4 text-slate-500 transition-transform duration-200" style="${isExpanded ? 'transform: rotate(180deg);' : ''}"></i>
+                            </button>
+                        </div>
+
+                        <!-- 对比面板容器 (默认 hidden，点击瞬间切显) -->
+                        <div id="detail-panel-${idx}" class="${isExpanded ? '' : 'hidden'} mt-3 pt-3 border-t border-amber-200/80 bg-amber-50/30 -mx-4 -mb-4 p-3 rounded-b-xl animate-fadeIn">
+                            <div class="text-[11px] font-bold text-slate-700 mb-2.5 flex items-center justify-between">
+                                <span>📸 JPG 与 RAW 画面等朝向/比例对照</span>
+                                <span class="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-medium">1:1 朝向锁定</span>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-2 mb-3">
+                                <!-- 左：JPG 预览 -->
+                                <div class="bg-white p-1.5 rounded-lg border border-stone-200 shadow-sm flex flex-col items-center">
+                                    <div class="w-full h-36 bg-slate-900/5 rounded overflow-hidden flex items-center justify-center mb-1 relative">
+                                        ${m.previewUrl ? 
+                                            `<img src="${m.previewUrl}" class="max-w-full max-h-full object-contain" alt="jpg preview">` : 
+                                            `<span class="text-xs text-slate-400">无预览图</span>`
+                                        }
+                                    </div>
+                                    <div class="text-[10px] font-semibold text-amber-800 text-center truncate w-full">[JPG] ${m.jpgName}</div>
+                                    <div class="text-[9px] text-slate-400">时间: ${m.jpgExifDate || '未知'}</div>
+                                </div>
+
+                                <!-- 右：RAW 预览 (懒加载模式) -->
+                                <div class="bg-white p-1.5 rounded-lg border border-stone-200 shadow-sm flex flex-col items-center">
+                                    <div class="w-full h-36 bg-slate-900/5 rounded overflow-hidden flex items-center justify-center mb-1 relative">
+                                        ${m.isMatched ? `
+                                            <div id="raw-loader-${idx}" class="${m.rawPreviewLoaded ? 'hidden' : 'flex'} items-center gap-1 text-amber-600 text-[10px]">
+                                                <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>
+                                                加载预览...
+                                            </div>
+                                            <img id="raw-img-${idx}" 
+                                                 src="${m.rawPreviewUrl || m.previewUrl || ''}" 
+                                                 style="${rotStyle}"
+                                                 onerror="this.onerror=null; this.src='${m.previewUrl}'; this.style='';" 
+                                                 class="${m.rawPreviewLoaded ? '' : 'hidden'} max-w-full max-h-full object-contain transition-transform duration-300" 
+                                                 alt="raw preview">
+                                        ` : `
+                                            <span class="text-xs text-slate-400">未匹配到RAW</span>
+                                        `}
+                                    </div>
+                                    <div class="text-[10px] font-semibold text-orange-800 text-center truncate w-full">[RAW] ${m.rawName || '缺失'}</div>
+                                    <div class="text-[9px] text-slate-400">${m.isMatched ? '朝向/比例同步锁定' : '未匹配'}</div>
+                                </div>
+                            </div>
+
+                            <!-- 属性详细信息比对表格 -->
+                            <table class="w-full text-[10px] border-collapse bg-white rounded-md overflow-hidden border border-stone-200">
+                                <tbody>
+                                    <tr class="border-b border-stone-100 bg-stone-50">
+                                        <td class="p-1 font-medium text-slate-500">属性项</td>
+                                        <td class="p-1 font-medium text-amber-800">JPG 选片属性</td>
+                                        <td class="p-1 font-medium text-orange-800">RAW 原片属性</td>
+                                    </tr>
+                                    <tr class="border-b border-stone-100">
+                                        <td class="p-1 text-slate-500">文件名称</td>
+                                        <td class="p-1 font-mono text-slate-700 truncate max-w-[90px]">${m.jpgName}</td>
+                                        <td class="p-1 font-mono text-slate-700 truncate max-w-[90px]">${m.rawName || '-'}</td>
+                                    </tr>
+                                    <tr class="border-b border-stone-100">
+                                        <td class="p-1 text-slate-500">拍摄时间</td>
+                                        <td class="p-1 font-mono text-emerald-700" colspan="2">${m.jpgExifDate || '已提取'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-1 text-slate-500">文件大小</td>
+                                        <td class="p-1 text-slate-700">${m.jpgFile ? formatBytes(m.jpgFile.size) : '15.7 MB'}</td>
+                                        <td class="p-1 text-slate-700">${m.rawFile ? formatBytes(m.rawFile.size) : (m.isMatched ? '24.1 MB' : '-')}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </div>
+            `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        async function loadDemoData() {
+            clearMemoryUrls();
+            state.jpgFiles = [];
+            state.rawFiles = [];
+            state.rawStemMap.clear();
+            state.rawDateMap.clear();
+
+            const demoItems = [
+                { jpgName: 'DSC08561.JPG', rawName: '额废物.ARW', date: '2026:07:31 12:26:34', orientation: 6 },
+                { jpgName: 'DSC08562.JPG', rawName: 'DSC08562.ARW', date: '2026:07:31 12:27:05', orientation: 1 },
+                { jpgName: 'DSC08563.JPG', rawName: '3123.ARW', date: '2026:07:31 12:27:11', orientation: 6 }
+            ];
+
+            state.jpgFiles = demoItems.map((item, i) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = item.orientation === 6 ? 120 : 160;
+                canvas.height = item.orientation === 6 ? 160 : 120;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = ['#0284c7', '#059669', '#ea580c'][i % 3];
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillText(item.jpgName, 10, canvas.height / 2);
+
+                return {
+                    name: item.jpgName,
+                    size: 17200000 + i * 500000,
+                    previewUrl: canvas.toDataURL('image/jpeg'),
+                    exifDate: item.date,
+                    orientation: item.orientation,
+                    isMock: true
+                };
+            });
+
+            demoItems.forEach((item, i) => {
+                const stem = getStem(item.rawName).toLowerCase();
+                const mockRaw = {
+                    name: item.rawName,
+                    size: 24100000,
+                    exifDate: item.date,
+                    orientation: item.orientation,
+                    previewUrl: state.jpgFiles[i].previewUrl,
+                    isMock: true
+                };
+                state.rawStemMap.set(stem, mockRaw);
+                state.rawDateMap.set(item.date, mockRaw);
+                state.rawFiles.push(mockRaw);
+            });
+
+            document.getElementById('jpg-badge').textContent = `已选 ${state.jpgFiles.length} 张`;
+            document.getElementById('raw-badge').textContent = `已载入 ${demoItems.length} 个RAW`;
+
+            updateJpgDropzoneUI();
+            updateRawDropzoneUI(demoItems.length);
+            await runMatching();
+        }
+
+        async function exportZipPackage() {
+            if (state.matches.length === 0) return;
+
+            const zip = new JSZip();
+            const jpgFolder = zip.folder("Selected_JPGs");
+            const rawFolder = zip.folder("Matched_RAWs");
+
+            for (let m of state.matches) {
+                if (m.jpgFile) {
+                    if (m.jpgFile instanceof File) {
+                        jpgFolder.file(m.jpgName, m.jpgFile);
+                    } else if (m.jpgFile.isMock) {
+                        jpgFolder.file(m.jpgName, `[DEMO JPG DATA]`);
+                    }
+                }
+
+                if (m.rawFile) {
+                    if (m.rawFile instanceof File) {
+                        rawFolder.file(m.rawName, m.rawFile);
+                    } else if (m.rawFile.isMock) {
+                        rawFolder.file(m.rawName, `[DEMO RAW DATA]`);
+                    }
+                }
+            }
+
+            const manifestContent = `=====================================\nKaiLionCrafts 选片与 RAW 格式对齐整理清单\n生成时间: ${new Date().toLocaleString()}\n=====================================\n\n` +
+                state.matches.map(m => `[JPG]: ${m.jpgName}  ===>  [RAW]: ${m.rawName || '【缺失】'} (${m.matchType === 'exif' ? '底层元数据/拍摄时间对齐' : '文件名对齐'})`).join('\n');
+            
+            zip.file("对齐结果说明清单.txt", manifestContent);
+
+            const btn = document.getElementById('export-zip-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 打包导出中...`;
+            btn.disabled = true;
+
+            try {
+                const content = await zip.generateAsync({ type: "blob" });
+                saveAs(content, `KaiLionCrafts_选片整理包_${new Date().toISOString().slice(0,10)}.zip`);
+            } catch (err) {
+                alert('打包 ZIP 时出错: ' + err.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                lucide.createIcons();
+            }
+        }
+
+        function exportCSVReport() {
+            if (state.matches.length === 0) return;
+
+            let csvContent = "\uFEFF";
+            csvContent += "序号,客户选中的JPG文件名,JPG大小,RAW匹配状态,对齐依据,对应的RAW文件名,RAW大小,拍摄时间\n";
+
+            state.matches.forEach((m, idx) => {
+                const jpgSize = m.jpgFile ? formatBytes(m.jpgFile.size) : '未知';
+                const rawSize = m.rawFile ? formatBytes(m.rawFile.size) : '未知';
+                const status = m.isMatched ? "已匹配" : "缺失RAW";
+                const matchType = m.matchType === 'exif' ? "底层拍摄时间元数据" : (m.matchType === 'name' ? "文件名" : "无");
+                const rawName = m.rawName || "无";
+                const dateStr = m.jpgExifDate || "未提取到";
+
+                csvContent += `${idx + 1},"${m.jpgName}","${jpgSize}","${status}","${matchType}","${rawName}","${rawSize}","${dateStr}"\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            saveAs(blob, `KaiLionCrafts_选片匹配结果清单_${new Date().toISOString().slice(0,10)}.csv`);
+        }
+
+        function clearJpgs() {
+            clearMemoryUrls();
+            state.jpgFiles = [];
+            document.getElementById('jpg-badge').textContent = `已选 0 张`;
+            document.getElementById('jpg-info').textContent = `支持格式: .jpg, .jpeg`;
+            updateJpgDropzoneUI();
+            runMatching();
+        }
+
+        function clearRaws() {
+            state.rawFiles = [];
+            state.rawStemMap.clear();
+            state.rawDateMap.clear();
+            document.getElementById('raw-badge').textContent = `已载入 0 个RAW`;
+            updateRawDropzoneUI(0);
+            runMatching();
+        }
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            window.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function setupDropzone(zoneId, handleFn) {
+            const zone = document.getElementById(zoneId);
+            if (!zone) return;
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                zone.addEventListener(eventName, () => zone.classList.add('dragover'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                zone.addEventListener(eventName, () => zone.classList.remove('dragover'), false);
+            });
+
+            zone.addEventListener('drop', (e) => {
+                handleFn(e);
+            });
+        }
+
+        setupDropzone('jpg-dropzone', handleJpgSelect);
+        setupDropzone('raw-dropzone', handleRawSelect);
+
+    </script>
+</body>
+</html>

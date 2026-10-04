@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaiLionCrafts · 超级图片命名工具 v4</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root{
+  --bd:#1C0E0A;--bm:#4E342E;--gold:#D4AF37;--gl:#E8C96A;--cr:#FFF3E0;--wh:#FFFFFF;
+  --sc2:#0D2B4E;--sc1:#EDF4FB;--od2:#2D3B1A;--od1:#F2F4E8;--kn2:#4E342E;--kn1:#FFF8EC;
+  --ka2:#5C3317;--ka1:#FFF4E8;--lgr:#F5F5F5;--mgr:#E0E0E0
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bd);color:var(--cr);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 15% 60%,rgba(212,175,55,.05) 0%,transparent 55%);pointer-events:none;z-index:0}
+.page{position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:24px 18px 80px}
+
+/* HEADER */
+.hdr{text-align:center;margin-bottom:28px}
+.hbadge{display:inline-block;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--gold);text-transform:uppercase;border:1px solid rgba(212,175,55,.3);padding:5px 14px;border-radius:2px;margin-bottom:12px}
+h1{font-family:'Playfair Display',serif;font-size:clamp(22px,4vw,40px);font-weight:900;color:#fff;line-height:1.1;margin-bottom:6px}
+h1 span{color:var(--gold)}
+.hsub{font-size:12px;color:rgba(255,243,224,.5);line-height:1.6}
+
+/* SKU BANNER */
+.sku-banner{background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.25);border-radius:8px;padding:16px 20px;margin-bottom:24px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sku-row{display:flex;flex-direction:column;gap:4px}
+.sku-label{font-size:10px;color:rgba(255,243,224,.4);text-transform:uppercase;letter-spacing:1px}
+.sku-formula{font-family:'DM Mono',monospace;font-size:13px;color:var(--gold);letter-spacing:.5px}
+.sku-parts{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.sp{padding:3px 8px;border-radius:3px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600}
+.sp-fix{background:rgba(78,52,46,.6);color:var(--gl)}
+.sp-cat{background:rgba(26,58,92,.5);color:#7EC8E3}
+.sp-mat{background:rgba(27,67,50,.5);color:#69B890}
+.sp-num{background:rgba(100,50,20,.5);color:#E8B890}
+.sp-img{background:rgba(70,20,70,.5);color:#C890E8}
+
+/* TABS */
+.tabs{display:flex;gap:3px;margin-bottom:20px;flex-wrap:wrap;border-bottom:1px solid rgba(212,175,55,.1);padding-bottom:3px}
+.tab{padding:9px 16px;border:none;background:transparent;color:rgba(255,243,224,.4);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border-radius:4px 4px 0 0;transition:all .2s;white-space:nowrap}
+.tab.active{background:rgba(212,175,55,.1);color:var(--gold);border-bottom:2px solid var(--gold)}
+.tab:hover:not(.active){color:rgba(255,243,224,.65)}
+.panel{display:none}.panel.active{display:block}
+
+/* CARDS */
+.card{background:rgba(255,243,224,.04);border:1px solid rgba(212,175,55,.1);border-radius:8px;padding:20px;margin-bottom:18px}
+.card:hover{border-color:rgba(212,175,55,.2)}
+.ctitle{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--gl);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.cdesc{font-size:11px;color:rgba(255,243,224,.4);margin-bottom:16px;line-height:1.6}
+
+/* CHIPS */
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.chip{padding:5px 12px;border:1px solid rgba(212,175,55,.18);border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;color:rgba(255,243,224,.45);background:transparent}
+.chip.on{background:rgba(212,175,55,.12);border-color:var(--gold);color:var(--gold)}
+.chip-kn.on{background:rgba(212,175,55,.1);border-color:#E8C96A;color:#E8C96A}
+.chip-od.on{background:rgba(100,163,100,.1);border-color:#B8C47E;color:#B8C47E}
+.chip-sc.on{background:rgba(126,200,227,.1);border-color:#7EC8E3;color:#7EC8E3}
+.chip-ka.on{background:rgba(244,162,97,.1);border-color:#F4A261;color:#F4A261}
+
+/* SEARCH */
+.srch{position:relative;margin-bottom:12px}
+.srch input{width:100%;background:rgba(255,243,224,.05);border:1px solid rgba(212,175,55,.2);border-radius:4px;color:var(--cr);font-family:'DM Mono',monospace;font-size:12px;padding:9px 12px 9px 34px;outline:none;transition:border-color .2s}
+.srch input:focus{border-color:var(--gold)}
+.srch-ic{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:rgba(255,243,224,.3);font-size:13px}
+
+/* PRODUCT GRID */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:9px;max-height:460px;overflow-y:auto}
+.pcard{background:rgba(255,243,224,.03);border:1.5px solid rgba(212,175,55,.1);border-radius:6px;padding:12px;cursor:pointer;transition:all .2s;position:relative}
+.pcard:hover{border-color:rgba(212,175,55,.4);background:rgba(212,175,55,.05)}
+.pcard.sel{border-color:var(--gold);background:rgba(212,175,55,.1)}
+.pc-sku{font-family:'DM Mono',monospace;font-size:9px;color:var(--gold);margin-bottom:3px;letter-spacing:.5px}
+.pc-name{font-size:11px;font-weight:600;color:var(--cr);margin-bottom:2px;line-height:1.3}
+.pc-sub{font-size:10px;color:rgba(255,243,224,.35)}
+.pc-pri{position:absolute;top:7px;right:8px;font-size:9px}
+.cat-KN .pc-sku{color:#E8C96A}.cat-OD .pc-sku{color:#B8C47E}.cat-SC .pc-sku{color:#7EC8E3}.cat-KA .pc-sku{color:#F4A261}
+.cat-KN{border-color:rgba(232,201,106,.15)}.cat-OD{border-color:rgba(184,196,126,.15)}.cat-SC{border-color:rgba(126,200,227,.15)}.cat-KA{border-color:rgba(244,162,97,.15)}
+
+/* DETAIL PANEL */
+.det{background:rgba(212,175,55,.05);border:1px solid rgba(212,175,55,.2);border-radius:8px;padding:18px;margin-bottom:18px;display:none}
+.det-sku-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.det-sku-main{font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:var(--gold);letter-spacing:1px}
+.det-name{font-size:13px;color:rgba(255,243,224,.7)}
+.det-meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:7px;margin-bottom:14px}
+.dm{background:rgba(255,243,224,.03);border-radius:4px;padding:7px 9px}
+.dm-l{font-size:9px;color:rgba(255,243,224,.35);text-transform:uppercase;letter-spacing:.8px;margin-bottom:2px}
+.dm-v{font-size:11px;color:var(--cr)}
+.img-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.img-box{background:rgba(26,58,92,.2);border:1px solid rgba(26,82,130,.3);border-radius:5px;padding:10px}
+.img-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.img-tag{font-size:9px;padding:2px 6px;border-radius:2px;font-weight:600}
+.tag-01{background:rgba(212,175,55,.2);color:var(--gold)}.tag-02{background:rgba(99,163,144,.2);color:#63A390}
+.tag-03{background:rgba(99,130,200,.2);color:#6382C8}.tag-04{background:rgba(180,120,80,.2);color:#B47850}
+.tag-05{background:rgba(140,80,160,.2);color:#8C50A0}
+.img-fn{font-family:'DM Mono',monospace;font-size:10px;color:var(--gl);word-break:break-all;line-height:1.4;margin-bottom:6px}
+.img-alt{font-size:10px;color:rgba(255,243,224,.45);line-height:1.5}
+
+/* FORM */
+label{font-size:10px;font-weight:600;color:var(--gl);letter-spacing:.5px;text-transform:uppercase;display:block;margin-bottom:5px}
+label .h{font-size:9px;color:rgba(255,243,224,.35);font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px}
+input,select{background:rgba(255,243,224,.05);border:1px solid rgba(212,175,55,.2);border-radius:4px;color:var(--cr);font-family:'DM Mono',monospace;font-size:12px;padding:8px 11px;outline:none;transition:border-color .2s;width:100%}
+input:focus,select:focus{border-color:var(--gold)}
+select option{background:#2C1A14}
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
+.full{grid-column:1/-1}
+
+/* COMBOBOX — select preset OR free-type */
+.combo-wrap{display:flex;flex-direction:column;gap:4px}
+.combo-sel{font-size:10px;color:rgba(255,243,224,.3);padding:5px 8px;border-radius:3px;background:rgba(255,243,224,.03);border:1px solid rgba(212,175,55,.12);cursor:pointer}
+.combo-sel option{background:#2C1A14}
+.combo-input{background:rgba(255,243,224,.05);border:1px solid rgba(212,175,55,.25);border-radius:4px;color:var(--cr);font-family:'DM Mono',monospace;font-size:12px;padding:8px 11px;outline:none;transition:border-color .2s;width:100%}
+.combo-input:focus{border-color:var(--gold)}
+.combo-hint{font-size:9px;color:rgba(255,243,224,.25);margin-top:2px;font-style:italic}
+.quick-pills{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.qp{padding:3px 8px;border:1px solid rgba(212,175,55,.2);border-radius:12px;font-size:10px;font-family:'DM Mono',monospace;color:rgba(255,243,224,.45);cursor:pointer;transition:all .15s}
+.qp:hover{border-color:var(--gold);color:var(--gold);background:rgba(212,175,55,.08)}
+.qp.active{border-color:var(--gold);color:var(--gold);background:rgba(212,175,55,.12)}
+
+/* PREV BOX */
+.prev-box{background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.2);border-radius:5px;padding:11px 14px;margin-bottom:10px}
+.prev-label{font-size:9px;color:rgba(255,243,224,.35);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
+.prev-val{font-family:'DM Mono',monospace;font-size:12px;color:var(--gold);word-break:break-all;line-height:1.5}
+.prev-alt{font-size:10px;color:rgba(255,243,224,.45);margin-top:4px;line-height:1.5;font-style:italic}
+
+/* BUTTONS */
+.btn{padding:8px 18px;border:none;border-radius:4px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px;letter-spacing:.3px}
+.btn-gold{background:var(--gold);color:var(--bd)}.btn-gold:hover{background:var(--gl);transform:translateY(-1px);box-shadow:0 4px 14px rgba(212,175,55,.3)}
+.btn-gold:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-outline{background:transparent;border:1.5px solid rgba(212,175,55,.3);color:var(--gl)}.btn-outline:hover{border-color:var(--gold);background:rgba(212,175,55,.06)}
+.btn-copy{background:rgba(26,58,92,.4);border:1px solid rgba(26,82,130,.4);color:#7EC8E3;font-size:10px;padding:3px 9px;border-radius:3px}.btn-copy:hover{background:rgba(26,58,92,.7)}
+.btn-sm{padding:5px 12px;font-size:11px}
+.btn-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+
+/* DROP ZONE */
+.dz{border:2px dashed rgba(212,175,55,.2);border-radius:6px;padding:32px 20px;text-align:center;cursor:pointer;transition:all .3s;background:rgba(212,175,55,.02);position:relative}
+.dz:hover,.dz.over{border-color:var(--gold);background:rgba(212,175,55,.06)}
+.dz input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dz-ic{font-size:36px;margin-bottom:10px;line-height:1}
+.dz-t{font-size:13px;font-weight:600;color:var(--cr);margin-bottom:5px}
+.dz-h{font-size:11px;color:rgba(255,243,224,.4)}.dz-h b{color:var(--gold)}
+
+/* FILE LIST */
+.fhdr{display:grid;grid-template-columns:26px 1fr 16px 1fr 60px;gap:8px;font-size:9px;font-weight:600;color:rgba(255,243,224,.3);text-transform:uppercase;letter-spacing:1px;padding:5px 10px;border-bottom:1px solid rgba(212,175,55,.08);margin-bottom:2px}
+.fi{display:grid;grid-template-columns:26px 1fr 16px 1fr 60px;gap:8px;align-items:center;padding:7px 10px;border-radius:4px;border-bottom:1px solid rgba(255,243,224,.03)}
+.fi:hover{background:rgba(255,243,224,.02)}
+.fi-n{font-family:'DM Mono',monospace;font-size:9px;color:rgba(255,243,224,.3);text-align:center}
+.fi-old{color:rgba(255,243,224,.4);word-break:break-all;font-size:10px}
+.fi-arr{color:var(--gold);text-align:center;font-size:12px}
+.fi-new{font-family:'DM Mono',monospace;font-size:10px;color:var(--gl);word-break:break-all}
+.fi-st{font-size:9px;padding:2px 6px;border-radius:2px;text-align:center;font-weight:600}
+.st-w{background:rgba(212,175,55,.1);color:var(--gold)}.st-ok{background:#D8F3DC;color:#1B4332}.st-err{background:#FFE8E8;color:#7B1818}
+.fwrap{max-height:360px;overflow-y:auto}
+
+/* PROGRESS */
+.prog{height:3px;background:rgba(212,175,55,.1);border-radius:2px;overflow:hidden;margin-top:10px;display:none}
+.pfill{height:100%;background:var(--gold);border-radius:2px;transition:width .3s;width:0}
+
+/* KW TABLE */
+.kwtable{width:100%;border-collapse:collapse}
+.kwtable th{font-size:9px;font-weight:600;color:rgba(255,243,224,.35);text-transform:uppercase;letter-spacing:1px;padding:7px 9px;border-bottom:1px solid rgba(212,175,55,.1);text-align:left}
+.kwtable td{padding:7px 9px;border-bottom:1px solid rgba(255,243,224,.03);font-size:11px;vertical-align:middle}
+.kwtable tr:hover td{background:rgba(255,243,224,.02)}
+.vh{background:rgba(200,50,50,.12);color:#E57373;padding:2px 6px;border-radius:2px;font-size:9px;font-weight:600}
+.vm{background:rgba(99,163,144,.12);color:#63A390;padding:2px 6px;border-radius:2px;font-size:9px;font-weight:600}
+.vl{background:rgba(26,58,92,.3);color:#7EC8E3;padding:2px 6px;border-radius:2px;font-size:9px;font-weight:600}
+
+/* INFO */
+.info{background:rgba(26,58,92,.2);border:1px solid rgba(26,82,130,.3);border-left:3px solid #4A90D9;border-radius:4px;padding:10px 13px;font-size:11px;color:rgba(255,243,224,.55);line-height:1.7;margin-bottom:14px}
+.info b{color:#7EC8E3}
+
+/* MAT CARDS */
+.mat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.mat-card{background:rgba(255,243,224,.03);border:1px solid rgba(212,175,55,.12);border-radius:6px;padding:12px;cursor:pointer;transition:all .2s}
+.mat-card:hover{border-color:rgba(212,175,55,.4);background:rgba(212,175,55,.07)}
+.mc-code{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px}
+.mc-cn{font-size:12px;font-weight:600;color:var(--cr);margin-bottom:3px}
+.mc-en{font-size:10px;color:rgba(255,243,224,.4);margin-bottom:5px}
+.mc-desc{font-size:10px;color:rgba(255,243,224,.45);line-height:1.5}
+.mc-ex{font-family:'DM Mono',monospace;font-size:9px;color:rgba(212,175,55,.5);margin-top:6px}
+
+/* STATS — 4 columns */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat-b{background:rgba(255,243,224,.04);border:1px solid rgba(212,175,55,.1);border-radius:6px;padding:12px;text-align:center}
+.stat-n{font-family:'Playfair Display',serif;font-size:26px;font-weight:900}
+.sn-g{color:var(--gold)}.sn-gr{color:#69B890}.sn-b{color:#7EC8E3}.sn-o{color:#F4A261}
+.stat-l{font-size:9px;color:rgba(255,243,224,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.8px}
+
+/* DIVIDER */
+.div{height:1px;background:rgba(212,175,55,.1);margin:12px 0}
+
+/* BATCH PREVIEW LIVE */
+.batch-live{background:rgba(212,175,55,.04);border:1px solid rgba(212,175,55,.15);border-radius:6px;padding:12px 14px;margin-bottom:10px}
+.bl-label{font-size:9px;color:rgba(255,243,224,.3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.bl-val{font-family:'DM Mono',monospace;font-size:13px;color:var(--gold);letter-spacing:.5px;word-break:break-all}
+.bl-sub{font-size:10px;color:rgba(255,243,224,.3);margin-top:3px}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bm);border:1px solid var(--gold);color:var(--cr);padding:9px 20px;border-radius:4px;font-size:11px;opacity:0;pointer-events:none;transition:opacity .3s;z-index:999;white-space:nowrap}
+.toast.show{opacity:1}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:rgba(255,255,255,.03)}
+::-webkit-scrollbar-thumb{background:rgba(212,175,55,.2);border-radius:3px}
+
+@media(max-width:700px){
+  .g2,.g3,.g4{grid-template-columns:1fr}.img-grid{grid-template-columns:1fr}
+  .sku-banner{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}
+  .fhdr,.fi{grid-template-columns:22px 1fr 1fr 50px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hbadge">KaiLionCrafts · 阳江锴利刀剪 · 超级命名工具 v4</div>
+  <h1>图片命名<span>超级工具</span></h1>
+  <p class="hsub">四大品类 · 厨刀 · 户外刀 · 剪刀 · 厨房用品 · 全品类SKU体系 · 一键生成图片文件名 + Alt Text + SEO命名</p>
+</div>
+
+<!-- SKU FORMAT BANNER -->
+<div class="sku-banner">
+  <div class="sku-row">
+    <div class="sku-label">📦 产品SKU（唯一标识，不含图片号）</div>
+    <div class="sku-formula">KL - KN - DS - 002</div>
+    <div class="sku-parts">
+      <span class="sp sp-fix">KL 公司代号</span>
+      <span class="sp sp-cat">KN 品类</span>
+      <span class="sp sp-mat">DS 材质</span>
+      <span class="sp sp-num">002 款式号</span>
+    </div>
+    <div style="font-size:10px;color:rgba(255,243,224,.4);margin-top:5px">厨房用品格式：KL-KA-SS-001 &nbsp;·&nbsp; 套装：KL-KA-SET-BBQ-001</div>
+  </div>
+  <div class="sku-row">
+    <div class="sku-label">🖼 图片文件名（SKU + 图片序号）</div>
+    <div class="sku-formula">KL-KA-SS-001-01.jpg</div>
+    <div class="sku-parts">
+      <span class="sp sp-fix">KL-KA-SS-001</span>
+      <span class="sp sp-img">-01 图片序号</span>
+      <span class="sp sp-fix">.jpg 格式</span>
+    </div>
+    <div style="font-size:10px;color:rgba(255,243,224,.4);margin-top:5px">一款产品可有01~99张图 &nbsp;·&nbsp; 电脑存档用此名 &nbsp;·&nbsp; 上传网站前加SEO前缀</div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('product')">📦 产品库命名</button>
+  <button class="tab" onclick="switchTab('custom')">✏️ 自定义生成</button>
+  <button class="tab" onclick="switchTab('batch')">⚡ 批量重命名</button>
+  <button class="tab" onclick="switchTab('matref')">🧱 材质代码表</button>
+  <button class="tab" onclick="switchTab('keywords')">📊 SEO关键词库</button>
+</div>
+
+<!-- ══════════ PANEL 1: PRODUCT LIBRARY ══════════ -->
+<div class="panel active" id="panel-product">
+  <div class="stats">
+    <div class="stat-b"><div class="stat-n sn-g" id="cnt-kn">0</div><div class="stat-l">🔪 厨刀 KN</div></div>
+    <div class="stat-b"><div class="stat-n sn-gr" id="cnt-od">0</div><div class="stat-l">🏕 户外刀 OD</div></div>
+    <div class="stat-b"><div class="stat-n sn-b" id="cnt-sc">0</div><div class="stat-l">✂ 剪刀 SC</div></div>
+    <div class="stat-b"><div class="stat-n sn-o" id="cnt-ka">0</div><div class="stat-l">🍳 厨房用品 KA</div></div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">📦 第一步：从产品库选择产品</div>
+    <div class="cdesc">点击任意产品卡片 → 自动生成该产品的SKU编号和图片文件名列表 + SEO命名 + Alt Text</div>
+    <div class="chips">
+      <div class="chip on" onclick="filterProd('all',this)">全部</div>
+      <div class="chip chip-kn" onclick="filterProd('KN',this)">🔪 厨刀 KN</div>
+      <div class="chip chip-od" onclick="filterProd('OD',this)">🏕 户外刀 OD</div>
+      <div class="chip chip-sc" onclick="filterProd('SC',this)">✂ 剪刀 SC</div>
+      <div class="chip chip-ka" onclick="filterProd('KA',this)">🍳 厨房用品 KA</div>
+    </div>
+    <div class="srch"><span class="srch-ic">🔍</span><input type="text" id="psearch" placeholder="搜索SKU、产品名、材质、系列..." oninput="renderProds()"></div>
+    <div class="pgrid" id="pgrid"></div>
+  </div>
+
+  <div class="det" id="det">
+    <div class="det-sku-row">
+      <div class="det-sku-main" id="det-sku">KL-KN-DS-002</div>
+      <div class="det-name" id="det-name">产品名称</div>
+    </div>
+    <div class="det-meta" id="det-meta"></div>
+    <div class="div"></div>
+    <div style="font-size:11px;font-weight:600;color:var(--gl);margin-bottom:8px">🖼 图片文件名列表（SKU存档用）</div>
+    <div style="margin-bottom:10px">
+      <div class="fg" style="margin-bottom:8px">
+        <label>生成张数 <span class="h">同一款产品生成几张图片的命名</span></label>
+        <select id="img-count" onchange="renderDetImgs()">
+          <option value="4">4张（主图+细节×2+场景）</option>
+          <option value="6">6张</option>
+          <option value="8">8张</option>
+          <option value="12">12张</option>
+          <option value="20">20张（展会/详情页）</option>
+          <option value="custom">自定义...</option>
+        </select>
+      </div>
+      <div id="det-imgs" class="img-grid"></div>
+    </div>
+    <div class="div"></div>
+    <div style="font-size:11px;font-weight:600;color:var(--gl);margin-bottom:8px">🔍 SEO图片命名（上传网站前改名）</div>
+    <div class="prev-box" id="seo-preview"></div>
+    <div class="btn-row">
+      <button class="btn btn-gold" onclick="copyAllSKU()">📋 复制全部图片名</button>
+      <button class="btn btn-outline btn-sm" onclick="copyAlt()">复制 Alt Text</button>
+      <button class="btn btn-outline btn-sm" onclick="copySEO()">复制 SEO主图名</button>
+      <button class="btn btn-outline btn-sm" onclick="copyKW()">复制关键词</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PANEL 2: CUSTOM GENERATE ══════════ -->
+<div class="panel" id="panel-custom">
+  <div class="card">
+    <div class="ctitle">✏️ 自定义SKU命名生成器</div>
+    <div class="cdesc">手动选择品类+材质+款式号，生成符合 KL-KN-DS-002-01 格式的完整图片命名序列</div>
+    <div class="info"><b>格式说明：</b> 产品SKU = <b>KL-[品类]-[材质]-[款式号]</b> &nbsp;·&nbsp; 图片文件名 = <b>KL-[品类]-[材质]-[款式号]-[图片序号].jpg</b><br>例：产品 KL-KA-SS-001 的图片为 KL-KA-SS-001-01.jpg / 02.jpg ...</div>
+    <div class="g3">
+      <div class="fg">
+        <label>品类代码</label>
+        <select id="c-cat" onchange="updateMatOpts();genCustom()">
+          <option value="KN">KN — 厨刀 Kitchen Knives</option>
+          <option value="OD">OD — 户外刀 Outdoor Knives</option>
+          <option value="SC">SC — 剪刀 Scissors</option>
+          <option value="KA">KA — 厨房用品 Kitchen Accessories</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>材质代码</label>
+        <select id="c-mat" onchange="genCustom()"></select>
+      </div>
+      <div class="fg">
+        <label>款式序号 <span class="h">001~999，建议3位数</span></label>
+        <input type="number" id="c-num" value="1" min="1" max="999" oninput="genCustom()">
+      </div>
+    </div>
+    <div class="g2">
+      <div class="fg">
+        <label>生成图片数量 <span class="h">同款产品几张图</span></label>
+        <select id="c-count" onchange="genCustom()">
+          <option value="4">4张</option><option value="6">6张</option>
+          <option value="8">8张</option><option value="12">12张</option>
+          <option value="20">20张（展会/详情页）</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>SEO关键词 <span class="h">用于图片SEO名（可选）</span></label>
+        <input type="text" id="c-seo" placeholder="bamboo-cutting-board-juice-groove" oninput="genCustom()">
+      </div>
+    </div>
+    <div id="c-output"></div>
+    <div class="div"></div>
+    <div style="font-size:11px;font-weight:600;color:var(--gl);margin-bottom:8px">⚡ 快速填入SEO关键词</div>
+    <div class="chips" id="kw-chips">
+      <div class="chip on" onclick="filterKwChips('all',this)">全部</div>
+      <div class="chip chip-kn" onclick="filterKwChips('🔪厨刀',this)">🔪 厨刀</div>
+      <div class="chip chip-od" onclick="filterKwChips('🏕户外刀',this)">🏕 户外刀</div>
+      <div class="chip chip-sc" onclick="filterKwChips('✂剪刀',this)">✂ 剪刀</div>
+      <div class="chip chip-ka" onclick="filterKwChips('🍳厨房用品',this)">🍳 厨房用品</div>
+    </div>
+    <div id="kw-quick" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+  </div>
+</div>
+
+<!-- ══════════ PANEL 3: BATCH RENAME ══════════ -->
+<div class="panel" id="panel-batch">
+  <div class="card">
+    <div class="ctitle">⚡ 批量重命名下载</div>
+    <div class="cdesc">上传实拍图片 → 自动按 KL-KA-SS-001-01.jpg 格式重命名 → 打包ZIP下载。图片全程本地处理，不上传服务器。</div>
+
+    <div class="g2" style="margin-bottom:14px">
+      <div>
+        <label style="margin-bottom:8px">命名模式</label>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <label style="text-transform:none;letter-spacing:0;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:7px">
+            <input type="radio" name="bmode" value="product" checked onchange="bModeChange()"> 📦 从产品库选择（推荐）
+          </label>
+          <label style="text-transform:none;letter-spacing:0;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:7px">
+            <input type="radio" name="bmode" value="custom" onchange="bModeChange()"> ✏️ 手动自定义（品类+材质+款式，全部可自由输入）
+          </label>
+        </div>
+      </div>
+      <div id="b-opts"></div>
+    </div>
+
+    <!-- 实时预览 -->
+    <div class="batch-live" id="b-live">
+      <div class="bl-label">📋 当前将生成的文件名格式</div>
+      <div class="bl-val" id="b-live-val">—</div>
+      <div class="bl-sub" id="b-live-sub">请先完成上方配置</div>
+    </div>
+
+    <div class="div"></div>
+    <div class="dz" id="bdz">
+      <input type="file" id="bfiles" multiple accept="image/*" onchange="handleBatch(this.files)">
+      <div class="dz-ic">🖼️</div>
+      <div class="dz-t">拖拽图片到这里 或 点击选择</div>
+      <div class="dz-h">JPG / PNG / WEBP · <b>Ctrl+A全选</b> · 全程本地处理不上传</div>
+    </div>
+
+    <div id="b-preview" style="display:none;margin-top:14px">
+      <div class="fhdr"><div>#</div><div>原文件名</div><div></div><div>新文件名</div><div>状态</div></div>
+      <div class="fwrap"><div id="b-list"></div></div>
+      <div class="prog" id="bprog"><div class="pfill" id="bfill"></div></div>
+      <div class="btn-row">
+        <button class="btn btn-gold" id="btn-zip" onclick="doZip()">⬇ 打包下载 ZIP</button>
+        <button class="btn btn-outline btn-sm" onclick="clearBatch()">✕ 清空</button>
+      </div>
+      <div id="b-stats" style="display:none;margin-top:12px">
+        <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stat-b"><div class="stat-n sn-g" id="bs-t">0</div><div class="stat-l">总数</div></div>
+          <div class="stat-b"><div class="stat-n sn-gr" id="bs-ok">0</div><div class="stat-l">成功</div></div>
+          <div class="stat-b"><div class="stat-n" id="bs-err" style="color:#E57373">0</div><div class="stat-l">失败</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PANEL 4: MATERIAL REF ══════════ -->
+<div class="panel" id="panel-matref">
+  <div class="card">
+    <div class="ctitle">🧱 材质代码参考表</div>
+    <div class="cdesc">KaiLionCrafts 四大品类材质代码。点击任意材质卡片 → 快速跳转到「自定义生成」并自动填入该材质。</div>
+    <div class="chips" id="mat-chips">
+      <div class="chip on" onclick="filterMat('all',this)">全部</div>
+      <div class="chip chip-kn" onclick="filterMat('KN',this)">🔪 厨刀 KN</div>
+      <div class="chip chip-od" onclick="filterMat('OD',this)">🏕 户外刀 OD</div>
+      <div class="chip chip-sc" onclick="filterMat('SC',this)">✂ 剪刀 SC</div>
+      <div class="chip chip-ka" onclick="filterMat('KA',this)">🍳 厨房用品 KA</div>
+    </div>
+    <div id="mat-grid"></div>
+  </div>
+</div>
+
+<!-- ══════════ PANEL 5: KEYWORDS ══════════ -->
+<div class="panel" id="panel-keywords">
+  <div class="card">
+    <div class="ctitle">📊 欧美SEO关键词分层库</div>
+    <div class="cdesc">点击关键词 → 一键填入「自定义生成」SEO命名框。高频词用于H1标题，中频词用于产品描述，长尾词用于博客和FAQ。</div>
+    <div class="chips" id="kw-type-chips">
+      <div class="chip on" onclick="filterKwTable('all',this)">全部</div>
+      <div class="chip chip-kn" onclick="filterKwTable('🔪厨刀',this)">🔪 厨刀</div>
+      <div class="chip chip-od" onclick="filterKwTable('🏕户外刀',this)">🏕 户外刀</div>
+      <div class="chip chip-sc" onclick="filterKwTable('✂剪刀',this)">✂ 剪刀</div>
+      <div class="chip chip-ka" onclick="filterKwTable('🍳厨房用品',this)">🍳 厨房用品</div>
+      <div class="chip" style="border-color:rgba(220,80,80,.3);color:rgba(220,80,80,.7)" onclick="filterKwTable('Head词',this)">🔴 高频</div>
+      <div class="chip" style="border-color:rgba(99,163,144,.3);color:rgba(99,163,144,.7)" onclick="filterKwTable('Body词',this)">🟢 中频</div>
+      <div class="chip" style="border-color:rgba(126,200,227,.3);color:rgba(126,200,227,.7)" onclick="filterKwTable('Long-tail',this)">🔵 长尾</div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="kwtable">
+        <thead><tr><th>品类</th><th>关键词 (EN)</th><th>搜索量</th><th>词类</th><th>优先级</th><th>操作</th></tr></thead>
+        <tbody id="kw-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /page -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════
+//  DATABASE
+// ════════════════════════════════════════════════════
+const DB = {
+"products":{
+"KL-KN-DS-001":{"cat":"KN","mat":"DS","num":"001","cn":"大马士革主厨刀（VG10黑柄8寸）","en":"Damascus Chef Knife 8 Inch VG10 Steel Black Handle","mat_cn":"VG10大马士革","spec":"8寸","moq":"30把","price":"$48-65","market":"欧美","priority":"⭐⭐⭐","seo_base":"yangjiang-damascus-chef-knife-8inch-vg10-black","alt":"Damascus chef knife 8 inch VG10 steel black handle Yangjiang manufacturer","keywords":"damascus chef knife vg10 / damascus kitchen knife 8 inch","series":"大马士革精选"},
+"KL-KN-DS-002":{"cat":"KN","mat":"DS","num":"002","cn":"大马士革菜刀（贝壳柄7寸）","en":"Damascus Nakiri Knife 7 Inch Abalone Shell Handle","mat_cn":"67层大马士革","spec":"7寸 Nakiri","moq":"30把","price":"$45-60","market":"欧美","priority":"⭐⭐⭐","seo_base":"yangjiang-damascus-nakiri-7inch-abalone-handle","alt":"Damascus nakiri knife 7 inch abalone shell handle Yangjiang manufacturer","keywords":"damascus nakiri knife / abalone handle damascus","series":"大马士革精选"},
+"KL-KN-DS-003":{"cat":"KN","mat":"DS","num":"003","cn":"大马士革中式菜刀8寸（玫瑰木）","en":"Damascus Chinese Cleaver 8 Inch Rosewood Handle","mat_cn":"67层大马士革","spec":"8寸 中式","moq":"25把","price":"$42-58","market":"欧美/亚洲","priority":"⭐⭐⭐","seo_base":"yangjiang-damascus-chinese-cleaver-8inch-rosewood","alt":"Damascus Chinese cleaver 8 inch rosewood handle professional Yangjiang manufacturer","keywords":"damascus chinese cleaver / damascus cleaver 8 inch rosewood","series":"大马士革精选"},
+"KL-KN-HF-001":{"cat":"KN","mat":"HF","num":"001","cn":"手工锻打大马士革主厨刀9寸","en":"Hand Forged Damascus Chef Knife 9 Inch Professional Artisan","mat_cn":"手工锻打大马士革","spec":"9寸 主厨刀","moq":"20把","price":"$58-75","market":"欧美高端","priority":"⭐⭐⭐","seo_base":"yangjiang-hand-forged-damascus-chef-knife-9inch","alt":"Hand forged Damascus chef knife 9 inch artisan Yangjiang luxury manufacturer","keywords":"hand forged damascus chef knife / handmade damascus 9 inch","series":"匠心锻造"},
+"KL-KN-HM-001":{"cat":"KN","mat":"HM","num":"001","cn":"锤纹专业主厨刀7.5寸（黑柄）","en":"Hammered Finish Chef Knife 7.5 Inch Black Handle Professional","mat_cn":"锤纹不锈钢","spec":"7.5寸 主厨刀","moq":"50把","price":"$22-32","market":"欧美","priority":"⭐⭐⭐","seo_base":"yangjiang-hammered-chef-knife-7.5inch-black-handle","alt":"Hammered finish chef knife 7.5 inch black handle professional Yangjiang manufacturer","keywords":"hammered chef knife / hammered finish kitchen knife black","series":"纹理工艺"},
+"KL-KN-SS-001":{"cat":"KN","mat":"SS","num":"001","cn":"8寸玫瑰木主厨刀（不锈钢）","en":"Professional Chef Knife 8 Inch Rosewood Handle Stainless Steel","mat_cn":"5Cr15MoV不锈钢","spec":"8寸 主厨刀","moq":"50把","price":"$25-35","market":"全球","priority":"⭐⭐⭐","seo_base":"yangjiang-chef-knife-8inch-rosewood-stainless","alt":"Professional chef knife 8 inch rosewood handle stainless steel Yangjiang wholesale","keywords":"chef knife 8 inch rosewood / professional kitchen knife rosewood","series":"专业厨房"},
+"KL-KN-SS-003":{"cat":"KN","mat":"SS","num":"003","cn":"8寸全钢一体主厨刀（黑柄）","en":"Professional Chef Knife 8 Inch Full Tang Black Handle","mat_cn":"9Cr18MoV不锈钢","spec":"8寸 全钢一体","moq":"50把","price":"$20-28","market":"欧美","priority":"⭐⭐⭐","seo_base":"yangjiang-professional-chef-knife-8inch-full-tang-black","alt":"Professional chef knife 8 inch full tang black handle Yangjiang wholesale manufacturer","keywords":"chef knife full tang black / professional chef knife 8 inch black","series":"专业厨房"},
+"KL-KN-HC-001":{"cat":"KN","mat":"HC","num":"001","cn":"1095高碳钢主厨刀（玫瑰木柄）","en":"High Carbon 1095 Chef Knife Rosewood Handle Professional","mat_cn":"1095高碳钢","spec":"8寸 主厨刀","moq":"30把","price":"$38-55","market":"欧美","priority":"⭐⭐⭐","seo_base":"yangjiang-high-carbon-1095-chef-knife-rosewood","alt":"High carbon 1095 chef knife rosewood handle professional Yangjiang manufacturer","keywords":"1095 high carbon chef knife / carbon steel kitchen knife rosewood","series":"高碳精品"},
+"KL-KN-CL-001":{"cat":"KN","mat":"CL","num":"001","cn":"三合夹钢主厨刀（玫瑰木柄）","en":"3-Layer Clad Steel Chef Knife Rosewood Handle Professional","mat_cn":"三合夹钢（软硬软）","spec":"8寸 主厨刀","moq":"30把","price":"$45-65","market":"欧美/日本","priority":"⭐⭐⭐","seo_base":"yangjiang-3layer-clad-steel-chef-knife-rosewood","alt":"3-layer clad steel chef knife rosewood handle professional Yangjiang manufacturer","keywords":"clad steel chef knife / 3 layer cladding kitchen knife rosewood","series":"复合夹钢"},
+"KL-KN-SET-DS-001":{"cat":"KN","mat":"SET-DS","num":"001","cn":"12件套大马士革厨刀套装（亚克力座）","en":"Damascus 12 Piece Kitchen Knife Set with Acrylic Block","mat_cn":"大马士革不锈钢","spec":"12件套+亚克力座","moq":"15套","price":"$55-75","market":"欧美/全球","priority":"⭐⭐⭐","seo_base":"yangjiang-damascus-kitchen-knife-set-12piece-acrylic","alt":"Damascus 12 piece kitchen knife set acrylic block Yangjiang wholesale manufacturer","keywords":"damascus kitchen knife set / 12 piece damascus knife set acrylic","series":"大马士革精选"},
+"KL-KN-SET-SS-001":{"cat":"KN","mat":"SET-SS","num":"001","cn":"10件套不锈钢厨刀（木质刀座）","en":"10 Piece Kitchen Knife Set Stainless Steel Wood Block","mat_cn":"5Cr15MoV不锈钢","spec":"10件套+木座","moq":"20套","price":"$55-75","market":"全球","priority":"⭐⭐⭐","seo_base":"yangjiang-kitchen-knife-set-10piece-stainless-wood-block","alt":"10 piece kitchen knife set stainless steel wood block Yangjiang wholesale manufacturer","keywords":"kitchen knife set 10 piece / knife set with wood block stainless","series":"专业厨房"},
+"KL-OD-DS-001":{"cat":"OD","mat":"DS","num":"001","cn":"大马士革折叠刀（G10柄4寸）","en":"Damascus Folding Knife 4 Inch G10 Handle Tactical EDC","mat_cn":"67层大马士革","spec":"4寸 折叠","moq":"50把","price":"$45-70","market":"欧美","priority":"⭐⭐⭐","seo_base":"yangjiang-damascus-folding-knife-4inch-g10-tactical","alt":"Damascus folding knife 4 inch G10 handle tactical EDC Yangjiang manufacturer","keywords":"damascus folding knife g10 / tactical edc damascus knife","series":"大马士革精选"},
+"KL-OD-DS-002":{"cat":"OD","mat":"DS","num":"002","cn":"大马士革折叠刀（贝壳柄礼品）","en":"Damascus Folding Knife Abalone Shell Handle Premium Gift EDC","mat_cn":"67层大马士革","spec":"3.5寸 折叠","moq":"30把","price":"$55-80","market":"欧美礼品","priority":"⭐⭐⭐","seo_base":"yangjiang-damascus-folding-knife-abalone-handle-gift","alt":"Damascus folding knife abalone shell handle premium gift EDC Yangjiang factory","keywords":"damascus edc knife abalone / damascus folding knife gift premium","series":"大马士革精选"},
+"KL-OD-DS-003":{"cat":"OD","mat":"DS","num":"003","cn":"手工锻造大马士革生存刀（伞绳柄）","en":"Hand Forged Damascus Survival Fixed Blade Paracord Handle","mat_cn":"手工锻造大马士革","spec":"9寸 固定刃","moq":"20把","price":"$80-120","market":"欧美高端","priority":"⭐⭐⭐","seo_base":"yangjiang-hand-forged-damascus-survival-knife-paracord","alt":"Hand forged Damascus survival fixed blade knife paracord handle Yangjiang luxury","keywords":"hand forged damascus survival knife / damascus fixed blade paracord","series":"匠心锻造"},
+"KL-OD-HC-001":{"cat":"OD","mat":"HC","num":"001","cn":"1095高碳生存刀特大号（伞绳柄12寸）","en":"Survival Fixed Blade Knife 12 Inch 1095 High Carbon Paracord","mat_cn":"1095高碳钢","spec":"12寸 固定刃","moq":"30把","price":"$55-85","market":"欧美户外","priority":"⭐⭐⭐","seo_base":"yangjiang-survival-fixed-blade-12inch-1095-carbon-paracord","alt":"Survival fixed blade knife 12 inch 1095 high carbon paracord handle Yangjiang","keywords":"survival knife 12 inch 1095 / high carbon fixed blade survival knife","series":"高碳精品"},
+"KL-OD-SS-001":{"cat":"OD","mat":"SS","num":"001","cn":"8Cr13MoV折叠EDC（贝壳柄）","en":"EDC Folding Pocket Knife 8Cr13MoV Abalone Shell Handle","mat_cn":"8Cr13MoV不锈钢","spec":"3.5寸 折叠","moq":"50把","price":"$28-45","market":"欧美","priority":"⭐⭐⭐","seo_base":"yangjiang-edc-folding-knife-8cr13-abalone-shell","alt":"EDC folding pocket knife 8Cr13MoV abalone shell handle Yangjiang wholesale","keywords":"edc folding knife abalone / pocket knife abalone handle stainless","series":"精品户外"},
+"KL-OD-TI-001":{"cat":"OD","mat":"TI","num":"001","cn":"战术折叠刀全黑（黑钛涂层EDC）","en":"Tactical Folding Knife Black Ti-Coated Blade Black Handle EDC","mat_cn":"黑钛涂层不锈钢","spec":"3.5寸 战术折叠","moq":"100把","price":"$25-40","market":"欧美战术","priority":"⭐⭐⭐","seo_base":"yangjiang-tactical-folding-knife-black-blade-black-handle","alt":"Tactical folding knife black Ti-coated blade black handle EDC Yangjiang wholesale","keywords":"tactical folding knife black / black blade edc knife titanium","series":"战术系列"},
+"KL-OD-SET-DS-001":{"cat":"OD","mat":"SET-DS","num":"001","cn":"户外刀礼盒套装3件（大马士革红绒盒）","en":"Outdoor Damascus Knife Gift Set 3 Piece Red Velvet Box","mat_cn":"大马士革不锈钢","spec":"3件套 礼盒","moq":"20套","price":"$55-85","market":"欧美礼品","priority":"⭐⭐⭐","seo_base":"yangjiang-outdoor-damascus-knife-gift-set-3piece-velvet","alt":"Outdoor Damascus knife gift set 3 piece red velvet box Yangjiang manufacturer","keywords":"outdoor knife gift set damascus / hunting knife gift box 3 piece","series":"礼品套装"},
+"KL-SC-SS-001":{"cat":"SC","mat":"SS","num":"001","cn":"厨房剪（不锈钢白柄可拆卸9寸）","en":"Kitchen Scissors Stainless Steel White Handle Detachable 9 Inch","mat_cn":"5Cr15MoV不锈钢","spec":"9寸 可拆","moq":"200把","price":"$8-15","market":"全球","priority":"⭐⭐⭐","seo_base":"yangjiang-kitchen-scissors-stainless-white-handle-detachable","alt":"Kitchen scissors stainless steel white handle detachable 9 inch Yangjiang wholesale","keywords":"kitchen scissors white detachable / stainless kitchen shears white","series":"厨房剪刀"},
+"KL-SC-SS-002":{"cat":"SC","mat":"SS","num":"002","cn":"家禽剪（不锈钢黑柄可拆卸8寸）","en":"Poultry Shears Kitchen Scissors Black Handle Detachable 8 Inch","mat_cn":"5Cr15MoV不锈钢","spec":"8寸 家禽剪","moq":"200把","price":"$8-14","market":"欧美/全球","priority":"⭐⭐⭐","seo_base":"yangjiang-poultry-shears-black-handle-detachable-8inch","alt":"Poultry shears kitchen scissors black handle detachable 8 inch Yangjiang manufacturer","keywords":"poultry shears detachable / kitchen scissors black handle poultry","series":"厨房剪刀"},
+"KL-SC-SS-004":{"cat":"SC","mat":"SS","num":"004","cn":"重型厨房剪多功能（不锈钢带锯齿）","en":"Heavy Duty Kitchen Shears Multi-Function Serrated Stainless Steel","mat_cn":"5Cr15MoV不锈钢","spec":"10寸 重型","moq":"100把","price":"$12-20","market":"欧美","priority":"⭐⭐⭐","seo_base":"yangjiang-heavy-duty-kitchen-shears-multi-function-serrated","alt":"Heavy duty kitchen shears multi-function serrated stainless Yangjiang wholesale","keywords":"heavy duty kitchen shears / multi function kitchen scissors serrated","series":"厨房剪刀"},
+"KL-SC-TI-001":{"cat":"SC","mat":"TI","num":"001","cn":"多功能厨房剪（钛涂层10寸）","en":"Multi-Function Kitchen Scissors Titanium Coated 10 Inch","mat_cn":"钛涂层不锈钢","spec":"10寸 钛涂层","moq":"100把","price":"$18-30","market":"欧美","priority":"⭐⭐⭐","seo_base":"yangjiang-multi-function-kitchen-scissors-titanium-10inch","alt":"Multi-function kitchen scissors titanium coated 10 inch Yangjiang manufacturer","keywords":"titanium kitchen scissors / titanium coated kitchen shears","series":"高端剪刀"},
+"KL-SC-HC-001":{"cat":"SC","mat":"HC","num":"001","cn":"高碳钢裁缝剪10寸（专业）","en":"Professional Tailor Scissors 10 Inch High Carbon Steel","mat_cn":"高碳钢","spec":"10寸 裁缝剪","moq":"50把","price":"$15-28","market":"欧美/专业","priority":"⭐⭐⭐","seo_base":"yangjiang-tailor-scissors-10inch-high-carbon-professional","alt":"Professional tailor scissors 10 inch high carbon steel Yangjiang manufacturer","keywords":"tailor scissors high carbon / professional tailoring scissors 10 inch","series":"专业剪刀"},
+"KL-SC-PR-001":{"cat":"SC","mat":"PR","num":"001","cn":"440C高端厨房剪（德式专业10寸）","en":"440C Premium Kitchen Shears German Style Professional 10 Inch","mat_cn":"440C不锈钢","spec":"10寸 德式","moq":"50把","price":"$25-42","market":"欧美高端","priority":"⭐⭐⭐","seo_base":"yangjiang-440c-premium-kitchen-shears-german-professional","alt":"440C premium kitchen shears German style professional 10 inch Yangjiang manufacturer","keywords":"440c kitchen shears german / premium kitchen scissors 440c stainless","series":"高端剪刀"},
+"KL-SC-SET-SS-001":{"cat":"SC","mat":"SET-SS","num":"001","cn":"剪刀礼盒套装4件（红绒盒）","en":"Premium Scissors Gift Set 4 Piece Red Velvet Box","mat_cn":"不锈钢","spec":"4件套 礼盒","moq":"30套","price":"$22-38","market":"欧美礼品","priority":"⭐⭐⭐","seo_base":"yangjiang-scissors-gift-set-4piece-red-velvet-box","alt":"Premium scissors gift set 4 piece red velvet box Yangjiang manufacturer wholesale","keywords":"scissors gift set / premium scissors gift box 4 piece","series":"礼品套装"},
+"KL-KA-CB-001":{"cat":"KA","mat":"BM","num":"001","cn":"竹制带汁槽砧板（双面30×40cm）","en":"Bamboo Cutting Board with Juice Groove Double-Sided 30×40cm","mat_cn":"天然楠竹","spec":"30×40cm 双面","moq":"50件","price":"$15-25","market":"欧美/全球","priority":"⭐⭐⭐","seo_base":"yangjiang-bamboo-cutting-board-juice-groove-double-sided","alt":"Bamboo cutting board with juice groove double-sided 30x40cm Yangjiang factory direct","keywords":"bamboo cutting board juice groove / bamboo chopping board double sided","series":"砧板系列"},
+"KL-KA-CB-002":{"cat":"KA","mat":"WD","num":"002","cn":"端纹胡桃木砧板（厚款18×12寸）","en":"End Grain Walnut Butcher Block Cutting Board 18×12 Inch","mat_cn":"端纹胡桃木/枫木","spec":"18×12寸 厚40mm","moq":"20件","price":"$35-55","market":"欧美高端/独立站","priority":"⭐⭐⭐","seo_base":"yangjiang-end-grain-walnut-butcher-block-18x12inch","alt":"End grain walnut butcher block cutting board 18x12 inch luxury Yangjiang","keywords":"end grain walnut cutting board / butcher block cutting board luxury","series":"砧板系列"},
+"KL-KA-CB-003":{"cat":"KA","mat":"PP","num":"003","cn":"三色分食塑料砧板套装（PP食品级）","en":"PP Plastic Cutting Board Set 3 Colors Color-Coded","mat_cn":"食品级PP","spec":"3件套 生熟分色","moq":"100件","price":"$10-18","market":"全球","priority":"⭐⭐⭐","seo_base":"yangjiang-plastic-cutting-board-set-3colors-color-coded","alt":"Food-grade PP plastic cutting board set 3 colors color coded Yangjiang wholesale","keywords":"plastic cutting board set 3 color / color coded cutting board food safe","series":"砧板系列"},
+"KL-KA-PL-001":{"cat":"KA","mat":"SS","num":"001","cn":"Y型不锈钢削皮刀（防滑柄）","en":"Y-Shaped Stainless Steel Vegetable Peeler Ergonomic Handle","mat_cn":"420J2不锈钢+ABS","spec":"Y型 防滑 挖眼器","moq":"100件","price":"$5-10","market":"全球","priority":"⭐⭐⭐","seo_base":"yangjiang-y-shaped-vegetable-peeler-stainless-ergonomic","alt":"Y-shaped stainless steel vegetable peeler ergonomic anti-slip handle Yangjiang","keywords":"y shaped vegetable peeler / stainless steel potato peeler ergonomic","series":"厨具小工具"},
+"KL-KA-GR-001":{"cat":"KA","mat":"SS","num":"002","cn":"四面不锈钢刨丝器（防滑底）","en":"4-Sided Stainless Steel Box Grater Non-Slip Base","mat_cn":"304不锈钢","spec":"四刀头 可拆洗","moq":"100件","price":"$12-20","market":"欧美","priority":"⭐⭐⭐","seo_base":"yangjiang-4-sided-box-grater-stainless-non-slip","alt":"4-sided stainless steel box grater non-slip base cheese grater Yangjiang","keywords":"stainless steel box grater 4 sided / cheese grater non-slip","series":"厨具小工具"},
+"KL-KA-SL-001":{"cat":"KA","mat":"PP","num":"004","cn":"多功能曼陀林切菜器（8种刀片）","en":"Mandoline Slicer 8 Blades Multi-Function Vegetable Cutter","mat_cn":"不锈钢+食品级PP","spec":"8种刀片 可调厚度","moq":"50件","price":"$18-30","market":"欧美/TikTok","priority":"⭐⭐⭐","seo_base":"yangjiang-mandoline-slicer-8-blades-vegetable-cutter","alt":"Mandoline vegetable slicer 8 blades adjustable thickness Yangjiang wholesale","keywords":"mandoline slicer 8 blades / vegetable slicer mandoline adjustable","series":"厨具小工具"},
+"KL-KA-GP-001":{"cat":"KA","mat":"ZA","num":"005","cn":"不锈钢压蒜器（省力可拆卸）","en":"Heavy Duty Stainless Steel Garlic Press Detachable Easy Clean","mat_cn":"锌合金/304不锈钢","spec":"可拆卸 省力一体成型","moq":"100件","price":"$8-15","market":"全球","priority":"⭐⭐⭐","seo_base":"yangjiang-garlic-press-stainless-steel-heavy-duty-detachable","alt":"Heavy duty stainless steel garlic press detachable easy clean Yangjiang kitchen gadget","keywords":"garlic press stainless steel heavy duty / garlic press detachable easy clean","series":"厨具小工具"},
+"KL-KA-CU-001":{"cat":"KA","mat":"SG","num":"001","cn":"硅胶木柄厨具6件套（耐高温230℃）","en":"Silicone Cooking Utensil Set 6-Piece Wood Handle Heat Resistant","mat_cn":"食品级硅胶+实木","spec":"6件套 耐热230℃","moq":"50套","price":"$18-30","market":"欧美/亚马逊","priority":"⭐⭐⭐","seo_base":"yangjiang-silicone-cooking-utensil-set-6piece-wood-handle","alt":"6-piece silicone cooking utensil set wood handle heat resistant 230C Yangjiang","keywords":"silicone cooking utensil set 6 piece / kitchen utensil set wood handle silicone","series":"烹饪厨具"},
+"KL-KA-CU-002":{"cat":"KA","mat":"SS","num":"006","cn":"不锈钢厨具12件套（带收纳桶）","en":"Stainless Steel Kitchen Utensil Set 12-Piece with Holder","mat_cn":"304不锈钢","spec":"12件套 防锈+收纳桶","moq":"30套","price":"$20-35","market":"全球","priority":"⭐⭐⭐","seo_base":"yangjiang-stainless-steel-utensil-set-12piece-with-holder","alt":"12-piece stainless steel kitchen utensil set with holder Yangjiang wholesale","keywords":"stainless kitchen utensil set 12 piece / kitchen tool set with holder stainless","series":"烹饪厨具"},
+"KL-KA-TG-001":{"cat":"KA","mat":"SG","num":"002","cn":"硅胶头自锁食物夹（防烫不锈钢）","en":"Silicone Tip Locking Kitchen Tongs Anti-Scald Stainless Steel","mat_cn":"硅胶头+304不锈钢","spec":"防烫 自锁 多尺寸","moq":"100件","price":"$8-15","market":"全球","priority":"⭐⭐⭐","seo_base":"yangjiang-silicone-locking-tongs-anti-scald-stainless","alt":"Silicone tip locking kitchen tongs anti-scald stainless steel Yangjiang wholesale","keywords":"silicone locking kitchen tongs / kitchen tongs silicone tips anti-scald","series":"烹饪厨具"},
+"KL-KA-BBQ-001":{"cat":"KA","mat":"SS","num":"007","cn":"不锈钢烧烤6件套（带收纳袋）","en":"BBQ Tool Set 6-Piece Stainless Steel with Carry Bag","mat_cn":"304不锈钢+木柄","spec":"6件套 含收纳袋","moq":"30套","price":"$18-30","market":"欧美/全球","priority":"⭐⭐⭐","seo_base":"yangjiang-bbq-tool-set-6piece-stainless-carry-bag","alt":"6-piece BBQ grill tool set stainless steel wood handle carry bag Yangjiang factory","keywords":"bbq tool set 6 piece stainless / grill tool set with bag stainless steel","series":"烧烤户外"},
+"KL-KA-BBQ-002":{"cat":"KA","mat":"MX","num":"008","cn":"烧烤21件套铝箱款（高端礼盒）","en":"21-Piece BBQ Tool Set Aluminum Case Premium Gift Box","mat_cn":"不锈钢+铝制收纳箱","spec":"21件套 铝箱礼盒","moq":"20套","price":"$35-60","market":"欧美礼品/跨境高客单","priority":"⭐⭐⭐","seo_base":"yangjiang-bbq-tool-set-21piece-aluminum-case-gift","alt":"21-piece BBQ tool set aluminum case premium gift box Yangjiang outdoor kitchen","keywords":"bbq tool set 21 piece / grill set aluminum case gift premium","series":"烧烤户外"},
+"KL-KA-TH-001":{"cat":"KA","mat":"SS","num":"009","cn":"探针式即时读数食品温度计","en":"Digital Instant Read Meat Thermometer Waterproof Probe","mat_cn":"不锈钢探针+ABS","spec":"防水 快速读数 可校准","moq":"100件","price":"$10-20","market":"欧美/全球","priority":"⭐⭐⭐","seo_base":"yangjiang-digital-instant-read-meat-thermometer-waterproof","alt":"Digital instant read meat thermometer waterproof probe BBQ kitchen Yangjiang","keywords":"instant read meat thermometer waterproof / digital meat thermometer probe kitchen","series":"烧烤户外"},
+"KL-KA-STO-001":{"cat":"KA","mat":"GL","num":"001","cn":"硼硅玻璃保鲜盒5件套（可微波）","en":"Borosilicate Glass Food Storage Container Set 5-Piece Microwave Safe","mat_cn":"硼硅玻璃+PP盖","spec":"5件套 可微波 叠放","moq":"30套","price":"$25-45","market":"欧美高端","priority":"⭐⭐⭐","seo_base":"yangjiang-borosilicate-glass-storage-container-5piece-microwave","alt":"5-piece borosilicate glass food storage container set microwave safe airtight Yangjiang","keywords":"glass food storage container set 5 piece / borosilicate glass containers microwave safe","series":"收纳储物"},
+"KL-KA-STO-002":{"cat":"KA","mat":"SS","num":"010","cn":"4层旋转调料架（不锈钢+竹）","en":"4-Tier Rotating Spice Rack Organizer Stainless Steel Bamboo","mat_cn":"不锈钢+竹木","spec":"4层 360°旋转","moq":"50件","price":"$18-30","market":"全球","priority":"⭐⭐⭐","seo_base":"yangjiang-rotating-spice-rack-4tier-stainless-bamboo","alt":"4-tier rotating spice rack organizer stainless steel bamboo 360 degree Yangjiang","keywords":"rotating spice rack 4 tier / kitchen spice organizer spinning stainless","series":"收纳储物"},
+"KL-KA-GAD-001":{"cat":"KA","mat":"SS","num":"011","cn":"平滑开罐器（不留锐边安全）","en":"Smooth Edge Can Opener Safe No Sharp Edges Stainless Steel","mat_cn":"不锈钢+ABS","spec":"不留锐边 安全易用","moq":"100件","price":"$8-15","market":"全球","priority":"⭐⭐⭐","seo_base":"yangjiang-smooth-edge-can-opener-safe-stainless","alt":"Smooth edge can opener no sharp edges safe stainless steel Yangjiang kitchen gadget","keywords":"smooth edge can opener / safe can opener no sharp edge stainless","series":"厨房小工具"},
+"KL-KA-GAD-002":{"cat":"KA","mat":"SS","num":"012","cn":"磁吸刀架（304不锈钢免打孔）","en":"Magnetic Knife Holder Strip 304 Stainless Steel No-Drill Wall Mount","mat_cn":"304不锈钢","spec":"40cm 强磁 免打孔","moq":"50件","price":"$15-28","market":"欧美/全球","priority":"⭐⭐⭐","seo_base":"yangjiang-magnetic-knife-holder-stainless-no-drill-wall-mount","alt":"Magnetic knife holder 304 stainless steel no drill wall mount 40cm Yangjiang","keywords":"magnetic knife holder wall mount / magnetic knife strip stainless no drill","series":"厨房小工具"},
+"KL-KA-SET-001":{"cat":"KA","mat":"SET-KIT","num":"001","cn":"厨房基础礼盒套装（砧板+厨具+刀架）","en":"Kitchen Basics Gift Set Cutting Board Utensils Knife Holder","mat_cn":"混合材质","spec":"3合1 家庭套装","moq":"20套","price":"$45-70","market":"欧美礼品/独立站","priority":"⭐⭐⭐","seo_base":"yangjiang-kitchen-basics-gift-set-cutting-board-utensils-holder","alt":"Kitchen basics gift set cutting board utensils knife holder Yangjiang premium factory","keywords":"kitchen gift set cutting board utensils / kitchen basics set gift box","series":"组合套装"},
+"KL-KA-SET-002":{"cat":"KA","mat":"SET-BBQ","num":"002","cn":"豪华烧烤礼盒套装（21件+温度计+手套）","en":"Deluxe BBQ Gift Set 21-Piece with Thermometer Gloves Aluminum Case","mat_cn":"混合材质","spec":"21件套+配件 铝箱","moq":"10套","price":"$65-90","market":"欧美礼品高客单","priority":"⭐⭐⭐","seo_base":"yangjiang-deluxe-bbq-gift-set-21piece-thermometer-gloves-case","alt":"Deluxe BBQ gift set 21 piece with thermometer gloves aluminum case Yangjiang premium","keywords":"bbq gift set deluxe 21 piece / outdoor grill gift set with accessories premium","series":"组合套装"}
+},
+
+"keywords":[
+{"cat":"🔪厨刀","kw":"damascus chef knife","vol":"高频 月搜50k+","type":"Head词","pri":"⭐⭐⭐"},
+{"cat":"🔪厨刀","kw":"kitchen knife set","vol":"高频 月搜100k+","type":"Head词","pri":"⭐⭐⭐"},
+{"cat":"🔪厨刀","kw":"damascus kitchen knife set","vol":"中频 月搜15k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"🔪厨刀","kw":"hand forged chinese cleaver","vol":"中频 月搜8k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"🔪厨刀","kw":"hammered chef knife","vol":"中频 月搜6k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"🔪厨刀","kw":"high carbon steel knife","vol":"中频 月搜5k+","type":"Body词","pri":"⭐⭐"},
+{"cat":"🔪厨刀","kw":"vg10 damascus chef knife","vol":"长尾 月搜2k+","type":"Long-tail","pri":"⭐⭐⭐"},
+{"cat":"🔪厨刀","kw":"damascus cleaver knife wholesale","vol":"长尾 月搜1k+","type":"Long-tail","pri":"⭐⭐⭐"},
+{"cat":"🏕户外刀","kw":"survival knife","vol":"高频 月搜80k+","type":"Head词","pri":"⭐⭐⭐"},
+{"cat":"🏕户外刀","kw":"tactical folding knife","vol":"高频 月搜60k+","type":"Head词","pri":"⭐⭐⭐"},
+{"cat":"🏕户外刀","kw":"edc knife","vol":"高频 月搜50k+","type":"Head词","pri":"⭐⭐⭐"},
+{"cat":"🏕户外刀","kw":"damascus folding knife edc","vol":"中频 月搜8k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"🏕户外刀","kw":"1095 high carbon survival knife","vol":"长尾 月搜3k+","type":"Long-tail","pri":"⭐⭐⭐"},
+{"cat":"🏕户外刀","kw":"outdoor knife gift set","vol":"中频 月搜5k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"✂剪刀","kw":"kitchen shears","vol":"高频 月搜60k+","type":"Head词","pri":"⭐⭐⭐"},
+{"cat":"✂剪刀","kw":"kitchen scissors","vol":"高频 月搜50k+","type":"Head词","pri":"⭐⭐⭐"},
+{"cat":"✂剪刀","kw":"heavy duty kitchen scissors","vol":"中频 月搜15k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"✂剪刀","kw":"titanium kitchen scissors","vol":"中频 月搜8k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"✂剪刀","kw":"poultry shears","vol":"中频 月搜10k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"✂剪刀","kw":"tailor scissors professional","vol":"中频 月搜5k+","type":"Body词","pri":"⭐⭐"},
+{"cat":"✂剪刀","kw":"kitchen shears wholesale manufacturer","vol":"长尾 月搜1k+","type":"Long-tail","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"bamboo cutting board","vol":"高频 月搜80k+","type":"Head词","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"kitchen utensil set","vol":"高频 月搜60k+","type":"Head词","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"bbq tool set","vol":"高频 月搜50k+","type":"Head词","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"silicone cooking utensils","vol":"中频 月搜20k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"bamboo cutting board juice groove","vol":"中频 月搜15k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"bbq gift set","vol":"中频 月搜12k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"garlic press stainless steel","vol":"中频 月搜10k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"glass food storage containers","vol":"中频 月搜15k+","type":"Body词","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"instant read meat thermometer","vol":"高频 月搜40k+","type":"Head词","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"bamboo cutting board wholesale supplier","vol":"长尾 月搜2k+","type":"Long-tail","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"silicone kitchen utensil set wholesale","vol":"长尾 月搜2k+","type":"Long-tail","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"bbq tool set 21 piece gift","vol":"长尾 月搜3k+","type":"Long-tail","pri":"⭐⭐⭐"},
+{"cat":"🍳厨房用品","kw":"magnetic knife holder wall mount stainless","vol":"长尾 月搜1.5k+","type":"Long-tail","pri":"⭐⭐⭐"}
+],
+
+"matCodes":{
+"KN":[
+  {"code":"DS","cn":"大马士革","en":"Damascus","desc":"大马士革钢，花纹独特，欧美零售/礼品最热销"},
+  {"code":"HF","cn":"手工锻打","en":"Hand Forged","desc":"手工锻造，独立站差异化利器，溢价高"},
+  {"code":"HM","cn":"锤纹/凿纹","en":"Hammered","desc":"锤目纹/凿纹防粘处理，日系厨刀热销特色"},
+  {"code":"SS","cn":"不锈钢","en":"Stainless Steel","desc":"5Cr15MoV/9Cr18MoV，出口主力，性价比首选"},
+  {"code":"HC","cn":"高碳钢","en":"High Carbon","desc":"1095/1084高碳，欧美户外圈认可，保锋好"},
+  {"code":"CL","cn":"复合夹钢","en":"Clad Steel","desc":"三合夹钢/VG10夹钢，日系高端厨刀标配"},
+  {"code":"SET-DS","cn":"大马士革套刀","en":"Damascus Set","desc":"大马士革套刀套装，含刀座"},
+  {"code":"SET-SS","cn":"不锈钢套刀","en":"Stainless Set","desc":"不锈钢套刀套装，含刀座"}
+],
+"OD":[
+  {"code":"DS","cn":"大马士革","en":"Damascus","desc":"大马士革户外刀，收藏/礼品级别"},
+  {"code":"HC","cn":"高碳钢","en":"High Carbon","desc":"1095高碳，美国户外圈必备，生存刀王者"},
+  {"code":"SS","cn":"不锈钢","en":"Stainless Steel","desc":"8Cr13MoV，折叠刀EDC主流材质"},
+  {"code":"TI","cn":"黑钛涂层","en":"Black Ti-Coated","desc":"黑钛涂层，战术全黑，视觉冲击强"},
+  {"code":"SET-DS","cn":"大马士革礼盒","en":"Damascus Gift Set","desc":"大马士革户外礼盒套装"},
+  {"code":"SET-SS","cn":"不锈钢礼盒","en":"Stainless Gift Set","desc":"不锈钢户外礼盒套装"}
+],
+"SC":[
+  {"code":"SS","cn":"普通不锈钢","en":"Standard Stainless","desc":"3Cr13/5Cr15MoV，批量走量，厨房剪主力"},
+  {"code":"TI","cn":"高端钛涂层","en":"Titanium Coated","desc":"钛涂层，高端厨房剪首选，颜色好看耐腐蚀"},
+  {"code":"HC","cn":"高碳钢专业剪","en":"High Carbon","desc":"高碳钢，裁缝剪/手艺剪，专业级别"},
+  {"code":"PR","cn":"440C高端剪","en":"440C Premium","desc":"440C，德式专业剪，欧美高端买家认可"},
+  {"code":"FS","cn":"全钢一体剪","en":"Full Steel","desc":"全钢一体，卫生，餐饮专业用"},
+  {"code":"SET-SS","cn":"剪刀礼盒套装","en":"Scissors Gift Set","desc":"剪刀礼盒套装，礼品市场"}
+],
+"KA":[
+  {"code":"BM","cn":"天然竹木","en":"Bamboo","desc":"楠竹/FSC认证，砧板首选，抗菌防裂，欧美绿色消费首选"},
+  {"code":"WD","cn":"实木（胡桃/枫木）","en":"Walnut/Maple Wood","desc":"胡桃木/枫木端纹，高端砧板，护刀厚款，独立站溢价"},
+  {"code":"PP","cn":"食品级PP/PE","en":"Food-Grade Plastic","desc":"食品级PP，砧板/小工具批量走量，洗碗机可用"},
+  {"code":"SS","cn":"304不锈钢","en":"304 Stainless Steel","desc":"304不锈钢，厨具/工具主流材质，耐用防锈"},
+  {"code":"SG","cn":"食品级硅胶","en":"Food-Grade Silicone","desc":"食品级硅胶，厨具/烘焙工具，耐高温 BPA-free，亚马逊爆款"},
+  {"code":"GL","cn":"硼硅玻璃","en":"Borosilicate Glass","desc":"硼硅玻璃，食品保鲜盒首选，可微波加热，高客单价"},
+  {"code":"ZA","cn":"锌合金","en":"Zinc Alloy","desc":"锌合金，压蒜器/开罐器，省力结构件，性价比"},
+  {"code":"MX","cn":"混合材质","en":"Mixed Material","desc":"多材质组合，烧烤套装/礼盒首选，配置丰富"},
+  {"code":"SET-BBQ","cn":"烧烤礼盒套装","en":"BBQ Gift Set","desc":"烧烤工具礼盒，欧美节日礼品爆款，高客单"},
+  {"code":"SET-KIT","cn":"厨房礼盒套装","en":"Kitchen Gift Set","desc":"厨房配件礼盒，砧板+厨具+配件组合，独立站主推"}
+]
+}
+};
+
+const PRODS = DB.products;
+const KWS = DB.keywords;
+const MATS = DB.matCodes;
+
+// ── STATE ────────────────────────────────────────────────────
+let selProd = null;
+let prodFilter = 'all';
+let bFiles = [];
+
+// ── INIT ─────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  renderProds();
+  updateStats();
+  updateMatOpts();
+  genCustom();
+  renderMatGrid();
+  renderKwTable();
+  renderKwQuick();
+  initBOpts();
+  initDZ();
+});
+
+// ── TABS ──────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const ids=['product','custom','batch','matref','keywords'];
+    t.classList.toggle('active', ids[i]===id);
+  });
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+}
+
+// ── PRODUCT LIBRARY ──────────────────────────────────────────
+function updateStats() {
+  const cnts={KN:0,OD:0,SC:0,KA:0};
+  Object.values(PRODS).forEach(p=>{ if(cnts[p.cat]!==undefined) cnts[p.cat]++; });
+  document.getElementById('cnt-kn').textContent=cnts.KN;
+  document.getElementById('cnt-od').textContent=cnts.OD;
+  document.getElementById('cnt-sc').textContent=cnts.SC;
+  document.getElementById('cnt-ka').textContent=cnts.KA;
+}
+
+function filterProd(cat, el) {
+  prodFilter=cat;
+  document.querySelectorAll('#panel-product .chips .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  renderProds();
+}
+
+function renderProds() {
+  const q=(document.getElementById('psearch')?.value||'').toLowerCase();
+  const grid=document.getElementById('pgrid');
+  const entries=Object.entries(PRODS).filter(([k,p])=>{
+    const catOk=prodFilter==='all'||p.cat===prodFilter;
+    const kwOk=!q||(k+p.cn+p.en+(p.mat_cn||'')+(p.series||'')).toLowerCase().includes(q);
+    return catOk&&kwOk;
+  });
+  grid.innerHTML=entries.map(([k,p])=>`
+    <div class="pcard cat-${p.cat}${selProd===k?' sel':''}" onclick="selectProd('${k}')">
+      <div class="pc-sku">${k}</div>
+      <div class="pc-name">${p.cn}</div>
+      <div class="pc-sub">${p.mat_cn||p.mat} · ${p.spec||''}</div>
+      <div class="pc-pri">${p.priority||''}</div>
+    </div>`).join('');
+}
+
+function selectProd(sku) {
+  selProd=sku;
+  const p=PRODS[sku];
+  document.querySelectorAll('.pcard').forEach(c=>c.classList.toggle('sel',c.querySelector('.pc-sku')?.textContent===sku));
+  const det=document.getElementById('det');
+  det.style.display='block';
+  document.getElementById('det-sku').textContent=sku;
+  document.getElementById('det-name').textContent=p.cn+' / '+p.en;
+  document.getElementById('det-meta').innerHTML=`
+    <div class="dm"><div class="dm-l">材质</div><div class="dm-v">${p.mat_cn||p.mat}</div></div>
+    <div class="dm"><div class="dm-l">规格</div><div class="dm-v">${p.spec||'-'}</div></div>
+    <div class="dm"><div class="dm-l">MOQ</div><div class="dm-v">${p.moq||'-'}</div></div>
+    <div class="dm"><div class="dm-l">价格</div><div class="dm-v">${p.price||'-'}</div></div>
+    <div class="dm"><div class="dm-l">市场</div><div class="dm-v">${p.market||'-'}</div></div>
+    <div class="dm"><div class="dm-l">系列</div><div class="dm-v">${p.series||'-'}</div></div>`;
+  renderDetImgs();
+  det.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function getImgCount() {
+  const sel=document.getElementById('img-count');
+  if(sel.value==='custom') {
+    const n=parseInt(prompt('输入生成张数（1-99）:'));
+    return isNaN(n)?6:Math.min(99,Math.max(1,n));
+  }
+  return parseInt(sel.value)||4;
+}
+
+function renderDetImgs() {
+  if(!selProd) return;
+  const p=PRODS[selProd];
+  const n=getImgCount();
+  const tags=['主图','细节A','细节B','使用场景','包装','白底图','对比图','尺寸图','组合图','礼盒图'];
+  let html='';
+  for(let i=1;i<=n;i++){
+    const fn=`${selProd}-${String(i).padStart(2,'0')}.jpg`;
+    const tag=tags[i-1]||`图${i}`;
+    html+=`<div class="img-box">
+      <div class="img-label"><span class="img-tag tag-0${Math.min(i,5)}">${String(i).padStart(2,'0')} ${tag}</span>
+        <button class="btn-copy" onclick="copyText('${fn}')">复制</button></div>
+      <div class="img-fn">${fn}</div>
+      <div class="img-alt">Alt: ${p.alt||p.en} - Image ${i}</div>
+    </div>`;
+  }
+  document.getElementById('det-imgs').innerHTML=html;
+  const seoName=`${p.seo_base||selProd.toLowerCase().replace(/[^a-z0-9]/g,'-')}-01.jpg`;
+  document.getElementById('seo-preview').innerHTML=`
+    <div class="prev-label">SEO主图名（上传网站时使用）</div>
+    <div class="prev-val">${seoName}</div>
+    <div class="prev-alt">Alt Text: ${p.alt||p.en}</div>
+    <div class="prev-alt" style="margin-top:5px">Keywords: ${p.keywords||''}</div>`;
+}
+
+function copyAllSKU() {
+  if(!selProd) return;
+  const n=getImgCount();
+  const lines=[];
+  for(let i=1;i<=n;i++) lines.push(`${selProd}-${String(i).padStart(2,'0')}.jpg`);
+  copyText(lines.join('\n'));
+}
+function copyAlt() { if(selProd) copyText(PRODS[selProd].alt||''); }
+function copySEO() { if(selProd) copyText((PRODS[selProd].seo_base||'')+'-01.jpg'); }
+function copyKW() { if(selProd) copyText(PRODS[selProd].keywords||''); }
+
+// ── CUSTOM GENERATE ───────────────────────────────────────────
+function updateMatOpts() {
+  const cat=document.getElementById('c-cat')?.value||'KN';
+  const mats=MATS[cat]||[];
+  const sel=document.getElementById('c-mat');
+  if(!sel) return;
+  sel.innerHTML=mats.map(m=>`<option value="${m.code}">${m.code} — ${m.cn}</option>`).join('');
+  genCustom();
+}
+
+function genCustom() {
+  const cat=document.getElementById('c-cat')?.value||'KN';
+  const mat=document.getElementById('c-mat')?.value||'SS';
+  const num=String(parseInt(document.getElementById('c-num')?.value)||1).padStart(3,'0');
+  const count=parseInt(document.getElementById('c-count')?.value)||4;
+  const seo=(document.getElementById('c-seo')?.value||'').trim().toLowerCase().replace(/\s+/g,'-');
+  const sku=`KL-${cat}-${mat}-${num}`;
+  const lines=[];
+  for(let i=1;i<=count;i++) lines.push(`${sku}-${String(i).padStart(2,'0')}.jpg`);
+  const seoName=seo?`yangjiang-${seo}-${sku.toLowerCase()}-01.jpg`:`yangjiang-${cat.toLowerCase()}-${mat.toLowerCase()}-${num}-01.jpg`;
+  document.getElementById('c-output').innerHTML=`
+    <div class="prev-box">
+      <div class="prev-label">产品SKU</div>
+      <div class="prev-val">${sku}</div>
+    </div>
+    <div class="prev-box">
+      <div class="prev-label">图片文件名（共${count}张）</div>
+      <div class="prev-val">${lines.join('<br>')}</div>
+    </div>
+    <div class="prev-box">
+      <div class="prev-label">SEO主图名（上传网站用）</div>
+      <div class="prev-val">${seoName}</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-gold btn-sm" onclick="copyText('${lines.join('\\n')}')">📋 复制全部图片名</button>
+      <button class="btn btn-outline btn-sm" onclick="copyText('${sku}')">复制SKU</button>
+      <button class="btn btn-outline btn-sm" onclick="copyText('${seoName}')">复制SEO主图名</button>
+    </div>`;
+}
+
+// ── KEYWORDS ──────────────────────────────────────────────────
+function filterKwChips(cat, el) {
+  document.querySelectorAll('#kw-chips .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  renderKwQuick(cat);
+}
+
+function renderKwQuick(cat='all') {
+  const kws=KWS.filter(k=>cat==='all'||k.cat===cat);
+  document.getElementById('kw-quick').innerHTML=kws.map(k=>`
+    <span style="padding:4px 10px;border:1px solid rgba(212,175,55,.2);border-radius:12px;font-size:10px;font-family:'DM Mono',monospace;color:rgba(255,243,224,.5);cursor:pointer;transition:all .15s"
+      onmouseenter="this.style.color='#D4AF37';this.style.borderColor='#D4AF37'"
+      onmouseleave="this.style.color='rgba(255,243,224,.5)';this.style.borderColor='rgba(212,175,55,.2)'"
+      onclick="fillSEO('${k.kw.replace(/[' ]/g,'-')}')">
+      ${k.kw} <span style="font-size:9px;color:rgba(255,243,224,.3)">${k.vol.split(' ')[0]}</span>
+    </span>`).join('');
+}
+
+function fillSEO(kw) {
+  const el=document.getElementById('c-seo');
+  if(el){ el.value=kw.replace(/\s+/g,'-'); genCustom(); toast('✓ 已填入SEO关键词'); }
+}
+
+function filterKwTable(filter, el) {
+  document.querySelectorAll('#panel-keywords .chips .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  renderKwTable(filter);
+}
+
+function renderKwTable(filter='all') {
+  const rows=KWS.filter(k=>{
+    if(filter==='all') return true;
+    return k.cat===filter||k.type===filter;
+  });
+  const typeClass={'Head词':'vh','Body词':'vm','Long-tail':'vl'};
+  document.getElementById('kw-tbody').innerHTML=rows.map(k=>`
+    <tr>
+      <td style="font-size:10px;color:rgba(255,243,224,.4)">${k.cat}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--gl)">${k.kw}</td>
+      <td style="color:rgba(255,243,224,.5);font-size:10px">${k.vol}</td>
+      <td><span class="${typeClass[k.type]||'vl'}">${k.type}</span></td>
+      <td>${k.pri||''}</td>
+      <td><button class="btn-copy" onclick="fillSEO('${k.kw.replace(/[' ]/g,'-')}');switchTab('custom')">填入</button></td>
+    </tr>`).join('');
+  // update count in chip
+  const allChip=document.querySelector('#panel-keywords .chips .chip:first-child');
+  if(allChip&&filter==='all') allChip.textContent=`全部 (${KWS.length})`;
+}
+
+// ── MATERIAL REF ─────────────────────────────────────────────
+function filterMat(cat, el) {
+  document.querySelectorAll('#mat-chips .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  renderMatGrid(cat);
+}
+
+function renderMatGrid(cat='all') {
+  const entries=cat==='all'
+    ? Object.entries(MATS).flatMap(([c,ms])=>ms.map(m=>({...m,_cat:c})))
+    : (MATS[cat]||[]).map(m=>({...m,_cat:cat}));
+  document.getElementById('mat-grid').innerHTML=`<div class="mat-grid">${
+    entries.map(m=>`
+      <div class="mat-card" onclick="goCustomMat('${m._cat}','${m.code}')">
+        <div class="mc-code">${m.code}</div>
+        <div class="mc-cn">${m.cn}</div>
+        <div class="mc-en">${m.en}</div>
+        <div class="mc-desc">${m.desc}</div>
+        <div class="mc-ex">${m._cat} · 点击→自定义生成</div>
+      </div>`).join('')
+  }</div>`;
+}
+
+function goCustomMat(cat, mat) {
+  switchTab('custom');
+  const catSel=document.getElementById('c-cat');
+  if(catSel){ catSel.value=cat; updateMatOpts(); }
+  setTimeout(()=>{
+    const matSel=document.getElementById('c-mat');
+    if(matSel){ matSel.value=mat; genCustom(); }
+  },50);
+  toast(`✓ 已切换到 ${cat} / ${mat}`);
+}
+
+// ── BATCH RENAME ──────────────────────────────────────────────
+function initBOpts() {
+  document.getElementById('b-opts').innerHTML = bProductOpts();
+  updateBLive();
+}
+
+function bModeChange() {
+  const mode = document.querySelector('input[name=bmode]:checked').value;
+  document.getElementById('b-opts').innerHTML = mode==='product' ? bProductOpts() : bCustomOpts();
+  if(mode==='custom') setTimeout(updateBMatHints, 50);
+  if(bFiles.length) renderBList();
+  updateBLive();
+}
+
+function bProductOpts() {
+  const opts = Object.keys(PRODS).map(k=>`<option value="${k}">[${k}] ${PRODS[k].cn}</option>`).join('');
+  return `<div class="fg">
+    <label>选择产品</label>
+    <select id="b-prod" onchange="renderBList();updateBLive()">${opts}</select>
+  </div>
+  <div class="fg">
+    <label>起始图片序号</label>
+    <input type="number" id="b-start" value="1" min="1" max="99" oninput="renderBList();updateBLive()">
+  </div>`;
+}
+
+function bCustomOpts() {
+  // All-category material list for datalist
+  const allMats = Object.values(MATS).flat().map(m=>m.code);
+  const uniqueMats = [...new Set(allMats)];
+  return `
+  <datalist id="dl-cat">
+    <option value="KN">KN — 厨刀</option>
+    <option value="OD">OD — 户外刀</option>
+    <option value="SC">SC — 剪刀</option>
+    <option value="KA">KA — 厨房用品</option>
+  </datalist>
+  <datalist id="dl-mat-all">
+    ${uniqueMats.map(c=>`<option value="${c}">`).join('')}
+    <option value="DS"><option value="HF"><option value="HM"><option value="SS"><option value="HC">
+    <option value="CL"><option value="TI"><option value="PR"><option value="FS">
+    <option value="BM"><option value="WD"><option value="PP"><option value="SG">
+    <option value="GL"><option value="ZA"><option value="MX">
+    <option value="SET-DS"><option value="SET-SS"><option value="SET-BBQ"><option value="SET-KIT">
+  </datalist>
+
+  <div class="fg">
+    <label>品类代码 <span class="h">可选择或自己输入任何代码</span></label>
+    <input list="dl-cat" id="b-cat" value="KA" placeholder="KN / OD / SC / KA / 自定义..." class="combo-input"
+      oninput="updateBMatHints();renderBList();updateBLive()" onchange="updateBMatHints();renderBList();updateBLive()">
+    <div class="quick-pills" id="cat-pills">
+      <span class="qp" onclick="setBCat('KN')">KN 厨刀</span>
+      <span class="qp" onclick="setBCat('OD')">OD 户外刀</span>
+      <span class="qp" onclick="setBCat('SC')">SC 剪刀</span>
+      <span class="qp" onclick="setBCat('KA')" style="border-color:#F4A261;color:#F4A261">KA 厨房用品</span>
+    </div>
+  </div>
+
+  <div class="fg">
+    <label>材质代码 <span class="h">可选择或自己输入任何代码</span></label>
+    <input list="dl-mat-all" id="b-mat" value="SS" placeholder="SS / BM / SG / DS / 自定义..." class="combo-input"
+      oninput="renderBList();updateBLive()" onchange="renderBList();updateBLive()">
+    <div class="quick-pills" id="mat-pills"></div>
+    <span class="combo-hint">💡 根据左侧品类显示推荐材质代码，也可直接输入任何自定义代码</span>
+  </div>
+
+  <div class="fg">
+    <label>款式序号 <span class="h">如 001 / 002 / A01 / 自定义</span></label>
+    <input type="text" id="b-num" value="001" placeholder="001 / 002 / A01 / V2..." class="combo-input"
+      oninput="renderBList();updateBLive()" onchange="renderBList();updateBLive()">
+    <div class="quick-pills">
+      <span class="qp" onclick="setBNum('001')">001</span>
+      <span class="qp" onclick="setBNum('002')">002</span>
+      <span class="qp" onclick="setBNum('003')">003</span>
+      <span class="qp" onclick="setBNum('010')">010</span>
+      <span class="qp" onclick="setBNum('100')">100</span>
+    </div>
+  </div>
+
+  <div class="fg">
+    <label>起始图片序号</label>
+    <input type="number" id="b-start2" value="1" min="1" max="99" oninput="renderBList();updateBLive()">
+  </div>
+  `;
+}
+
+function setBCat(v) {
+  const el=document.getElementById('b-cat');
+  if(el){ el.value=v; updateBMatHints(); renderBList(); updateBLive(); }
+}
+function setBNum(v) {
+  const el=document.getElementById('b-num');
+  if(el){ el.value=v; renderBList(); updateBLive(); }
+}
+
+function updateBMatHints() {
+  const cat=(document.getElementById('b-cat')?.value||'').toUpperCase();
+  const pills=document.getElementById('mat-pills');
+  if(!pills) return;
+  const mats=MATS[cat]||[];
+  pills.innerHTML=mats.slice(0,6).map(m=>`<span class="qp" onclick="setBMat('${m.code}')">${m.code} ${m.cn}</span>`).join('');
+}
+function setBMat(v) {
+  const el=document.getElementById('b-mat');
+  if(el){ el.value=v; renderBList(); updateBLive(); }
+}
+
+function updateBLive() {
+  const live=document.getElementById('b-live');
+  if(!live) return;
+  const name=getBatchName(0);
+  const nameN=getBatchName(1);
+  document.getElementById('b-live-val').textContent=name+' , '+nameN+' , ...';
+  document.getElementById('b-live-sub').textContent='每张图片将按此格式自动重命名（序号递增）';
+}
+
+function getBatchName(idx) {
+  const mode=document.querySelector('input[name=bmode]:checked')?.value;
+  if(mode==='product') {
+    const sku=document.getElementById('b-prod')?.value||Object.keys(PRODS)[0];
+    const start=parseInt(document.getElementById('b-start')?.value)||1;
+    return `${sku}-${String(start+idx).padStart(2,'0')}.jpg`;
+  } else {
+    const cat=(document.getElementById('b-cat')?.value||'KA').toUpperCase().trim();
+    const mat=(document.getElementById('b-mat')?.value||'SS').toUpperCase().trim();
+    const num=(document.getElementById('b-num')?.value||'001').trim();
+    const numPadded=num.match(/^\d+$/)?String(parseInt(num)).padStart(3,'0'):num;
+    const start=parseInt(document.getElementById('b-start2')?.value)||1;
+    return `KL-${cat}-${mat}-${numPadded}-${String(start+idx).padStart(2,'0')}.jpg`;
+  }
+}
+
+function handleBatch(files) {
+  bFiles=[...bFiles,...Array.from(files).filter(f=>f.type.startsWith('image/'))];
+  if(!bFiles.length) return;
+  document.getElementById('b-preview').style.display='block';
+  renderBList();
+  toast(`已选 ${files.length} 张，共 ${bFiles.length} 张`);
+}
+
+function renderBList() {
+  const el=document.getElementById('b-list'); if(!el) return;
+  el.innerHTML=bFiles.map((f,i)=>`<div class="fi">
+    <div class="fi-n">${i+1}</div>
+    <div class="fi-old">${f.name}</div>
+    <div class="fi-arr">→</div>
+    <div class="fi-new">${getBatchName(i)}</div>
+    <div class="fi-st st-w">待处理</div>
+  </div>`).join('');
+  updateBLive();
+}
+
+function clearBatch() {
+  bFiles=[];
+  const bf=document.getElementById('bfiles');
+  if(bf) bf.value='';
+  document.getElementById('b-preview').style.display='none';
+  document.getElementById('b-stats').style.display='none';
+  toast('已清空');
+}
+
+async function doZip() {
+  if(!bFiles.length){toast('请先选择图片');return;}
+  const btn=document.getElementById('btn-zip');
+  btn.disabled=true; btn.textContent='⏳ 处理中...';
+  const prog=document.getElementById('bprog');
+  const fill=document.getElementById('bfill');
+  prog.style.display='block'; fill.style.width='0%';
+  const zip=new JSZip(); let ok=0,err=0;
+  const items=document.querySelectorAll('#b-list .fi');
+  for(let i=0;i<bFiles.length;i++){
+    try{
+      const buf=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsArrayBuffer(bFiles[i]);});
+      zip.file(getBatchName(i),buf); ok++;
+      if(items[i]){const s=items[i].querySelector('.fi-st');s.className='fi-st st-ok';s.textContent='✓';}
+    }catch(e){
+      err++;
+      if(items[i]){const s=items[i].querySelector('.fi-st');s.className='fi-st st-err';s.textContent='✗';}
+    }
+    fill.style.width=Math.round((i+1)/bFiles.length*100)+'%';
+  }
+  const blob=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`KaiLionCrafts_重命名_${new Date().toISOString().slice(0,10)}.zip`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  document.getElementById('bs-t').textContent=bFiles.length;
+  document.getElementById('bs-ok').textContent=ok;
+  document.getElementById('bs-err').textContent=err;
+  document.getElementById('b-stats').style.display='block';
+  btn.disabled=false; btn.textContent='⬇ 重新下载 ZIP';
+  toast(`✓ 完成！${ok}张已打包`);
+}
+
+function initDZ() {
+  const dz=document.getElementById('bdz'); if(!dz) return;
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over')});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');handleBatch(e.dataTransfer.files)});
+}
+
+// ── UTILS ─────────────────────────────────────────────────────
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(()=>toast('✓ 已复制到剪贴板')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('✓ 已复制');
+  });
+}
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2800);
+}
+</script>
+</body>
+</html>

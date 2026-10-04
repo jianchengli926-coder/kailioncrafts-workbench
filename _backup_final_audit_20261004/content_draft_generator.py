@@ -1,0 +1,797 @@
+# -*- coding: utf-8 -*-
+"""
+KaiLionCrafts AI客户开发工作台 - 知识库驱动的客户开发内容草稿生成
+P1.2D: 内容草稿生成器
+
+安全规则：
+- 生成前必须验证 approved Knowledge Pack
+- hard_blocker 存在时禁止生成对外草稿
+- 只使用 confirmed + public_use_allowed 的 Fact
+- 不编造客户案例、订单、MOQ、产能、认证
+- 公司表述使用 strategic manufacturing partners / local manufacturing network
+- 不自动发送，只生成草稿
+"""
+import sqlite3
+import json
+import os
+import hashlib
+import re
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, List, Dict, Any, Tuple
+from urllib.parse import urlparse
+
+import knowledge_facts as kf
+import prospect_evaluator as pe
+from model_registry import TEXT_CHAIN_IDS, REASONING_CHAIN_IDS
+
+# ============ website_evidence 可选导入 ============
+# 新模块不可用时，现有草稿生成功能不受影响
+try:
+    import website_evidence as _we
+    _WE_AVAILABLE = True
+except Exception:  # pragma: no cover - 降级路径
+    _we = None
+    _WE_AVAILABLE = False
+
+DB_PATH = Path(os.environ.get("WORKBENCH_DB_PATH",
+    str(Path(__file__).parent / "data" / "workbench.db")))
+
+# 模型链统一从 model_registry 读取，避免重复硬编码
+DRAFT_TEXT_CHAIN = TEXT_CHAIN_IDS
+DRAFT_REASONING_CHAIN = REASONING_CHAIN_IDS
+
+DRAFT_TYPES = [
+    "first_email",
+    "linkedin_first_message",
+    "follow_up_email",
+    "product_recommendation",
+    "pain_point_analysis",
+    "rfq_response",
+    "next_action_plan",
+    "whatapp_message",
+]
+
+DRAFT_STATUSES = ["draft", "needs_review", "approved", "rejected"]
+
+# 禁止编造的内容类型
+PROHIBITED_CLAIMS = [
+    "客户案例", "订单金额", "销售额", "MOQ", "产能", "交付周期",
+    "认证", "客户评价", "工厂所有权", "未经确认的产品参数",
+    # English claims that must not appear in English drafts (scan is lowercased)
+    "we own the factory", "own factory", "owns the factory",
+    "iso 9001", "iso9001 certified", "iso certified",
+    "10000 pcs/month", "capacity of", "monthly capacity",
+    "cheaper than", "20% cheaper", "lowest price",
+    "ce/fda certified", "all certifications",
+]
+
+# 安全的公司表述
+SAFE_COMPANY_PHRASES = [
+    "strategic manufacturing partners",
+    "local manufacturing network",
+    "supply chain collaboration",
+    "verified supplier network",
+]
+
+
+def _conn():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    c = sqlite3.connect(str(DB_PATH))
+    c.row_factory = sqlite3.Row
+    return c
+
+
+def _now():
+    return datetime.utcnow().isoformat() + "Z"
+
+
+def _gen_id(prefix: str) -> str:
+    return f"{prefix}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{hashlib.md5(_now().encode()).hexdigest()[:8]}"
+
+
+def init_db():
+    """初始化草稿表，可重复执行"""
+    c = _conn()
+    cur = c.cursor()
+    cur.executescript("""
+    CREATE TABLE IF NOT EXISTS content_drafts (
+        draft_id TEXT PRIMARY KEY,
+        customer_id TEXT,
+        draft_type TEXT,
+        subject TEXT,
+        body TEXT,
+        language TEXT DEFAULT 'en',
+        status TEXT DEFAULT 'draft',
+        internal_only INTEGER DEFAULT 0,
+        knowledge_pack_id TEXT,
+        knowledge_pack_version INTEGER,
+        knowledge_snapshot_hash TEXT,
+        fact_ids TEXT,
+        fact_versions TEXT,
+        confirmed_claims TEXT,
+        inferred_claims TEXT,
+        missing_information TEXT,
+        risk_flags TEXT,
+        model TEXT,
+        failover INTEGER DEFAULT 0,
+        attempts INTEGER DEFAULT 0,
+        trace_id TEXT,
+        created_at TEXT,
+        created_by TEXT,
+        updated_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_draft_customer ON content_drafts(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_draft_type ON content_drafts(draft_type);
+    CREATE INDEX IF NOT EXISTS idx_draft_status ON content_drafts(status);
+    """)
+    c.commit()
+    c.close()
+
+
+# ============ Knowledge Pack 校验 ============
+
+def validate_draft_generation_prerequisites(customer_id: str,
+                                             pack_ref: Optional[Dict] = None,
+                                             allow_internal: bool = True) -> Dict:
+    """
+    校验草稿生成前置条件。
+    返回 {'can_generate': bool, 'internal_only': bool, 'errors': [], 'pack': ..., 'evaluation': ...}
+    """
+    init_db()
+    errors = []
+    internal_only = False
+
+    # 1. 获取客户评估
+    qualification = pe.get_customer_qualification(customer_id)
+    if not qualification['success']:
+        errors.append('客户评估不存在，请先进行 ICP 评估')
+        return {'can_generate': False, 'internal_only': False, 'errors': errors}
+
+    evaluation = qualification['icp_evaluation']
+
+    # 2. 检查 hard blockers
+    if evaluation.get('hard_blockers'):
+        blockers = evaluation['hard_blockers']
+        if not allow_internal:
+            errors.append(f'客户存在 {len(blockers)} 个 hard blocker，禁止生成对外草稿')
+            return {'can_generate': False, 'internal_only': False, 'errors': errors,
+                    'hard_blockers': blockers}
+        else:
+            internal_only = True
+            errors.append('客户存在 hard blocker，仅允许生成内部草稿')
+
+    # 3. 检查 Knowledge Pack
+    pack = None
+    if pack_ref and pack_ref.get('pack_id'):
+        validation = pe.validate_customer_pack_binding(pack_ref['pack_id'], pack_ref.get('pack_version'))
+        if not validation['valid']:
+            if not allow_internal:
+                errors.extend(validation['errors'])
+                return {'can_generate': False, 'internal_only': False, 'errors': errors}
+            else:
+                internal_only = True
+        else:
+            pack = validation['pack']
+    else:
+        # 尝试从客户绑定获取
+        binding = pe.get_customer_knowledge_binding(customer_id)
+        if binding:
+            validation = pe.validate_customer_pack_binding(
+                binding['knowledge_pack_id'], binding['knowledge_pack_version'])
+            if validation['valid']:
+                pack = validation['pack']
+            else:
+                internal_only = True
+                errors.append('客户绑定的 Knowledge Pack 无效，仅允许内部草稿')
+        else:
+            internal_only = True
+            errors.append('缺少已批准 Knowledge Pack，仅允许生成内部草稿')
+
+    # 4. 验证 Pack 中的 Fact
+    if pack:
+        frozen_facts = pack.get('frozen_fact_snapshots', [])
+        for fact in frozen_facts:
+            if fact.get('review_status') != 'confirmed':
+                errors.append(f"Fact {fact.get('fact_id')} 不是 confirmed 状态")
+                internal_only = True
+            if not fact.get('public_use_allowed'):
+                errors.append(f"Fact {fact.get('fact_id')} 不允许对外使用")
+                internal_only = True
+            # 检查来源可追溯
+            has_source = (
+                (fact.get('source_url') and fact['source_url'].startswith(('http://', 'https://'))) or
+                (fact.get('source_document') and fact.get('source_locator')) or
+                fact.get('source_hash')
+            )
+            if not has_source:
+                errors.append(f"Fact {fact.get('fact_id')} 来源不可追溯")
+                internal_only = True
+
+        # 验证 snapshot hash
+        if pack.get('knowledge_snapshot_hash'):
+            # hash 已在 approve 时计算，这里验证存在性
+            pass
+
+    if errors and not internal_only:
+        return {'can_generate': False, 'internal_only': False, 'errors': errors}
+
+    return {
+        'can_generate': True,
+        'internal_only': internal_only,
+        'errors': errors if internal_only else [],
+        'pack': pack,
+        'evaluation': evaluation,
+    }
+
+
+# ============ 草稿生成 ============
+
+def _build_prompt(customer_input: Dict, draft_type: str, pack: Optional[Dict],
+                  language: str = 'en', mode: str = 'standard',
+                  website_evidence: Optional[Dict] = None) -> Tuple[str, str]:
+    """构建生成提示词，返回 (system_prompt)。
+
+    website_evidence: fetch_website_evidence 返回的证据 dict；
+        - 抓取成功时，在 user_prompt 中加入 "Verified Website Evidence" 段（[已验证事实]）
+        - 客户输入信息标注 [客户输入]
+        - 缺失信息标注 [缺失信息]
+        - 无证据/抓取失败时明确标注 [无法验证]，禁止把网站内容当事实推断
+    """
+    system_prompt = f"""You are a professional B2B outreach content generator for KaiLionCrafts, a cutting tool manufacturing company.
+
+CRITICAL RULES:
+1. Only use confirmed facts from the Knowledge Pack. Do NOT invent:
+   - Customer cases, order amounts, sales figures
+   - MOQ, production capacity, delivery time
+   - Certifications, customer testimonials
+   - Factory ownership claims
+2. For manufacturing capabilities, use phrases like:
+   - "strategic manufacturing partners"
+   - "local manufacturing network"
+   - "supply chain collaboration"
+   Do NOT claim KaiLionCrafts owns factories directly.
+3. If information is missing, state it clearly rather than inventing.
+4. Language: {language}
+5. Content type: {draft_type}
+6. Mode: {mode} (standard = concise, reasoning = detailed analysis)
+7. Distinguish evidence levels:
+   - [已验证事实] verified facts from the customer's own website
+   - [客户输入] info provided by the customer, NOT independently verified
+   - [缺失信息] missing info — do NOT invent
+   - [无法验证] website evidence unavailable — do NOT infer website content as fact
+
+Output format:
+- Subject: [subject line]
+- Body: [email/message body]
+- Confirmed Claims: [list of facts used from Knowledge Pack]
+- Inferred Claims: [list of reasonable inferences]
+- Missing Information: [what is needed]
+- Risk Flags: [any compliance or accuracy concerns]
+"""
+
+    # 构建用户提示词 —— 客户输入信息标注 [客户输入]
+    user_parts = [f"Customer Information [客户输入]:"]
+    user_parts.append(f"- Company [客户输入]: {customer_input.get('company_name', 'N/A')}")
+    user_parts.append(f"- Website [客户输入]: {customer_input.get('website', 'N/A')}")
+    user_parts.append(f"- Country [客户输入]: {customer_input.get('country', 'N/A')}")
+    user_parts.append(f"- Buyer Type [客户输入]: {customer_input.get('buyer_type', 'N/A')}")
+    if customer_input.get('product_categories'):
+        user_parts.append(f"- Products [客户输入]: {', '.join(customer_input['product_categories'])}")
+    if customer_input.get('main_products'):
+        user_parts.append(f"- Main Products [客户输入]: {customer_input.get('main_products')}")
+    if customer_input.get('known_pain_points'):
+        user_parts.append(f"- Known Pain Points [客户输入]: {customer_input['known_pain_points']}")
+
+    # 已验证网站证据 / 无法验证 提示
+    ev_ok = bool(website_evidence and website_evidence.get('status') in ('success', 'too_large'))
+    if ev_ok:
+        user_parts.append(f"\nVerified Website Evidence [已验证事实] (from {website_evidence.get('url', '')}):")
+        if website_evidence.get('title'):
+            user_parts.append(f"- Website Title [已验证事实]: {website_evidence['title']}")
+        if website_evidence.get('description'):
+            user_parts.append(f"- Website Description [已验证事实]: {website_evidence['description']}")
+        if website_evidence.get('main_products'):
+            mp = website_evidence['main_products']
+            user_parts.append(f"- Main Products [已验证事实]: {', '.join(mp) if isinstance(mp, list) else mp}")
+        if website_evidence.get('country'):
+            user_parts.append(f"- Country [已验证事实]: {website_evidence['country']}")
+        cc = website_evidence.get('contact_clues') or {}
+        if isinstance(cc, dict):
+            if cc.get('emails'):
+                user_parts.append(f"- Website Emails [已验证事实]: {', '.join(cc['emails'])}")
+            if cc.get('phones'):
+                user_parts.append(f"- Website Phones [已验证事实]: {', '.join(cc['phones'])}")
+    else:
+        user_parts.append("\nWebsite evidence unavailable - do not infer website content as fact [无法验证].")
+
+    # 缺失信息明确列出 [缺失信息]
+    missing_fields = []
+    if not customer_input.get('company_name'):
+        missing_fields.append('company_name')
+    if not customer_input.get('website'):
+        missing_fields.append('website')
+    if not customer_input.get('country'):
+        missing_fields.append('country')
+    if not customer_input.get('email') and not (ev_ok and (website_evidence.get('contact_clues') or {}).get('emails')):
+        missing_fields.append('email')
+    if not customer_input.get('product_categories') and not customer_input.get('main_products'):
+        missing_fields.append('main_products')
+    if missing_fields:
+        user_parts.append(f"\nMissing Information [缺失信息]: {', '.join(missing_fields)}")
+
+    if pack:
+        user_parts.append(f"\nKnowledge Pack: {pack['name']} v{pack['version']}")
+        user_parts.append(f"Approved Facts ({len(pack.get('frozen_fact_snapshots', []))}):")
+        for fact in pack.get('frozen_fact_snapshots', [])[:10]:
+            user_parts.append(f"- [{fact.get('fact_id')}] {fact.get('title')}: {fact.get('content', '')[:200]}")
+
+    user_parts.append(f"\nGenerate a {draft_type} in {language}.")
+    user_prompt = "\n".join(user_parts)
+
+    return system_prompt, user_prompt
+
+
+def _parse_model_response(response_text: str) -> Dict:
+    """解析模型响应，提取 subject, body, confirmed_claims 等"""
+    # 先剥离本地小模型可能内联写出的 <think>...</think> 思考内容
+    response_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL).strip()
+    result = {
+        'subject': '',
+        'body': response_text,
+        'confirmed_claims': [],
+        'inferred_claims': [],
+        'missing_information': [],
+        'risk_flags': [],
+    }
+
+    # 简单解析
+    sections = re.split(r'\n(?=(?:Subject|Body|Confirmed Claims|Inferred Claims|Missing Information|Risk Flags):)', response_text, flags=re.IGNORECASE)
+    for section in sections:
+        section = section.strip()
+        if section.lower().startswith('subject:'):
+            result['subject'] = section.split(':', 1)[1].strip()
+        elif section.lower().startswith('body:'):
+            result['body'] = section.split(':', 1)[1].strip()
+        elif section.lower().startswith('confirmed claims:'):
+            content = section.split(':', 1)[1].strip()
+            result['confirmed_claims'] = [line.strip('- ').strip() for line in content.split('\n') if line.strip()]
+        elif section.lower().startswith('inferred claims:'):
+            content = section.split(':', 1)[1].strip()
+            result['inferred_claims'] = [line.strip('- ').strip() for line in content.split('\n') if line.strip()]
+        elif section.lower().startswith('missing information:'):
+            content = section.split(':', 1)[1].strip()
+            result['missing_information'] = [line.strip('- ').strip() for line in content.split('\n') if line.strip()]
+        elif section.lower().startswith('risk flags:'):
+            content = section.split(':', 1)[1].strip()
+            result['risk_flags'] = [line.strip('- ').strip() for line in content.split('\n') if line.strip()]
+
+    return result
+
+
+def generate_content_draft(customer_id: str, draft_type: str,
+                           customer_input: Optional[Dict] = None,
+                           pack_ref: Optional[Dict] = None,
+                           language: str = 'en',
+                           mode: str = 'standard',
+                           created_by: str = "system",
+                           use_mock: bool = False,
+                           website_evidence: Optional[Dict] = None,
+                           auto_fetch_evidence: bool = False) -> Dict:
+    """
+    生成内容草稿。
+    use_mock=True 时使用模板生成，不调用真实 AI（用于测试和无 API Key 环境）。
+    website_evidence: 外部已抓取的网站证据 dict；传入则直接使用。
+    auto_fetch_evidence: 为 True 且 website_evidence 为 None 时，尝试抓取网站证据。
+    """
+    init_db()
+
+    if draft_type not in DRAFT_TYPES:
+        return {'success': False, 'errors': [f'不支持的草稿类型: {draft_type}']}
+
+    # 1. 校验前置条件
+    prereq = validate_draft_generation_prerequisites(customer_id, pack_ref, allow_internal=True)
+    if not prereq['can_generate']:
+        return {'success': False, 'errors': prereq['errors']}
+
+    pack = prereq['pack']
+    internal_only = prereq['internal_only']
+    evaluation = prereq.get('evaluation', {})
+
+    # 2. 获取客户输入
+    if customer_input is None:
+        customer_input = {
+            'customer_id': customer_id,
+            'company_name': evaluation.get('company_name', ''),
+            'website': evaluation.get('website', ''),
+            'country': evaluation.get('country', ''),
+            'buyer_type': evaluation.get('buyer_type', ''),
+        }
+
+    # 2b. 可选：自动抓取网站证据
+    if auto_fetch_evidence and website_evidence is None and _WE_AVAILABLE:
+        try:
+            _url = customer_input.get('website', '')
+            if _url and _we.is_safe_url(_url)[0]:
+                website_evidence = _we.fetch_website_evidence(customer_id, _url)
+        except Exception:
+            website_evidence = None
+
+    # 3. 选择模型链
+    chain = DRAFT_REASONING_CHAIN if mode == 'reasoning' else DRAFT_TEXT_CHAIN
+
+    # 4. 构建提示词（传入网站证据）
+    system_prompt, user_prompt = _build_prompt(customer_input, draft_type, pack,
+                                               language, mode,
+                                               website_evidence=website_evidence)
+
+    # 5. 生成内容（mock 模式）
+    model_used = chain[0]
+    failover = 0
+    attempts = 1
+    trace_id = _gen_id("trace")
+
+    if use_mock:
+        # Mock 生成：基于模板
+        mock_content = _generate_mock_content(customer_input, draft_type, pack, language)
+        parsed = _parse_model_response(mock_content)
+    else:
+        # 真实 AI 调用（需要 ai_client）
+        try:
+            import ai_client
+            # P1 修复：必须使用全局单例 ai_client.ai，而不是新建 AIClient()。
+            # 新建实例的 manual_text_model/manual_vision_model 永远为 None，
+            # 会绕过侧边栏/设置页的会话级手动模型选择，导致草稿生成与路由脱节。
+            ai = ai_client.ai
+            # 传递 mode 参数：standard 关闭 thinking，reasoning 允许内部诊断
+            response = ai.chat(user_prompt, system_prompt=system_prompt, temperature=0.7, mode=mode)
+            # P1-1 修复：ai_client.chat() 返回纯字符串（正文内容），不是 dict。
+            # 模型名 / 故障转移次数等元信息存在 ai.last_trace 中。
+            _trace = getattr(ai, 'last_trace', None) or {}
+            model_used = _trace.get('model', chain[0])
+            failover = int(_trace.get('failover_count', 0) or 0)
+            attempts = failover + 1
+            parsed = _parse_model_response(response if isinstance(response, str) else '')
+        except Exception as e:
+            return {'success': False, 'errors': [f'AI 调用失败: {str(e)}']}
+
+    # 6a. 空 body 拦截：AI 返回空白内容时不继续落库，避免生成空白开发信
+    if not parsed.get('body', '').strip():
+        return {'success': False, 'errors': ['AI 返回内容为空，请重试或调整提示词']}
+
+    # 6. 安全检查：扫描禁止编造的内容
+    risk_flags = list(parsed.get('risk_flags', []))
+    body_lower = parsed['body'].lower()
+    for prohibited in PROHIBITED_CLAIMS:
+        if prohibited.lower() in body_lower:
+            risk_flags.append(f'检测到可能编造的内容: {prohibited}')
+
+    # 6b. 低证据客户：身份未验证 或 网站证据抓取失败 → 强制内部草稿
+    identity_status = evaluation.get('identity_status', 'unresolved')
+    ev_failed = website_evidence is not None and website_evidence.get('status') not in ('success', 'too_large')
+    low_evidence = (identity_status != 'verified') or ev_failed
+    if low_evidence:
+        internal_only = True
+        risk_flags.append('低证据客户-待核实草稿')
+
+    # 6c. 证据引用 + 客户快照
+    evidence_refs = []
+    if website_evidence:
+        evidence_refs.append({
+            'evidence_id': website_evidence.get('evidence_id'),
+            'url': website_evidence.get('url'),
+            'status': website_evidence.get('status'),
+            'fetched_at': website_evidence.get('fetched_at'),
+        })
+    customer_snapshot = {
+        'customer_id': customer_id,
+        'company_name': customer_input.get('company_name', ''),
+        'website': customer_input.get('website', ''),
+        'country': customer_input.get('country', ''),
+        'buyer_type': customer_input.get('buyer_type', ''),
+        'product_categories': customer_input.get('product_categories', []),
+        'main_products': customer_input.get('main_products', ''),
+        'identity_status': identity_status,
+    }
+
+    # 6d. 草稿版本：同一 customer_id + draft_type 已有草稿则版本递增
+    version = 1
+    try:
+        vc = _conn()
+        try:
+            row = vc.execute(
+                "SELECT COUNT(*) AS n FROM content_drafts WHERE customer_id=? AND draft_type=?",
+                (customer_id, draft_type)).fetchone()
+            if row and row['n'] and row['n'] > 0:
+                version = int(row['n']) + 1
+        finally:
+            vc.close()
+    except Exception:
+        version = 1
+
+    # 7. 保存草稿
+    draft_id = _gen_id("draft")
+    now = _now()
+
+    fact_ids = []
+    fact_versions = []
+    if pack:
+        for snap in pack.get('frozen_fact_snapshots', []):
+            fact_ids.append(snap.get('fact_id'))
+            fact_versions.append(snap.get('version'))
+
+    # content_drafts 表无 evidence_refs / customer_snapshot / version 列：
+    # 按约束不修改表结构，将其以 JSON 形式合并进 risk_flags 列保存，
+    # 同时在返回结果中携带结构化字段供调用方使用。
+    persisted_risk_flags = list(risk_flags)
+    try:
+        persisted_risk_flags.append(
+            f"draft_meta::"
+            + json.dumps({
+                "version": version,
+                "evidence_refs": evidence_refs,
+                "customer_snapshot": customer_snapshot,
+            }, ensure_ascii=False)
+        )
+    except Exception:
+        pass
+
+    final_status = 'draft' if low_evidence else ('needs_review' if not internal_only else 'draft')
+
+    c = _conn()
+    try:
+        c.execute("""INSERT INTO content_drafts
+            (draft_id, customer_id, draft_type, subject, body, language, status,
+             internal_only, knowledge_pack_id, knowledge_pack_version, knowledge_snapshot_hash,
+             fact_ids, fact_versions, confirmed_claims, inferred_claims, missing_information,
+             risk_flags, model, failover, attempts, trace_id, created_at, created_by, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (draft_id, customer_id, draft_type, parsed['subject'], parsed['body'], language,
+             final_status,
+             int(internal_only),
+             pack['pack_id'] if pack else None,
+             pack['version'] if pack else None,
+             pack['knowledge_snapshot_hash'] if pack else None,
+             json.dumps(fact_ids), json.dumps(fact_versions),
+             json.dumps(parsed['confirmed_claims'], ensure_ascii=False),
+             json.dumps(parsed['inferred_claims'], ensure_ascii=False),
+             json.dumps(parsed['missing_information'], ensure_ascii=False),
+             json.dumps(persisted_risk_flags, ensure_ascii=False),
+             model_used, failover, attempts, trace_id, now, created_by, now))
+        c.commit()
+    except Exception as e:
+        c.rollback()
+        return {'success': False, 'errors': [f'数据库错误: {str(e)}']}
+    finally:
+        c.close()
+
+    return {
+        'success': True,
+        'draft_id': draft_id,
+        'draft_type': draft_type,
+        'subject': parsed['subject'],
+        'body': parsed['body'],
+        'internal_only': internal_only,
+        'status': final_status,
+        'version': version,
+        'evidence_refs': evidence_refs,
+        'customer_snapshot': customer_snapshot,
+        'low_evidence': low_evidence,
+        'knowledge_pack_id': pack['pack_id'] if pack else None,
+        'knowledge_pack_version': pack['version'] if pack else None,
+        'knowledge_snapshot_hash': pack['knowledge_snapshot_hash'] if pack else None,
+        'fact_ids': fact_ids,
+        'fact_versions': fact_versions,
+        'confirmed_claims': parsed['confirmed_claims'],
+        'inferred_claims': parsed['inferred_claims'],
+        'missing_information': parsed['missing_information'],
+        'risk_flags': risk_flags,
+        'model': model_used,
+        'failover': failover,
+        'attempts': attempts,
+        'trace_id': trace_id,
+        'model_chain': chain,
+        'created_at': now,
+    }
+
+
+def _generate_mock_content(customer_input: Dict, draft_type: str,
+                           pack: Optional[Dict], language: str) -> str:
+    """生成 mock 内容（不调用真实 AI）"""
+    company = customer_input.get('company_name', 'Valued Partner')
+    country = customer_input.get('country', 'your region')
+    products = customer_input.get('product_categories', ['cutting tools'])
+
+    if draft_type == 'first_email':
+        subject = f"Exploring {products[0] if products else 'cutting tool'} partnership opportunities"
+        body = f"""Dear {company} Team,
+
+I hope this message finds you well. I'm reaching out from KaiLionCrafts, a company specializing in high-quality cutting tools through our strategic manufacturing partners and local manufacturing network.
+
+We noticed your company operates in {country} and may have interest in {', '.join(products)}. Our supply chain collaboration allows us to offer competitive pricing while maintaining quality standards.
+
+Would you be open to a brief conversation about potential collaboration?
+
+Best regards,
+KaiLionCrafts Team"""
+    elif draft_type == 'linkedin_first_message':
+        subject = f"Connecting about {products[0] if products else 'cutting tools'}"
+        body = f"""Hi {company.split()[0] if company else 'there'},
+
+I came across your profile and was impressed by your work in {country}. I work with KaiLionCrafts, where we connect businesses with verified supplier networks for cutting tools.
+
+I'd love to connect and share how our supply chain collaboration might benefit your operations.
+
+Best,
+KaiLionCrafts"""
+    elif draft_type == 'follow_up_email':
+        subject = f"Following up: {products[0] if products else 'cutting tool'} solutions"
+        body = f"""Dear {company} Team,
+
+I'm following up on my previous message about KaiLionCrafts' cutting tool solutions.
+
+Through our strategic manufacturing partners, we can support your {', '.join(products)} needs with consistent quality and reliable supply.
+
+Please let me know if you'd like to discuss further.
+
+Best regards,
+KaiLionCrafts Team"""
+    elif draft_type == 'product_recommendation':
+        subject = f"Recommended {products[0] if products else 'cutting tools'} for {company}"
+        body = f"""Product Recommendation for {company}
+
+Based on your profile in {country}, we recommend the following:
+
+1. {products[0] if products else 'Standard Cutting Tools'} - Suitable for your market
+2. Custom solutions available through our local manufacturing network
+
+All products are sourced from verified suppliers in our network.
+
+Note: Specific MOQ, pricing, and delivery details require confirmation based on your requirements."""
+    elif draft_type == 'pain_point_analysis':
+        subject = f"Pain Point Analysis: {company}"
+        body = f"""Pain Point Analysis for {company}
+
+Potential challenges in {country}:
+1. Supply chain consistency - addressed by our verified supplier network
+2. Quality control - managed through strategic manufacturing partners
+3. Cost efficiency - achieved through local manufacturing network
+
+Recommended approach: Start with sample evaluation to validate fit."""
+    elif draft_type == 'rfq_response':
+        subject = f"RFQ Response: {products[0] if products else 'cutting tools'}"
+        body = f"""Thank you for your inquiry, {company}.
+
+We appreciate your interest in our {', '.join(products)}. Through our supply chain collaboration, we can provide:
+- Competitive pricing from verified manufacturers
+- Quality assurance through strategic partners
+- Flexible production capacity
+
+Next steps: Please share your specific requirements for a detailed quotation."""
+    elif draft_type == 'whatapp_message':
+        # WhatsApp 话术：口语化、50-100 词、拆成 2-3 条短消息，不自动发送
+        subject = f"WhatsApp intro to {company}"
+        body = f"""Hi {company.split()[0] if company else 'there'}! 👋 (msg 1/3)
+This is KaiLionCrafts. We work with a verified network of cutting tool makers to supply kitchens and brands in {country}.
+
+(msg 2/3)
+Saw you're in the {', '.join(products[:1]) if products else 'cutting tool'} space — we've helped partners get consistent quality at better margins through our local manufacturing network.
+
+(msg 3/3)
+Would you be open to a quick reply? No rush — just want to know if it's worth sharing a short catalog. 😊
+[Draft only — do NOT auto-send; requires human approval]"""
+    else:  # next_action_plan
+        subject = f"Next Steps: {company} Partnership"
+        body = f"""Next Action Plan for {company}
+
+1. Initial discovery call (15 min)
+2. Product catalog sharing
+3. Sample evaluation
+4. Custom solution discussion
+5. Pilot order
+
+Our local manufacturing network ensures quality and reliability throughout."""
+
+    confirmed = []
+    if pack:
+        for fact in pack.get('frozen_fact_snapshots', [])[:3]:
+            confirmed.append(f"{fact.get('title')}: {fact.get('content', '')[:100]}")
+
+    return f"""Subject: {subject}
+
+Body:
+{body}
+
+Confirmed Claims:
+{chr(10).join('- ' + c for c in confirmed) if confirmed else '- Based on customer profile and approved knowledge pack'}
+
+Inferred Claims:
+- Customer may have interest in {', '.join(products)} based on profile
+- {country} market may have specific requirements
+
+Missing Information:
+- Specific product specifications
+- Target pricing range
+- Order volume expectations
+
+Risk Flags:
+- Internal draft, requires human review before sending
+- All manufacturing claims use partner network language"""
+
+
+# ============ 草稿管理 ============
+
+def get_content_draft(draft_id: str) -> Optional[Dict]:
+    """获取单个草稿"""
+    init_db()
+    c = _conn()
+    row = c.execute("SELECT * FROM content_drafts WHERE draft_id=?", (draft_id,)).fetchone()
+    c.close()
+    if not row:
+        return None
+    d = dict(row)
+    for field in ['fact_ids', 'fact_versions', 'confirmed_claims', 'inferred_claims', 'missing_information', 'risk_flags']:
+        if d.get(field):
+            d[field] = json.loads(d[field])
+    d['internal_only'] = bool(d['internal_only'])
+    d['failover'] = bool(d['failover'])
+    return d
+
+
+def list_content_drafts(customer_id: Optional[str] = None,
+                        draft_type: Optional[str] = None,
+                        status: Optional[str] = None,
+                        limit: int = 50) -> List[Dict]:
+    """列出草稿"""
+    init_db()
+    c = _conn()
+    sql = "SELECT * FROM content_drafts WHERE 1=1"
+    params = []
+    if customer_id:
+        sql += " AND customer_id=?"
+        params.append(customer_id)
+    if draft_type:
+        sql += " AND draft_type=?"
+        params.append(draft_type)
+    if status:
+        sql += " AND status=?"
+        params.append(status)
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    rows = c.execute(sql, params).fetchall()
+    c.close()
+    results = []
+    for row in rows:
+        d = dict(row)
+        for field in ['fact_ids', 'fact_versions', 'confirmed_claims', 'inferred_claims', 'risk_flags']:
+            if d.get(field):
+                d[field] = json.loads(d[field])
+        d['internal_only'] = bool(d['internal_only'])
+        results.append(d)
+    return results
+
+
+def update_draft_status(draft_id: str, status: str,
+                        updated_by: str = "system") -> Dict:
+    """更新草稿状态（人工审核）"""
+    if status not in DRAFT_STATUSES:
+        return {'success': False, 'errors': [f'无效状态: {status}']}
+
+    init_db()
+    c = _conn()
+    try:
+        c.execute("UPDATE content_drafts SET status=?, updated_at=? WHERE draft_id=?",
+                  (status, _now(), draft_id))
+        c.commit()
+        return {'success': True, 'draft_id': draft_id, 'status': status}
+    except Exception as e:
+        c.rollback()
+        return {'success': False, 'errors': [str(e)]}
+    finally:
+        c.close()
+
+
+def get_draft_model_chain(mode: str = 'standard') -> List[str]:
+    """获取草稿生成使用的模型链"""
+    return DRAFT_REASONING_CHAIN if mode == 'reasoning' else DRAFT_TEXT_CHAIN

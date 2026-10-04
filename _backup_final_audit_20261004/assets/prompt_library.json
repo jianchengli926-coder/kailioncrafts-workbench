@@ -1,0 +1,530 @@
+[
+  {
+    "id": "master_controls",
+    "category": "master",
+    "category_name": "⚙️ 总控制与质量系统",
+    "subcategories": [
+      {
+        "id": "master_general",
+        "title": "通用产品识别母提示词 (Master Prompt)",
+        "scene_desc": "适合每次上传白底图后的首发指令，自动识别产品类别、材质、造型，锁定产品100%一致性并判断欧美消费场景。",
+        "target": "全品类通用 / Gemini / GPT Image",
+        "tags": [
+          "母提示词",
+          "产品分析",
+          "全品类"
+        ],
+        "prompt": "You are a professional commercial product photographer and art director specializing in Amazon, Shopify, and premium independent e-commerce brands targeting US and European markets.\n\nAnalyze the uploaded product image carefully.\n\nFirst identify:\n- product category (kitchen knife / outdoor knife / scissors / kitchen accessory)\n- material and finish\n- shape and design characteristics\n- realistic Western usage scenarios\n- target customer group (home cook, chef, outdoor enthusiast, professional)\n- market positioning (premium daily use / professional / gift)\n\nBased on real selling environments on Amazon US, European retailers, and independent lifestyle brands, create a realistic lifestyle product photography scene.\n\nThe product in the reference image must remain 100% identical:\n- same shape, dimensions, blade geometry, handle design, texture, color, and details\n\nDo not redesign the product. Do not add extra parts. Do not modify the structure.\n\nCreate a realistic commercial photo suitable for independent website product pages, e-commerce homepage, and brand marketing banners.\n\nThe image must look like a real professional photograph, not AI generated.\n\nRequirements: natural lighting, real environment, realistic human interaction, authentic materials, subtle imperfections, premium but believable atmosphere, professional product photography, high-end lifestyle commercial photography for Western audiences.",
+        "prompt_zh": "你是一位专业商业产品摄影师与艺术总监，专注于面向美国与欧洲市场的 Amazon、Shopify 及高端独立站品牌。\n\n仔细分析上传的产品图片。\n\n首先识别：\n- 产品品类（厨房刀 / 户外刀 / 剪刀 / 厨房配件）\n- 材质与表面处理\n- 造型与设计特征\n- 真实的欧美使用场景\n- 目标客户群体（家庭厨娘、专业厨师、户外爱好者、专业人士）\n- 市场定位（日常高端 / 专业 / 礼品）\n\n基于 Amazon 美国站、欧洲零售商与独立生活方式品牌的真实销售环境，创建逼真的生活方式产品摄影场景。\n\n参考图中的产品必须保持 100% 一致：造型、尺寸、刃型、柄型、纹理、颜色与细节均不可改变。\n\n请勿重新设计产品、添加部件或修改结构。\n\n创建适用于独立站产品页、电商首页与品牌营销 Banner 的逼真商业照片。\n\n图片必须看起来像真实专业摄影师拍摄，而非 AI 生成。\n\n要求：自然光线、真实环境、逼真人体交互、真实材质、细微自然瑕疵、高端但可信的氛围、专业产品摄影、面向欧美客户的高端生活方式商业摄影。"
+      },
+      {
+        "id": "qc_identity",
+        "title": "QC：产品100%一致性锁定",
+        "scene_desc": "防翻车必备，防止 AI 改刀型、刃弧、手柄铆钉或加假 Logo。",
+        "target": "所有模型",
+        "tags": [
+          "QC防翻车",
+          "外观锁定"
+        ],
+        "prompt": "PRODUCT IDENTITY PROTECTION:\n\nThe uploaded product is the exact product reference.\n\nMaintain 100% identical: overall shape, dimensions, proportions, blade geometry, blade curve, blade thickness, handle design, screws, rivets, texture, logo position, material appearance.\n\nDo not redesign, improve, modify, simplify, or add decorative elements.\n\nThe product must look like the same physical item photographed in another environment.",
+        "prompt_zh": "产品身份保护：\n\n上传产品为精准参考。保持 100% 一致：整体造型、尺寸、比例、刀刃几何与弧度、厚度、手柄设计、螺丝、铆钉、纹理、Logo 位置、材质外观。\n\n严禁重新设计、改进、修改、简化或添加装饰。\n\n产品必须像在另一环境中拍摄的同一实体物品。"
+      },
+      {
+        "id": "qc_blade",
+        "title": "QC：刀刃纹理与金属真实感",
+        "scene_desc": "保护大马士革纹、拉丝、镜面等金属物理质感。",
+        "target": "厨刀/户外刀",
+        "tags": [
+          "QC",
+          "大马士革",
+          "金属质感"
+        ],
+        "prompt": "BLADE DETAIL PRESERVATION & METAL REALISM:\n\nPreserve original blade characteristics: Damascus pattern, steel grain, brushed metal texture, polished reflection, edge line, grinding marks.\n\nDo not create fake patterns or replace blade material.\n\nCreate realistic stainless steel behavior that follows environment lighting, shows natural highlights, and maintains metal texture.\n\nAvoid chrome mirror effect, liquid metal, plastic appearance, CGI rendering.",
+        "prompt_zh": "刀刃细节与金属真实感：保留大马士革纹、钢材纹理、拉丝质感、抛光光泽、刃线、研磨痕迹。禁止虚假纹理或替换材质。呈现遵循环境光的自然高光与金属质感。避免电镀镜面、液态金属、塑料感与 CGI 渲染。"
+      },
+      {
+        "id": "qc_hand",
+        "title": "QC：手部真实度与使用逻辑",
+        "scene_desc": "防止多指、畸形手或不合理使用姿势。",
+        "target": "带人体交互场景",
+        "tags": [
+          "QC",
+          "手部",
+          "真实逻辑"
+        ],
+        "prompt": "HUMAN HAND REALISM & REAL WORLD USAGE LOGIC:\n\nIf human interaction is shown: hands must be anatomically correct with exactly five fingers, natural grip, realistic wrist angle, and correct product holding position.\n\nAvoid extra fingers, missing fingers, strange hand shapes, impossible holding.\n\nUsage must match real purpose:\n- Kitchen knife: cut food ingredients\n- Outdoor knife: camping, rope, wood, outdoor prep\n- Garden scissors: plants, branches, flowers\n- Tailor scissors: fabric, textile\n\nDo not create unrealistic usage scenarios.",
+        "prompt_zh": "真人手部与使用逻辑：手部必须解剖正确（五指、自然握持、真实手腕角度）。禁止多余/缺失手指与畸形姿势。用途必须符合现实：厨刀切食材、户外刀野营切绳削木、园艺剪修枝、裁缝剪裁布。禁止不合逻辑的使用场景。"
+      },
+      {
+        "id": "qc_negative",
+        "title": "QC：通用负面控制词",
+        "scene_desc": "剔除 AI 感、CGI、假光影与夸张渲染。",
+        "target": "通用",
+        "tags": [
+          "QC",
+          "Negative"
+        ],
+        "prompt": "NEGATIVE PROMPT:\n\nDo not create: AI generated look, CGI render, 3D model appearance, unrealistic materials, fake reflections, exaggerated colors, impossible physics, distorted products, changed product design, wrong proportions, extra objects, fake human hands.",
+        "prompt_zh": "负面提示词：切勿生成 AI 感、CGI 渲染、3D 模型外观、不真实材质、虚假反射、夸张色彩、不可能物理效果、变形产品、被改设计、错误比例、多余物体、假人手。"
+      },
+      {
+        "id": "qc_knife_struct",
+        "title": "QC 刀具结构保护 Knife Structure",
+        "scene_desc": "锁定刃长厚度尖端刀脊柄比例，禁止幻想刀型。",
+        "target": "厨刀/户外刀",
+        "tags": [
+          "QC",
+          "结构"
+        ],
+        "prompt": "KNIFE STRUCTURE PROTECTION:\n\nMaintain: blade length, blade thickness, edge angle, tip shape, spine design, handle proportion.\n\nThe knife blade must not become longer, shorter, wider, curved, or different shape.\n\nKeep original manufacturing design. No fantasy knife design.",
+        "prompt_zh": "刀具结构保护：保持刃长、厚度、刃角、尖端、刀脊、柄比例。刀刃不得变长变短变宽弯曲。保持原厂设计，禁止幻想刀型。"
+      },
+      {
+        "id": "qc_scissors_struct",
+        "title": "QC 剪刀结构保护",
+        "scene_desc": "锁定刃长指孔支点开合角度。",
+        "target": "剪刀",
+        "tags": [
+          "QC",
+          "剪刀"
+        ],
+        "prompt": "SCISSORS STRUCTURE LOCK:\n\nMaintain: blade length, handle size, finger hole shape, pivot position, opening angle.\n\nDo not change number of holes, handle shape, blade curvature.\n\nThe scissors must remain the same real product.",
+        "prompt_zh": "剪刀结构锁定：保持刃长、手柄尺寸、指孔形状、支点、开合角度。禁止改变孔数、柄形、刃弧。必须是同一真实产品。"
+      },
+      {
+        "id": "qc_eu_style",
+        "title": "QC 欧美审美过滤器",
+        "scene_desc": "北欧厨房、现代美式、户外冒险、专业工艺。拒绝廉价电商风。",
+        "target": "通用",
+        "tags": [
+          "QC",
+          "欧美审美"
+        ],
+        "prompt": "EUROPEAN AMERICAN DESIGN STYLE:\n\nThe image should communicate: premium, clean, functional, professional, natural lifestyle.\n\nPreferred styles: Scandinavian kitchen, modern American home, outdoor adventure, professional craftsmanship.\n\nAvoid: cheap marketplace style, over decorated Chinese ecommerce style, fake luxury.",
+        "prompt_zh": "欧美设计风格：传递高端、干净、实用、专业、自然生活。偏好：北欧厨房、现代美式家居、户外冒险、专业工艺。避免：廉价市场风、过度装饰中国电商风、假奢华。"
+      },
+      {
+        "id": "qc_final_commercial",
+        "title": "QC 最终商业摄影总控",
+        "scene_desc": "成片前统一追加。专业单反、自然光、物理材质。",
+        "target": "成片前",
+        "tags": [
+          "QC",
+          "总控"
+        ],
+        "prompt": "FINAL COMMERCIAL PHOTOGRAPHY PROMPT:\n\nCreate a real professional commercial photograph.\nThe uploaded product is the exact physical product. Do not modify the product.\nCreate a realistic usage environment.\nThe image should look like a professional brand photoshoot.\nCamera: professional DSLR. Lens: 35mm / 50mm / 85mm.\nLighting: natural commercial lighting. Materials: physically accurate. People: realistic human interaction.\nSuitable for international ecommerce, brand website, advertising campaign. No AI appearance.",
+        "prompt_zh": "最终商业摄影总控：创建真实专业商业照片。上传产品为精确实体，禁止修改。创建真实使用环境。应像专业品牌拍摄。相机专业单反，镜头35/50/85mm，自然商业光，材质物理准确，人物交互真实。适用于国际电商、品牌官网、广告。无AI感。"
+      }
+    ]
+  },
+  {
+    "id": "kitchen_knives",
+    "category": "kitchen",
+    "category_name": "🔪 厨房刀品类 Kitchen Knives (KN)",
+    "subcategories": [
+      {
+        "id": "kn_chef_01",
+        "title": "Chef / Gyuto · 欧美现代家庭厨房切菜",
+        "scene_desc": "主厨刀/牛刀最常用场景。明亮欧美开放式厨房，木砧板与新鲜蔬果，自然窗光。",
+        "target": "1:1 / 详情页",
+        "tags": [
+          "Chef Knife",
+          "Gyuto",
+          "家庭厨房",
+          "欧美审美"
+        ],
+        "prompt": "Create a realistic premium kitchen lifestyle photograph of a Western home cook using the uploaded chef knife (or gyuto).\n\nScene: bright modern European-American open-plan kitchen with white or light oak cabinets, marble or quartz island, large window with soft natural daylight.\n\nShow: natural hand holding the knife correctly in a pinch grip, wooden cutting board, fresh vegetables (herbs, tomatoes, onions), clean premium workspace.\n\nStyle: professional food magazine photography, 50mm lens feel, shallow depth of field, authentic materials, subtle real-life imperfections. No staged plastic look.\n\nKeep the knife 100% identical to the reference. The image must look like a real commercial photograph for a US/EU independent kitchen brand.",
+        "prompt_zh": "制作一张欧美家庭厨娘使用上传主厨刀（或牛刀）的逼真高端厨房生活方式照片。\n\n场景：明亮现代欧美开放式厨房，白色或浅橡木橱柜、大理石/石英岛台、大窗柔和自然光。\n\n展示：自然手部以正确捏握姿势持刀、木质砧板、新鲜蔬果香草、干净高端台面。\n\n风格：专业美食杂志摄影、50mm 镜头感、浅景深、真实材质与细微生活痕迹。禁止塑料感摆拍。\n\n刀具须与参考图 100% 一致。图像须像真实面向美欧独立厨具品牌的商业照片。"
+      },
+      {
+        "id": "kn_chef_02",
+        "title": "Chef / Gyuto · 专业餐厅后厨备餐",
+        "scene_desc": "高端主厨刀卖点图。不锈钢工作台、厨师手部、新鲜食材，传递专业锋利与可靠。",
+        "target": "1:1 / 卖点图",
+        "tags": [
+          "Chef Knife",
+          "专业厨房",
+          "Michelin感"
+        ],
+        "prompt": "Create a realistic professional restaurant kitchen scene featuring the uploaded chef knife.\n\nScene: high-end Western restaurant prep area with stainless steel counters, organized mise en place, fresh proteins and vegetables.\n\nShow: chef hands using the knife with precision, sharp clean cuts, professional atmosphere under realistic kitchen lighting.\n\nStyle: culinary documentary / Michelin kitchen commercial photography. Communicate sharpness, control, and professional reliability.\n\nKeep the knife exactly identical. No fantasy or CGI feel.",
+        "prompt_zh": "制作一张展示上传主厨刀的逼真专业餐厅后厨场景。\n\n场景：高端西餐备餐区，不锈钢台面、整齐配菜、新鲜蛋白与蔬菜。\n\n展示：厨师手部精准用刀、干净利落的切口、专业氛围与真实厨房灯光。\n\n风格：美食纪录片 / 米其林厨房商业摄影。传递锋利、掌控与专业可靠。\n\n刀具保持完全一致。禁止幻想或 CGI 感。"
+      },
+      {
+        "id": "kn_santoku_01",
+        "title": "Santoku / Nakiri · 精准切片与蔬果料理",
+        "scene_desc": "三德刀/菜刀适合精细切片。极简现代厨房，强调刃口控制与干净切口。",
+        "target": "1:1",
+        "tags": [
+          "Santoku",
+          "Nakiri",
+          "精准切片"
+        ],
+        "prompt": "Create a realistic Japanese-inspired modern Western kitchen scene using the uploaded santoku or nakiri knife.\n\nScene: minimal clean kitchen with light wood and stone surfaces, soft natural window light.\n\nShow: precise vertical slicing of fresh vegetables or herbs on a wooden board, clean paper-thin cuts, focused hand control.\n\nMood: precision, craftsmanship, balance, healthy cooking.\n\nStyle: professional culinary photography preferred by US and European home cooks who value Japanese knife performance.\n\nKeep product 100% identical.",
+        "prompt_zh": "制作一张使用上传三德刀或菜刀的日式灵感现代欧美厨房场景。\n\n场景：极简干净厨房，浅色木与石材台面、柔和窗光。\n\n展示：在木砧板上对新鲜蔬果或香草做垂直精准切片、薄如蝉翼的切口、专注手部控制。\n\n氛围：精准、工艺、平衡、健康烹饪。\n\n风格：受美欧家庭厨娘欢迎的专业美食摄影，强调日式刀具性能。\n\n产品保持 100% 一致。"
+      },
+      {
+        "id": "kn_cleaver_01",
+        "title": "Cleaver / Butcher · 厚切与肉类处理",
+        "scene_desc": "砍骨刀/屠宰刀。厚砧板、生鲜肉块、有力但安全的手部动作，欧美肉类料理审美。",
+        "target": "1:1",
+        "tags": [
+          "Cleaver",
+          "Butcher",
+          "肉类处理"
+        ],
+        "prompt": "Create a realistic premium meat preparation scene featuring the uploaded cleaver or butcher knife.\n\nScene: modern Western kitchen or small butcher-style prep station with thick wooden board, fresh cuts of meat, clean stainless or stone surfaces.\n\nShow: confident controlled hand movement portioning meat, realistic weight and presence of the cleaver, professional but approachable atmosphere.\n\nStyle: American/European food commercial photography. Communicate power, durability, and craftsmanship without looking aggressive or weapon-like.\n\nKeep the knife identical to the reference.",
+        "prompt_zh": "制作一张展示上传砍骨刀或屠宰刀的逼真高端肉类处理场景。\n\n场景：现代西厨或小型肉铺式备餐台，厚木砧板、新鲜肉块、干净不锈钢或石材台面。\n\n展示：沉稳有力的手部分割肉类、砍刀真实的重量感与存在感、专业但亲和的氛围。\n\n风格：美欧美食商业摄影。传递力量、耐用与工艺，避免攻击性或武器化观感。\n\n刀具与参考图保持一致。"
+      },
+      {
+        "id": "kn_bread_01",
+        "title": "Bread / Slicing · 烘焙与切片场景",
+        "scene_desc": "面包刀/切片刀。家用烘焙厨房，法棍、面粉、温馨晨光。",
+        "target": "1:1",
+        "tags": [
+          "Bread Knife",
+          "烘焙",
+          "切片"
+        ],
+        "prompt": "Create a realistic home bakery lifestyle photograph featuring the uploaded bread or slicing knife.\n\nScene: warm European-style home kitchen with artisan sourdough or baguette, flour dust, wooden board, soft morning window light.\n\nShow: natural hand slicing bread with clean even cuts, cozy authentic atmosphere.\n\nStyle: premium bakery magazine photography popular in US and European lifestyle brands.\n\nKeep the knife exactly identical.",
+        "prompt_zh": "制作一张展示上传面包刀或切片刀的逼真家用烘焙生活方式照片。\n\n场景：温馨欧式家庭厨房，手工酸面团或法棍、面粉、木质砧板、柔和晨间窗光。\n\n展示：自然手部均匀切片面包、干净切口、真实温馨氛围。\n\n风格：美欧生活方式品牌常见的高端烘焙杂志摄影。\n\n刀具保持完全一致。"
+      },
+      {
+        "id": "kn_set_01",
+        "title": "Kitchen Knife Sets · 套装礼盒与台面展示",
+        "scene_desc": "多件套/礼盒装。高端厨房台面或礼品包装，适合提升客单与节日营销。",
+        "target": "1:1 / 16:9",
+        "tags": [
+          "Knife Set",
+          "礼盒",
+          "套装"
+        ],
+        "prompt": "Create a premium kitchen knife set presentation photograph using the uploaded knife set or main knife from the set.\n\nScene: elegant modern Western kitchen countertop or dining surface with matching block or gift packaging, soft natural light, minimal premium props (wood, linen, herbs).\n\nComposition: clean catalog-style arrangement, product as hero, suitable for Shopify product page and gift marketing.\n\nStyle: high-end kitchenware brand photography (US/EU aesthetic). Keep all products identical to references.",
+        "prompt_zh": "制作一张展示上传刀具套装或主刀的高端厨刀套装陈列照片。\n\n场景：优雅现代西厨台面或餐桌，配套刀座或礼盒包装，柔和自然光，极简高端道具（木、亚麻、香草）。\n\n构图：干净画册式排列，产品为主体，适合 Shopify 产品页与礼品营销。\n\n风格：美欧审美的高端厨具品牌摄影。所有产品与参考保持一致。"
+      },
+      {
+        "id": "kn_bbq_01",
+        "title": "Kitchen Knife · 美式后院 BBQ 备餐",
+        "scene_desc": "户外烧烤备肉。美国后院、烤架、木质备餐桌，周末生活方式。",
+        "target": "1:1 / 16:9",
+        "tags": [
+          "BBQ",
+          "美式生活方式"
+        ],
+        "prompt": "Create a realistic American backyard BBQ preparation scene featuring the uploaded kitchen knife.\n\nScene: suburban patio with stainless grill, wooden prep table, raw meat and vegetables ready for grilling, warm golden-hour sunlight.\n\nShow: natural outdoor cooking action, authentic weekend lifestyle mood popular with US customers.\n\nStyle: American lifestyle food advertising photography. Keep knife identical.",
+        "prompt_zh": "制作一张展示上传厨刀的逼真美式后院 BBQ 备餐场景。\n\n场景：郊区露台、不锈钢烤架、木质备餐桌、待烤的肉与蔬菜、金色小时暖光。\n\n展示：自然的户外烹饪动作、受美国客户欢迎的真实周末生活方式氛围。\n\n风格：美式生活方式美食广告摄影。刀具保持一致。"
+      },
+      {
+        "id": "kn_holiday_01",
+        "title": "Kitchen Knife · 感恩节 / 圣诞家庭厨房",
+        "scene_desc": "欧美节日营销。温馨家庭厨房、节日食材、暖光与轻微节日装饰。",
+        "target": "1:1 / 16:9",
+        "tags": [
+          "节日",
+          "Thanksgiving",
+          "Christmas"
+        ],
+        "prompt": "Create a realistic holiday family cooking scene for Thanksgiving or Christmas featuring the uploaded kitchen knife.\n\nScene: warm European-American family kitchen with seasonal ingredients, wooden board, soft warm lighting, subtle festive elements in background (not cluttered).\n\nMood: family tradition, quality cooking, trust, togetherness.\n\nStyle: premium holiday kitchen advertisement photography for Western markets. Keep knife identical.",
+        "prompt_zh": "制作感恩节或圣诞节家庭烹饪的逼真场景，展示上传厨刀。\n\n场景：温馨欧美家庭厨房、时令食材、木质砧板、柔和暖光、背景轻微节日元素（不杂乱）。\n\n氛围：家庭传统、品质烹饪、信任与团聚。\n\n风格：面向西方市场的高端节日厨房广告摄影。刀具保持一致。"
+      },
+      {
+        "id": "kn_macro_01",
+        "title": "Kitchen Knife · 刀刃微距质感卖点图",
+        "scene_desc": "详情页核心卖点。聚焦刃口、钢材、手柄材质，背景虚化厨房。",
+        "target": "1:1",
+        "tags": [
+          "微距",
+          "卖点",
+          "质感"
+        ],
+        "prompt": "Create a premium macro product photograph focusing on the uploaded kitchen knife details.\n\nShow: blade texture, steel finish, sharp edge line, handle material and rivets.\n\nBackground: softly blurred premium Western kitchen.\n\nLighting: professional studio mixed with natural reflections.\n\nStyle: luxury knife brand detail shot. Do not change any product details — enhance realism only.",
+        "prompt_zh": "制作一张聚焦上传厨刀细节的高端微距产品照片。\n\n展示：刀刃纹理、钢材表面、锋利刃线、手柄材质与铆钉。\n\n背景：虚化的高端西厨。\n\n光线：专业影棚光结合自然反射。\n\n风格：奢侈刀具品牌细节图。禁止改动产品细节，仅增强真实感。"
+      },
+      {
+        "id": "kn_banner_01",
+        "title": "Kitchen Knife · 独立站 16:9 Hero Banner",
+        "scene_desc": "官网首页第一屏。产品偏右，左侧留白放标题与 CTA。",
+        "target": "16:9",
+        "tags": [
+          "16:9",
+          "Hero Banner",
+          "独立站"
+        ],
+        "prompt": "Create a premium website hero banner for a kitchen knife brand targeting US and European customers.\n\nUse the uploaded knife as the hero product placed on the right side of a beautiful modern Western kitchen scene.\n\nLeave clean negative space on the left for headline and CTA.\n\nLighting: natural morning commercial light.\n\nStyle: luxury international kitchenware brand campaign. Must look like a real professional photograph.",
+        "prompt_zh": "为面向美欧客户的厨刀品牌制作一张高端网站 Hero Banner。\n\n上传刀具作为主角，置于美丽现代西厨场景右侧。\n\n左侧留出干净负空间放置标题与 CTA。\n\n光线：自然晨间商业光。\n\n风格：国际厨具品牌高端广告片。必须像真实专业照片。"
+      }
+    ]
+  },
+  {
+    "id": "outdoor_knives",
+    "category": "outdoor",
+    "category_name": "🏕️ 户外刀品类 Outdoor Knives (OK)",
+    "subcategories": [
+      {
+        "id": "ok_bushcraft_01",
+        "title": "Bushcraft · 森林营地切绳与削木",
+        "scene_desc": "丛林生存刀典型场景。温带针叶林营地、木头、伞绳，户外发烧友质感。",
+        "target": "1:1 / 详情页",
+        "tags": [
+          "Bushcraft",
+          "丛林生存",
+          "削木",
+          "切绳"
+        ],
+        "prompt": "Create a realistic outdoor bushcraft lifestyle photograph featuring the uploaded fixed blade knife.\n\nScene: dense North American pine forest campsite, wooden log workbench, paracord, campfire smoke in background, natural overcast daylight.\n\nShow: male hands with work gloves using the knife to shave feather sticks or slice paracord with precision.\n\nStyle: rugged outdoor gear commercial photography popular on US gear blogs and Amazon US. Authentic, durable, field-tested vibe.\n\nKeep knife 100% identical.",
+        "prompt_zh": "制作一张展示上传直刀的逼真户外丛林生存生活方式照片。\n\n场景：北美密林营地、木桩台、伞绳、背景篝火微烟、自然阴天光线。\n\n展示：戴防磨手套的男士手部用刀精准削木花或切断伞绳。\n\n风格：美欧装备博客与 AmazonUS 常见的硬核户外装备商业摄影。真实、耐用、实战感。\n\n刀具保持 100% 一致。"
+      },
+      {
+        "id": "ok_camping_01",
+        "title": "Camping · 帐篷营地户外餐备料",
+        "scene_desc": "折叠刀/户外小直刀。轻量化露营、折叠桌、煎锅与野餐食材。",
+        "target": "1:1",
+        "tags": [
+          "Camping",
+          "折叠刀",
+          "野餐备料"
+        ],
+        "prompt": "Create a realistic campsite cooking lifestyle photo using the uploaded folding knife or compact outdoor knife.\n\nScene: modern camping setup with tent, portable wooden table, cast iron skillet, fresh picnic food, warm golden hour sun through trees.\n\nShow: camper using knife to slice sausage, cheese, or fruit on a wooden camp board.\n\nMood: adventure, relaxation, high quality outdoor living.\n\nStyle: premium outdoor lifestyle brand photo. Keep product identical.",
+        "prompt_zh": "制作一张使用上传折叠刀或便携户外刀的逼真露营烹饪生活方式照片。\n\n场景：现代露营环境、帐篷、便携木桌、铸铁锅、新鲜野餐食材、树缝间金色余晖。\n\n展示：露营者用刀在便携砧板上切香肠、奶酪或水果。\n\n氛围：冒险、放松、品质户外生活。\n\n风格：高端户外生活方式品牌照片。产品保持一致。"
+      },
+      {
+        "id": "ok_hunting_01",
+        "title": "Hunting / EDC · 皮套与战术皮带挂载",
+        "scene_desc": "猎刀/EDC。皮革鞘、皮带挂载、猎人外衣，强调便携与工艺。",
+        "target": "1:1",
+        "tags": [
+          "Hunting",
+          "Leather Sheath",
+          "EDC"
+        ],
+        "prompt": "Create a realistic close-up outdoor photo of the uploaded knife in its leather or kydex sheath mounted on a rugged belt or tactical backpack.\n\nScene: outdoor field background, leather jacket texture, natural forest tones.\n\nFocus: product fit, secure carry system, craftsmanship of sheath and knife handle.\n\nStyle: premium hunting and EDC commercial photography for US buyers. Keep knife and sheath design identical.",
+        "prompt_zh": "制作一张上传刀具置于皮鞘/K板鞘内并挂载于硬朗皮带或战术背包上的逼真户外特写照片。\n\n场景：户外野外背景、皮衣质感、自然森林色调。\n\n焦点：产品契合度、安全携带系统、刀鞘与刀柄工艺。\n\n风格：面向美国买家的高端猎刀与 EDC 商业摄影。刀具与刀鞘保持一致。"
+      },
+      {
+        "id": "ok_tactical_01",
+        "title": "Tactical / Survival · 极地与恶劣环境强韧测试",
+        "scene_desc": "战术生存刀。岩石、寒冷或泥地环境，体现坚固、防锈与硬核品质。",
+        "target": "1:1",
+        "tags": [
+          "Tactical",
+          "Survival",
+          "硬核耐用"
+        ],
+        "prompt": "Create a realistic tough environment product shoot featuring the uploaded tactical outdoor knife.\n\nScene: wet granite rocks, cold alpine stream, or misty mountain terrain with dark muted natural lighting.\n\nShow: knife resting securely on rock or wood with water droplets, highlighting rugged finish, anti-reflective coating, and grip texture.\n\nStyle: military-inspired outdoor advertisement photography. No sci-fi or fantasy effects. Keep knife 100% identical.",
+        "prompt_zh": "制作一张展示上传战术户外刀的恶劣环境逼真产品特写。\n\n场景：湿润花岗岩、寒冷高山溪流或雾气弥漫的山地，采用深沉自然光。\n\n展示：刀具稳固于岩石或木头之上，配有水滴，突出硬朗表面处理、防反光涂层与手柄纹理。\n\n风格：军规灵感户外广告摄影。无科幻或幻想效果。刀具保持 100% 一致。"
+      },
+      {
+        "id": "ok_banner_01",
+        "title": "Outdoor Knife · 欧美独立站 16:9 横幅",
+        "scene_desc": "户外品牌官网 Banner。右侧放置刀具与露营场景，左侧留白写品牌标语。",
+        "target": "16:9",
+        "tags": [
+          "16:9",
+          "Outdoor Banner",
+          "官网首页"
+        ],
+        "prompt": "Create a cinematic 16:9 website hero banner for an outdoor knife brand.\n\nPlace the uploaded outdoor knife as the hero object on a wooden camp table on the right, with a beautiful blurred mountain landscape at sunset in the background.\n\nLeave clear negative space on the left side for brand text and buy button.\n\nLighting: warm golden sunset light.\n\nStyle: high-end US outdoor gear advertisement photograph.",
+        "prompt_zh": "为户外刀品牌制作一张电影感 16:9 网站 Hero Banner。\n\n上传户外刀作为主角，置于右侧木质营地桌上，背景为夕阳下美丽的模糊山景。\n\n左侧留出清晰负空间放置品牌文案与购买按钮。\n\n光线：暖金色落日余晖。\n\n风格：高端美式户外装备广告照片。"
+      }
+    ]
+  },
+  {
+    "id": "scissors_category",
+    "category": "scissors",
+    "category_name": "✂️ 剪刀品类 Scissors & Shears (SC)",
+    "subcategories": [
+      {
+        "id": "sc_poultry_01",
+        "title": "Poultry Shears · 鸡骨剪 / 厨房重型剪",
+        "scene_desc": "厨房剪核心场景。轻松剪烤鸡、家禽关节或硬质食材，干净利落。",
+        "target": "1:1",
+        "tags": [
+          "Poultry Shears",
+          "厨房剪",
+          "鸡骨剪"
+        ],
+        "prompt": "Create a realistic kitchen lifestyle photo using the uploaded heavy-duty poultry shears.\n\nScene: clean modern Western kitchen, wooden board, whole roasted chicken or fresh poultry, lemon and herbs.\n\nShow: natural hand holding shears correctly, effortlessly cutting through joint or bone with clean action.\n\nStyle: culinary commercial photography highlighting mechanical strength and sharp blades.\n\nKeep shears structure, spring, lock, and handle 100% identical.",
+        "prompt_zh": "制作一张使用上传重型鸡骨剪的逼真厨房生活方式照片。\n\n场景：干净现代西厨、木砧板、整只烤鸡或新鲜家禽、柠檬与香草。\n\n展示：自然手部正确握剪，轻松利落剪开关节或骨头。\n\n风格：突出机械力度与锋利刃口的美食商业摄影。\n\n剪刀结构、弹簧、锁扣与手柄保持 100% 一致。"
+      },
+      {
+        "id": "sc_garden_01",
+        "title": "Pruning Shears · 园艺剪 / 枝剪",
+        "scene_desc": "园艺剪。美式庭院、果树、花卉修剪，阳光自然打照。",
+        "target": "1:1",
+        "tags": [
+          "Pruning Shears",
+          "园艺剪",
+          "庭院修剪"
+        ],
+        "prompt": "Create a realistic gardening lifestyle photo featuring the uploaded pruning shears.\n\nScene: sunny American backyard garden, green foliage, rose bushes, or fruit tree branches.\n\nShow: gardener hand wearing light gardening gloves making a precise clean cut on a branch or flower stem.\n\nMood: healthy garden, relaxation, premium hand tools.\n\nStyle: outdoor home and garden brand photography. Keep product 100% identical.",
+        "prompt_zh": "制作一张展示上传园艺剪的逼真园艺生活方式照片。\n\n场景：阳光明媚的美式后院花园、绿叶、玫瑰灌木或果树枝条。\n\n展示：园丁手戴轻便园艺手套对枝条或花茎做精准干净的剪裁。\n\n氛围：健康花园、轻松闲适、高端手工具。\n\n风格：户外家居与园艺品牌摄影。产品保持 100% 一致。"
+      },
+      {
+        "id": "sc_tailor_01",
+        "title": "Tailor Shears · 裁缝剪 / 裁布剪",
+        "scene_desc": "裁缝剪/专业裁布剪。工作室工作台、各种织物、卷尺、平整剪切线条。",
+        "target": "1:1",
+        "tags": [
+          "Tailor Shears",
+          "裁缝剪",
+          "服装设计"
+        ],
+        "prompt": "Create a realistic craft studio scene featuring the uploaded professional tailor shears.\n\nScene: bright fashion design workshop, wooden cutting table, rolls of denim or cotton fabric, measuring tape.\n\nShow: hand guiding the shears flat along table cutting fabric in a smooth straight line.\n\nMood: craftsmanship, accuracy, professional design studio.\n\nStyle: premium craft tool commercial photography. Keep product identical.",
+        "prompt_zh": "制作一张展示上传专业裁缝剪的逼真手工工作室场景。\n\n场景：明亮服装设计工作室、木质裁剪台、牛仔或棉布卷、卷尺。\n\n展示：手部引导剪刀贴合台面平稳剪切面料成流畅直线。\n\n氛围：匠心、精准、专业设计工作室。\n\n风格：高端手工工具商业摄影。产品保持一致。"
+      },
+      {
+        "id": "sc_office_01",
+        "title": "Office / Craft Scissors · 办公剪 / 办公桌",
+        "scene_desc": "办公剪刀/学生剪。极简书桌、纸张、办公文具，温馨利落。",
+        "target": "1:1",
+        "tags": [
+          "Office Scissors",
+          "办公剪",
+          "文具"
+        ],
+        "prompt": "Create a realistic modern home office workspace photograph using the uploaded office scissors.\n\nScene: minimalist desk, oak surface, notebook, paper craft, clean indoor daylight.\n\nShow: precision paper cutting, neat office aesthetic popular in European stationary catalogs.\n\nKeep product 100% identical.",
+        "prompt_zh": "制作一张使用上传办公剪刀的现代居家办公桌面逼真照片。\n\n场景：极简书桌、橡木台面、笔记本、纸艺、干净室内日光。\n\n展示：精准剪纸、欧洲文具画册常见的整洁办公审美。\n\n产品保持 100% 一致。"
+      }
+    ]
+  },
+  {
+    "id": "accessories_category",
+    "category": "accessories",
+    "category_name": "🍳 厨房配件 Kitchen Accessories (KA)",
+    "subcategories": [
+      {
+        "id": "ka_board_01",
+        "title": "Cutting Board · 木质砧板与厨刀陈列",
+        "scene_desc": "相思木/黑胡桃木砧板。搭配厨刀、新鲜食材，展示木质纹理与耐用度。",
+        "target": "1:1",
+        "tags": [
+          "Cutting Board",
+          "砧板",
+          "木质纹理"
+        ],
+        "prompt": "Create a premium lifestyle product photo of the uploaded wooden cutting board.\n\nScene: bright modern kitchen, marble counter, soft natural window light.\n\nShow: board used as charcuterie platter or chopping surface with sliced cheese, grapes, herbs, and a professional chef knife resting neatly.\n\nFocus: rich wood grain, juice groove details, solid quality, anti-microbial clean appearance.\n\nStyle: high-end US kitchenware brand photography. Keep board 100% identical.",
+        "prompt_zh": "制作一张上传木质砧板的高端生活方式产品照片。\n\n场景：明亮现代厨房、大理石台面、柔和自然窗光。\n\n展示：砧板用作熟食拼盘或切菜台，摆放切片奶酪、葡萄、香草与平放的专业主厨刀。\n\n焦点：丰富木纹、导汁槽细节、扎实品质、干净卫生感。\n\n风格：美欧高端厨具品牌摄影。砧板保持 100% 一致。"
+      },
+      {
+        "id": "ka_sharpener_01",
+        "title": "Knife Sharpener · 磨刀器 / 磨刀石使用",
+        "scene_desc": "磨刀器/水磨石。磨刀姿势、金属微屑或水雾，体现轻松恢复锋利。",
+        "target": "1:1",
+        "tags": [
+          "Sharpener",
+          "磨刀器",
+          "磨刀石"
+        ],
+        "prompt": "Create a realistic product scene featuring the uploaded knife sharpener or whetstone.\n\nScene: modern kitchen workspace, wooden or stainless surface, soft clean lighting.\n\nShow: hand holding chef knife at correct 15-degree angle gliding smoothly through the sharpener slot or over wet stone.\n\nMood: maintenance, precision, sharp edge restoration.\n\nStyle: professional kitchen hardware advertising. Keep sharpener exactly identical.",
+        "prompt_zh": "制作一张展示上传磨刀器或磨刀石的逼真产品场景。\n\n场景：现代厨房工作区、木质或不锈钢台面、柔和干净光线。\n\n展示：手部持主厨刀保持 15 度角平稳划过磨刀槽或湿润砥石。\n\n氛围：保养、精准、恢复锋利。\n\n风格：专业厨房五金广告。磨刀器保持完全一致。"
+      },
+      {
+        "id": "ka_block_01",
+        "title": "Knife Block / Holder · 磁吸刀架 / 刀座",
+        "scene_desc": "磁吸木质刀架或插刀座。整齐陈列多把刀具，高端厨房收纳审美。",
+        "target": "1:1",
+        "tags": [
+          "Knife Block",
+          "刀架",
+          "磁吸刀座",
+          "厨房收纳"
+        ],
+        "prompt": "Create an elegant kitchen storage photograph featuring the uploaded magnetic knife block or holder.\n\nScene: luxury modern European kitchen counter, backsplash, organized kitchen vibe.\n\nShow: knife block displaying a neat set of chef knives securely attached, reflecting natural ambient daylight.\n\nStyle: high-end interior and kitchen accessory commercial shoot. Keep block structure identical.",
+        "prompt_zh": "制作一张展示上传磁吸刀架或刀座的优雅厨房收纳照片。\n\n场景：奢华现代欧洲厨房台面、防溅墙、井井有条的厨房氛围。\n\n展示：刀架整齐吸附展出一套主厨刀，反射自然环境日光。\n\n风格：高端室内与厨房配件商业拍摄。刀架结构保持一致。"
+      }
+    ]
+  },
+  {
+    "id": "brand_marketing",
+    "category": "brand",
+    "category_name": "🏢 独立站 / B2B 营销 Brand & B2B (BM)",
+    "subcategories": [
+      {
+        "id": "bm_b2b_factory_01",
+        "title": "B2B · 阳江工厂精工制造与质检 (QC)",
+        "scene_desc": "外贸 B2B 验厂级场景。干净现代工坊、工匠打磨、千分尺测量，体现 OEM/ODM 实力。",
+        "target": "1:1 / 16:9",
+        "tags": [
+          "B2B",
+          "工厂精工",
+          "质检QC",
+          "OEM/ODM"
+        ],
+        "prompt": "Create a realistic premium manufacturing and craft photograph featuring the uploaded knife/scissors being inspected or crafted.\n\nScene: clean, high-tech knife manufacturing workshop, polished steel workstation, precision measuring tools (caliper, micrometer).\n\nShow: skilled craftsman in clean work uniform inspecting blade edge geometry or handle fit with extreme precision under professional task lighting.\n\nMood: industrial excellence, quality control, precision engineering, trusted B2B OEM supplier.\n\nStyle: corporate industrial photography suitable for B2B supplier catalog, Alibaba International, and brand About Us page.\n\nKeep the product 100% identical.",
+        "prompt_zh": "制作一张展示上传刀/剪被检验或打磨的高端生产工艺逼真照片。\n\n场景：干净高科技刀具生产车间、抛光钢质工作台、精密测量工具（卡尺、千分尺）。\n\n展示：资深工匠身着干净工作服在专业工作灯下极精准地检测刀刃几何或手柄契合度。\n\n氛围：工业精湛、质量控制、精密工程、值得信赖的 B2B OEM 供应商。\n\n风格：适合 B2B 供应商目录、阿里国际站及品牌“关于我们”页面的企业工业摄影。\n\n产品保持 100% 一致。"
+      },
+      {
+        "id": "bm_b2b_packaging_01",
+        "title": "B2B · 高端定制礼盒与定制 Logo 包装",
+        "scene_desc": "B2B 买家重视包装。黑色哑光礼盒、烫金 Logo、EVA 内衬，高客单价质感。",
+        "target": "1:1",
+        "tags": [
+          "礼盒包装",
+          "Logo定制",
+          "B2B高客单"
+        ],
+        "prompt": "Create a premium commercial packaging photograph featuring the uploaded product alongside its high-end custom gift box.\n\nScene: elegant dark wooden or stone surface, soft directional studio spotlight.\n\nShow: black matte magnetic gift box open next to the knife, soft velvet or dense EVA foam insert custom molded to fit the knife perfectly.\n\nFocus: luxury unboxing experience, custom logo embossing, gift-ready presentation for Amazon FBA and B2B clients.\n\nKeep product identical.",
+        "prompt_zh": "制作一张展示上传产品及其配套高端定制礼盒的高端商业包装照片。\n\n场景：优雅深色木质或石材台面、柔和定向影棚聚光。\n\n展示：黑色哑光磁吸礼盒于刀具旁打开，软绒或高密度 EVA 海绵内衬完美开模契合刀具。\n\n焦点：奢华开箱体验、定制 Logo 压印、适合 Amazon FBA 与 B2B 客户的礼品级展示。\n\n产品保持一致。"
+      },
+      {
+        "id": "bm_hero_video_01",
+        "title": "Hero Video · 首屏 16:9 动态视频封面",
+        "scene_desc": "官网首页 16:9 背景视频静态帧。大马士革纹高光划过、食材水分迸发。",
+        "target": "16:9",
+        "tags": [
+          "16:9",
+          "视频封面",
+          "动态感"
+        ],
+        "prompt": "Create a dramatic 16:9 cinematic video keyframe featuring the uploaded knife.\n\nScene: dark moody kitchen studio, single dramatic side light highlighting steel texture.\n\nShow: blade slicing through a crisp ruby red tomato with water micro-droplets flying in macro ultra-slow-motion.\n\nMood: sharpness, high performance, luxury, cinematic impact.\n\nStyle: high-end TV commercial cinematography for premium global cookware brands.",
+        "prompt_zh": "制作一张展示上传刀具的戏剧感 16:9 电影级视频关键帧。\n\n场景：暗调影棚厨房、单一戏剧性侧光勾勒钢材纹理。\n\n展示：刀刃切过鲜红脆嫩番茄，微距超慢动作下飞溅水滴。\n\n氛围：极致锋利、高性能、奢华、电影级视觉冲击。\n\n风格：高端全球厨具品牌 TVC 广告级摄影。"
+      }
+    ]
+  },
+  {
+    "id": "video_prompts",
+    "category": "video",
+    "category_name": "🎬 AI 短视频提示词 Video Prompts (Sora / Kling / Runway)",
+    "subcategories": [
+      {
+        "id": "vp_knife_slice_01",
+        "title": "厨刀超慢动作切片 (Ultra Slow-Motion)",
+        "scene_desc": "TikTok/Reels 爆款视频，水灵番茄/牛肉薄切，突出极致锋利与大马士革光泽。",
+        "target": "9:16 / 16:9",
+        "tags": [
+          "AI视频",
+          "Sora/Kling",
+          "慢动作",
+          "极致锋利"
+        ],
+        "prompt": "Ultra-slow-motion cinematic commercial video (1000fps feel).\n\nThe knife from the photo slices smoothly through a ripe succulent red tomato on a dark wooden board.\n\nMicroscopic water droplets and tiny tomato seeds splash in super slow motion as the razor-sharp edge cuts cleanly without crushing the tomato.\n\nLighting: dramatic side key light illuminating the metallic Damascus blade grain and polished edge.\n\nCamera motion: slow tracking macro dolly forward.\n\nUltra-realistic texture, 8k resolution, no deformation, physically accurate physics.",
+        "prompt_zh": "超慢动作电影级商业视频（1000帧/秒视效）。\n\n参考图中的刀具在深色木砧板上极其平滑地切过一颗熟透水灵的红番茄。\n\n微观水滴与细小番茄籽在超慢动作下飞溅，极锋利的刃口干净切入而不压塌番茄。\n\n光线：戏剧性侧主光照亮大马士革金属纹理与抛光刃口。\n\n相机运动：缓慢前移的微距轨道推镜头。\n\n极度真实纹理、8k 超高清、无变形、物理准确。"
+      },
+      {
+        "id": "vp_outdoor_rope_01",
+        "title": "户外刀野外一刀切断硬质麻绳",
+        "scene_desc": "户外硬核演示。丛林背景，一刀利落斩断麻绳，纤维散开特写。",
+        "target": "9:16 / 16:9",
+        "tags": [
+          "AI视频",
+          "户外刀",
+          "斩断测试"
+        ],
+        "prompt": "Slow motion close-up action video of the outdoor knife.\n\nA hand holding the outdoor knife forcefully and cleanly slashes through a thick coiled hemp rope mounted on a wooden stump.\n\nRope fibers explode outwards instantly in clean cut fashion.\n\nSetting: sunlit forest camp, subtle dust particles floating in golden light.\n\nCamera motion: dynamic low-angle tracking shot.\n\nAuthentic physical impact, sharp sound visual cue, cinematic color grade.",
+        "prompt_zh": "户外刀慢动作特写动作视频。\n\n手持户外刀强劲利落地砍断固定于木桩上的粗麻绳。\n\n麻绳纤维瞬间向外爆开呈干净切口。\n\n环境：阳光森林营地，金色光线中飘浮细微尘埃。\n\n相机运动：动态低视角追踪镜头。\n\n真实物理冲击、锋利斩断视觉感、电影级调色。"
+      },
+      {
+        "id": "vp_scissors_paper_01",
+        "title": "剪刀平滑剪裁纸张/皮革 (Smooth Cut)",
+        "scene_desc": "剪刀性能演示。顺滑推进推剪，没有任何卡顿与抖动。",
+        "target": "9:16 / 16:9",
+        "tags": [
+          "AI视频",
+          "剪刀",
+          "顺滑剪裁"
+        ],
+        "prompt": "Macro slow motion video showcasing the cutting performance of the scissors.\n\nThe shears glide effortlessly through thick natural leather or heavy cardstock in one continuous, silky-smooth motion.\n\nShow close-up pivot mechanism rotating smoothly and precise blade edge alignment.\n\nLighting: bright studio lighting with metallic highlights.\n\nCamera angle: 45-degree macro focus tracking the cut line.",
+        "prompt_zh": "展示剪刀剪切性能的微距慢动作视频。\n\n剪刀以连续极度顺滑的动作轻松划剪穿过厚实天然皮革或重磅卡纸。\n\n近景展示支点结构平稳旋转与双刃口精准对齐。\n\n光线：带有金属高光的明亮影棚光。\n\n相机视角：45度微距焦点追踪剪裁线。"
+      }
+    ]
+  }
+]

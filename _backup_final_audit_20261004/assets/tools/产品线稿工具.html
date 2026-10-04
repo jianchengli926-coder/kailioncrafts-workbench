@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KaiLionCrafts - 批量智能线稿转化工具</title>
+    <style>
+        :root {
+            --bg-dark: #0d0d10;
+            --panel-bg: #16161a;
+            --accent: #eb4d4b;
+            --accent-blue: #3867d6;
+            --text-light: #f5f6fa;
+            --border: #2f3542;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 360px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.7);
+            z-index: 10;
+        }
+
+        .brand {
+            padding: 20px;
+            background: #0f0f12;
+            border-bottom: 1px solid var(--border);
+        }
+        .brand h1 { font-size: 16px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+        .brand p { font-size: 11px; color: #747d8c; margin-top: 4px; }
+
+        .controls-container {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-left: 3px solid var(--accent-blue);
+            padding-left: 8px;
+        }
+
+        /* 批量产品列表管理区 */
+        .product-list-section {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 160px;
+            overflow-y: auto;
+            background: #0b0b0d;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+        .product-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            background: #1e222b;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .product-item:hover { background: #262c38; }
+        .product-item.active {
+            border-color: var(--accent-blue);
+            background: #202838;
+        }
+        .product-item.global-item {
+            background: #1c1c24;
+            border: 1px dashed #4b6584;
+            justify-content: center;
+        }
+        .product-item.global-item.active {
+            background: var(--accent-blue);
+            border-style: solid;
+            border-color: #fff;
+        }
+        .product-item.global-item .product-name {
+            font-weight: bold;
+            color: #fff;
+            text-align: center;
+        }
+        .product-thumb {
+            width: 32px;
+            height: 32px;
+            object-fit: cover;
+            border-radius: 3px;
+            background: #000;
+        }
+        .product-name {
+            font-size: 11px;
+            color: #d1d1d6;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #a4b0be;
+        }
+        .control-label span.val {
+            font-family: monospace;
+            color: var(--accent-blue);
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: #3e3e4a;
+            border-radius: 2px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .btn {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .btn:hover { background: #4b7bec; }
+        .btn-secondary { background: #2f3542; color: #d1d1d6; }
+        .btn-secondary:hover { background: #3f4453; }
+        
+        .btn-mode {
+            background: #1e222b;
+            border: 1px dashed #57606f;
+            color: #fff;
+        }
+        .btn-mode.active {
+            background: var(--accent);
+            border-style: solid;
+            box-shadow: 0 0 10px rgba(235, 77, 75, 0.4);
+        }
+
+        .export-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: auto;
+        }
+
+        /* 核心画布工作区 */
+        .workspace {
+            flex: 1;
+            background: #08080a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+            position: relative;
+            overflow: auto;
+        }
+
+        .canvas-holder {
+            position: relative;
+            background: #faf8f5; 
+            box-shadow: 0 30px 70px rgba(0,0,0,0.8);
+            border-radius: 4px;
+            display: inline-block; 
+        }
+        .canvas-holder.mode-cursor { cursor: crosshair; }
+
+        canvas {
+            display: block;
+            max-width: 100%;
+            max-height: 82vh;
+            width: auto;
+            height: auto;
+        }
+
+        .dropzone {
+            border: 2px dashed #57606f;
+            padding: 60px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            background: var(--panel-bg);
+            max-width: 450px;
+            transition: all 0.3s;
+        }
+        .dropzone:hover { border-color: var(--accent-blue); background: #1c1d24; }
+        .dropzone svg { width: 48px; height: 48px; fill: #747d8c; margin-bottom: 15px; }
+
+        #fileInput { display: none; }
+        .loading-tip {
+            position: absolute;
+            background: rgba(0,0,0,0.9);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 13px;
+            display: none;
+            z-index: 20;
+            border: 1px solid #444;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar" id="sidebar" style="display: none;">
+        <div class="brand">
+            <h1>KaiLionCrafts</h1>
+            <p>生产级批量产品线稿渲染器</p>
+        </div>
+        
+        <div class="controls-container">
+            <button class="btn btn-secondary" onclick="triggerUpload()">重新批量导入产品图片</button>
+
+            <div class="section">
+                <div class="section-title">📦 产品批次队列管理</div>
+                <div id="current-mode-badge" style="font-size: 11px; font-weight: bold; padding: 2px 0;">当前状态：全局调整</div>
+                <div class="product-list-section" id="productList"></div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">线下笔触细腻度 (Pencil Aesthetics)</div>
+                <div class="control-group">
+                    <div class="control-label"><span>纸张齿痕散点 (Paper Tooth)</span><span class="val" id="v-tooth">15%</span></div>
+                    <input type="range" id="p-tooth" min="0" max="60" step="5" value="15">
+                </div>
+                <div class="control-group">
+                    <div class="control-label"><span>手描复合轮廓 (Multi-Stroke)</span><span class="val" id="v-weight">3.0</span></div>
+                    <input type="range" id="p-weight" min="1.0" max="8.0" step="0.5" value="3.0">
+                </div>
+                <div class="control-group">
+                    <div class="control-label"><span>石墨显色深浅 (Ink Depth)</span><span class="val" id="v-ink">1.8</span></div>
+                    <input type="range" id="p-ink" min="1.0" max="3.5" step="0.1" value="1.8">
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">真实手稿细节 (Hand-Drawn Details)</div>
+                <div class="control-group">
+                    <div class="control-label"><span>肌肉律动排线 (Hatching)</span><span class="val" id="v-hatch">25%</span></div>
+                    <input type="range" id="p-hatch" min="0" max="80" step="5" value="25">
+                </div>
+                <div class="control-group">
+                    <div class="control-label"><span>手描十字架定位线 (Draft Lines)</span><span class="val" id="v-layout">65%</span></div>
+                    <input type="range" id="p-layout" min="0" max="100" step="5" value="65">
+                </div>
+                <div class="control-group">
+                    <div class="control-label"><span>墨水晕染/历史斑驳 (Smudges)</span><span class="val" id="v-smudge">关</span></div>
+                    <input type="range" id="p-smudge" min="0" max="1" step="1" value="0">
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">手写设计标注 (Manuscript Callouts)</div>
+                <button class="btn btn-mode" id="labelBtn" onclick="toggleLabelMode()">✍️ 在当前图上添加专有标注</button>
+                <p style="font-size: 11px; color: #747d8c; margin-top: -4px; text-align: center;">提示：单品下鼠标直接拖拽图上[文字]或[圆圈]调换位置</p>
+                <button class="btn btn-secondary" style="font-size:11px; padding:6px;" onclick="clearLabels()">清除当前图所有标注</button>
+            </div>
+
+            <div class="export-group">
+                <button class="btn btn-secondary" onclick="exportCurrentSketch()">导出当前显示的高清图 (PNG)</button>
+                <button class="btn" onclick="exportAllSketches()">⚡ 自动批量导出所有产品线稿</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <div id="dropzone" class="dropzone" onclick="triggerUpload()">
+            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+            <p style="font-size:14px; color:#a4b0be;">点击或拖入多个产品照片<br><span style="font-size:11px;color:#747d8c;">(支持一次选择多张图片进入批量流水线)</span></p>
+        </div>
+
+        <div id="canvasHolder" class="canvas-holder" style="display: none;">
+            <canvas id="sketchCanvas"></canvas>
+        </div>
+
+        <div id="loadingTip" class="loading-tip">正在提取纤维笔触、揉入纸张齿痕...</div>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*" multiple>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const dropzone = document.getElementById('dropzone');
+        const canvasHolder = document.getElementById('canvasHolder');
+        const sidebar = document.getElementById('sidebar');
+        const canvas = document.getElementById('sketchCanvas');
+        const ctx = canvas.getContext('2d');
+        const loadingTip = document.getElementById('loadingTip');
+        const labelBtn = document.getElementById('labelBtn');
+        const productListContainer = document.getElementById('productList');
+        const modeBadge = document.getElementById('current-mode-badge');
+
+        // 核心批量状态管理
+        let imagesList = []; 
+        let activeIndex = -1; // -1 表示“全局批量模式”，>=0 表示“正在针对特定索引的品类进行局部单调”
+        
+        let isLabelMode = false;
+        let labels = [];
+        let bounds = { x1: 0, x2: 0, y1: 0, y2: 0 };
+        let draggedLabel = null;
+        let dragType = null; 
+
+        function triggerUpload() { fileInput.click(); }
+        fileInput.addEventListener('change', handleFileEvent);
+        
+        window.addEventListener('dragover', e => e.preventDefault());
+        window.addEventListener('drop', e => { 
+            e.preventDefault(); 
+            if(e.dataTransfer.files.length){ processBatchFiles(e.dataTransfer.files); } 
+        });
+
+        function handleFileEvent(e) {
+            if (e.target.files && e.target.files.length > 0) { processBatchFiles(e.target.files); }
+        }
+
+        // 批量加载流程
+        function processBatchFiles(files) {
+            loadingTip.innerText = "正在多通道解析图像元数据...";
+            loadingTip.style.display = 'block';
+            
+            imagesList = []; 
+            let loadedCount = 0;
+            const totalFiles = files.length;
+
+            for (let i = 0; i < totalFiles; i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        let w = img.width, h = img.height;
+                        const maxDim = 1800; 
+                        if (w > maxDim || h > maxDim) {
+                            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                            else { w = Math.round((w * maxDim) / h); h = maxDim; }
+                        }
+                        
+                        // 为每张产品图创建独立的局部参数快照
+                        imagesList.push({
+                            img: img,
+                            name: file.name,
+                            width: w,
+                            height: h,
+                            params: {
+                                tooth: parseInt(document.getElementById('p-tooth').value),
+                                weight: parseFloat(document.getElementById('p-weight').value),
+                                ink: parseFloat(document.getElementById('p-ink').value),
+                                hatch: parseInt(document.getElementById('p-hatch').value),
+                                layout: parseInt(document.getElementById('p-layout').value),
+                                smudge: parseInt(document.getElementById('p-smudge').value)
+                            },
+                            labels: [],
+                            bounds: { x1: 0, x2: 0, y1: 0, y2: 0 }
+                        });
+
+                        loadedCount++;
+                        if (loadedCount === totalFiles) {
+                            completeBatchLoading();
+                        }
+                    }
+                    img.src = event.target.result;
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function completeBatchLoading() {
+            dropzone.style.display = 'none';
+            canvasHolder.style.display = 'block';
+            sidebar.style.display = 'flex';
+            
+            // 初始化默认切换为“整体参数调节”
+            switchActiveMode(-1);
+            loadingTip.style.display = 'none';
+        }
+
+        // 生成更新左侧队列UI面板
+        function renderProductListUI() {
+            productListContainer.innerHTML = '';
+
+            // 1. 全局调节控制柄项
+            const globalItem = document.createElement('div');
+            globalItem.className = `product-item global-item ${activeIndex === -1 ? 'active' : ''}`;
+            globalItem.innerHTML = `<span class="product-name">🌐 1. 整体参数控制模式</span>`;
+            globalItem.onclick = () => switchActiveMode(-1);
+            productListContainer.appendChild(globalItem);
+
+            // 2. 局部各个品类列表项
+            imagesList.forEach((item, idx) => {
+                const itemEl = document.createElement('div');
+                itemEl.className = `product-item ${activeIndex === idx ? 'active' : ''}`;
+                itemEl.innerHTML = `
+                    <img class="product-thumb" src="${item.img.src}">
+                    <span class="product-name" title="${item.name}">${idx + 1}. ${item.name}</span>
+                `;
+                itemEl.onclick = () => switchActiveMode(idx);
+                productListContainer.appendChild(itemEl);
+            });
+        }
+
+        // 核心路由：切换操作靶向目标（整体 vs 单图细节调整）
+        function switchActiveMode(targetIdx) {
+            activeIndex = targetIdx;
+            renderProductListUI();
+
+            if (activeIndex === -1) {
+                modeBadge.innerText = "当前状态：⚙️ 批量整体调节 (参数联动所有图片)";
+                modeBadge.style.color = "var(--accent-blue)";
+                // 全局模式下默认将首张图作为基准预览
+                renderPipeline();
+            } else {
+                modeBadge.innerText = `当前状态：✏️ 正在细调第 ${activeIndex + 1} 个产品参数`;
+                modeBadge.style.color = "var(--accent)";
+                
+                // 将滑动条位置强行反向同步回当前被点击图片的特有参数上
+                const localParams = imagesList[activeIndex].params;
+                sliders.forEach(id => {
+                    const input = document.getElementById(`p-${id}`);
+                    input.value = localParams[id];
+                    
+                    let displayVal = localParams[id];
+                    if(id === 'hatch' || id === 'layout' || id === 'tooth') displayVal += '%';
+                    if(id === 'smudge') displayVal = displayVal == '1' ? '开' : '关';
+                    document.getElementById(`v-${id}`).innerText = displayVal;
+                });
+
+                renderPipeline();
+            }
+        }
+
+        // 滑动条事件分配劫持
+        const sliders = ['tooth', 'weight', 'ink', 'hatch', 'layout', 'smudge'];
+        sliders.forEach(id => {
+            document.getElementById(`p-${id}`).addEventListener('input', (e) => {
+                let val = parseFloat(e.target.value);
+                let displayVal = e.target.value;
+                if(id === 'hatch' || id === 'layout' || id === 'tooth') displayVal += '%';
+                if(id === 'smudge') displayVal = displayVal == '1' ? '开' : '关';
+                document.getElementById(`v-${id}`).innerText = displayVal;
+                
+                if (imagesList.length > 0) {
+                    if (activeIndex === -1) {
+                        // 整体调节：遍历刷新队列中所有品类的参数
+                        imagesList.forEach(item => {
+                            item.params[id] = val;
+                        });
+                    } else {
+                        // 独立调节：只针对当前在调品类改写
+                        imagesList[activeIndex].params[id] = val;
+                    }
+                    renderPipeline();
+                }
+            });
+        });
+
+        function toggleLabelMode() {
+            if (activeIndex === -1) {
+                alert("请先在下方产品列表中选择单个明确的产品，再为其进行手写体划线标注！");
+                return;
+            }
+            isLabelMode = !isLabelMode;
+            labelBtn.classList.toggle('active', isLabelMode);
+            canvasHolder.classList.toggle('mode-cursor', isLabelMode);
+        }
+
+        function clearLabels() { 
+            let targetIdx = activeIndex >= 0 ? activeIndex : 0;
+            if(imagesList[targetIdx]) {
+                imagesList[targetIdx].labels = []; 
+                renderPipeline(); 
+            }
+        }
+
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (e.clientX - rect.left) * scaleX,
+                y: (e.clientY - rect.top) * scaleY
+            };
+        }
+
+        // 鼠标按下
+        canvas.addEventListener('mousedown', function(e) {
+            if (imagesList.length === 0) return;
+            let targetIdx = activeIndex >= 0 ? activeIndex : 0;
+            const currentItem = imagesList[targetIdx];
+
+            const coords = getCanvasCoords(e);
+            const cx = coords.x;
+            const cy = coords.y;
+
+            if (isLabelMode) {
+                const text = prompt("请输入此处的线下工程手写体内容 (自动转大写):");
+                if(text) {
+                    const tx = cx > canvas.width / 2 ? cx + 140 : cx - 240;
+                    const ty = cy - 80 - (Math.random() * 20); 
+                    currentItem.labels.push({ cx, cy, tx, ty, text: text.toUpperCase() });
+                    renderPipeline();
+                }
+                toggleLabelMode();
+                return;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const scale = rect.width / canvas.width; 
+            const hitRadius = 35 / scale;            
+
+            for (let i = 0; i < currentItem.labels.length; i++) {
+                const lbl = currentItem.labels[i];
+                if (Math.hypot(cx - lbl.tx, cy - lbl.ty) < hitRadius + 30) {
+                    draggedLabel = lbl;
+                    dragType = 'text';
+                    return;
+                }
+                if (Math.hypot(cx - lbl.cx, cy - lbl.cy) < hitRadius) {
+                    draggedLabel = lbl;
+                    dragType = 'anchor';
+                    return;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            if (imagesList.length === 0) return;
+            let targetIdx = activeIndex >= 0 ? activeIndex : 0;
+            const currentItem = imagesList[targetIdx];
+            const coords = getCanvasCoords(e);
+
+            if (draggedLabel) {
+                if (dragType === 'text') {
+                    draggedLabel.tx = coords.x;
+                    draggedLabel.ty = coords.y;
+                } else if (dragType === 'anchor') {
+                    draggedLabel.cx = coords.x;
+                    draggedLabel.cy = coords.y;
+                }
+                renderPipeline();
+                return;
+            }
+
+            if (!isLabelMode) {
+                const rect = canvas.getBoundingClientRect();
+                const scale = rect.width / canvas.width;
+                const hitRadius = 30 / scale;
+                let isHovering = false;
+
+                for (let i = 0; i < currentItem.labels.length; i++) {
+                    const lbl = currentItem.labels[i];
+                    if (Math.hypot(coords.x - lbl.tx, coords.y - lbl.ty) < hitRadius + 30 || 
+                        Math.hypot(coords.x - lbl.cx, coords.y - lbl.cy) < hitRadius) {
+                        isHovering = true;
+                        break;
+                    }
+                }
+                canvas.style.cursor = isHovering ? 'move' : 'default';
+            }
+        });
+
+        window.addEventListener('mouseup', function() {
+            draggedLabel = null;
+            dragType = null;
+        });
+
+        // 渲染重组核心
+        function renderPipeline() {
+            if (imagesList.length === 0) return;
+            
+            let renderIdx = activeIndex >= 0 ? activeIndex : 0;
+            const currentItem = imagesList[renderIdx];
+
+            const w = currentItem.width, h = currentItem.height;
+            canvas.width = w;
+            canvas.height = h;
+
+            ctx.drawImage(currentItem.img, 0, 0, w, h);
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const pixels = imgData.data;
+
+            // 读取该图片自有的参数配置
+            const localParams = currentItem.params;
+            const paperTooth = localParams.tooth / 100;
+            const radius = Math.max(1, Math.round(localParams.weight));
+            const contrast = localParams.ink;
+            const hatchWeight = localParams.hatch / 100;
+            const layoutOpacity = localParams.layout / 100;
+            const enableSmudge = localParams.smudge;
+
+            const gray = new Uint8ClampedArray(w * h);
+            const invertedBlur = new Uint8ClampedArray(w * h);
+
+            let minX = w, maxX = 0, minY = h, maxY = 0;
+
+            for (let i = 0; i < pixels.length; i += 4) {
+                const idx = i / 4;
+                const r = pixels[i], g = pixels[i+1], b = pixels[i+2];
+                const gVal = 0.299 * r + 0.587 * g + 0.114 * b;
+                gray[idx] = gVal;
+                invertedBlur[idx] = 255 - gVal;
+
+                if (r < 245 || g < 245 || b < 245) {
+                    const x = idx % w, y = Math.floor(idx / w);
+                    if (x < minX) minX = x; if (x > maxX) maxX = x;
+                    if (y < minY) minY = y; if (y > maxY) maxY = y;
+                }
+            }
+            currentItem.bounds = { x1: minX, x2: maxX, y1: minY, y2: maxY };
+            bounds = currentItem.bounds; 
+
+            const blurred = new Uint8ClampedArray(w * h);
+            fastBoxBlur(invertedBlur, blurred, w, h, radius);
+
+            ctx.fillStyle = "#faf8f5";
+            ctx.fillRect(0, 0, w, h);
+            const outImgData = ctx.getImageData(0, 0, w, h);
+            const outPixels = outImgData.data;
+
+            for (let i = 0; i < gray.length; i++) {
+                const x = i % w, y = Math.floor(i / w);
+                const bVal = blurred[i];
+                const gVal = gray[i];
+
+                let sketch = 255;
+                if (bVal < 255) {
+                    sketch = (gVal * 255) / (255 - bVal);
+                }
+
+                let edgeDetail = 0;
+                if (x > 1 && x < w - 2 && y > 1 && y < h - 2) {
+                    const dx = gray[i + 1] - gray[i - 1];
+                    const dy = gray[i + w] - gray[i - w];
+                    edgeDetail = Math.sqrt(dx * dx + dy * dy);
+                }
+                if (edgeDetail > 12) {
+                    sketch -= (edgeDetail * 0.75 * contrast);
+                } else if (sketch < 225) {
+                    sketch += (225 - sketch) * 0.45;
+                }
+
+                if (hatchWeight > 0 && gVal < 190 && edgeDetail > 5) {
+                    const wave = Math.sin(x / 14) * 3;
+                    if (Math.floor(x + y * 1.1 + wave) % 10 === 0) {
+                        const sFactor = (190 - gVal) / 190;
+                        sketch -= (hatchWeight * sFactor * 130);
+                    }
+                }
+
+                if (sketch < 240 && paperTooth > 0) {
+                    const grain = (Math.random() - 0.5) * paperTooth * 120;
+                    sketch += grain;
+                }
+
+                sketch = 255 - (255 - sketch) * contrast;
+                if (sketch > 255) sketch = 255; if (sketch < 0) sketch = 0;
+
+                const cIdx = i * 4;
+                outPixels[cIdx] = Math.min(250, (sketch / 255) * 250);
+                outPixels[cIdx+1] = Math.min(248, (sketch / 255) * 248);
+                outPixels[cIdx+2] = Math.min(245, (sketch / 255) * 245);
+            }
+            ctx.putImageData(outImgData, 0, 0);
+
+            if (layoutOpacity > 0 && minX < maxX) {
+                const colorStr = `rgba(60, 75, 95, ${layoutOpacity * 0.4})`;
+                const ext = 90; 
+                const midY = minY + (maxY - minY) / 2;
+                const bX = minX + (maxX - minX) * 0.35;
+
+                drawOrganicLine(minX - ext, minY, maxX + ext, minY, colorStr);
+                drawOrganicLine(minX - ext, maxY, maxX + ext, maxY, colorStr);
+                drawOrganicLine(minX, minY - ext, minX, maxY + ext, colorStr);
+                drawOrganicLine(maxX, minY - ext, maxX, maxY + ext, colorStr);
+                drawOrganicLine(bX, minY - ext, bX, maxY + ext, colorStr);
+
+                ctx.save();
+                ctx.setLineDash([15, 6, 3, 6]);
+                drawOrganicLine(minX - ext, midY, maxX + ext, midY, `rgba(50, 65, 85, ${layoutOpacity * 0.35})`);
+                ctx.restore();
+
+                const drawHandCross = (cx, cy) => {
+                    drawOrganicLine(cx - 15, cy + (Math.random()-0.5)*2, cx + 15, cy + (Math.random()-0.5)*2, colorStr);
+                    drawOrganicLine(cx + (Math.random()-0.5)*2, cy - 15, cx + (Math.random()-0.5)*2, cy + 15, colorStr);
+                };
+                drawHandCross(minX, minY);
+                drawHandCross(maxX, minY);
+                drawHandCross(minX, maxY);
+                drawHandCross(maxX, maxY);
+                drawHandCross(bX, midY);
+            }
+
+            if (enableSmudge === 1 && minX < maxX) {
+                drawRealisticSmudges(minX, maxX, minY, maxY);
+            }
+
+            // 映射加载当前图片特有的标注数据
+            labels = currentItem.labels;
+            drawManuscriptCallouts();
+        }
+
+        function drawOrganicLine(x1, y1, x2, y2, colorStyle) {
+            ctx.save();
+            ctx.strokeStyle = colorStyle;
+            ctx.lineWidth = 0.8 + Math.random() * 0.4;
+
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            const midX = (x1 + x2) / 2 + (Math.random() - 0.5) * 1.5;
+            const midY = (y1 + y2) / 2 + (Math.random() - 0.5) * 1.5;
+            ctx.quadraticCurveTo(midX, midY, x2, y2);
+            ctx.stroke();
+
+            if (Math.random() > 0.2) {
+                ctx.strokeStyle = colorStyle.replace(/[\d\.]+\)$/, "0.15)"); 
+                ctx.lineWidth = 0.5;
+                ctx.beginPath();
+                ctx.moveTo(x1 + (Math.random()-0.5)*2, y1 + (Math.random()-0.5)*2);
+                ctx.lineTo(x2 + (Math.random()-0.5)*2, y2 + (Math.random()-0.5)*2);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawRealisticSmudges(x1, x2, y1, y2) {
+            ctx.save();
+            const spots = [
+                {x: x1 + 30, y: y1 - 35, r: 10, a: 0.02},  
+                {x: x1 + 35, y: y1 - 30, r: 3, a: 0.03},
+                {x: x1 - 20, y: y2 + 10, r: 15, a: 0.02},  
+                {x: x2 - 80, y: y1 - 60, r: 12, a: 0.02}
+            ];
+
+            spots.forEach(s => {
+                const grad = ctx.createRadialGradient(s.x, s.y, s.r * 0.1, s.x, s.y, s.r);
+                grad.addColorStop(0, `rgba(80, 65, 50, ${s.a})`); 
+                grad.addColorStop(0.3, `rgba(80, 65, 50, ${s.a * 0.5})`);
+                grad.addColorStop(1, "rgba(250, 248, 245, 0)");
+                
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.restore();
+        }
+
+        function drawManuscriptCallouts() {
+            labels.forEach(lbl => {
+                ctx.save();
+                ctx.strokeStyle = "rgba(20, 30, 45, 0.85)";
+                ctx.lineWidth = 1.0;
+                ctx.beginPath();
+                ctx.arc(lbl.cx, lbl.cy, 5, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                drawOrganicLine(lbl.cx - 10, lbl.cy, lbl.cx + 10, lbl.cy, "rgba(20, 30, 45, 0.7)");
+                drawOrganicLine(lbl.cx, lbl.cy - 10, lbl.cx, lbl.cy + 10, "rgba(20, 30, 45, 0.7)");
+
+                ctx.strokeStyle = "rgba(35, 45, 60, 0.9)";
+                ctx.lineWidth = 1.1;
+                ctx.beginPath();
+                ctx.moveTo(lbl.cx, lbl.cy);
+                
+                const ctrlX = lbl.cx + (lbl.tx - lbl.cx) * 0.2;
+                const ctrlY = lbl.cy + (lbl.ty - lbl.cy) * 0.9;
+                ctx.quadraticCurveTo(ctrlX, ctrlY, lbl.tx, lbl.ty);
+                ctx.stroke();
+
+                ctx.fillStyle = "#16191f";
+                ctx.font = "700 13px 'Courier New', 'BlinkMacSystemFont', monospace";
+                
+                ctx.translate(lbl.tx, lbl.ty - 6);
+                ctx.transform(1, 0, 0.08, 1, 0, 0); 
+                ctx.fillText(lbl.text, 0, 0);
+                
+                ctx.restore();
+                ctx.save();
+
+                const textWidth = ctx.measureText(lbl.text).width * 0.85; 
+                drawOrganicLine(lbl.tx, lbl.ty, lbl.tx + textWidth + 25, lbl.ty, "rgba(0,0,0,0.35)");
+
+                ctx.restore();
+            });
+        }
+
+        function fastBoxBlur(src, dest, w, h, r) {
+            const temp = new Uint8ClampedArray(w * h);
+            for (let y = 0; y < h; y++) {
+                let sum = 0;
+                const rowOffset = y * w;
+                for (let x = -r; x <= r; x++) {
+                    sum += src[rowOffset + Math.min(w - 1, Math.max(0, x))];
+                }
+                for (let x = 0; x < w; x++) {
+                    temp[rowOffset + x] = sum / (2 * r + 1);
+                    const nextX = Math.min(w - 1, x + r + 1);
+                    const prevX = Math.max(0, x - r);
+                    sum += src[rowOffset + nextX] - src[rowOffset + prevX];
+                }
+            }
+            for (let x = 0; x < w; x++) {
+                let sum = 0;
+                for (let y = -r; y <= r; y++) {
+                    sum += temp[Math.min(h - 1, Math.max(0, y)) * w + x];
+                }
+                for (let y = 0; y < h; y++) {
+                    dest[y * w + x] = sum / (2 * r + 1);
+                    const nextY = Math.min(h - 1, y + r + 1);
+                    const prevY = Math.max(0, y - r);
+                    sum += temp[nextY * w + x] - temp[prevY * w + x];
+                }
+            }
+        }
+
+        // 单图导出
+        function exportCurrentSketch() {
+            if (imagesList.length === 0) return;
+            let renderIdx = activeIndex >= 0 ? activeIndex : 0;
+            const link = document.createElement('a');
+            link.download = `Sketch_${imagesList[renderIdx].name.replace(/\.[^/.]+$/, "")}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // 全队列批量导出
+        async function exportAllSketches() {
+            if (imagesList.length === 0) return;
+            
+            const originIdx = activeIndex; 
+            loadingTip.innerText = "⚡ 正在启动批量离线渲染导出引擎...";
+            loadingTip.style.display = 'block';
+
+            for (let i = 0; i < imagesList.length; i++) {
+                loadingTip.innerText = `正在导出第 (${i+1}/${imagesList.length}) 张: ${imagesList[i].name}`;
+                
+                activeIndex = i;
+                renderPipeline();
+
+                const link = document.createElement('a');
+                link.download = `Sketch_Batch_${imagesList[i].name.replace(/\.[^/.]+$/, "")}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+                await new Promise(resolve => setTimeout(resolve, 350));
+            }
+
+            switchActiveMode(originIdx);
+            loadingTip.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

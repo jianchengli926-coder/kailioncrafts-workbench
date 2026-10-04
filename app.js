@@ -18679,11 +18679,17 @@ function viewKnowledge(root){
   if(knowCat!=='全部') list=list.filter(k=>k.cat===knowCat);
   if(knowQ){ const q=knowQ.toLowerCase(); list=list.filter(k=>(k.title+k.content+k.tags).toLowerCase().includes(q)); }
   root.innerHTML=`
-    <div class="flex gap8 mb16">
-      ${cats.map(c=>`<button class="btn ${knowCat===c?'btn-gold':'btn-outline'}" onclick="knowCat='${c}';renderView()">${c}</button>`).join('')}
-      <input class="form-control" style="width:200px;margin-left:auto" placeholder="搜索知识库..." value="${esc(knowQ)}" oninput="knowQ=this.value;renderView()">
+    <div class="flex gap8 mb16" style="align-items:center">
+      <button class="btn btn-outline" onclick="kbSearchState._showLegacy=false;renderView()">← 返回知识库</button>
+      <h2 style="margin:0;font-size:18px">📝 业务笔记</h2>
+      <span style="margin-left:auto;font-size:12px;color:#718096">${list.length} 条记录</span>
+    </div>
+    <div class="flex gap8 mb16" style="flex-wrap:wrap">
+      ${cats.map(c=>`<button class="btn btn-sm ${knowCat===c?'btn-gold':'btn-outline'}" onclick="knowCat='${c}';renderView()">${c}</button>`).join('')}
+    </div>
+    <div class="flex gap8 mb16" style="flex-wrap:wrap">
+      <input class="form-control" style="width:200px" placeholder="搜索知识库..." value="${esc(knowQ)}" oninput="knowQ=this.value;renderView()">
       <button class="btn btn-gold" onclick="kbSearchState._showLegacy=false;renderView()">🔍 公司知识库检索</button>
-      <button class="btn btn-outline" onclick="kbSearchState._showLegacy=true;renderView()">📝 业务笔记</button>
       <button class="btn" onclick="knowBrain=true;renderView()">🧠 业务大脑</button>
       <button class="btn" style="background:linear-gradient(135deg,#c9a961,#8b6914);color:#fff" onclick="prospectKB=true;renderView()">📊 外贸开发知识库</button>
       <button class="btn btn-primary" onclick="openKnowForm()">＋ 新增</button>

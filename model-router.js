@@ -6,9 +6,9 @@
  *   openai_proxy（GPT中转站，OpenAI兼容） → glm（智谱） → ollama（本地）
  *
  * 模型链：
- * - 普通文本：gpt-4o → gpt-4o-mini → glm-4-flash → qwen3.5:9b → qwen2.5:7b
- * - 推理：gpt-4o → glm-4-flash → qwen3.5:9b → deepseek-r1:7b
- * - 视觉：gpt-4o → glm-4.6v-flash → qwen3.5:9b → qwen2.5vl:7b
+ * - 普通文本：gpt-5.6-terra → glm-4-flash → qwen3.5:9b → qwen2.5:7b
+ * - 推理：gpt-5.6-terra → glm-4-flash → qwen3.5:9b → deepseek-r1:7b
+ * - 视觉：gpt-5.6-terra → glm-4.6v-flash → qwen3.5:9b → qwen2.5vl:7b
  * - 生图：cogview-3-flash → x/flux2-klein:4b-fp4
  * - Embedding：nomic-embed-text:latest（固定）
  *
@@ -26,10 +26,11 @@ const ModelTrace = require('./model-trace.js');
 // 模型链配置（集中定义，不重复硬编码）
 // ============================================================
 
+// 2026-10-05: First hop changed from gpt-4o (not available on wawapi proxy) to gpt-5.6-terra
 const MODEL_CHAINS = {
-  text: ['gpt-4o', 'gpt-4o-mini', 'glm-4-flash', 'qwen3.5:9b', 'qwen2.5:7b'],
-  reasoning: ['gpt-4o', 'glm-4-flash', 'qwen3.5:9b', 'deepseek-r1:7b'],
-  vision: ['gpt-4o', 'glm-4.6v-flash', 'qwen3.5:9b', 'qwen2.5vl:7b'],
+  text: ['gpt-5.6-terra', 'glm-4-flash', 'qwen3.5:9b', 'qwen2.5:7b'],
+  reasoning: ['gpt-5.6-terra', 'glm-4-flash', 'qwen3.5:9b', 'deepseek-r1:7b'],
+  vision: ['gpt-5.6-terra', 'glm-4.6v-flash', 'qwen3.5:9b', 'qwen2.5vl:7b'],
   image: ['cogview-3-flash', 'x/flux2-klein:4b-fp4'],
   embedding: ['nomic-embed-text:latest']
 };
@@ -41,9 +42,11 @@ const CLOUD_MODELS = new Set([
 ]);
 
 // GPT中转站（openai_proxy，OpenAI 兼容格式）提供的模型列表
+// 2026-10-05: Aligned with actual wawapi.top /v1/models response (8 models)
 const OPENAI_PROXY_MODELS = new Set([
-  'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo',
-  'claude-3-5-sonnet', 'gemini-2.0-flash'
+  'gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra',
+  'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol',
+  'codex-auto-review'
 ]);
 
 // 本地模型列表

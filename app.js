@@ -12298,7 +12298,7 @@ function viewPlans(root){
         </div>
       </div>
       <div style="margin-top:12px;padding:10px 14px;background:#fffbeb;border-radius:6px;font-size:12px;color:#92400e;line-height:1.6">
-        💡 <b>今日建议</b>：本周还需新增 <b style="color:#ef4444">' + Math.max(0, weekTarget.customers - weekNewCustomers) + '</b> 个客户，发送 <b style="color:#ef4444">' + Math.max(0, weekTarget.emails - weekEmails) + '</b> 封开发信。建议每天新增3-5个客户，发送10-15封开发信。
+        💡 <b>今日建议</b>：本周还需新增 <b style="color:#ef4444">${Math.max(0, weekTarget.customers - weekNewCustomers)}</b> 个客户，发送 <b style="color:#ef4444">${Math.max(0, weekTarget.emails - weekEmails)}</b> 封开发信。建议每天新增3-5个客户，发送10-15封开发信。
       </div>
     </div>
 
@@ -17340,7 +17340,7 @@ function viewSettings(root){
       if(badge){
         const oai = (cfg && cfg.openai_proxy) || {};
         badge.outerHTML = oai.configured
-          ? `<span id="oaiProxyStatusBadge" class="badge" style="background:#dcfce7;color:#166534">✅ 已配置 · ${esc(oai.currentModel||'gpt-4o')}</span>`
+          ? `<span id="oaiProxyStatusBadge" class="badge" style="background:#dcfce7;color:#166534">✅ 已配置 · ${esc(oai.currentModel||'gpt-5.6-terra')}</span>`
           : `<span id="oaiProxyStatusBadge" class="badge" style="background:#fef3c7;color:#92400e">⚠️ 未配置（使用服务端默认路由）</span>`;
       }
     }catch(e){}
@@ -20686,7 +20686,7 @@ function viewReports(root){
       <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #eee">
         <div style="font-size:12px;font-weight:700;color:#2b6cb0;margin-bottom:6px">🌍 市场拓展优先级</div>
         <div class="text-xs text-muted" style="line-height:1.8">
-          ${PROSPECT_KB.markets.map((m,i)=>`<div style="display:flex;justify-content:space-between"><span>${i+1}. ${m.name.split(' ')[0]}</span><span style="color:${i<2?'#38a169':i<4?'#d69e2e':'#718096'}">${'★'*(5-i)}</span></div>`).join('')}
+          ${(PROSPECT_KB.markets||[]).map((m,i)=>`<div style="display:flex;justify-content:space-between"><span>${i+1}. ${(m.name||'未知').split(' ')[0]}</span><span style="color:${i<2?'#38a169':i<4?'#d69e2e':'#718096'}">${'★'.repeat(Math.max(0,5-i))}</span></div>`).join('')}
         </div>
       </div>
       <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #eee">
@@ -40526,9 +40526,10 @@ function renderAiModelRouterCard(){
   const oai = cfg.openai_proxy || {};
   const configured = !!oai.configured;
   const statusBadge = configured
-    ? `<span id="oaiProxyStatusBadge" class="badge" style="background:#dcfce7;color:#166534">✅ 已配置 · ${esc(oai.currentModel||'gpt-4o')}</span>`
+    ? `<span id="oaiProxyStatusBadge" class="badge" style="background:#dcfce7;color:#166534">✅ 已配置 · ${esc(oai.currentModel||'gpt-5.6-terra')}</span>`
     : `<span id="oaiProxyStatusBadge" class="badge" style="background:#fef3c7;color:#92400e">⚠️ 未配置（使用服务端默认路由）</span>`;
-  const models = ['','gpt-4o','gpt-4o-mini','gpt-4-turbo','claude-3-5-sonnet','gemini-2.0-flash','glm-4-flash','qwen3.5:9b'];
+  // 2026-10-05: Aligned with actual available models (wawapi proxy + GLM + local Ollama)
+  const models = ['','gpt-5.6-terra','gpt-5.5','gpt-6-astra','glm-4-flash','glm-4.7-flash','qwen3.5:9b','deepseek-r1:7b','qwen2.5:7b'];
   return `
   <div class="card card-pad mb16" style="border-left:4px solid #10b981">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">

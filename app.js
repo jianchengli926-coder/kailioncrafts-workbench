@@ -6151,12 +6151,18 @@ function getTimelineEvents(cid, limit=50){
   S.whatsappTemplates = DB.load('whatsappTemplates') || [];
   S.whatsappTasks = DB.load('whatsappTasks') || [];
   S.whatsappRecords = DB.load('whatsappRecords') || [];
+  // P5 Phase5: AI intelligence, insights, quality, feishu broadcast, WA compliance
+  S.p5ClassifyHistory = DB.load('p5ClassifyHistory') || [];
+  S.p5ActionSuggestions = DB.load('p5ActionSuggestions') || [];
+  S.p5SuggestionMeta = DB.load('p5SuggestionMeta') || {lastGenerated:null, generationCount:0};
+  S.p5AuditLogs = DB.load('p5AuditLogs') || [];
+  S.p5FeishuConfig = DB.load('p5FeishuConfig') || {webhookUrl:'', pushTime:'09:00', enabled:false, contentToggles:{pendingTasks:true,yesterdayStats:true,followUpCount:true,highIntent:true,aiSuggestions:true}, lastPushedAt:null, pushHistory:[]};
 
   // V74.5 全局null清理：把所有为null的数组初始化为空数组，防止页面渲染崩溃
   Object.keys(S).forEach(k => {
     if (S[k] === null) {
       // 根据属性名判断应该初始化为数组还是对象
-      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','importBatches','replyDrafts','dormantCustomers','wakeupDrafts','warmupTasks','apiKeys','apiCallLogs','webhooks','webhookLogs','aiImageHistory','whatsappAccounts','whatsappTemplates','whatsappTasks','whatsappRecords'];
+      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','importBatches','replyDrafts','dormantCustomers','wakeupDrafts','warmupTasks','apiKeys','apiCallLogs','webhooks','webhookLogs','aiImageHistory','whatsappAccounts','whatsappTemplates','whatsappTasks','whatsappRecords','p5ClassifyHistory','p5ActionSuggestions','p5AuditLogs'];
       if (arrayKeys.includes(k)) S[k] = [];
       else S[k] = {};
     }
@@ -6227,6 +6233,12 @@ function persist(){
   DB.save('whatsappTemplates', S.whatsappTemplates||[]);
   DB.save('whatsappTasks', S.whatsappTasks||[]);
   DB.save('whatsappRecords', S.whatsappRecords||[]);
+  // P5 Phase5: persist new data fields
+  DB.save('p5ClassifyHistory', S.p5ClassifyHistory||[]);
+  DB.save('p5ActionSuggestions', S.p5ActionSuggestions||[]);
+  DB.save('p5SuggestionMeta', S.p5SuggestionMeta||{});
+  DB.save('p5AuditLogs', S.p5AuditLogs||[]);
+  DB.save('p5FeishuConfig', S.p5FeishuConfig||{});
 }
 
 /* V74.6 导出客户数据为CSV */

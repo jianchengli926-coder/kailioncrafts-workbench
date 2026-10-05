@@ -4463,6 +4463,89 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
     return v1Send(404, { error: 'not found', code: 'ENDPOINT_NOT_FOUND' });
   }
 
+  // ============ Phase 5: Feishu Broadcast Proxy ============
+  // Browser -> local server -> Feishu custom bot webhook.
+  // Avoids CORS: browsers cannot POST directly to open.feishu.cn.
+  if (pathname === '/api/feishu/send' && req.method === 'POST') {
+    try {
+      const body = await readBody(req);
+      const webhookUrl = body.webhookUrl;
+      const card = body.card;
+
+      if (!webhookUrl || typeof webhookUrl !== 'string') {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: false, error: 'webhookUrl is required' }));
+        return;
+      }
+      if (!card || typeof card !== 'object') {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: false, error: 'card payload is required' }));
+        return;
+      }
+
+      // Parse the webhook URL to get host and path.
+      let u;
+      try { u = new URL(webhookUrl); } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: false, error: 'invalid webhookUrl: ' + e.message }));
+        return;
+      }
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: false, error: 'webhookUrl must be http(s)' }));
+        return;
+      }
+
+      const payloadStr = JSON.stringify(card);
+      const isHttps = u.protocol === 'https:';
+      const mod = isHttps ? https : http;
+
+      const feishuResp = await new Promise((resolve, reject) => {
+        const options = {
+          hostname: u.hostname,
+          port: u.port || (isHttps ? 443 : 80),
+          path: u.pathname + u.search,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payloadStr)
+          },
+          timeout: 10000
+        };
+        const fr = mod.request(options, (fresp) => {
+          let data = '';
+          fresp.on('data', (chunk) => { data += chunk; });
+          fresp.on('end', () => {
+            resolve({ statusCode: fresp.statusCode, body: data });
+          });
+        });
+        fr.on('error', (e) => reject(e));
+        fr.on('timeout', () => { fr.destroy(new Error('Feishu webhook timeout (10s)')); });
+        fr.write(payloadStr);
+        fr.end();
+      });
+
+      // Try to parse Feishu response JSON.
+      let feishuJson = null;
+      try { feishuJson = JSON.parse(feishuResp.body); } catch (e) { /* non-JSON response */ }
+
+      // Feishu returns {"code":0,"msg":"success"} on success.
+      const ok = feishuResp.statusCode >= 200 && feishuResp.statusCode < 300
+        && (!feishuJson || feishuJson.code === 0 || feishuJson.StatusCode === 0);
+
+      res.writeHead(ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        success: ok,
+        feishuStatus: feishuResp.statusCode,
+        feishuResponse: feishuJson || feishuResp.body
+      }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: false, error: e.message }));
+    }
+    return;
+  }
+
   // ============ 静态文件 ============
   let filePath;
   if (pathname === '/' || pathname === '') {

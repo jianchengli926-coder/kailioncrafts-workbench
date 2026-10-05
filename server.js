@@ -19,6 +19,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
 const { URL } = require('url');
+const querystring = require('querystring');
 const dns = require('dns');
 // P2.2B-2: 模型路由和故障转移
 const ModelRouter = require('./model-router');
@@ -4703,6 +4704,244 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
         feishuStatus: feishuResp.statusCode,
         feishuResponse: feishuJson || feishuResp.body
       }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: false, error: e.message }));
+    }
+    return;
+  }
+
+  // ============ Phase 7: OpenStreetMap Overpass Local Business Search ============
+  // Free OSM Overpass API proxy with caching and rate limiting.
+  // Searches for businesses (knife/kitchen/outdoor shops) by location and radius.
+  if (pathname === '/api/osm/search' && req.method === 'POST') {
+    try {
+      const body = await readBody(req);
+      const category = (body.category || 'kitchen').toLowerCase();
+      const city = (body.city || '').trim();
+      const country = (body.country || '').trim();
+      const radius = Math.min(parseInt(body.radius || '5000', 10), 50000);
+      const limit = Math.min(parseInt(body.limit || '50', 10), 200);
+
+      if (!city && !country) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: false, error: 'city or country is required' }));
+        return;
+      }
+
+      // Cache key
+      const cacheKey = `${category}:${city}:${country}:${radius}:${limit}`;
+      const osmCachePath = path.join(ROOT_DIR, 'data', 'osm_cache.json');
+      let osmCache = {};
+      try {
+        if (fs.existsSync(osmCachePath)) {
+          osmCache = JSON.parse(fs.readFileSync(osmCachePath, 'utf8'));
+        }
+      } catch (e) { osmCache = {}; }
+
+      // Return cached result if less than 24 hours old
+      if (osmCache[cacheKey] && (Date.now() - osmCache[cacheKey].cachedAt) < 86400000) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: true, results: osmCache[cacheKey].results, cached: true }));
+        return;
+      }
+
+      // Build Overpass QL query
+      // Category to OSM shop/amenity tags mapping
+      const tagMap = {
+        kitchen: ['shop=kitchen', 'shop=houseware', 'shop=hardware', 'shop=doityourself'],
+        knives: ['shop=hardware', 'shop=doityourself', 'shop=outdoor', 'shop=sports'],
+        outdoor: ['shop=outdoor', 'shop=sports', 'shop=camping', 'shop=hunting'],
+        general: ['shop=hardware', 'shop=wholesale', 'shop=import']
+      };
+      const tags = tagMap[category] || tagMap.general;
+
+      const areaClause = city
+        ? `area["name"="${city}"]${country ? `["is_in:country"="${country}"]` : ''}->.searchArea;`
+        : `area["name"="${country}"]->.searchArea;`;
+
+      const tagClauses = tags.map(t => {
+        const [k, v] = t.split('=');
+        return `node["${k}"="${v}"](area.searchArea); way["${k}"="${v}"](area.searchArea); relation["${k}"="${v}"](area.searchArea);`;
+      }).join('\n');
+
+      const overpassQuery = `[out:json][timeout:30];
+${areaClause}
+(
+${tagClauses}
+);
+out center tags ${limit};`;
+
+      // Rate limiting: max 1 request per 3 seconds to Overpass
+      const lastOsmCall = global._lastOsmCall || 0;
+      const waitTime = Math.max(0, 3000 - (Date.now() - lastOsmCall));
+      if (waitTime > 0) {
+        await new Promise(r => setTimeout(r, waitTime));
+      }
+      global._lastOsmCall = Date.now();
+
+      // Call Overpass API
+      const overpassUrl = 'https://overpass-api.de/api/interpreter';
+      const overpassResp = await new Promise((resolve, reject) => {
+        const postData = querystring.stringify({ data: overpassQuery });
+        const u = new URL(overpassUrl);
+        const options = {
+          hostname: u.hostname,
+          port: 443,
+          path: u.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Length': Buffer.byteLength(postData),
+            'User-Agent': 'KaiLionCrafts-Prospect/1.0 (local B2B tool)'
+          },
+          timeout: 35000
+        };
+        const req2 = https.request(options, (res2) => {
+          let data = '';
+          res2.on('data', chunk => data += chunk);
+          res2.on('end', () => resolve({ statusCode: res2.statusCode, body: data }));
+        });
+        req2.on('error', reject);
+        req2.on('timeout', () => { req2.destroy(); reject(new Error('Overpass timeout')); });
+        req2.write(postData);
+        req2.end();
+      });
+
+      if (overpassResp.statusCode !== 200) {
+        // Try fallback Overpass instance
+        const fallbackUrl = 'https://overpass.kumi.systems/api/interpreter';
+        // ... simplified: return error with retry hint
+        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: false, error: 'Overpass API returned ' + overpassResp.statusCode + ', please retry in a few seconds' }));
+        return;
+      }
+
+      const osmData = JSON.parse(overpassResp.body);
+      const results = (osmData.elements || []).map(el => {
+        const tags = el.tags || {};
+        const lat = el.lat || (el.center && el.center.lat) || null;
+        const lon = el.lon || (el.center && el.center.lon) || null;
+        return {
+          id: el.type + '/' + el.id,
+          name: tags.name || tags['name:en'] || 'Unnamed',
+          type: el.type,
+          category: tags.shop || tags.amenity || tags.office || '',
+          address: [tags['addr:housenumber'], tags['addr:street'], tags['addr:city'], tags['addr:country']].filter(Boolean).join(', '),
+          city: tags['addr:city'] || city,
+          country: tags['addr:country'] || country,
+          lat: lat,
+          lon: lon,
+          website: tags.website || tags.contact_website || '',
+          phone: tags.phone || tags.contact_phone || '',
+          email: tags.email || tags.contact_email || '',
+          openingHours: tags.opening_hours || '',
+          rawTags: tags
+        };
+      }).filter(r => r.name && r.name !== 'Unnamed');
+
+      // Cache the result
+      osmCache[cacheKey] = { results: results, cachedAt: Date.now() };
+      try {
+        if (!fs.existsSync(path.join(ROOT_DIR, 'data'))) {
+          fs.mkdirSync(path.join(ROOT_DIR, 'data'), { recursive: true });
+        }
+        fs.writeFileSync(osmCachePath, JSON.stringify(osmCache, null, 2));
+      } catch (e) { /* cache write failure is non-fatal */ }
+
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: true, results: results, total: results.length, cached: false }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: false, error: e.message }));
+    }
+    return;
+  }
+
+  // ============ Phase 7: MCP Server (Basic Version) ============
+  // Exposes workbench capabilities (search customers, get customer detail,
+  // generate draft, view send tasks) to external AI assistants via HTTP.
+  // This is a simplified MCP-compatible endpoint; full MCP SDK not required.
+  if (pathname === '/api/mcp/tools' && req.method === 'GET') {
+    const tools = [
+      { name: 'search_customers', description: 'Search customers by keyword, country, or status', inputSchema: { type: 'object', properties: { query: { type: 'string' }, country: { type: 'string' }, status: { type: 'string' } } } },
+      { name: 'get_customer_detail', description: 'Get detailed information about a customer', inputSchema: { type: 'object', properties: { customerId: { type: 'string' } }, required: ['customerId'] } },
+      { name: 'generate_outreach_draft', description: 'Generate an email outreach draft for a customer (draft only, never sends)', inputSchema: { type: 'object', properties: { customerId: { type: 'string' }, purpose: { type: 'string' } }, required: ['customerId'] } },
+      { name: 'list_send_tasks', description: 'List today\'s send tasks and pending follow-ups', inputSchema: { type: 'object', properties: { date: { type: 'string' } } } },
+      { name: 'query_knowledge', description: 'Search the company knowledge base', inputSchema: { type: 'object', properties: { query: { type: 'string' }, topK: { type: 'number' } }, required: ['query'] } }
+    ];
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ success: true, tools: tools, server: 'KaiLionCrafts MCP', version: '1.0-basic' }));
+    return;
+  }
+
+  if (pathname === '/api/mcp/call' && req.method === 'POST') {
+    try {
+      const body = await readBody(req);
+      const toolName = body.tool;
+      const args = body.arguments || {};
+
+      // Load state from data directory (MCP reads the same localStorage-backed files)
+      const dataDir = path.join(ROOT_DIR, 'data');
+      const loadJson = (name, def) => {
+        try {
+          const p = path.join(dataDir, name + '.json');
+          if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+        } catch (e) {}
+        return def;
+      };
+
+      let result = null;
+      if (toolName === 'search_customers') {
+        const customers = loadJson('customers', []);
+        const q = (args.query || '').toLowerCase();
+        const filtered = customers.filter(c => {
+          if (args.country && (c.country || '').toLowerCase() !== args.country.toLowerCase()) return false;
+          if (args.status && c.status !== args.status) return false;
+          if (q) {
+            const hay = (c.company + ' ' + (c.contact && c.contact.email) + ' ' + (c.tags || []).join(' ')).toLowerCase();
+            if (hay.indexOf(q) < 0) return false;
+          }
+          return true;
+        }).slice(0, 50).map(c => ({ id: c.id, company: c.company, country: c.country, status: c.status, email: c.contact && c.contact.email }));
+        result = { count: filtered.length, customers: filtered };
+      } else if (toolName === 'get_customer_detail') {
+        const customers = loadJson('customers', []);
+        const c = customers.find(x => x.id === args.customerId);
+        if (!c) { result = { error: 'customer not found' }; }
+        else {
+          result = {
+            id: c.id, company: c.company, country: c.country, city: c.city,
+            contact: c.contact, status: c.status, tags: c.tags, products: c.products,
+            website: c.website, leadScore: c.leadScore, notes: c.notes,
+            createdAt: c.createdAt, lastInteraction: c.lastInteraction
+          };
+        }
+      } else if (toolName === 'list_send_tasks') {
+        const dailyTasks = loadJson('dailySendTasks', []);
+        const today = args.date || new Date().toISOString().slice(0, 10);
+        const todayTasks = dailyTasks.filter(t => (t.date || '').slice(0, 10) === today);
+        result = { date: today, count: todayTasks.length, tasks: todayTasks.map(t => ({ id: t.id, customer: t.customerName, type: t.type, status: t.status, scheduledTime: t.scheduledTime })) };
+      } else if (toolName === 'query_knowledge') {
+        result = { note: 'Knowledge search requires the /api/kb/search endpoint with full-text index. Use query="' + (args.query || '') + '" via /api/kb/search.' };
+      } else if (toolName === 'generate_outreach_draft') {
+        result = { note: 'Draft generation requires AI model call. This MCP endpoint returns a template only. Use the workbench UI for AI-generated drafts.', customerId: args.customerId, template: { subject: 'Inquiry about ' + (args.purpose || 'your products'), body: 'Dear Sir/Madam,\n\nI came across your company and would like to introduce KaiLionCrafts...\n\nBest regards' } };
+      } else {
+        result = { error: 'unknown tool: ' + toolName };
+      }
+
+      // Log MCP call
+      try {
+        const mcpLogPath = path.join(dataDir, 'mcp_logs.json');
+        let logs = [];
+        if (fs.existsSync(mcpLogPath)) logs = JSON.parse(fs.readFileSync(mcpLogPath, 'utf8'));
+        logs.push({ time: new Date().toISOString(), tool: toolName, args: args, resultCount: result && result.count });
+        if (logs.length > 500) logs = logs.slice(-500);
+        fs.writeFileSync(mcpLogPath, JSON.stringify(logs));
+      } catch (e) {}
+
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: true, tool: toolName, result: result }));
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ success: false, error: e.message }));

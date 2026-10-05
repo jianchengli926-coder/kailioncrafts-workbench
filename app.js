@@ -6167,12 +6167,33 @@ function getTimelineEvents(cid, limit=50){
   S.p6WarmupDialogues = DB.load('p6WarmupDialogues') || [];
   S.p6ReplyQualityAudits = DB.load('p6ReplyQualityAudits') || [];
   S.p6ScoreTraceCache = DB.load('p6ScoreTraceCache') || {};
+  // P7 Phase7: 15 P2 AI upgrade features
+  S.p7LearningRecords = DB.load('p7LearningRecords') || [];
+  S.p7LearnedPatterns = DB.load('p7LearnedPatterns') || [];
+  S.p7LearningStats = DB.load('p7LearningStats') || {totalEdits:0, patternsLearned:0, mostModifiedParts:{}, lastAnalysis:null};
+  S.p7NlRules = DB.load('p7NlRules') || [];
+  S.p7RuleTriggers = DB.load('p7RuleTriggers') || [];
+  S.p7NegotiationAnalysis = DB.load('p7NegotiationAnalysis') || {};
+  S.p7NlQueryHistory = DB.load('p7NlQueryHistory') || [];
+  S.p7BestSendTimes = DB.load('p7BestSendTimes') || {};
+  S.p7OsmSearches = DB.load('p7OsmSearches') || [];
+  S.p7OsmCache = DB.load('p7OsmCache') || {};
+  S.p7DataSources = DB.load('p7DataSources') || {ai_search:{enabled:true,name:'AI搜索'},customs:{enabled:true,name:'海关数据'},osm:{enabled:true,name:'OSM本地商家'}};
+  S.p7MarketRotation = DB.load('p7MarketRotation') || {currentMarket:'',stats:{},lastRecommendation:null};
+  S.p7WebResearch = DB.load('p7WebResearch') || [];
+  S.p7Invoices = DB.load('p7Invoices') || [];
+  S.p7InvoiceConfig = DB.load('p7InvoiceConfig') || {companyName:'KaiLionCrafts',bankInfo:{},invoicePrefix:'PI',nextNumber:1};
+  S.p7CsvSyncLogs = DB.load('p7CsvSyncLogs') || [];
+  S.p7CsvSyncConfig = DB.load('p7CsvSyncConfig') || {fieldMapping:{},direction:'export',lastSync:null};
+  S.p7GeoContents = DB.load('p7GeoContents') || [];
+  S.p7McpConfig = DB.load('p7McpConfig') || {enabled:false,port:8765,apiKey:'',logs:[]};
+  S.p7ModelRouting = DB.load('p7ModelRouting') || {research:'deepseek-r1:7b',writing:'gpt-5.6-terra',summary:'glm-4-flash',enabled:true};
 
   // V74.5 全局null清理：把所有为null的数组初始化为空数组，防止页面渲染崩溃
   Object.keys(S).forEach(k => {
     if (S[k] === null) {
       // 根据属性名判断应该初始化为数组还是对象
-      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','importBatches','replyDrafts','dormantCustomers','wakeupDrafts','warmupTasks','apiKeys','apiCallLogs','webhooks','webhookLogs','aiImageHistory','whatsappAccounts','whatsappTemplates','whatsappTasks','whatsappRecords','p5ClassifyHistory','p5ActionSuggestions','p5AuditLogs','p6Sequences','p6SequenceAssignments','p6FallbackSuggestions','p6BriefingHistory','p6DeliverabilityReports','p6WarmupDialogues','p6ReplyQualityAudits'];
+      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','importBatches','replyDrafts','dormantCustomers','wakeupDrafts','warmupTasks','apiKeys','apiCallLogs','webhooks','webhookLogs','aiImageHistory','whatsappAccounts','whatsappTemplates','whatsappTasks','whatsappRecords','p5ClassifyHistory','p5ActionSuggestions','p5AuditLogs','p6Sequences','p6SequenceAssignments','p6FallbackSuggestions','p6BriefingHistory','p6DeliverabilityReports','p6WarmupDialogues','p6ReplyQualityAudits','p7LearningRecords','p7LearnedPatterns','p7NlRules','p7RuleTriggers','p7NlQueryHistory','p7OsmSearches','p7WebResearch','p7Invoices','p7CsvSyncLogs','p7GeoContents'];
       if (arrayKeys.includes(k)) S[k] = [];
       else S[k] = {};
     }
@@ -6259,6 +6280,27 @@ function persist(){
   DB.save('p6WarmupDialogues', S.p6WarmupDialogues||[]);
   DB.save('p6ReplyQualityAudits', S.p6ReplyQualityAudits||[]);
   DB.save('p6ScoreTraceCache', S.p6ScoreTraceCache||{});
+  // P7 Phase7: persist new data fields
+  DB.save('p7LearningRecords', S.p7LearningRecords||[]);
+  DB.save('p7LearnedPatterns', S.p7LearnedPatterns||[]);
+  DB.save('p7LearningStats', S.p7LearningStats||{});
+  DB.save('p7NlRules', S.p7NlRules||[]);
+  DB.save('p7RuleTriggers', S.p7RuleTriggers||[]);
+  DB.save('p7NegotiationAnalysis', S.p7NegotiationAnalysis||{});
+  DB.save('p7NlQueryHistory', S.p7NlQueryHistory||[]);
+  DB.save('p7BestSendTimes', S.p7BestSendTimes||{});
+  DB.save('p7OsmSearches', S.p7OsmSearches||[]);
+  DB.save('p7OsmCache', S.p7OsmCache||{});
+  DB.save('p7DataSources', S.p7DataSources||{});
+  DB.save('p7MarketRotation', S.p7MarketRotation||{});
+  DB.save('p7WebResearch', S.p7WebResearch||[]);
+  DB.save('p7Invoices', S.p7Invoices||[]);
+  DB.save('p7InvoiceConfig', S.p7InvoiceConfig||{});
+  DB.save('p7CsvSyncLogs', S.p7CsvSyncLogs||[]);
+  DB.save('p7CsvSyncConfig', S.p7CsvSyncConfig||{});
+  DB.save('p7GeoContents', S.p7GeoContents||[]);
+  DB.save('p7McpConfig', S.p7McpConfig||{});
+  DB.save('p7ModelRouting', S.p7ModelRouting||{});
 }
 
 /* V74.6 导出客户数据为CSV */

@@ -1532,6 +1532,170 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
     return;
   }
 
+  // P6-13: Deliverability pre-send health check (SPF / DKIM / DMARC / DNSBL)
+  // Uses Node.js built-in dns module — free, no paid API.
+  // Optimized: parallel queries with per-query 3s timeouts, overall 15s timeout.
+  if (pathname === '/api/deliverability/check' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const params = JSON.parse(body || '{}');
+        const domain = String(params.domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        if (!domain) {
+          res.writeHead(400, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({success:false, error:'domain 必填'}));
+          return;
+        }
+        const dkimSelectors = Array.isArray(params.dkimSelectors) && params.dkimSelectors.length
+          ? params.dkimSelectors
+          : ['google','default','selector1','selector2','mail','k1','s1'];
+
+        const timeoutMs = 15000;
+        const timer = setTimeout(() => {
+          if (!res.writableEnded) {
+            res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+            res.end(JSON.stringify({success:true, domain, partial:true, error:'timeout', checkedAt:new Date().toISOString()}));
+          }
+        }, timeoutMs);
+
+        // Per-query timeout helper: race DNS query against a 3s timer
+        const withTimeout = (promise, ms) => Promise.race([
+          promise,
+          new Promise((resolve) => setTimeout(() => resolve({found:false, records:[], error:'timeout', timeout:true}), ms))
+        ]);
+        const resolveTxtSafe = (name) => withTimeout(new Promise((resolve) => {
+          dns.resolveTxt(name, (err, records) => {
+            if (err) resolve({found:false, records:[], error: err.code || err.message});
+            else resolve({found:true, records: records.map(r => r.join(' ')), error:null});
+          });
+        }), 3000);
+        const resolveMxSafe = () => withTimeout(new Promise((resolve) => {
+          dns.resolveMx(domain, (err, addresses) => {
+            if (err) resolve([]);
+            else resolve((addresses||[]).map(r => ({exchange:r.exchange, priority:r.priority})));
+          });
+        }), 3000).then(r => Array.isArray(r) ? r : []);
+        const resolve4Safe = (host) => withTimeout(new Promise((resolve) => {
+          dns.resolve4(host, (err, addrs) => {
+            if (err) resolve([]);
+            else resolve(addrs||[]);
+          });
+        }), 3000).then(r => Array.isArray(r) ? r : []);
+
+        (async () => {
+          // Run SPF, DMARC, MX in parallel
+          const [spfResult, dmarcResult, mxRecords] = await Promise.all([
+            resolveTxtSafe(domain),
+            resolveTxtSafe('_dmarc.' + domain),
+            resolveMxSafe()
+          ]);
+
+          // 1. SPF
+          const spfRecord = (spfResult.records || []).find(r => /v=spf1/i.test(r));
+          const spf = {
+            status: spfRecord ? 'pass' : (spfResult.error === 'ENOTFOUND' || spfResult.error === 'ENODATA' ? 'fail' : 'warn'),
+            record: spfRecord || null,
+            detail: spfRecord ? 'SPF 记录已配置' : (spfResult.error ? '未找到 SPF TXT 记录 ('+spfResult.error+')' : '未找到 SPF 记录'),
+            fix: spfRecord ? null : '在域名 DNS 中添加 TXT 记录：v=spf1 include:_spf.google.com ~all（根据实际服务商调整）'
+          };
+
+          // 2. DKIM — try top 4 selectors in parallel, then remaining if none found
+          let dkimPass = false, dkimRecord = null, dkimSelectorUsed = null, dkimTried = [];
+          const trySelectors = async (sels) => {
+            const results = await Promise.all(sels.map(sel =>
+              resolveTxtSafe(sel + '._domainkey.' + domain).then(r => ({sel, r}))
+            ));
+            for (const {sel, r} of results) {
+              dkimTried.push({selector: sel, found: r.found});
+              const rec = (r.records || []).find(x => /v=dkim1/i.test(x) || /p=/.test(x));
+              if (rec && !dkimPass) { dkimPass = true; dkimRecord = rec; dkimSelectorUsed = sel; }
+            }
+          };
+          await trySelectors(dkimSelectors.slice(0, 4));
+          if (!dkimPass && dkimSelectors.length > 4) await trySelectors(dkimSelectors.slice(4));
+          const dkim = {
+            status: dkimPass ? 'pass' : 'warn',
+            selector: dkimSelectorUsed,
+            record: dkimRecord,
+            triedSelectors: dkimTried,
+            detail: dkimPass ? ('DKIM 已配置 (selector=' + dkimSelectorUsed + ')') : '未检测到 DKIM 签名（已尝试常用 selector）',
+            fix: dkimPass ? null : '在邮箱服务商后台启用 DKIM，获取 selector 和公钥，添加 TXT 记录到 selector._domainkey.' + domain
+          };
+
+          // 3. DMARC
+          const dmarcRecord = (dmarcResult.records || []).find(r => /v=dmarc1/i.test(r));
+          const dmarcPolicy = dmarcRecord ? (dmarcRecord.match(/p=([^;]+)/)||[])[1] : null;
+          const dmarc = {
+            status: dmarcRecord ? (dmarcPolicy === 'none' ? 'warn' : 'pass') : 'fail',
+            policy: dmarcPolicy,
+            record: dmarcRecord || null,
+            detail: dmarcRecord ? ('DMARC 已配置，策略 p=' + (dmarcPolicy||'none')) : '未找到 DMARC 记录',
+            fix: dmarcRecord ? (dmarcPolicy === 'none' ? '建议将策略从 p=none 逐步升级为 p=quarantine / p=reject' : null) : '添加 TXT 记录到 _dmarc.' + domain + '：v=DMARC1; p=none; rua=mailto:dmarc@' + domain
+          };
+
+          // 4. DNSBL blacklist check — resolve MX IPs in parallel, then check DNSBLs in parallel
+          const dnsblZones = ['zen.spamhaus.org','bl.spamcop.net'];
+          const mxIps = [];
+          if (mxRecords.length) {
+            const ipResults = await Promise.all(mxRecords.slice(0, 2).map(mx =>
+              resolve4Safe(mx.exchange).then(ips => ips.slice(0, 1).map(ip => ({ip, mx: mx.exchange})))
+            ));
+            ipResults.forEach(arr => arr.forEach(x => mxIps.push(x)));
+          }
+          const dnsblResults = [];
+          let listed = false;
+          if (mxIps.length) {
+            const blChecks = await Promise.all(mxIps.flatMap(({ip, mx}) =>
+              dnsblZones.map(zone => {
+                const blName = ip.split('.').reverse().join('.') + '.' + zone;
+                return withTimeout(new Promise((resolve) => {
+                  dns.resolve4(blName, (err) => resolve(!err));
+                }), 3000).then(r => ({ip, mx, zone, listed: r === true}));
+              })
+            ));
+            blChecks.forEach(r => { dnsblResults.push(r); if (r.listed) listed = true; });
+          }
+          const blacklist = {
+            status: listed ? 'fail' : (mxRecords.length ? 'pass' : 'warn'),
+            listed: listed,
+            checks: dnsblResults,
+            detail: listed ? '⚠️ 检测到 MX IP 在黑名单中' : (mxRecords.length ? 'MX IP 未在主要黑名单中' : '未找到 MX 记录，无法检查黑名单'),
+            fix: listed ? '检查发送行为，申请从黑名单移除' : null
+          };
+
+          // 5. Overall score
+          const passCount = [spf, dkim, dmarc, blacklist].filter(x => x.status === 'pass').length;
+          const failCount = [spf, dkim, dmarc, blacklist].filter(x => x.status === 'fail').length;
+          const overall = failCount > 0 ? 'fail' : (passCount >= 3 ? 'pass' : 'warn');
+          const score = Math.round((passCount * 25) + ([spf, dkim, dmarc, blacklist].filter(x => x.status === 'warn').length * 12));
+
+          clearTimeout(timer);
+          if (!res.writableEnded) {
+            res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+            res.end(JSON.stringify({
+              success:true, domain, overall, score,
+              spf, dkim, dmarc, blacklist,
+              mxRecords: mxRecords.slice(0,5),
+              checkedAt: new Date().toISOString()
+            }));
+          }
+        })().catch(e => {
+          clearTimeout(timer);
+          if (!res.writableEnded) {
+            res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+            res.end(JSON.stringify({success:true, domain, overall:'warn', score:0, error:e.message, checkedAt:new Date().toISOString()}));
+          }
+        });
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({success:false, error:'Deliverability检查失败: '+e.message}));
+      }
+    });
+    return;
+  }
+
   // P2.2B-2: 模型生成（带故障转移）
   if (pathname === '/api/ai/generate' && req.method === 'POST') {
     if (!requireAuth(req, res)) return;

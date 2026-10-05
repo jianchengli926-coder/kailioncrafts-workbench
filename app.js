@@ -6157,12 +6157,22 @@ function getTimelineEvents(cid, limit=50){
   S.p5SuggestionMeta = DB.load('p5SuggestionMeta') || {lastGenerated:null, generationCount:0};
   S.p5AuditLogs = DB.load('p5AuditLogs') || [];
   S.p5FeishuConfig = DB.load('p5FeishuConfig') || {webhookUrl:'', pushTime:'09:00', enabled:false, contentToggles:{pendingTasks:true,yesterdayStats:true,followUpCount:true,highIntent:true,aiSuggestions:true}, lastPushedAt:null, pushHistory:[]};
+  // P6 Phase6: 12 P1 core capabilities
+  S.p6Sequences = DB.load('p6Sequences') || [];
+  S.p6SequenceAssignments = DB.load('p6SequenceAssignments') || [];
+  S.p6TierConfig = DB.load('p6TierConfig') || null;
+  S.p6FallbackSuggestions = DB.load('p6FallbackSuggestions') || [];
+  S.p6BriefingHistory = DB.load('p6BriefingHistory') || [];
+  S.p6DeliverabilityReports = DB.load('p6DeliverabilityReports') || [];
+  S.p6WarmupDialogues = DB.load('p6WarmupDialogues') || [];
+  S.p6ReplyQualityAudits = DB.load('p6ReplyQualityAudits') || [];
+  S.p6ScoreTraceCache = DB.load('p6ScoreTraceCache') || {};
 
   // V74.5 全局null清理：把所有为null的数组初始化为空数组，防止页面渲染崩溃
   Object.keys(S).forEach(k => {
     if (S[k] === null) {
       // 根据属性名判断应该初始化为数组还是对象
-      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','importBatches','replyDrafts','dormantCustomers','wakeupDrafts','warmupTasks','apiKeys','apiCallLogs','webhooks','webhookLogs','aiImageHistory','whatsappAccounts','whatsappTemplates','whatsappTasks','whatsappRecords','p5ClassifyHistory','p5ActionSuggestions','p5AuditLogs'];
+      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','importBatches','replyDrafts','dormantCustomers','wakeupDrafts','warmupTasks','apiKeys','apiCallLogs','webhooks','webhookLogs','aiImageHistory','whatsappAccounts','whatsappTemplates','whatsappTasks','whatsappRecords','p5ClassifyHistory','p5ActionSuggestions','p5AuditLogs','p6Sequences','p6SequenceAssignments','p6FallbackSuggestions','p6BriefingHistory','p6DeliverabilityReports','p6WarmupDialogues','p6ReplyQualityAudits'];
       if (arrayKeys.includes(k)) S[k] = [];
       else S[k] = {};
     }
@@ -6239,6 +6249,16 @@ function persist(){
   DB.save('p5SuggestionMeta', S.p5SuggestionMeta||{});
   DB.save('p5AuditLogs', S.p5AuditLogs||[]);
   DB.save('p5FeishuConfig', S.p5FeishuConfig||{});
+  // P6 Phase6: persist new data fields
+  DB.save('p6Sequences', S.p6Sequences||[]);
+  DB.save('p6SequenceAssignments', S.p6SequenceAssignments||[]);
+  DB.save('p6TierConfig', S.p6TierConfig||{});
+  DB.save('p6FallbackSuggestions', S.p6FallbackSuggestions||[]);
+  DB.save('p6BriefingHistory', S.p6BriefingHistory||[]);
+  DB.save('p6DeliverabilityReports', S.p6DeliverabilityReports||[]);
+  DB.save('p6WarmupDialogues', S.p6WarmupDialogues||[]);
+  DB.save('p6ReplyQualityAudits', S.p6ReplyQualityAudits||[]);
+  DB.save('p6ScoreTraceCache', S.p6ScoreTraceCache||{});
 }
 
 /* V74.6 导出客户数据为CSV */

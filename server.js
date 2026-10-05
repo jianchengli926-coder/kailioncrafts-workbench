@@ -3937,6 +3937,140 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
     return;
   }
 
+  // ============ P2: Email Open/Click Pixel Tracking ============
+  // Tracking data is stored in tracking_data.json (project root).
+  // The open/click callback routes are PUBLIC because email clients cannot
+  // carry the workbench session cookie. Token creation and event queries
+  // require authentication.
+  const TRACKING_DATA_FILE = path.join(ROOT_DIR, 'tracking_data.json');
+  const PIXEL_GIF_BUF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+
+  function loadTrackingData() {
+    try {
+      if (!fs.existsSync(TRACKING_DATA_FILE)) return { tokens: {} };
+      const raw = fs.readFileSync(TRACKING_DATA_FILE, 'utf-8');
+      const obj = JSON.parse(raw);
+      if (!obj || typeof obj !== 'object' || !obj.tokens) return { tokens: {} };
+      return obj;
+    } catch (e) {
+      log('Tracking data read failed: ' + e.message, 'WARN');
+      return { tokens: {} };
+    }
+  }
+
+  function saveTrackingData(data) {
+    try {
+      fs.writeFileSync(TRACKING_DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (e) {
+      log('Tracking data write failed: ' + e.message, 'WARN');
+    }
+  }
+
+  // Public: record open event and return 1x1 transparent GIF
+  if (pathname.startsWith('/api/track/open/') && req.method === 'GET') {
+    const token = pathname.replace('/api/track/open/', '').replace(/\/$/, '');
+    const data = loadTrackingData();
+    const entry = data.tokens[token];
+    if (entry) {
+      if (!entry.events) entry.events = [];
+      const ua = req.headers['user-agent'] || '';
+      const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
+      entry.events.push({ time: new Date().toISOString(), ip: ip, userAgent: ua, type: 'open' });
+      // Cap events per token at 500 to prevent unbounded growth
+      if (entry.events.length > 500) entry.events = entry.events.slice(-500);
+      saveTrackingData(data);
+      log('Pixel open recorded for token ' + token.substring(0, 8) + '...', 'INFO');
+    }
+    // Always return the pixel even if token not found (avoid leaking info)
+    res.writeHead(200, {
+      'Content-Type': 'image/gif',
+      'Content-Length': PIXEL_GIF_BUF.length,
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache'
+    });
+    res.end(PIXEL_GIF_BUF);
+    return;
+  }
+
+  // Public: record click event and 302 redirect to original URL
+  if (pathname.startsWith('/api/track/click/') && req.method === 'GET') {
+    const token = pathname.replace('/api/track/click/', '').replace(/\/$/, '');
+    const targetUrl = reqUrl.searchParams.get('url') || '';
+    const data = loadTrackingData();
+    const entry = data.tokens[token];
+    if (entry) {
+      if (!entry.events) entry.events = [];
+      const ua = req.headers['user-agent'] || '';
+      const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
+      entry.events.push({ time: new Date().toISOString(), ip: ip, userAgent: ua, type: 'click', target: targetUrl });
+      if (entry.events.length > 500) entry.events = entry.events.slice(-500);
+      saveTrackingData(data);
+      log('Click recorded for token ' + token.substring(0, 8) + '...', 'INFO');
+    }
+    // Validate redirect target to prevent open redirect abuse
+    let safeTarget = '/';
+    if (targetUrl && /^https?:\/\//i.test(targetUrl)) {
+      safeTarget = targetUrl;
+    }
+    res.writeHead(302, { 'Location': safeTarget });
+    res.end();
+    return;
+  }
+
+  // Auth required: create a tracking token
+  if (pathname === '/api/track/token' && req.method === 'POST') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const body = await readBody(req);
+      const token = crypto.randomBytes(16).toString('hex');
+      const data = loadTrackingData();
+      data.tokens[token] = {
+        customerId: body.customerId || '',
+        draftId: body.draftId || '',
+        email: body.email || '',
+        category: body.category || '',
+        createdAt: new Date().toISOString(),
+        events: []
+      };
+      saveTrackingData(data);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: true, token: token }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: false, error: e.message }));
+    }
+    return;
+  }
+
+  // Auth required: query tracking events by customerId
+  if (pathname === '/api/track/events' && req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
+    const customerId = reqUrl.searchParams.get('customerId') || '';
+    const data = loadTrackingData();
+    const results = [];
+    for (const [token, entry] of Object.entries(data.tokens)) {
+      if (customerId && entry.customerId !== customerId) continue;
+      const opens = entry.events.filter(e => e.type === 'open');
+      const clicks = entry.events.filter(e => e.type === 'click');
+      results.push({
+        token: token,
+        customerId: entry.customerId,
+        draftId: entry.draftId,
+        email: entry.email,
+        category: entry.category,
+        createdAt: entry.createdAt,
+        openCount: opens.length,
+        clickCount: clicks.length,
+        lastOpenAt: opens.length ? opens[opens.length - 1].time : null,
+        lastClickAt: clicks.length ? clicks[clicks.length - 1].time : null,
+        events: entry.events || []
+      });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ success: true, events: results }));
+    return;
+  }
+
   // ============ 静态文件 ============
   let filePath;
   if (pathname === '/' || pathname === '') {

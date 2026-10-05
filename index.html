@@ -668,6 +668,36 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
   .cat-knowledge-panel{position:fixed!important;left:12px!important;right:12px!important;width:auto!important;max-height:60vh;top:auto!important;bottom:80px}
 }
 
+/* ===== P2 Phase2: Daily Send / Email Accounts / Tracking ===== */
+.p2-quota-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.p2-quota-chip{flex:1;min-width:120px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;text-align:center}
+.p2-quota-chip .num{font-size:22px;font-weight:800;color:#2c5282}
+.p2-quota-chip .lbl{font-size:11px;color:#64748b;margin-top:2px}
+.p2-quota-chip.full{border-color:#fc8181;background:#fff5f5}
+.p2-quota-chip.full .num{color:#e53e3e}
+.p2-quota-chip.warn .num{color:#dd6b20}
+.p2-task-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}
+.p2-task-card.sent{border-left:4px solid #38a169;opacity:.85}
+.p2-task-card.skipped{border-left:4px solid #a0aec0;opacity:.6}
+.p2-task-card.pending{border-left:4px solid #3182ce}
+.p2-task-main{flex:1;min-width:220px}
+.p2-task-meta{font-size:11px;color:#64748b;margin-top:3px}
+.p2-task-actions{display:flex;gap:6px;flex-wrap:wrap}
+.p2-cat-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;color:#fff}
+.p2-email-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid #3182ce}
+.p2-email-card.full{border-left-color:#e53e3e}
+.p2-email-card.idle{border-left-color:#a0aec0}
+.p2-followup-item{background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:12px;margin-bottom:8px}
+.p2-followup-item.done{background:#f0fff4;border-color:#9ae6b4;opacity:.7}
+.p2-tracking-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.p2-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.p2-tbl th{background:#f7fafc;padding:8px 10px;border:1px solid #e2e8f0;text-align:left;font-weight:600}
+.p2-tbl td{padding:8px 10px;border:1px solid #e2e8f0}
+@media (max-width:640px){
+  .p2-quota-chip{min-width:100px}
+  .p2-task-card{flex-direction:column}
+}
+
 </style>
 </head>
 <body>

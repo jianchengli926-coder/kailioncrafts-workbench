@@ -6129,6 +6129,11 @@ function getTimelineEvents(cid, limit=50){
   S.waHistory = DB.load('waHistory') || [];
   S.emailHistory = DB.load('emailHistory') || [];
   S.whatsappHistory = DB.load('whatsappHistory') || [];
+  // P2 Phase2: email accounts, send records, follow-up reminders, daily send tasks
+  S.emailAccounts = DB.load('emailAccounts') || [];
+  S.sendRecords = DB.load('sendRecords') || [];
+  S.followUpReminders = DB.load('followUpReminders') || [];
+  S.dailySendTasks = DB.load('dailySendTasks') || [];
 
   // V74.5 全局null清理：把所有为null的数组初始化为空数组，防止页面渲染崩溃
   Object.keys(S).forEach(k => {
@@ -6183,6 +6188,11 @@ function persist(){
   DB.save('outreachKnowledgeBase',S.outreachKnowledgeBase);
   DB.save('campaigns',S.campaigns); DB.save('campaignCustomerTasks',S.campaignCustomerTasks);
   DB.save('importBatches', S.importBatches||[]);
+  // P2 Phase2: persist new data fields
+  DB.save('emailAccounts', S.emailAccounts||[]);
+  DB.save('sendRecords', S.sendRecords||[]);
+  DB.save('followUpReminders', S.followUpReminders||[]);
+  DB.save('dailySendTasks', S.dailySendTasks||[]);
 }
 
 /* V74.6 导出客户数据为CSV */
@@ -8582,6 +8592,8 @@ const NAV = [
   {key:'devplans',icon:'📋',label:'开发计划',title:'开发计划中心',crumb:'多计划并行 · AI自动运行'},
   {key:'customers',icon:'👥',label:'客户台账',title:'客户台账',crumb:'39 家线索 · 按优先级分层'},
   {key:'drafts',icon:'✉️',label:'开发信',title:'开发信管理',crumb:'AI 草稿 · 人工发送'},
+  {key:'dailySend',icon:'📮',label:'今日发送',title:'每日发送任务',crumb:'15封/天 · 4品类均衡 · 人工发送'},
+  {key:'sendHistory',icon:'📜',label:'发送历史',title:'发送记录与追踪',crumb:'打开率 · 点击率 · 跟进序列'},
   {key:'outreachKB',icon:'🗂️',label:'客户开发知识库',title:'客户开发知识库',crumb:'Outreach Knowledge Base · 搜索去重 · 历史归档'},
   {key:'campaigns',icon:'🚀',label:'客户开发Campaign',title:'客户开发 Campaign',crumb:'Campaign Management · 任务分组 · 阶段跟踪'},
   {key:'knowledgeFacts',icon:'✅',label:'知识事实',title:'精准开发知识事实',crumb:'可对外使用的事实依据 · 人工审核 · 来源可追溯'},
@@ -9902,13 +9914,688 @@ function renderView(){
   const c = document.getElementById('mainContent');
   c.style.animation='none'; c.offsetHeight; c.style.animation='';
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, prospect:viewProspectDev, devplans:viewDevPlans, planDetail:viewPlanDetail,
-    customers:viewCustomers, drafts:viewDrafts, outreachKB:viewOutreachKB, campaigns:viewCampaigns, campaignDetail:viewCampaignDetail, knowledgeFacts:viewKnowledgeFacts, knowledgePacks:viewKnowledgePacks, inbox:viewInbox, schedule:viewSchedule,
+    customers:viewCustomers, drafts:viewDrafts, dailySend:viewDailySend, sendHistory:viewSendHistory, outreachKB:viewOutreachKB, campaigns:viewCampaigns, campaignDetail:viewCampaignDetail, knowledgeFacts:viewKnowledgeFacts, knowledgePacks:viewKnowledgePacks, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
     seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach, dailyWork:viewDailyWork, outreachQueue:viewOutreachQueue, reviewQueue:viewReviewQueue, followUpPlan:viewFollowUpPlan, outreachAnalytics:viewOutreachAnalytics, bulkImport:viewBulkImport, importHistory:viewImportHistory};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
   document.getElementById('notifDot').textContent = todo;
+}
+
+/* ============================================================
+ * P2 Phase2: Email Account Management / Daily Send / Tracking / Follow-up
+ * All new CSS classes use p2- prefix. No SMTP auto-send — manual only.
+ * ============================================================ */
+
+const P2_CAT_COLORS = {
+  outdoor_knives: '#c05621',
+  kitchen_knives: '#2b6cb0',
+  professional_scissors: '#805ad5',
+  kitchen_accessories: '#d69e2e'
+};
+const P2_CAT_LABELS = {
+  outdoor_knives: '户外刀',
+  kitchen_knives: '厨房刀',
+  professional_scissors: '剪刀',
+  kitchen_accessories: '厨房用品'
+};
+const P2_DAILY_MAX = 15;
+const P2_PER_ACCOUNT_MAX = 5;
+
+function p2TodayStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+/* Reset daily counters when the date changes */
+function p2ResetDailyCounters(){
+  const today = p2TodayStr();
+  let changed = false;
+  (S.emailAccounts||[]).forEach(acc => {
+    if(acc.dailySentDate !== today){
+      acc.dailySentCount = 0;
+      acc.dailySentDate = today;
+      changed = true;
+    }
+  });
+  if(changed) persist();
+}
+
+/* Get accounts that still have quota today */
+function p2GetAvailableAccounts(){
+  p2ResetDailyCounters();
+  return (S.emailAccounts||[]).filter(a => a.dailySentCount < P2_PER_ACCOUNT_MAX);
+}
+
+/* Round-robin account assignment based on task index */
+function p2AssignAccount(taskIndex){
+  const avail = p2GetAvailableAccounts();
+  if(!avail.length) return null;
+  return avail[taskIndex % avail.length];
+}
+
+/* Check if a customer has already been sent today or ever */
+function p2CustomerAlreadySent(customerId){
+  return (S.sendRecords||[]).some(r => r.customerId === customerId && r.status === 'sent');
+}
+
+/* Generate today's send tasks: balanced across 4 categories, max 15 */
+function p2GenerateDailyTasks(){
+  p2ResetDailyCounters();
+  const today = p2TodayStr();
+
+  // If tasks already exist for today, return them
+  if(S.dailySendTasks && S.dailySendTasks.date === today && S.dailySendTasks.tasks && S.dailySendTasks.tasks.length){
+    return S.dailySendTasks.tasks;
+  }
+
+  // Eligible customers: has email, has productCategory, not blacklisted/unsubscribed, not already sent
+  const eligible = (S.customers||[]).filter(c => {
+    const email = getCustomerPrimaryEmail(c);
+    if(!email) return false;
+    const cat = normalizeCatId(c.productCategory);
+    if(!cat) return false;
+    if(c.blacklisted || c.unsubscribe) return false;
+    if(p2CustomerAlreadySent(c.id)) return false;
+    // Exclude if customer status is '已回复' or '不再联系'
+    if(c.status === '已回复' || c.status === '不再联系') return false;
+    return true;
+  });
+
+  // Group by category
+  const byCat = { outdoor_knives: [], kitchen_knives: [], professional_scissors: [], kitchen_accessories: [] };
+  eligible.forEach(c => {
+    const cat = normalizeCatId(c.productCategory);
+    if(byCat[cat]) byCat[cat].push(c);
+  });
+
+  // Sort each category by lead score (higher first)
+  Object.keys(byCat).forEach(cat => {
+    byCat[cat].sort((a,b) => ((b.leadScore||b.scores?.total||0) - (a.leadScore||a.scores?.total||0)));
+  });
+
+  // Round-robin pick: 4 per category first (16 slots), then trim to 15
+  const tasks = [];
+  const perCatTarget = 4;
+  let catOrder = ['outdoor_knives','kitchen_knives','professional_scissors','kitchen_accessories'];
+  let catIdx = 0;
+  let safety = 0;
+  while(tasks.length < P2_DAILY_MAX && safety < 200){
+    safety++;
+    const cat = catOrder[catIdx % 4];
+    catIdx++;
+    const picked = byCat[cat].splice(0, 1)[0];
+    if(!picked) continue;
+    // Find an approved draft for this customer
+    const draft = (S.drafts||[]).find(d => d.customerId === picked.id && d.status === '已审核');
+    const account = p2AssignAccount(tasks.length);
+    tasks.push({
+      id: uid(),
+      customerId: picked.id,
+      customerName: picked.company || picked.contact?.name || '未知',
+      email: getCustomerPrimaryEmail(picked),
+      category: cat,
+      draftId: draft ? (draft.draftId || draft.id) : null,
+      draftSubject: draft ? draft.subject : null,
+      assignedAccountId: account ? account.id : null,
+      assignedAccountEmail: account ? account.email : null,
+      status: 'pending', // pending | sent | skipped
+      sentAt: null,
+      sentRecordId: null
+    });
+  }
+
+  S.dailySendTasks = { date: today, tasks: tasks };
+  persist();
+  return tasks;
+}
+
+/* View: Daily Send Task List */
+function viewDailySend(root){
+  p2ResetDailyCounters();
+  const tasks = p2GenerateDailyTasks();
+  const accounts = S.emailAccounts || [];
+  const today = p2TodayStr();
+
+  // Stats
+  const sentToday = tasks.filter(t => t.status === 'sent');
+  const pendingCount = tasks.filter(t => t.status === 'pending').length;
+  const skippedCount = tasks.filter(t => t.status === 'skipped').length;
+
+  // Category distribution
+  const catDist = { outdoor_knives: 0, kitchen_knives: 0, professional_scissors: 0, kitchen_accessories: 0 };
+  tasks.forEach(t => { if(catDist[t.category] != null) catDist[t.category]++; });
+  const sentCatDist = { outdoor_knives: 0, kitchen_knives: 0, professional_scissors: 0, kitchen_accessories: 0 };
+  sentToday.forEach(t => { if(sentCatDist[t.category] != null) sentCatDist[t.category]++; });
+
+  // If no email accounts configured
+  if(accounts.length === 0){
+    root.innerHTML = `
+      <div class="card card-pad" style="text-align:center;padding:40px">
+        <div style="font-size:48px;margin-bottom:12px">📧</div>
+        <h3 style="margin:0 0 8px">请先配置企业邮箱账户</h3>
+        <p class="text-muted" style="margin:0 0 16px">在"设置"页面添加最多3个企业邮箱账户，然后再来这里生成每日发送任务。</p>
+        <button class="btn btn-gold" onclick="go('settings')">⚙️ 前往设置</button>
+      </div>`;
+    return;
+  }
+
+  root.innerHTML = `
+    <!-- Header -->
+    <div style="background:linear-gradient(120deg,#2c5282,var(--primary));color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:17px">📮 今日发送任务</div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:4px">${today} · 共 ${tasks.length} 个任务 · 人工发送，工作台不会自动发邮件</div>
+    </div>
+
+    <!-- Quota visualization -->
+    <div class="p2-quota-bar">
+      <div class="p2-quota-chip ${sentToday.length>=P2_DAILY_MAX?'full':''}">
+        <div class="num">${sentToday.length}/${P2_DAILY_MAX}</div>
+        <div class="lbl">今日已发</div>
+      </div>
+      ${accounts.map(a => {
+        const full = a.dailySentCount >= P2_PER_ACCOUNT_MAX;
+        return `<div class="p2-quota-chip ${full?'full':''}">
+          <div class="num">${a.dailySentCount||0}/${P2_PER_ACCOUNT_MAX}</div>
+          <div class="lbl">${esc(a.displayName||a.email)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- Category distribution -->
+    <div class="card card-pad mb16">
+      <div class="card-title">📊 品类分布</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        ${Object.keys(P2_CAT_LABELS).map(cat => `
+          <div style="flex:1;min-width:120px;text-align:center;padding:10px;background:#f7fafc;border-radius:8px">
+            <div style="width:12px;height:12px;border-radius:50%;background:${P2_CAT_COLORS[cat]};display:inline-block;margin-right:4px"></div>
+            <b style="font-size:14px">${sentCatDist[cat]}/${catDist[cat]}</b>
+            <div style="font-size:11px;color:#64748b">${P2_CAT_LABELS[cat]}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Task list -->
+    <div class="card card-pad mb16">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-title" style="margin:0">📋 任务清单（${pendingCount}待发 · ${sentToday.length}已发 · ${skippedCount}已跳过）</div>
+        <button class="btn btn-sm btn-outline" onclick="p2RegenerateTasks()">🔄 重新生成</button>
+      </div>
+      ${tasks.length === 0 ? `
+        <div class="text-sm text-muted text-center py16">今日暂无待发送客户。所有有邮箱的客户可能已联系完毕。</div>
+      ` : tasks.map((t, idx) => `
+        <div class="p2-task-card ${t.status}">
+          <div class="p2-task-main">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-weight:700">${idx+1}. ${esc(t.customerName)}</span>
+              <span class="p2-cat-badge" style="background:${P2_CAT_COLORS[t.category]}">${P2_CAT_LABELS[t.category]||t.category}</span>
+              ${t.status==='sent' ? '<span class="badge" style="background:#38a169;color:#fff">已发送</span>' : ''}
+              ${t.status==='skipped' ? '<span class="badge" style="background:#a0aec0;color:#fff">已跳过</span>' : ''}
+            </div>
+            <div class="p2-task-meta">
+              📧 ${esc(t.email)}<br>
+              ${t.assignedAccountEmail ? `📤 使用邮箱: ${esc(t.assignedAccountEmail)}<br>` : ''}
+              ${t.draftId ? `📝 已有草稿: ${esc(t.draftSubject||'已审核')}` : '📝 无草稿 — 需先生成'}
+            </div>
+          </div>
+          <div class="p2-task-actions">
+            ${t.status === 'pending' ? `
+              ${t.draftId ? `<button class="btn btn-sm btn-outline" onclick="p2ViewDraft('${t.draftId}')">查看草稿</button>` : `<button class="btn btn-sm btn-gold" onclick="p2GoGenerateDraft('${t.customerId}')">去生成</button>`}
+              <button class="btn btn-sm btn-success" onclick="p2MarkSent('${t.id}')">✅ 标记已发送</button>
+              <button class="btn btn-sm btn-outline" onclick="p2SkipTask('${t.id}')">跳过</button>
+              <button class="btn btn-sm btn-outline" onclick="p2ReplaceTask('${t.id}')">替换客户</button>
+            ` : ''}
+            ${t.status === 'sent' ? `
+              <button class="btn btn-sm btn-outline" onclick="go('customerDetail',{id:'${t.customerId}'})">客户详情</button>
+            ` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="card card-pad" style="background:#fffbeb;border:1px solid #f6e05e">
+      <b>⚠️ 发送流程说明：</b>
+      <ol style="margin:8px 0 0;padding-left:20px;font-size:13px;line-height:1.8">
+        <li>在企业邮箱（如企业微信邮箱/Outlook）中手动发送开发信给客户</li>
+        <li>发送后回到本页面，点击"✅ 标记已发送"</li>
+        <li>系统自动记录发送时间、使用的邮箱，并创建第3/7/14天跟进提醒</li>
+        <li>每邮箱每天最多5封，全天最多15封</li>
+      </ol>
+    </div>
+  `;
+}
+
+/* Mark a task as sent */
+function p2MarkSent(taskId){
+  const tasks = S.dailySendTasks.tasks || [];
+  const task = tasks.find(t => t.id === taskId);
+  if(!task) return;
+  if(task.status === 'sent'){ toast('该任务已标记为已发送', 'err'); return; }
+
+  // Find the assigned account
+  const account = (S.emailAccounts||[]).find(a => a.id === task.assignedAccountId);
+  if(!account){ toast('未找到分配的邮箱账户', 'err'); return; }
+
+  // Create send record
+  const record = {
+    id: uid(),
+    customerId: task.customerId,
+    customerName: task.customerName,
+    email: task.email,
+    emailAccountId: account.id,
+    emailAccountAddress: account.email,
+    sentAt: new Date().toISOString(),
+    draftId: task.draftId,
+    subject: task.draftSubject || '',
+    category: task.category,
+    status: 'sent',
+    openStatus: 'unknown',
+    clickStatus: 'none',
+    followUpStatus: 'pending'
+  };
+  if(!S.sendRecords) S.sendRecords = [];
+  S.sendRecords.unshift(record);
+
+  // Increment account counter
+  account.dailySentCount = (account.dailySentCount||0) + 1;
+  account.dailySentDate = p2TodayStr();
+
+  // Update task status
+  task.status = 'sent';
+  task.sentAt = new Date().toISOString();
+  task.sentRecordId = record.id;
+
+  // Create follow-up reminders (day 3, 7, 14)
+  p2CreateFollowUpReminders(task, record);
+
+  // Add timeline event
+  addTimelineEvent(task.customerId, 'email', '开发信已发送', `通过 ${account.email} 发送给 ${task.email}`, { sendRecordId: record.id, draftId: task.draftId });
+
+  persist();
+  toast('✅ 已标记发送，跟进提醒已创建');
+  renderView();
+}
+
+/* Skip a task */
+function p2SkipTask(taskId){
+  const tasks = S.dailySendTasks.tasks || [];
+  const task = tasks.find(t => t.id === taskId);
+  if(!task) return;
+  task.status = 'skipped';
+  persist();
+  toast('已跳过该客户');
+  renderView();
+}
+
+/* Replace a task with next eligible customer in same category */
+function p2ReplaceTask(taskId){
+  const tasks = S.dailySendTasks.tasks || [];
+  const task = tasks.find(t => t.id === taskId);
+  if(!task) return;
+  // Find another eligible customer in same category not already in tasks
+  const usedIds = new Set(tasks.map(t => t.customerId));
+  const replacement = (S.customers||[]).find(c => {
+    if(usedIds.has(c.id)) return false;
+    if(normalizeCatId(c.productCategory) !== task.category) return false;
+    if(c.blacklisted || c.unsubscribe) return false;
+    if(p2CustomerAlreadySent(c.id)) return false;
+    const email = getCustomerPrimaryEmail(c);
+    return !!email;
+  });
+  if(!replacement){ toast('同品类暂无其他待开发客户', 'err'); return; }
+  const draft = (S.drafts||[]).find(d => d.customerId === replacement.id && d.status === '已审核');
+  const account = p2AssignAccount(tasks.length);
+  task.customerId = replacement.id;
+  task.customerName = replacement.company || replacement.contact?.name || '未知';
+  task.email = getCustomerPrimaryEmail(replacement);
+  task.draftId = draft ? (draft.draftId || draft.id) : null;
+  task.draftSubject = draft ? draft.subject : null;
+  task.assignedAccountId = account ? account.id : null;
+  task.assignedAccountEmail = account ? account.email : null;
+  task.status = 'pending';
+  task.sentAt = null;
+  toast('已替换为: ' + task.customerName);
+  persist();
+  renderView();
+}
+
+/* Regenerate today's tasks */
+function p2RegenerateTasks(){
+  if(!confirm('重新生成将清除今日未发送任务，确定？')) return;
+  S.dailySendTasks = { date: p2TodayStr(), tasks: [] };
+  p2GenerateDailyTasks();
+  toast('已重新生成今日任务');
+  renderView();
+}
+
+/* Go to draft generation for a customer */
+function p2GoGenerateDraft(customerId){
+  currentCustomerId = customerId;
+  go('drafts');
+}
+
+/* View an existing draft */
+function p2ViewDraft(draftId){
+  // Try to open the draft editor
+  if(typeof openDraftEditor === 'function'){ openDraftEditor(draftId); }
+}
+
+/* Create follow-up reminders at day 3, 7, 14 */
+function p2CreateFollowUpReminders(task, sendRecord){
+  if(!S.followUpReminders) S.followUpReminders = [];
+  const now = new Date();
+  const reminders = [
+    { type: 'followup1', days: 3, label: '第一封跟进', suggested: 'Follow up on the initial email — ask if they had a chance to review, offer additional product details.' },
+    { type: 'followup2', days: 7, label: '第二封跟进', suggested: 'Share a relevant product spec or case study, ask about their current supplier situation.' },
+    { type: 'final', days: 14, label: '最后跟进/冷却', suggested: 'Breakup email — polite close, leave door open for future contact.' }
+  ];
+  reminders.forEach(r => {
+    const due = new Date(now.getTime() + r.days * 24 * 60 * 60 * 1000);
+    S.followUpReminders.push({
+      id: uid(),
+      customerId: task.customerId,
+      customerName: task.customerName,
+      email: task.email,
+      sendRecordId: sendRecord.id,
+      originalSubject: sendRecord.subject || '',
+      dueDate: due.toISOString().slice(0, 10),
+      type: r.type,
+      typeLabel: r.label,
+      status: 'pending',
+      suggestedMessage: r.suggested,
+      category: task.category,
+      createdAt: new Date().toISOString()
+    });
+  });
+}
+
+/* Get due follow-up reminders (today or overdue, pending) */
+function p2GetDueFollowUps(){
+  const today = p2TodayStr();
+  return (S.followUpReminders||[]).filter(r => r.status === 'pending' && r.dueDate <= today);
+}
+
+/* Mark a follow-up as done */
+function p2MarkFollowUpDone(reminderId){
+  const r = (S.followUpReminders||[]).find(x => x.id === reminderId);
+  if(!r) return;
+  r.status = 'done';
+  addTimelineEvent(r.customerId, 'followup', '跟进邮件已发送: ' + r.typeLabel, `跟进客户 ${r.customerName}`, { reminderId: r.id });
+  persist();
+  toast('✅ 跟进标记完成');
+  renderView();
+}
+
+/* View: Send History */
+function viewSendHistory(root){
+  const records = S.sendRecords || [];
+  const today = p2TodayStr();
+
+  // Build filter state
+  const filterDate = window._p2FilterDate || '';
+  const filterAccount = window._p2FilterAccount || '';
+  const filterCat = window._p2FilterCat || '';
+
+  let filtered = records.slice();
+  if(filterDate) filtered = filtered.filter(r => (r.sentAt||'').slice(0,10) === filterDate);
+  if(filterAccount) filtered = filtered.filter(r => r.emailAccountAddress === filterAccount);
+  if(filterCat) filtered = filtered.filter(r => r.category === filterCat);
+
+  // Stats
+  const totalSent = records.length;
+  const todaySent = records.filter(r => (r.sentAt||'').slice(0,10) === today).length;
+  const openedCount = records.filter(r => r.openStatus === 'opened').length;
+  const clickedCount = records.filter(r => r.clickStatus === 'clicked').length;
+  const openRate = totalSent ? Math.round(openedCount/totalSent*100) : 0;
+  const clickRate = totalSent ? Math.round(clickedCount/totalSent*100) : 0;
+
+  const accounts = S.emailAccounts || [];
+
+  root.innerHTML = `
+    <div style="background:linear-gradient(120deg,#2c5282,var(--primary));color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:17px">📜 发送记录与追踪</div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:4px">共 ${totalSent} 条发送记录 · 打开率 ${openRate}% · 点击率 ${clickRate}%</div>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="card card-pad mb16">
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">累计发送</div><div class="stat-value">${totalSent}</div></div>
+        <div class="stat-card"><div class="stat-label">今日发送</div><div class="stat-value" style="color:var(--primary)">${todaySent}</div></div>
+        <div class="stat-card"><div class="stat-label">已打开</div><div class="stat-value" style="color:var(--green)">${openedCount}</div></div>
+        <div class="stat-card"><div class="stat-label">已点击</div><div class="stat-value" style="color:var(--orange)">${clickedCount}</div></div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card card-pad mb16">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <b class="text-sm">筛选：</b>
+        <input type="date" class="form-control" style="width:auto" value="${filterDate}" onchange="window._p2FilterDate=this.value;renderView()">
+        <select class="form-control" style="width:auto" onchange="window._p2FilterAccount=this.value;renderView()">
+          <option value="">全部邮箱</option>
+          ${accounts.map(a => `<option value="${esc(a.email)}" ${filterAccount===a.email?'selected':''}>${esc(a.displayName||a.email)}</option>`).join('')}
+        </select>
+        <select class="form-control" style="width:auto" onchange="window._p2FilterCat=this.value;renderView()">
+          <option value="">全部品类</option>
+          ${Object.keys(P2_CAT_LABELS).map(c => `<option value="${c}" ${filterCat===c?'selected':''}>${P2_CAT_LABELS[c]}</option>`).join('')}
+        </select>
+        <button class="btn btn-sm btn-outline" onclick="window._p2FilterDate='';window._p2FilterAccount='';window._p2FilterCat='';renderView()">清除筛选</button>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card card-pad">
+      ${filtered.length === 0 ? `
+        <div class="text-sm text-muted text-center py16">暂无发送记录</div>
+      ` : `
+        <div style="overflow-x:auto">
+        <table class="p2-tbl">
+          <thead><tr><th>时间</th><th>客户</th><th>邮箱</th><th>品类</th><th>使用账户</th><th>主题</th><th>打开</th><th>点击</th></tr></thead>
+          <tbody>
+            ${filtered.map(r => `
+              <tr>
+                <td>${(r.sentAt||'').slice(0,16).replace('T',' ')}</td>
+                <td><b>${esc(r.customerName)}</b></td>
+                <td style="font-size:11px">${esc(r.email)}</td>
+                <td><span class="p2-cat-badge" style="background:${P2_CAT_COLORS[r.category]||'#999'}">${P2_CAT_LABELS[r.category]||r.category}</span></td>
+                <td style="font-size:11px">${esc(r.emailAccountAddress||'')}</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(r.subject||'')}</td>
+                <td>${r.openStatus==='opened'?'<span style="color:#38a169">✅ 已打开</span>':'<span style="color:#a0aec0">未打开</span>'}</td>
+                <td>${r.clickStatus==='clicked'?'<span style="color:#dd6b20">🔗 已点击</span>':'—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+/* ============================================================
+ * Email Account Management (Settings page module)
+ * ============================================================ */
+function p2RenderEmailAccountsModule(){
+  const accounts = S.emailAccounts || [];
+  return `
+    <div class="card card-pad mb16" style="background:linear-gradient(135deg,#eff6ff,#fff);border-left:4px solid #3182ce">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📧 邮箱账户管理</span>
+        <button class="btn btn-sm btn-gold" onclick="p2ShowAccountForm()">+ 添加邮箱</button>
+      </div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:12px">
+        最多配置3个企业邮箱，每个每天最多发送${P2_PER_ACCOUNT_MAX}封，全天共${P2_DAILY_MAX}封。仅配置管理，不自动发送。
+      </div>
+      ${accounts.length === 0 ? `
+        <div class="text-sm text-muted text-center py16">尚未配置邮箱账户。点击"添加邮箱"开始。</div>
+      ` : accounts.map(a => {
+        const full = (a.dailySentCount||0) >= P2_PER_ACCOUNT_MAX;
+        const cls = full ? 'full' : (a.dailySentCount > 0 ? '' : 'idle');
+        return `
+        <div class="p2-email-card ${cls}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+            <div>
+              <b style="font-size:14px">${esc(a.displayName||a.email)}</b>
+              <div style="font-size:12px;color:#64748b;margin-top:2px">📧 ${esc(a.email)}</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:2px">
+                SMTP: ${esc(a.smtpServer||'未配置')}:${esc(a.smtpPort||'')} · 日上限 ${a.dailyLimit||P2_PER_ACCOUNT_MAX}
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:18px;font-weight:800;color:${full?'#e53e3e':'#2c5282'}">${a.dailySentCount||0}/${P2_PER_ACCOUNT_MAX}</div>
+              <div style="font-size:11px;color:#64748b">今日已发 · 累计 ${a.totalSent||0}</div>
+              <div style="margin-top:6px;display:flex;gap:4px;justify-content:flex-end">
+                <button class="btn btn-xs btn-outline" onclick="p2ShowAccountForm('${a.id}')">编辑</button>
+                <button class="btn btn-xs" style="background:#e53e3e;color:#fff" onclick="p2DeleteEmailAccount('${a.id}')">删除</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+      <div id="p2AccountFormContainer"></div>
+    </div>
+  `;
+}
+
+function p2ShowAccountForm(editId){
+  const container = document.getElementById('p2AccountFormContainer');
+  if(!container) return;
+  const acc = editId ? (S.emailAccounts||[]).find(a => a.id === editId) : null;
+  container.innerHTML = `
+    <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-top:12px">
+      <b style="font-size:13px">${acc?'编辑邮箱账户':'添加邮箱账户'}</b>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+        <div><label class="text-xs text-muted">显示名称</label><input id="p2f_displayName" class="form-control" value="${esc(acc?acc.displayName:'')}" placeholder="如: Leo - KaiLion"></div>
+        <div><label class="text-xs text-muted">邮箱地址</label><input id="p2f_email" class="form-control" value="${esc(acc?acc.email:'')}" placeholder="sales@kailioncrafts.com"></div>
+        <div><label class="text-xs text-muted">SMTP服务器</label><input id="p2f_smtpServer" class="form-control" value="${esc(acc?acc.smtpServer:'')}" placeholder="smtp.exmail.qq.com"></div>
+        <div><label class="text-xs text-muted">端口</label><input id="p2f_smtpPort" class="form-control" value="${esc(acc?acc.smtpPort:'465')}" placeholder="465"></div>
+        <div><label class="text-xs text-muted">授权码/密码</label><input id="p2f_password" type="password" class="form-control" value="${esc(acc?acc.password:'')}" placeholder="邮箱授权码"></div>
+        <div><label class="text-xs text-muted">每日发送上限</label><input id="p2f_dailyLimit" type="number" class="form-control" value="${acc?(acc.dailyLimit||5):5}" min="1" max="10"></div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn btn-sm btn-gold" onclick="p2SaveEmailAccount('${editId||''}')">💾 保存</button>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('p2AccountFormContainer').innerHTML=''">取消</button>
+      </div>
+    </div>
+  `;
+}
+
+function p2SaveEmailAccount(editId){
+  const displayName = document.getElementById('p2f_displayName').value.trim();
+  const email = document.getElementById('p2f_email').value.trim();
+  const smtpServer = document.getElementById('p2f_smtpServer').value.trim();
+  const smtpPort = document.getElementById('p2f_smtpPort').value.trim();
+  const password = document.getElementById('p2f_password').value;
+  const dailyLimit = parseInt(document.getElementById('p2f_dailyLimit').value) || P2_PER_ACCOUNT_MAX;
+
+  if(!email || !email.includes('@')){ toast('请输入有效的邮箱地址', 'err'); return; }
+  if(!S.emailAccounts) S.emailAccounts = [];
+
+  if(editId){
+    const acc = S.emailAccounts.find(a => a.id === editId);
+    if(acc){ Object.assign(acc, { displayName, email, smtpServer, smtpPort, password, dailyLimit }); }
+  } else {
+    if(S.emailAccounts.length >= 3){ toast('最多配置3个邮箱账户', 'err'); return; }
+    S.emailAccounts.push({
+      id: uid(), displayName, email, smtpServer, smtpPort, password,
+      dailyLimit: Math.min(dailyLimit, P2_PER_ACCOUNT_MAX),
+      dailySentCount: 0, dailySentDate: p2TodayStr(), totalSent: 0, createdAt: new Date().toISOString()
+    });
+  }
+  persist();
+  toast('✅ 邮箱账户已保存');
+  renderView();
+}
+
+function p2DeleteEmailAccount(id){
+  if(!confirm('确定删除该邮箱账户？')) return;
+  S.emailAccounts = (S.emailAccounts||[]).filter(a => a.id !== id);
+  persist();
+  toast('已删除');
+  renderView();
+}
+
+/* ============================================================
+ * Follow-up reminders block (used in viewDailyWork)
+ * ============================================================ */
+function p2RenderFollowUpBlock(){
+  const due = p2GetDueFollowUps();
+  if(due.length === 0) return '';
+  return `
+    <div class="card card-pad mb16" style="border-left:4px solid #d69e2e">
+      <div class="card-title">📅 今日跟进提醒（${due.length}）</div>
+      ${due.map(r => `
+        <div class="p2-followup-item">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px">
+            <div>
+              <b>${esc(r.customerName)}</b>
+              <span class="text-xs text-muted ml8">${esc(r.email)}</span>
+              <span class="badge ml8" style="background:#d69e2e;color:#fff">${r.typeLabel}</span>
+            </div>
+            <span class="text-xs">到期: ${r.dueDate}</span>
+          </div>
+          <div class="text-xs mt4" style="color:#64748b">
+            原主题: ${esc(r.originalSubject||'无')}
+          </div>
+          <div style="background:#fff;border-radius:6px;padding:8px;margin-top:6px;font-size:12px;color:#475569">
+            💡 建议话术: ${esc(r.suggestedMessage)}
+          </div>
+          <div class="mt6 flex gap8 flex-wrap">
+            <button class="btn btn-xs btn-outline" onclick="p2CopyFollowupMessage('${r.id}')">复制建议话术</button>
+            <button class="btn btn-xs btn-success" onclick="p2MarkFollowUpDone('${r.id}')">✅ 标记已跟进</button>
+            <button class="btn btn-xs btn-outline" onclick="go('customerDetail',{id:'${r.customerId}'})">客户详情</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function p2CopyFollowupMessage(reminderId){
+  const r = (S.followUpReminders||[]).find(x => x.id === reminderId);
+  if(!r) return;
+  navigator.clipboard.writeText(r.suggestedMessage).then(() => toast('已复制建议话术'));
+}
+
+/* Inject tracking pixel into draft body when a draft is about to be saved.
+ * Called after generateOutreachEmailDraft returns, before pushing to S.drafts. */
+async function p2InjectTrackingIntoDraft(draft){
+  try {
+    const resp = await fetch('/api/track/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerId: draft.customerId || '',
+        draftId: draft.draftId || draft.id || '',
+        email: draft.email || '',
+        category: draft.category || ''
+      })
+    });
+    if(!resp.ok) return draft;
+    const data = await resp.json();
+    if(!data.success || !data.token) return draft;
+    const token = data.token;
+    const BASE = 'https://prospect.kailioncrafts.com';
+
+    // 1. Rewrite http/https links to go through click tracking
+    if(draft.body){
+      draft.body = draft.body.replace(/https?:\/\/[^\s<>"')\]]+/g, function(url){
+        // Don't rewrite already-tracked URLs
+        if(url.indexOf('/api/track/') !== -1) return url;
+        return BASE + '/api/track/click/' + token + '?url=' + encodeURIComponent(url);
+      });
+      // 2. Append open-tracking pixel at end
+      draft.body += '\n\n<img src="' + BASE + '/api/track/open/' + token + '" width="1" height="1" alt="" style="display:none" />';
+      draft.trackingToken = token;
+    }
+    return draft;
+  } catch(e) {
+    console.warn('Tracking token injection failed:', e);
+    return draft;
+  }
 }
 
 
@@ -12641,12 +13328,23 @@ function batchKBEmail(){
       if(!check.allowed){ skipped++; continue; }
       const result = await generateOutreachEmailDraft(c, {providerPolicy:'online_safe', lang:'en', tone:'professional'});
       if(result.error){ failed++; continue; }
+      // P2: Inject open/click tracking pixel into the draft body before saving
+      const draftPayload = {
+        customerId: id,
+        draftId: uid(),
+        email: getCustomerPrimaryEmail(c),
+        category: normalizeCatId(c.productCategory),
+        subject: result.subject,
+        body: result.body
+      };
+      await p2InjectTrackingIntoDraft(draftPayload);
       S.drafts = S.drafts || [];
       S.drafts.unshift({
-        id: uid(), customerId:id, customerName:c.company, country:c.country, language:'英语',
-        subject:result.subject, body:result.body, content:result.body, status:'待审核', createdAt:now(),
+        id: draftPayload.draftId, customerId:id, customerName:c.company, country:c.country, language:'英语',
+        subject:draftPayload.subject, body:draftPayload.body, content:draftPayload.body, status:'待审核', createdAt:now(),
         kbGenerated:true, knowledgeContext:result.knowledgeContext, providerPolicy:'online_safe',
-        reviewStatus:'unreviewed', reviewNotes:'', manuallyEdited:false, aiNotes:['V77.4 统一知识库事实访问层生成']
+        reviewStatus:'unreviewed', reviewNotes:'', manuallyEdited:false, aiNotes:['V77.4 统一知识库事实访问层生成'],
+        trackingToken: draftPayload.trackingToken || null
       });
       syncCustomerToOutreachKB(id);
       count++;
@@ -16351,6 +17049,7 @@ function viewSettings(root){
       </div>
       <div style="font-size:11px;color:#9ca3af;margin-top:8px">⚠️ 密码仅允许在本机修改，公网访问时修改接口返回403。密码文件access_config.json不进入Git。</div>
     </div>
+    ${p2RenderEmailAccountsModule()}
     <div class="card card-pad mb16"><div class="card-title">👥 团队管理</div>
       <table class="tbl mb16"><thead><tr><th>姓名</th><th>角色</th><th>负责市场</th><th>月度目标</th></tr></thead>
       <tbody>
@@ -21725,6 +22424,29 @@ function viewOutreachAnalytics(root){
       </div>
     </div>
 
+    <!-- P2: Send tracking stats -->
+    ${(function(){
+      const recs = S.sendRecords || [];
+      const total = recs.length;
+      const today = p2TodayStr();
+      const todayCount = recs.filter(r => (r.sentAt||'').slice(0,10) === today).length;
+      const opened = recs.filter(r => r.openStatus === 'opened').length;
+      const clicked = recs.filter(r => r.clickStatus === 'clicked').length;
+      const openRate = total ? Math.round(opened/total*100) : 0;
+      const clickRate = total ? Math.round(clicked/total*100) : 0;
+      const pendingFollowups = (S.followUpReminders||[]).filter(r => r.status === 'pending').length;
+      return `<div class="card card-pad mb16">
+        <div class="card-title">📮 发送追踪（P2）</div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-label">累计发送</div><div class="stat-value">${total}</div></div>
+          <div class="stat-card"><div class="stat-label">今日发送</div><div class="stat-value" style="color:var(--primary)">${todayCount}</div></div>
+          <div class="stat-card"><div class="stat-label">打开率</div><div class="stat-value" style="color:var(--green)">${openRate}%</div></div>
+          <div class="stat-card"><div class="stat-label">点击率</div><div class="stat-value" style="color:var(--orange)">${clickRate}%</div></div>
+          <div class="stat-card"><div class="stat-label">待跟进提醒</div><div class="stat-value" style="color:#d69e2e">${pendingFollowups}</div></div>
+        </div>
+      </div>`;
+    })()}
+
     <!-- 结果统计 -->
     <div class="card card-pad mb16">
       <div class="card-title">人工录入结果（基于真实记录）</div>
@@ -21950,6 +22672,9 @@ function viewDailyWork(root){
         <div class="stat-card"><div class="stat-label">阻断客户</div><div class="stat-value" style="color:var(--red)">${view.counts.blockedCustomers}</div></div>
       </div>
     </div>
+
+    <!-- P2: Follow-up reminders (day 3/7/14) -->
+    ${p2RenderFollowUpBlock()}
 
     <!-- P1-3: 任务异常提醒（逾期/失败/待重试） -->
     ${(function(){

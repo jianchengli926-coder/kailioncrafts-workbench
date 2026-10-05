@@ -6134,12 +6134,16 @@ function getTimelineEvents(cid, limit=50){
   S.sendRecords = DB.load('sendRecords') || [];
   S.followUpReminders = DB.load('followUpReminders') || [];
   S.dailySendTasks = DB.load('dailySendTasks') || [];
+  // P3 Phase3: AI reply drafts, dormant customer tracking, wake-up email drafts
+  S.replyDrafts = DB.load('replyDrafts') || [];
+  S.dormantCustomers = DB.load('dormantCustomers') || [];
+  S.wakeupDrafts = DB.load('wakeupDrafts') || [];
 
   // V74.5 全局null清理：把所有为null的数组初始化为空数组，防止页面渲染崩溃
   Object.keys(S).forEach(k => {
     if (S[k] === null) {
       // 根据属性名判断应该初始化为数组还是对象
-      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','importBatches'];
+      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','importBatches','replyDrafts','dormantCustomers','wakeupDrafts'];
       if (arrayKeys.includes(k)) S[k] = [];
       else S[k] = {};
     }
@@ -6193,6 +6197,10 @@ function persist(){
   DB.save('sendRecords', S.sendRecords||[]);
   DB.save('followUpReminders', S.followUpReminders||[]);
   DB.save('dailySendTasks', S.dailySendTasks||[]);
+  // P3 Phase3: persist new data fields
+  DB.save('replyDrafts', S.replyDrafts||[]);
+  DB.save('dormantCustomers', S.dormantCustomers||[]);
+  DB.save('wakeupDrafts', S.wakeupDrafts||[]);
 }
 
 /* V74.6 导出客户数据为CSV */

@@ -215,27 +215,37 @@
 
   window.p5PushNow = function(){ p5PushBroadcast(true); };
 
-  // ── Scheduled push check (page-open based) ────────────────
-  function p5CheckScheduledPush(){
+  // ── Scheduled push status check (NO auto-send) ────────────
+  // 仅更新"待推送/已推送"状态提示，绝不自动发送。
+  // 所有发送必须由用户手动点击"立即推送测试"按钮触发。
+  function p5UpdatePushStatus(){
     var cfg = S.p5FeishuConfig;
     if(!cfg.enabled || !cfg.webhookUrl) return;
     var today = p5TodayStr();
+    var statusEl = document.getElementById('p5_push_status');
+    if(!statusEl) return;
     // Already pushed today?
-    if(cfg.lastPushedAt && p5ToDateStr(cfg.lastPushedAt) === today) return;
+    if(cfg.lastPushedAt && p5ToDateStr(cfg.lastPushedAt) === today){
+      statusEl.innerHTML = '<span style="color:#38a16p">✅ 今日已推送</span>';
+      return;
+    }
     // Is current time >= pushTime?
     var now = new Date();
     var nowMin = now.getHours()*60 + now.getMinutes();
     var parts = (cfg.pushTime || '09:00').split(':');
     var pushMin = (parseInt(parts[0],10)||0)*60 + (parseInt(parts[1],10)||0);
     if(nowMin >= pushMin){
-      p5PushBroadcast(false);
+      statusEl.innerHTML = '<span style="color:#d69e2e">⏰ 到达推送时间，请手动点击"立即推送测试"</span>';
+    } else {
+      var remainMin = pushMin - nowMin;
+      statusEl.innerHTML = '<span style="color:#718096">🕐 距推送时间还有 ' + remainMin + ' 分钟（不会自动发送）</span>';
     }
   }
 
-  // Run scheduled check every 60 seconds while the page is open.
-  setInterval(p5CheckScheduledPush, 60000);
-  // Also check once shortly after page load.
-  setTimeout(p5CheckScheduledPush, 3000);
+  // Refresh push status display every 60 seconds (status only, NO sending).
+  setInterval(p5UpdatePushStatus, 60000);
+  // Also update once shortly after page load.
+  setTimeout(p5UpdatePushStatus, 500);
 
   // ═══════════════════════════════════════════════════════════
   //  MAIN VIEW
@@ -247,7 +257,8 @@
     var h = '';
     h += '<div class="flex-between mb16">';
     h += '  <div><h2 style="margin:0">📢 飞书每日播报</h2>';
-    h += '  <div class="text-sm text-muted" style="margin-top:4px">将工作台每日数据汇总推送到你的飞书自定义机器人群 · 完全免费 · 不发送任何客户外部消息</div></div>';
+    h += '  <div class="text-sm text-muted" style="margin-top:4px">将工作台每日数据汇总推送到你的飞书自定义机器人群 · 完全免费 · 不发送任何客户外部消息</div>';
+    h += '  <div id="p5_push_status" style="margin-top:6px;font-size:13px"></div></div>';
     h += '  <button class="btn btn-primary" onclick="p5PushNow()">🧪 立即推送测试</button>';
     h += '</div>';
 
@@ -277,7 +288,7 @@
     h += '    </div>';
     h += '  </div>';
 
-    h += '  <div class="p5-warn-box">⚠️ 定时推送为「页面打开时触发」：需要保持工作台页面在浏览器中打开，到达推送时间后会自动推送一次。关闭页面后不会后台推送。</div>';
+    h += '  <div class="p5-warn-box">🔒 安全模式：定时设置仅用于显示"待推送"状态提示，<b>不会自动发送</b>。到达推送时间后，请手动点击上方"立即推送测试"按钮确认发送。关闭页面后不会后台推送。</div>';
 
     // Content toggles
     h += '  <div class="p5-field">';

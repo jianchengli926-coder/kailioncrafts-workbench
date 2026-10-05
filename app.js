@@ -10014,7 +10014,7 @@ function viewCustomersFromBatch(batchId){
 
 function renderView(){
   // V76.0 懒加载搜索结果（只加载一次）
-  if(!window._prospectResultsLoaded && prospectSearchResults.length === 0){
+  if(!window._prospectResultsLoaded && (window.prospectSearchResults||[]).length === 0){
     const loaded = loadProspectSearchResults();
     if(loaded > 0) console.log('已恢复最近搜索结果: ' + loaded + ' 条');
     window._prospectResultsLoaded = true;
@@ -11233,12 +11233,16 @@ function radarChart(scores, size){
   if(!scores) return '<div style="padding:20px;text-align:center;color:#a0aec0;font-size:13px">暂无数据</div>';
   size = size||220;
   const cx = size/2, cy = size/2, R = size/2 - 30;
+  // Guard: default any undefined/NaN score to 0 to prevent NaN rendering
+  const safe = v => (typeof v === 'number' && !isNaN(v)) ? v : 0;
   const dims = [
-    {label:'产品匹配', v:scores.product},
-    {label:'客户类型', v:scores.companyType},
-    {label:'采购信号', v:scores.purchaseSignal},
-    {label:'联系质量', v:scores.contactQuality}
+    {label:'产品匹配', v:safe(scores.product)},
+    {label:'客户类型', v:safe(scores.companyType)},
+    {label:'采购信号', v:safe(scores.purchaseSignal)},
+    {label:'联系质量', v:safe(scores.contactQuality)}
   ];
+  // If all scores are 0, show placeholder instead of empty polygon
+  if(dims.every(d => d.v === 0)) return '<div style="padding:20px;text-align:center;color:#a0aec0;font-size:13px">暂无数据</div>';
   const n = dims.length;
   const pt = (i,r)=>{ const ang = -Math.PI/2 + i*2*Math.PI/n; return [cx+r*Math.cos(ang), cy+r*Math.sin(ang)]; };
   let rings = '';
@@ -19241,6 +19245,8 @@ function kbToggleQuickFilter(key) {
   }
   renderView();
 }
+// Expose to window for inline onclick handlers (inside IIFE)
+window.kbToggleQuickFilter = kbToggleQuickFilter;
 
 // 清除筛选
 function kbClearFilters() {
@@ -20754,22 +20760,31 @@ function viewReports(root){
       <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #eee">
         <div style="font-size:12px;font-weight:700;color:#8b6914;margin-bottom:6px">📦 品类业绩占比建议</div>
         <div class="text-xs text-muted" style="line-height:1.8">
-          ${PROSPECT_KB.categories.slice(0,4).map((c,i)=>`<div style="display:flex;justify-content:space-between"><span>${c.name}</span><b>${Math.round(c.count/PROSPECT_KB.categories.reduce((s,x)=>s+x.count,0)*100)}%</b></div>`).join('')}
+          ${(() => {
+            const cats = PROSPECT_KB.categories || [];
+            const totalCount = cats.reduce((s,x)=>s+(x.count||0),0) || 1;
+            if(!cats.length) return '<span style="color:#a0aec0">暂无数据</span>';
+            return cats.slice(0,4).map((c,i)=>`<div style="display:flex;justify-content:space-between"><span>${c.name||'未命名'}</span><b>${Math.round((c.count||0)/totalCount*100)}%</b></div>`).join('');
+          })()}
         </div>
       </div>
       <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #eee">
         <div style="font-size:12px;font-weight:700;color:#2b6cb0;margin-bottom:6px">🌍 市场拓展优先级</div>
         <div class="text-xs text-muted" style="line-height:1.8">
-          ${(PROSPECT_KB.markets||[]).map((m,i)=>`<div style="display:flex;justify-content:space-between"><span>${i+1}. ${(m.name||'未知').split(' ')[0]}</span><span style="color:${i<2?'#38a169':i<4?'#d69e2e':'#718096'}">${'★'.repeat(Math.max(0,5-i))}</span></div>`).join('')}
+          ${(() => {
+            const mkts = PROSPECT_KB.markets || [];
+            if(!mkts.length) return '<span style="color:#a0aec0">暂无数据</span>';
+            return mkts.map((m,i)=>`<div style="display:flex;justify-content:space-between"><span>${i+1}. ${(m.name||'未知').split(' ')[0]}</span><span style="color:${i<2?'#38a169':i<4?'#d69e2e':'#718096'}">${'★'.repeat(Math.max(0,5-i))}</span></div>`).join('');
+          })()}
         </div>
       </div>
       <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #eee">
         <div style="font-size:12px;font-weight:700;color:#38a169;margin-bottom:6px">💎 业绩增长抓手</div>
         <div class="text-xs text-muted" style="line-height:1.8">
           <b>1.</b> 老客户复购（关联品类推荐）<br>
-          <b>2.</b> 新市场拓展（${PROSPECT_KB.markets[2].name.split(' ')[0]}）<br>
-          <b>3.</b> 高客单价产品（${PROSPECT_KB.categories[1].name}）<br>
-          <b>4.</b> 认证溢价（${PROSPECT_KB.certifications[0].name}）
+          <b>2.</b> 新市场拓展（${(PROSPECT_KB.markets&&PROSPECT_KB.markets[2]?PROSPECT_KB.markets[2].name:'待确认').split(' ')[0]}）<br>
+          <b>3.</b> 高客单价产品（${PROSPECT_KB.categories&&PROSPECT_KB.categories[1]?PROSPECT_KB.categories[1].name:'待确认'}）<br>
+          <b>4.</b> 认证溢价（${PROSPECT_KB.certifications&&PROSPECT_KB.certifications[0]?PROSPECT_KB.certifications[0].name:'待确认'}）
         </div>
       </div>
     </div>
@@ -20781,8 +20796,11 @@ function viewReports(root){
     <div class="card card-pad"><div class="card-title">💰 战报（现在）</div>
       <div class="stat-label">本月目标 $${(goal/1000)}K</div>
       <div class="stat-value">$${(actual/1000).toFixed(1)}K</div>
-      <div style="background:#f1f5f9;height:18px;border-radius:9px;overflow:hidden;margin:8px 0"><div style="width:${Math.round(actual/goal*100)}%;background:var(--gold);height:100%"></div></div>
-      <div class="text-sm">完成率 <b>${Math.round(actual/goal*100)}%</b> · 环比 <span style="color:var(--green)">+12%</span> · 同比 <span style="color:var(--green)">+35%</span></div>
+      ${(() => {
+        const pct = goal > 0 ? Math.round(actual/goal*100) : 0;
+        return `<div style="background:#f1f5f9;height:18px;border-radius:9px;overflow:hidden;margin:8px 0"><div style="width:${Math.min(pct,100)}%;background:var(--gold);height:100%"></div></div>
+        <div class="text-sm">完成率 <b>${pct}%</b> · 环比 <span style="color:var(--green)">+12%</span> · 同比 <span style="color:var(--green)">+35%</span></div>`;
+      })()}
     </div>
     <div class="card card-pad"><div class="card-title">⚡ 行为（过程）</div>
       <table class="tbl"><tbody>
@@ -34315,6 +34333,8 @@ let prospectProfile = {
 };
 let prospectProfiles = []; // 保存的画像模板
 let prospectSearchResults = [];
+// Expose to window for inline onchange handlers (inside IIFE)
+window.prospectSearchResults = prospectSearchResults;
 
 // V76.0 搜索结果持久化（localStorage）
 const PROSPECT_SEARCH_CACHE_KEY = 'prospect_search_results_cache';

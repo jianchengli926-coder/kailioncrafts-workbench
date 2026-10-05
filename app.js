@@ -11788,7 +11788,7 @@ function planCtrl(pid, status){
 /* ============================================================
  * 视图 3：客户库 CRM
  * ============================================================ */
-let custFilter = {grade:'', country:'', source:'', status:'', q:'', page:1, view:'all', selected:[]};
+let custFilter = {grade:'', category:'', country:'', source:'', status:'', q:'', page:1, view:'all', selected:[]};
 const CUST_PAGE = 10;
 function viewCustomers(root){
   custFilter.q = routeParams.q || custFilter.q || '';
@@ -11797,6 +11797,10 @@ function viewCustomers(root){
   const batchFilterId = (window._customerFilter && window._customerFilter.importBatchId) || '';
   if(batchFilterId) list = list.filter(c => c.importBatchId === batchFilterId);
   if(custFilter.grade) list = list.filter(c=>c.scores.grade===custFilter.grade);
+  if(custFilter.category){
+    if(custFilter.category==='__none__') list = list.filter(c=>!normalizeCatId(c.productCategory));
+    else list = list.filter(c=>normalizeCatId(c.productCategory)===custFilter.category);
+  }
   if(custFilter.country) list = list.filter(c=>c.country===custFilter.country);
   if(custFilter.source) list = list.filter(c=>c.source===custFilter.source);
   if(custFilter.status) list = list.filter(c=>c.status===custFilter.status);
@@ -11896,6 +11900,11 @@ function viewCustomers(root){
           <option value="">全部等级</option><option value="A" ${custFilter.grade==='A'?'selected':''}>A 级</option>
           <option value="B" ${custFilter.grade==='B'?'selected':''}>B 级</option><option value="C" ${custFilter.grade==='C'?'selected':''}>C 级</option>
         </select>
+        <select class="form-control" style="width:140px" onchange="custFilter.category=this.value;custFilter.page=1;renderView()">
+          <option value="">全部品类</option>
+          ${CAT_DEFS.map(x=>`<option value="${x.id}" ${custFilter.category===x.id?'selected':''}>${x.icon} ${x.nameEn}</option>`).join('')}
+          <option value="__none__" ${custFilter.category==='__none__'?'selected':''}>未分类</option>
+        </select>
         <select class="form-control" style="width:130px" onchange="custFilter.country=this.value;custFilter.page=1;renderView()">
           <option value="">全部国家</option>${countries.map(c=>`<option ${custFilter.country===c?'selected':''}>${c}</option>`).join('')}
         </select>
@@ -11957,8 +11966,8 @@ function viewCustomers(root){
     </div>
     <div id="customerListView" class="card">
       <div class="table-wrap"><table class="tbl">
-        <colgroup><col style="width:4%"><col style="width:16%"><col style="width:5%"><col style="width:5%"><col style="width:7%"><col style="width:12%"><col style="width:12%"><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:11%"></colgroup>
-        <thead><th><input type="checkbox" onchange="toggleAllCust(this.checked)"></th><th>公司</th><th>国家</th><th>等级</th><th>线索质量</th><th>主营产品</th><th>决策人邮箱</th><th>距上次跟进</th><th>下次跟进</th><th>标签</th><th>状态</th></tr></thead>
+        <colgroup><col style="width:4%"><col style="width:15%"><col style="width:5%"><col style="width:5%"><col style="width:7%"><col style="width:10%"><col style="width:8%"><col style="width:11%"><col style="width:7%"><col style="width:7%"><col style="width:9%"><col style="width:9%"></colgroup>
+        <thead><th><input type="checkbox" onchange="toggleAllCust(this.checked)"></th><th>公司</th><th>国家</th><th>等级</th><th>线索质量</th><th>品类</th><th>主营产品</th><th>决策人邮箱</th><th>距上次跟进</th><th>下次跟进</th><th>标签</th><th>状态</th></tr></thead>
         <tbody>
         ${pageList.length? pageList.map(c=>`
           <tr style="cursor:pointer" onclick="openCustomerDetail('${c.id}')">
@@ -11967,6 +11976,7 @@ function viewCustomers(root){
             <td>${esc(c.country)}</td>
             <td>${gradeBadge(c.scores.grade)} <span class="text-sm text-muted">${c.scores.total}</span></td>
             <td>${renderCustomerQualityBadge(c)}</td>
+            <td class="text-sm">${catBadgeHtml(c.productCategory)}</td>
             <td class="text-sm">${esc(c.products)}</td>
             <td class="text-sm mono">${esc(c.contact.email)}</td>
             <td>${followDaysBadge(c)}</td>
@@ -11974,7 +11984,7 @@ function viewCustomers(root){
             <td>${(c.tags||[]).slice(0,2).map(t=>`<span class="badge badge-gold" style="font-size:10px;padding:2px 6px;margin:1px">${t.length>6?t.substring(0,6)+"…":t}</span>`).join("")||"<span class='text-muted text-sm'>-</span>"}</td>
             <td><span class="badge ${c.status==='已回复'?'badge-a':c.status==='跟进中'?'badge-blue':c.status==='待跟进'?'badge-gold':'badge-gray'}">${esc(c.status)}</span>${!c.owner?'<button class="btn btn-gold btn-sm" style="margin-left:6px" onclick="event.stopPropagation();claimCust(\''+c.id+'\')">领取</button>':''}</td>
           </tr>`).join('')
-        : `<tr><td colspan="11"><div class="empty"><div class="big">🔍</div><p>没有符合条件的客户</p></div></td></tr>`}
+        : `<tr><td colspan="12"><div class="empty"><div class="big">🔍</div><p>没有符合条件的客户</p></div></td></tr>`}
         </tbody>
       </table></div>
       ${pager(list.length, custFilter.page, CUST_PAGE, 'gotoCustPage')}
@@ -12812,6 +12822,7 @@ function openCustomerDetail(cid){
     </div>
     <div class="drawer-body">
       <div class="flex gap8 mb16" style="flex-wrap:wrap">${gradeBadge(c.scores.grade)}
+        ${catBadgeHtml(c.productCategory)}
         <span class="badge badge-gray">综合 ${c.scores.total} 分</span>
         <span class="badge ${c.status==='已回复'?'badge-a':c.status==='跟进中'?'badge-blue':'badge-gold'}">${esc(c.status)}</span>
         ${(c.tags||[]).map(t=>`<span class="badge badge-gold" style="cursor:pointer" onclick="copyText('${t}')">${esc(t)}</span>`).join('')}
@@ -14314,7 +14325,7 @@ function renderGroupedCustomers(){
   }, 10);
 }
 function resetCustomerFilter(){
-  custFilter = {q:'', grade:'', country:'', source:'', tag:'', status:'', customerType:'', followDays:'', view:'all', page:1, selected:[]};
+  custFilter = {q:'', grade:'', category:'', country:'', source:'', tag:'', status:'', customerType:'', followDays:'', view:'all', page:1, selected:[]};
   window._customerFilter = null;
   renderView();
   toast('✅ 筛选条件已重置');
@@ -14345,6 +14356,12 @@ function openCustomerForm(cid){
         <div class="form-group"><label>WhatsApp</label><input class="form-control" id="cf_wa" value="${esc(v.contact.whatsapp||'')}"></div>
       </div>
       <div class="form-group"><label>主营产品</label><input class="form-control" id="cf_products" value="${esc(v.products||'')}" placeholder="如：厨房剪、多用刀"></div>
+      <div class="form-group"><label>产品品类（用于知识库驱动开发信）</label>
+        <select class="form-control" id="cf_category">
+          <option value="">未分类</option>
+          ${CAT_DEFS.map(x=>`<option value="${x.id}" ${normalizeCatId(v.productCategory)===x.id?'selected':''}>${x.icon} ${x.nameEn} / ${x.name}</option>`).join('')}
+        </select>
+      </div>
     </div>
     <div class="modal-foot">
       ${c?`<button class="btn btn-danger" onclick="delCustomer('${c.id}')">删除</button>`:''}
@@ -14359,6 +14376,7 @@ function saveCustomer(cid){
     company, website:document.getElementById('cf_website').value.trim(),
     country:document.getElementById('cf_country').value, customerType:document.getElementById('cf_type').value,
     products:document.getElementById('cf_products').value.trim(),
+    productCategory: document.getElementById('cf_category') ? document.getElementById('cf_category').value : '',
     contact:{name:document.getElementById('cf_name').value.trim(), title:document.getElementById('cf_title').value.trim(),
       email:document.getElementById('cf_email').value.trim(), whatsapp:document.getElementById('cf_wa').value.trim(), linkedin:'', phone:''}
   };
@@ -15368,7 +15386,12 @@ function openDraftEditor(did, isNew){
       <div class="form-group"><label>收件人</label><input class="form-control" id="dr_email" value="${c?esc(c.contact.email):''}"></div>
       <div class="form-group"><label>主题</label><input class="form-control" id="dr_subject" value="${esc(d.subject)}"></div>
       <div class="form-group"><label>正文（AI 生成草稿，发送前请人工审核修改）</label>
-        <textarea class="form-control" id="dr_body" style="min-height:260px;font-family:Menlo,monospace;font-size:12.5px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${esc(d.body || d.content || '')}</textarea></div>
+        <textarea class="form-control" id="dr_body" style="min-height:260px;font-family:Menlo,monospace;font-size:12.5px" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${esc(d.body || d.content || '')}</textarea>
+        <div style="position:relative;margin-top:6px">
+          <button class="btn btn-outline btn-sm" onclick="openCatKnowledgePanel('${d.id}')">📚 插入品类知识</button>
+          <div id="catKbPanel_${d.id}" class="cat-knowledge-panel" style="display:none;position:absolute;left:0;top:32px;z-index:9999;width:320px;max-height:340px;overflow-y:auto;background:#fff;border:1px solid #c7d2fe;border-radius:10px;box-shadow:0 10px 30px rgba(30,58,138,.18);padding:12px"></div>
+        </div>
+      </div>
       <div class="form-group"><label>审核备注</label><textarea class="form-control" id="dr_review_notes" rows="2" placeholder="例如：已核对产品描述；删除未确认认证声明">${esc(d.reviewNotes || '')}</textarea></div>
       <div style="font-size:11px;margin:-4px 0 12px;color:${d.reviewStatus==='reviewed' ? '#166534' : (d.reviewStatus==='rejected' ? '#991b1b' : '#92400e')}">审核状态：${d.reviewStatus==='reviewed' ? '✅ 已人工审核' : (d.reviewStatus==='rejected' ? '❌ 已拒绝（' + esc(d.rejectReason || '无原因') + '）' : '⚠️ 待人工审核')}${d.manuallyEdited ? ' · ✏️ 含人工修正' : ''}</div>
       <!-- P2.2B-1.5 草稿知识溯源面板 -->
@@ -16495,6 +16518,7 @@ function viewSettings(root){
         批量处理 → qwen本地（省100%）
       </div></div>
     ${renderApiSettings()}
+    ${renderAiModelRouterCard()}
     ${renderMonitorSettings()}
     ${renderEmailHealth()}
     <div class="card card-pad mb16"><div class="card-title">📤 数据导出</div>
@@ -16573,6 +16597,21 @@ function viewSettings(root){
       </div>
     </div>`;
   setTimeout(renderApiUsage, 50);
+  // V80.0: refresh server AI config (openai_proxy status) then re-render settings card
+  setTimeout(async ()=>{
+    try{
+      const r = await fetch('/api/ai/config');
+      const cfg = await r.json();
+      window.AI_SERVER_CONFIG = cfg;
+      const badge = document.getElementById('oaiProxyStatusBadge');
+      if(badge){
+        const oai = (cfg && cfg.openai_proxy) || {};
+        badge.outerHTML = oai.configured
+          ? `<span id="oaiProxyStatusBadge" class="badge" style="background:#dcfce7;color:#166534">✅ 已配置 · ${esc(oai.currentModel||'gpt-4o')}</span>`
+          : `<span id="oaiProxyStatusBadge" class="badge" style="background:#fef3c7;color:#92400e">⚠️ 未配置（使用服务端默认路由）</span>`;
+      }
+    }catch(e){}
+  }, 80);
 }
 function saveSettings(){
   S.settings.company.nameCn = document.getElementById('set_cn').value;
@@ -25022,15 +25061,30 @@ function buildOutreachEmailPrompt(customer, options, kbCtx){
     'Buyer type: ' + (customer.customerType || 'Unknown'),
     'Main products: ' + (customer.mainProducts || customer.products || 'Unknown')
   ].join('\n');
+  // V80.0: append structured product-category knowledge block when available
+  const catKb = options?.categoryKnowledge;
+  let catBlock = '';
+  if(catKb){
+    const spList = Array.isArray(catKb.sellingPoints) ? catKb.sellingPoints : [];
+    catBlock = '\n\n[Product Category Knowledge - ' + (catKb.nameEn || catKb.category || '') + ']\n' +
+      'Key Materials: ' + (catKb.keyMaterials || 'N/A') + '\n' +
+      'Selling Points:\n' + (spList.length ? spList.map(s=>'- '+s).join('\n') : '- N/A') + '\n' +
+      (catKb.certifications ? ('Certifications: ' + catKb.certifications + '\n') : '') +
+      (catKb.moqRange ? ('MOQ: ' + catKb.moqRange + '\n') : '') +
+      (catKb.packaging ? ('Packaging: ' + catKb.packaging + '\n') : '') +
+      (catKb.summary ? ('Summary: ' + catKb.summary + '\n') : '') +
+      '\nBased on the above product knowledge, write a personalized cold outreach email.\n' +
+      'The email MUST reference at least 2 specific selling points from our product line above, phrased naturally in English.\n';
+  }
   return 'Write a first-contact B2B outbound email for KaiLionCrafts.\n\n【Customer info】\n' + customerFacts +
-    buildOutreachKbContextPrompt(kbCtx) +
+    buildOutreachKbContextPrompt(kbCtx) + catBlock +
     '\n\n【Requirements】\n' +
     '1. Language: ' + (lang === 'zh' ? 'Chinese' : 'English') + '. Tone: professional.\n' +
     '2. Format: "Subject: <subject>" then blank line then email body.\n' +
-    '3. Length: 120-180 English words. One clear CTA.\n' +
-    '4. Do not invent facts. Use only the knowledge base context above.\n' +
+    '3. Length: 120-180 English words. One clear CTA (e.g. request a reply / sample / quick call).\n' +
+    '4. Do not invent facts. Use only the knowledge base context and product category knowledge above.\n' +
     '5. This is a draft for human review. No guarantees, pricing, MOQ, lead-time or certification claims without fact support.\n' +
-    '6. Include https://kailioncrafts.com/ in signature. If contact name is missing, write conservatively.';
+    '6. Signature: "Best regards, Leo Li, KaiLionCrafts", and include https://kailioncrafts.com/. If contact name is missing, write conservatively.';
 }
 
 function parseOutreachEmailResult(content){
@@ -25044,9 +25098,16 @@ function parseOutreachEmailResult(content){
 async function generateOutreachEmailDraft(customer, options={}){
   const policy = options.providerPolicy || 'online_safe';
   const kbCtx = await retrieveKnowledgeForOutreach(customer, policy);
+  // V80.0: inject structured product-category knowledge when the customer has a category
+  let catKb = null;
+  const catId = normalizeCatId(customer && customer.productCategory);
+  if(catId){
+    try{ catKb = await getCategoryKnowledge(catId); }catch(e){ catKb = null; }
+  }
+  options.categoryKnowledge = catKb;
   const prompt = buildOutreachEmailPrompt(customer, options, kbCtx);
   // P2.2D-4.5: 本地模型使用异步模式（避免长耗时导致浏览器 fetch 超时）
-  const manualModel = options.manualModel || null;
+  const manualModel = options.manualModel || getManualModel() || null;
   const isLocalManual = manualModel && (manualModel.includes('qwen3.5') || manualModel.includes('qwen2.5'));
   const useAsync = isLocalManual || options.forceAsync;
   const result = await callAI([{role:'user', content:prompt}], {
@@ -30700,6 +30761,7 @@ function viewAutoSearch(root){
         <div style="font-size:12px;color:#78350f;line-height:1.5">本页的"自动搜客"使用预置示例数据演示流程，<b>不会连接真实搜索引擎</b>，返回的公司名称、联系方式均为模拟数据，不可用于实际开发。真实联网搜客请使用左侧导航「<b>精准开发</b>」新功能（Tavily 真实搜索 + 公司深度分析）。</div>
       </div>
     </div>
+    ${catSelectorHtml()}
     <!-- V75.3 自然语言智能搜客（参考CRM工作台） -->
     <div class="card card-pad mb16" style="background:linear-gradient(135deg,#faf5ff,#f3e8ff);border:1px solid #ddd6fe">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -34516,6 +34578,7 @@ function renderTavilyConfigCard(){
 
 function renderProspectSearch(){
   return `
+    ${catSelectorHtml()}
     ${renderTavilyConfigCard()}
     <div class="card card-pad mb16">
       <div class="card-title">🔍 联网搜客（真实搜索）</div>
@@ -34589,6 +34652,7 @@ function renderProspectSearch(){
                   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                     <span style="font-weight:700;font-size:14px;color:${isCompany?'#1e293b':'#6b7280'}">${esc(r.title||'无标题')}</span>
                     <span style="background:${sourceColor}15;color:${sourceColor};padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid ${sourceColor}30">${esc(r.sourceLabel||r.sourceType||'未知')}</span>
+                    ${window._selectedCategory?catBadgeHtml(window._selectedCategory):''}
                     ${isCompany && r.matchLevel?`<span style="background:${r.matchLevel==='A'?'#dcfce7':r.matchLevel==='B'?'#fef9c3':r.matchLevel==='C'?'#ffedd5':'#fee2e2'};color:${r.matchLevel==='A'?'#166534':r.matchLevel==='B'?'#854d0e':r.matchLevel==='C'?'#9a3412':'#991b1b'};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer" onclick="document.getElementById('matchDetail_${i}').style.display=document.getElementById('matchDetail_${i}').style.display==='none'?'block':'none'">${r.matchScore}分 (${r.matchLevel}级) ⓘ</span>`:''}
                     ${!isCompany && r.exclusionReason?`<span style="background:#fef2f2;color:#991b1b;padding:2px 6px;border-radius:4px;font-size:10px" title="${esc(r.exclusionReason)}">已排除：${esc(r.exclusionReason.substring(0,20))}${r.exclusionReason.length>20?'...':''}</span>`:''}
                     ${r.needsModuleC && isCompany?'<span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-size:10px">⏳ 待模块C确认</span>':''}
@@ -35529,6 +35593,7 @@ function prospectAddSelectedToLeads(){
       status: '新线索',
       priority: 'C',
       category: prospectProfile.categories.join(',') || '',
+      productCategory: window._selectedCategory || '',
       countries: prospectProfile.countries.join(',') || '',
       customerType: prospectProfile.customerTypes.join(',') || '',
       analysis: null,
@@ -35673,6 +35738,7 @@ function convertProspectToCustomerWithArchive(idx){
     type: lead.customerType || '潜在客户',
     status: '新线索',
     createdAt: convertedAt,
+    productCategory: normalizeCatId(lead.productCategory || lead.category) || '',
     contact: {name:'', title:'', email:'', phone:'', whatsapp:'', linkedin:''},
     scores: {total: lead.matchScore || 50, grade: (lead.matchScore>=80?'A':lead.matchScore>=60?'B':'C')},
     tags: [lead.category||'', lead.countries||''].filter(t=>t),
@@ -39464,4 +39530,259 @@ if(document.readyState === 'loading'){
   document.addEventListener('DOMContentLoaded', initArkDB);
 }else{
   initArkDB();
+}
+
+/* ============================================================
+ * V80.0 品类知识库模块 (Category Knowledge Module)
+ * - 四品类统一来源：优先后端 /api/category/*，离线用内置 fallback
+ * - 仅用于生成内容、标签与筛选项；本模块绝不触发任何邮件发送
+ * ============================================================ */
+window._categoryList = window._categoryList || null;
+window._selectedCategory = window._selectedCategory || null;
+window._catKnowledgeCache = window._catKnowledgeCache || {};
+
+// Canonical category definitions (fallback + display metadata)
+const CAT_DEFS = [
+  {id:'outdoor_knives', name:'户外刀具', nameEn:'Outdoor Knives', icon:'🔪', color:'#059669',
+   searchKeywords:['outdoor knife wholesale','camping knife supplier','hunting knife manufacturer','folding pocket knife bulk'],
+   fallbackKnowledge:{
+     keyMaterials:'440C / 5Cr15Mov stainless steel, G10 / rosewood handles, full-tang blades',
+     sellingPoints:['Full-tang construction for strength and balanced weight','Hand-finished convex grind keeps a razor edge','Rust-resistant stainless steel built for outdoor use','Custom laser engraving and OEM packaging available','Low MOQ 300 pcs with 3-day sample lead time'],
+     certifications:'BSCI, ISO9001, FDA food-contact grade',
+     moqRange:'300-500 pcs per model',
+     packaging:'Color box / blister / custom gift box',
+     summary:'Yangjiang-made outdoor, camping and hunting knives for brands and distributors.'
+   }},
+  {id:'kitchen_knives', name:'厨房刀具', nameEn:'Kitchen Knives', icon:'🔪', color:'#dc2626',
+   searchKeywords:['kitchen knife wholesale','chef knife manufacturer','kitchen knife set supplier','stainless steel knife set bulk'],
+   fallbackKnowledge:{
+     keyMaterials:'5Cr15Mov / 7Cr17MoV high-carbon stainless steel, Pakkawood / PP handles',
+     sellingPoints:['Precision-tapered Granton edge for non-stick slicing','Full bolster for comfort and safer grip','Balanced 8-inch chef knife for professional and home use','OEM/ODM handle engraving and custom gift-box sets','MOQ 300 pcs, factory-direct Yangjiang pricing'],
+     certifications:'BSCI, ISO9001, FDA, LFGB food-contact grade',
+     moqRange:'300-500 pcs per set',
+     packaging:'Magnetic box / color box / gift set',
+     summary:'Yangjiang kitchen knives and knife sets for brands, distributors and grocery chains.'
+   }},
+  {id:'professional_scissors', name:'专业剪刀', nameEn:'Professional Scissors', icon:'✂️', color:'#7c3aed',
+   searchKeywords:['kitchen scissors wholesale','poultry shears supplier','multipurpose scissors manufacturer','herb scissors bulk'],
+   fallbackKnowledge:{
+     keyMaterials:'420J2 / 3Cr14 stainless steel blades, TPR soft-grip handles, detachable design',
+     sellingPoints:['Detachable blades for easy cleaning and sharpening','Integrated bottle opener, nutcracker and bone notch','TFE non-slip coating for durable cutting edge','Ergonomic ambidextrous TPR grip','MOQ 500 pcs, OEM color and logo'],
+     certifications:'BSCI, ISO9001, FDA food-contact grade',
+     moqRange:'500 pcs per model',
+     packaging:'Blister card / color box / hanging card',
+     summary:'Yangjiang kitchen scissors and multipurpose shears for houseware distributors.'
+   }},
+  {id:'kitchen_accessories', name:'厨房用品', nameEn:'Kitchen Accessories', icon:'🍳', color:'#d97706',
+   searchKeywords:['kitchen utensils wholesale','kitchen gadgets supplier','cutting board manufacturer','cooking tools bulk'],
+   fallbackKnowledge:{
+     keyMaterials:'Food-grade stainless steel + BPA-free nylon/PP, bamboo and beech wood',
+     sellingPoints:['Heat-resistant nylon heads safe for non-stick pans','Ergonomic non-slip handles for daily cooking','Dishwasher-safe and hygienic','Custom color and private-label packaging','MOQ 500 pcs, mixable across utensil sets'],
+     certifications:'BSCI, ISO9001, FDA, LFGB food-contact grade',
+     moqRange:'500 pcs per item',
+     packaging:'Color box / hanging card / set box',
+     summary:'Yangjiang kitchen utensils, gadgets and storage for homeware buyers.'
+   }}
+];
+
+// Map legacy prospect category ids to the canonical API-contract ids
+const CAT_ID_ALIAS = {outdoor:'outdoor_knives', kitchen:'kitchen_knives', scissors:'professional_scissors', accessories:'kitchen_accessories'};
+
+// Normalize any stored id (legacy, comma-joined) to a canonical id
+function normalizeCatId(id){
+  if(!id) return '';
+  id = String(id).trim();
+  if(CAT_ID_ALIAS[id]) return CAT_ID_ALIAS[id];
+  if(CAT_DEFS.find(c=>c.id===id)) return id;
+  const parts = id.split(/[,，]/).map(s=>s.trim());
+  for(const p of parts){
+    if(CAT_ID_ALIAS[p]) return CAT_ID_ALIAS[p];
+    if(CAT_DEFS.find(c=>c.id===p)) return p;
+  }
+  return '';
+}
+
+// Return display metadata for a category id
+function catMeta(catId){
+  const nid = normalizeCatId(catId);
+  return CAT_DEFS.find(c=>c.id===nid) || null;
+}
+
+// Load category list from backend, cache it, fall back to built-in defs
+async function ensureCategoryList(){
+  if(window._categoryList && window._categoryList.length) return window._categoryList;
+  try{
+    const r = await fetch('/api/category/list');
+    const j = await r.json();
+    if(j && j.success && Array.isArray(j.categories) && j.categories.length){
+      window._categoryList = j.categories;
+      return window._categoryList;
+    }
+  }catch(e){ /* API not ready yet — use fallback */ }
+  window._categoryList = CAT_DEFS.map(c=>({id:c.id,name:c.name,nameEn:c.nameEn,icon:c.icon,searchKeywords:c.searchKeywords,description:''}));
+  return window._categoryList;
+}
+
+// Load structured knowledge for one category, cache it
+async function getCategoryKnowledge(catId){
+  const nid = normalizeCatId(catId);
+  if(!nid) return null;
+  if(window._catKnowledgeCache[nid]) return window._catKnowledgeCache[nid];
+  try{
+    const r = await fetch('/api/category/knowledge?category='+encodeURIComponent(nid));
+    const j = await r.json();
+    if(j && j.success){ window._catKnowledgeCache[nid]=j; return j; }
+  }catch(e){ /* use fallback */ }
+  const def = CAT_DEFS.find(c=>c.id===nid);
+  if(def && def.fallbackKnowledge){
+    const fb = {success:true, category:nid, name:def.name, nameEn:def.nameEn, sellingPoints:[], ...def.fallbackKnowledge};
+    window._catKnowledgeCache[nid]=fb; return fb;
+  }
+  return null;
+}
+
+// Small colored badge for a category id
+function catBadgeHtml(catId){
+  const m = catMeta(catId);
+  if(!m) return '';
+  return `<span class="cat-badge" style="display:inline-block;background:${m.color}15;color:${m.color};border:1px solid ${m.color}40;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:700;white-space:nowrap">${m.icon} ${m.nameEn||m.name}</span>`;
+}
+
+// Render the search-page category selector bar
+function catSelectorHtml(){
+  const list = window._categoryList || CAT_DEFS.map(c=>({id:c.id,name:c.name,nameEn:c.nameEn,icon:c.icon}));
+  const cur = window._selectedCategory || '';
+  let html = `<div class="cat-sel-bar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px">
+    <span style="font-size:12px;font-weight:700;color:#475569;white-space:nowrap">🏷️ 搜客品类：</span>
+    <button class="cat-sel-btn btn btn-sm ${!cur?'btn-gold':'btn-outline'}" data-cat="" onclick="setSearchCategory('')">全品类</button>`;
+  list.forEach(c=>{
+    const active = cur===c.id;
+    html += `<button class="cat-sel-btn btn btn-sm ${active?'btn-gold':'btn-outline'}" data-cat="${c.id}" onclick="setSearchCategory('${c.id}')">${c.icon} ${c.nameEn||c.name}</button>`;
+  });
+  html += `<span class="text-sm text-muted" style="margin-left:auto;font-size:11px">选中品类后自动带出英文搜索关键词</span></div>`;
+  return html;
+}
+
+// Set the active search category, highlight buttons, prefill keyword box
+function setSearchCategory(catId){
+  window._selectedCategory = catId || null;
+  ensureCategoryList().then(list=>{
+    const c = list.find(x=>x.id===catId);
+    const kwInput = document.getElementById('pp_keywords');
+    if(c && kwInput){
+      if(c.searchKeywords && c.searchKeywords.length){
+        kwInput.value = c.searchKeywords.join(', ');
+        kwInput.dispatchEvent(new Event('change'));
+      }
+    }
+    // Autosearch page fallback: fill the natural-language input with a hint query
+    const natInput = document.getElementById('naturalSearchInput');
+    if(c && natInput && !natInput.value.trim()){
+      natInput.value = 'Find wholesale ' + (c.nameEn||c.name) + ' buyers';
+    }
+  });
+  document.querySelectorAll('.cat-sel-btn').forEach(b=>{
+    const isActive = (b.getAttribute('data-cat')||'') === (catId||'');
+    b.classList.toggle('btn-gold', isActive);
+    b.classList.toggle('btn-outline', !isActive);
+  });
+  toast(catId ? ('已选品类：'+((catMeta(catId)||{}).nameEn||catId)) : '已清除品类筛选');
+}
+
+// Draft editor: open / close the "insert category knowledge" floating panel
+async function openCatKnowledgePanel(draftId){
+  const panel = document.getElementById('catKbPanel_'+draftId);
+  if(!panel) return;
+  if(panel.style.display==='block'){ panel.style.display='none'; return; }
+  const d = S.drafts.find(x=>x.id===draftId);
+  const c = d && S.customers.find(x=>x.id===d.customerId);
+  const curCat = normalizeCatId(c && c.productCategory) || '';
+  const list = await ensureCategoryList();
+  let html = `<div style="font-weight:700;font-size:12px;color:#1e40af;margin-bottom:8px">📚 品类卖点库（点击任意卖点插入正文）</div>`;
+  html += `<div style="margin-bottom:8px"><select class="form-control" style="font-size:12px;padding:5px 8px" onchange="switchCatKbPanel('${draftId}',this.value)">`;
+  html += `<option value="">— 选择品类 —</option>`;
+  list.forEach(x=>{
+    html += `<option value="${x.id}" ${curCat===x.id?'selected':''}>${x.icon} ${x.nameEn||x.name}</option>`;
+  });
+  html += `</select></div>`;
+  html += `<div id="catKbSelling_${draftId}" style="font-size:12px;color:#64748b">加载中...</div>`;
+  html += `<div style="margin-top:6px;font-size:10px;color:#94a3b8">当前客户品类：${curCat?esc((catMeta(curCat)||{}).nameEn||curCat):'未设置'}</div>`;
+  panel.innerHTML = html;
+  panel.style.display='block';
+  const targetCat = curCat || (list[0] && list[0].id) || '';
+  await renderCatSellingPoints(draftId, targetCat);
+}
+
+async function switchCatKbPanel(draftId, catId){ await renderCatSellingPoints(draftId, catId); }
+
+async function renderCatSellingPoints(draftId, catId){
+  const box = document.getElementById('catKbSelling_'+draftId);
+  if(!box) return;
+  if(!catId){ box.innerHTML='<div style="color:#94a3b8">请先选择品类</div>'; return; }
+  box.innerHTML='加载中...';
+  const kb = await getCategoryKnowledge(catId);
+  if(!kb){ box.innerHTML='<div style="color:#94a3b8">暂无该品类知识</div>'; return; }
+  let html = '';
+  const sp = Array.isArray(kb.sellingPoints) ? kb.sellingPoints : [];
+  if(sp.length){
+    html += '<div style="font-size:11px;font-weight:700;color:#475569;margin:6px 0 4px">✅ 核心卖点：</div>';
+    sp.forEach(s=>{
+      const safe = String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      html += `<div style="padding:6px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:12px;color:#334155" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='#f8fafc'" onclick="insertCatSellingPoint('${draftId}','${safe}')">✦ ${esc(s)}</div>`;
+    });
+  }
+  if(kb.keyMaterials) html += `<div style="font-size:11px;color:#64748b;margin-top:6px"><b>材质：</b>${esc(kb.keyMaterials)}</div>`;
+  if(kb.moqRange) html += `<div style="font-size:11px;color:#64748b"><b>MOQ：</b>${esc(kb.moqRange)}</div>`;
+  box.innerHTML = html || '<div style="color:#94a3b8">暂无卖点数据</div>';
+}
+
+// Insert a selling point into the draft body textarea at the cursor
+function insertCatSellingPoint(draftId, text){
+  const ta = document.getElementById('dr_body');
+  if(!ta) return;
+  const start = (ta.selectionStart != null) ? ta.selectionStart : ta.value.length;
+  const end = (ta.selectionEnd != null) ? ta.selectionEnd : ta.value.length;
+  const pad = ta.value ? ' ' : '';
+  const insertText = pad + text + ' ';
+  ta.value = ta.value.substring(0,start) + insertText + ta.value.substring(end);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = start + insertText.length;
+  ta.style.height = 'auto'; ta.style.height = ta.scrollHeight+'px';
+  toast('已插入卖点');
+}
+
+// Manual AI model selection (settings page). Empty = auto server routing.
+function getManualModel(){ return (S.settings && S.settings.aiManualModel) || ''; }
+function setManualModel(m){
+  if(!S.settings) S.settings = {};
+  S.settings.aiManualModel = m || '';
+  try{ DB.save('settings', S.settings); }catch(e){}
+  toast(m ? ('已切换手动模型：'+m) : '已恢复服务端自动路由');
+}
+
+// Settings card: openai_proxy status + manual model switcher
+function renderAiModelRouterCard(){
+  const cur = getManualModel();
+  const cfg = window.AI_SERVER_CONFIG || {};
+  const oai = cfg.openai_proxy || {};
+  const configured = !!oai.configured;
+  const statusBadge = configured
+    ? `<span id="oaiProxyStatusBadge" class="badge" style="background:#dcfce7;color:#166534">✅ 已配置 · ${esc(oai.currentModel||'gpt-4o')}</span>`
+    : `<span id="oaiProxyStatusBadge" class="badge" style="background:#fef3c7;color:#92400e">⚠️ 未配置（使用服务端默认路由）</span>`;
+  const models = ['','gpt-4o','gpt-4o-mini','gpt-4-turbo','claude-3-5-sonnet','gemini-2.0-flash','glm-4-flash','qwen3.5:9b'];
+  return `
+  <div class="card card-pad mb16" style="border-left:4px solid #10b981">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🌐 GPT 中转站 · 手动模型切换</span>
+      ${statusBadge}
+    </div>
+    <div class="text-sm text-muted mb12">开发信等 AI 生成可手动指定模型；留空则由服务端自动路由（GLM → Ollama 故障转移）。切换后立即生效并保存。</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:13px;font-weight:600">当前手动模型：</label>
+      <select class="form-control" style="max-width:280px" onchange="setManualModel(this.value)">
+        ${models.map(m=>`<option value="${m}" ${cur===m?'selected':''}>${m||'自动路由（默认）'}</option>`).join('')}
+      </select>
+    </div>
+    ${Array.isArray(oai.models) && oai.models.length ? `<div class="text-sm text-muted mt12">支持模型：${oai.models.map(m=>`<span class="badge" style="background:#f1f5f9;color:#475569;margin-right:4px">${esc(m)}</span>`).join('')}</div>` : ''}
+  </div>`;
 }

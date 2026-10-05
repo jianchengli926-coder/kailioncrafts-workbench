@@ -27,6 +27,114 @@ const WebsiteEvidence = require('./website-evidence');
 // P2.3B: 客户优先级排序
 const ProspectPriority = require('./prospect-priority');
 
+// ============ 四大品类知识库（结构化摘要，只读） ============
+// 数据来源：公司知识库/02_产品知识库/00_四大品类产品参数汇总_确认版.md（v5.7，2026-09-28）
+// 原则：只收录已有资料确认数据；缺数据项标注"待工厂确认"，不编造。
+// 用途：品类列表接口 + AI 写开发信/产品资料时注入结构化卖点上下文。
+const CATEGORY_KNOWLEDGE = {
+  outdoor_knives: {
+    id: 'outdoor_knives',
+    name: '户外刀具',
+    nameEn: 'Outdoor Knives',
+    icon: '🔪',
+    searchKeywords: [
+      'outdoor knife wholesale', 'camping knife supplier', 'EDC knife manufacturer',
+      'hunting knife factory', 'tactical knife OEM', 'pocket knife bulk', 'survival knife distributor'
+    ],
+    description: 'EDC折刀、固定柄猎刀、战术刀、生存刀，D2/440C/S30V钢材，Kydex/真皮刀套',
+    keyMaterials: '440C (57-59 HRC), S30V/S35VN (60-62 HRC), D2 (62-64 HRC), 1095 High Carbon (58-62 HRC), CPM-3V (60-62 HRC), M390/20CV (60-63 HRC), VG10 Core Damascus (65-67 HRC)',
+    sellingPoints: [
+      'Yangjiang manufacturing base - China\'s knife capital',
+      'Multiple steel options from budget 440C to premium M390/Damascus',
+      'Liner Lock / Frame Lock / Axis Lock / Back Lock mechanisms available',
+      'Kydex sheath for tactical, genuine leather sheath for fixed-blade hunting knives',
+      'Stonewashed / Black Oxide / PVD coating / Two-tone surface treatments',
+      'OEM/ODM and private label supported',
+      'Folding knife MOQ from 100 pcs, light logo customization from 50-150 pcs'
+    ],
+    certifications: '⚠️ 待工厂确认（合作工厂资质，非KaiLionCrafts自有）',
+    moqRange: '折刀SS系列100pcs起，轻定制Logo/涂层50-150pcs，手锻猎刀HC系列约1000pcs',
+    packaging: 'Kydex刀套/真皮刀套/磁吸礼盒/吸塑纸卡/FSC木盒',
+    hsCodes: '固定柄猎刀8211.92, 折叠EDC 8211.93, 套刀8211.10',
+    summary: 'KaiLionCrafts户外刀具产品线覆盖EDC折刀、固定柄猎刀、战术刀和生存刀。基于阳江五金刀剪产业带，提供从入门440C到高端M390/Damascus的全层级钢材选择，支持OEM/ODM和Private Label。不生产自动刀(OTF)、蝴蝶刀(Balisong)、重力刀。'
+  },
+  kitchen_knives: {
+    id: 'kitchen_knives',
+    name: '厨房刀具',
+    nameEn: 'Kitchen Knives',
+    icon: '🔪',
+    searchKeywords: [
+      'kitchen knife set wholesale', 'chef knife manufacturer', 'damascus knife supplier',
+      'Santoku knife factory', 'Japanese knife OEM', 'kitchen cutlery distributor', 'professional chef knife bulk'
+    ],
+    description: '主厨刀、Santoku、Nakiri、套刀，5Cr15MoV/VG10 Damascus钢材，Pakkawood手柄',
+    keyMaterials: '3Cr13 (55-57 HRC), 4Cr13 (56-58 HRC), 5Cr15MoV (57-59 HRC, Yangjiang main steel), 7Cr17MoV (58-60), 8Cr13MoV (59-61), 9Cr18MoV (60-62), 440C (57-59), D2 (62-64), VG10 Core Damascus (65-67), 1.4116 German steel (56-58)',
+    sellingPoints: [
+      'Yangjiang manufacturing base - China\'s knife capital',
+      'Japanese 15° edge per side as standard chef knife, Western 20° available',
+      'Pakkawood mainstream handles, G10/Micarta/Rosewood for premium lines',
+      'Granton Edge on Santoku, serrated bread knives, ≥4.0mm thick cleavers',
+      'OEM/ODM, private label and full custom (≥500 pcs) supported',
+      'Blade lengths from 80mm paring to 300mm slicing'
+    ],
+    certifications: '⚠️ 待工厂确认（合作工厂资质，非KaiLionCrafts自有）',
+    moqRange: '单刀主力线50-300pcs，Damascus单刀100pcs，套刀100pcs，轻定制Logo 50-150pcs，全ODM深度定制≥500pcs',
+    packaging: '磁吸礼盒(含EVA内衬+刀尖保护套)/吸塑纸卡/FSC木盒',
+    hsCodes: '套刀8211.10（单刀逐类HS编码待工厂确认）',
+    summary: 'KaiLionCrafts厨房刀具覆盖主厨刀、Santoku、Nakiri、面包刀、斩骨刀和套刀共36 SKU。阳江主力5Cr15MoV到VG10 Damascus全层级钢材，日式15°标准开刃，Pakkawood主流手柄，支持OEM/ODM和Private Label。'
+  },
+  professional_scissors: {
+    id: 'professional_scissors',
+    name: '专业剪刀',
+    nameEn: 'Professional Scissors',
+    icon: '✂️',
+    searchKeywords: [
+      'kitchen scissors wholesale', 'pruning shears supplier', 'hair scissors manufacturer',
+      'tinning scissors factory', 'garden shears OEM', 'poultry scissors bulk', 'professional scissors distributor'
+    ],
+    description: '厨房剪、园艺剪、理发剪、铁皮剪，5Cr15MoV/8Cr13MoV钢材，可拆卸/弹簧助力设计',
+    keyMaterials: '3Cr13/4Cr13 (55-58 HRC), 5Cr15MoV/8Cr13MoV (57-61 HRC), high-grade stainless for hair scissors (58-60 HRC), VG10 Core Damascus (65-67 HRC)',
+    sellingPoints: [
+      'Yangjiang manufacturing base - China\'s scissors capital',
+      'Flat / Hollow / Convex grind and Serrated edge options per use case',
+      'Heavy-duty kitchen scissors: detachable + safety lock + spring assist',
+      'Adjustable pivot bolt on premium lines, fixed rivet on value lines',
+      'Types: kitchen/poultry, pruning, tailor, hair, tin/aviation shears',
+      'OEM/ODM and private label supported'
+    ],
+    certifications: '⚠️ 待工厂确认（合作工厂资质，非KaiLionCrafts自有）',
+    moqRange: 'Damascus厨房剪100pcs，铁皮剪100pcs，轻定制Logo 50-150pcs，标准走量厨房剪MOQ待工厂确认',
+    packaging: '吸塑纸卡/磁吸礼盒',
+    hsCodes: '⚠️ 待工厂确认',
+    summary: 'KaiLionCrafts专业剪刀产品线覆盖厨房剪/禽肉剪、园艺整枝剪、裁缝剪、理发剪和铁皮/航空剪共32 SKU。按用途提供平磨/凹磨/凸磨/锯齿刃口工艺，强力厨房剪标配可拆卸+安全锁+弹簧助力，支持OEM/ODM。'
+  },
+  kitchen_accessories: {
+    id: 'kitchen_accessories',
+    name: '厨房用品',
+    nameEn: 'Kitchen Accessories',
+    icon: '🍳',
+    searchKeywords: [
+      'kitchen utensils wholesale', 'cutting board supplier', 'BBQ tools manufacturer',
+      'cookware set factory', 'silicone kitchen tools OEM', 'peeler grater bulk', 'kitware distributor'
+    ],
+    description: 'BBQ工具、锅具、砧板、削皮擦丝、夹铲工具，18/10不锈钢/食品级硅胶/铸铁材质',
+    keyMaterials: '18/10 Stainless Steel, 304 Stainless Steel, Food-grade Silicone (-40°C to 230°C), Cast Iron, Enameled Cast Iron, Beech/Hard Wood, Bamboo, Wheat Straw',
+    sellingPoints: [
+      'Yangjiang manufacturing base',
+      'BBQ tools 10 SKU, cookware 5 SKU, cutting boards 3 SKU, peeler/grater 7 SKU, tongs/turners 5 SKU',
+      'Food-grade silicone heat resistant -40°C to 230°C',
+      '18/10 stainless for pots and food tongs, enameled cast iron Dutch oven',
+      'Beech/bamboo/wheat-straw cutting boards available',
+      'OEM/ODM and private label supported'
+    ],
+    certifications: '⚠️ 待工厂确认（合作工厂资质，非KaiLionCrafts自有；食品接触材料检测报告逐SKU确认）',
+    moqRange: '混合MOQ 100-500pcs，珐琅Dutch Oven 100pcs，轻定制Logo 50-150pcs',
+    packaging: '吸塑纸卡/彩盒',
+    hsCodes: '⚠️ 待工厂确认',
+    summary: 'KaiLionCrafts厨房用品覆盖BBQ工具、锅具、砧板、削皮擦丝和夹铲工具共30 SKU。18/10不锈钢、食品级硅胶(-40~230°C)、铸铁/珐琅铸铁、榉木竹材多材质组合，支持OEM/ODM和Private Label。'
+  }
+};
+
 // ============ 全局异常保护（防止进程崩溃退出）============
 process.on('uncaughtException', (err) => {
   console.error(`[${new Date().toLocaleString('zh-CN')}] [FATAL] 未捕获异常:`, err.message);
@@ -1075,12 +1183,13 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
       const configPath = require('path').join(ROOT_DIR, 'api_config.json');
       if (!require('fs').existsSync(configPath)) {
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({configured:false, glm:{configured:false,model:null,endpoint:null}, ollama:{configured:false,baseURL:null}}));
+        res.end(JSON.stringify({configured:false, glm:{configured:false,model:null,endpoint:null}, openai_proxy:{configured:false,model:null,endpoint:null,models:[]}, ollama:{configured:false,baseURL:null}}));
         return;
       }
       const cfg = JSON.parse(require('fs').readFileSync(configPath, 'utf8'));
       const glm = cfg.glm || {};
       const ollama = cfg.ollama || {};
+      const openaiProxy = cfg.openai_proxy || {};
       res.writeHead(200, {'Content-Type':'application/json'});
       res.end(JSON.stringify({
         configured: true,
@@ -1091,11 +1200,19 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
           endpoint: glm.endpoint || null,
           timeout: glm.timeout || 30000
         },
+        openai_proxy: {
+          enabled: openaiProxy.enabled !== false,
+          configured: !!(openaiProxy.apiKey && openaiProxy.apiKey.length > 0),
+          name: openaiProxy.name || 'GPT中转站',
+          model: openaiProxy.model || 'gpt-4o',
+          models: openaiProxy.models || [],
+          endpoint: openaiProxy.endpoint || null
+        },
         ollama: {
           enabled: ollama.enabled !== false,
           baseURL: ollama.baseURL || 'http://localhost:11434/v1'
         },
-        providerOrder: cfg.providerOrder || ['glm', 'ollama']
+        providerOrder: cfg.providerOrder || ['openai_proxy', 'glm', 'ollama']
       }));
       return;
     } catch(e) {
@@ -1116,6 +1233,59 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
       res.writeHead(500, {'Content-Type':'application/json'});
       res.end(JSON.stringify({error:'获取模型状态失败', message:e.message}));
     }
+    return;
+  }
+
+  // ============ 品类知识API（只读，需认证） ============
+  // 四大品类元数据 + 采购搜索关键词模板
+  if (pathname === '/api/category/list' && req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const categories = Object.values(CATEGORY_KNOWLEDGE).map(c => ({
+        id: c.id,
+        name: c.name,
+        nameEn: c.nameEn,
+        icon: c.icon,
+        searchKeywords: c.searchKeywords,
+        description: c.description
+      }));
+      res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+      res.end(JSON.stringify({ success: true, categories }));
+    } catch(e) {
+      res.writeHead(500, {'Content-Type':'application/json; charset=utf-8'});
+      res.end(JSON.stringify({ success:false, error:'获取品类列表失败: ' + e.message }));
+    }
+    return;
+  }
+
+  // 单品类结构化卖点知识（?category=outdoor_knives|kitchen_knives|professional_scissors|kitchen_accessories）
+  if (pathname === '/api/category/knowledge' && req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
+    const categoryId = reqUrl.searchParams.get('category') || '';
+    const known = CATEGORY_KNOWLEDGE[categoryId];
+    if (!known) {
+      res.writeHead(404, {'Content-Type':'application/json; charset=utf-8'});
+      res.end(JSON.stringify({
+        success: false,
+        error: '未知品类: ' + categoryId,
+        availableCategories: Object.keys(CATEGORY_KNOWLEDGE)
+      }));
+      return;
+    }
+    res.writeHead(200, {'Content-Type':'application/json; charset=utf-8'});
+    res.end(JSON.stringify({
+      success: true,
+      category: known.id,
+      name: known.name,
+      nameEn: known.nameEn,
+      keyMaterials: known.keyMaterials,
+      sellingPoints: known.sellingPoints,
+      certifications: known.certifications,
+      moqRange: known.moqRange,
+      packaging: known.packaging,
+      hsCodes: known.hsCodes,
+      summary: known.summary
+    }));
     return;
   }
 

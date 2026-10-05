@@ -2,16 +2,19 @@
  * model-router.js
  * P2.2B-2: Node.js 模型路由和故障转移
  *
+ * Provider 优先级（api_config.json -> providerOrder）：
+ *   openai_proxy（GPT中转站，OpenAI兼容） → glm（智谱） → ollama（本地）
+ *
  * 模型链：
- * - 普通文本：glm-4.7-flash → glm-4-flash → qwen3.5:9b → qwen2.5:7b
- * - 推理：glm-4.7-flash → qwen3.5:9b → deepseek-r1:7b
- * - 视觉：glm-4.6v-flash → qwen3.5:9b → qwen2.5vl:7b
+ * - 普通文本：gpt-4o → gpt-4o-mini → glm-4-flash → qwen3.5:9b → qwen2.5:7b
+ * - 推理：gpt-4o → glm-4-flash → qwen3.5:9b → deepseek-r1:7b
+ * - 视觉：gpt-4o → glm-4.6v-flash → qwen3.5:9b → qwen2.5vl:7b
  * - 生图：cogview-3-flash → x/flux2-klein:4b-fp4
  * - Embedding：nomic-embed-text:latest（固定）
  *
  * 故障转移：
- * - 允许：408、429、5xx、timeout、abort、connection refused、慢响应
- * - 禁止：400、401、403、422、内容审核拒绝、参数错误、手动模式
+ * - 允许：408、429、5xx、timeout、abort、connection refused、慢响应、未配置
+ * - 禁止：400、401、403、422、invalid_api_key、内容审核拒绝、参数错误、手动模式
  */
 
 'use strict';
@@ -24,17 +27,23 @@ const ModelTrace = require('./model-trace.js');
 // ============================================================
 
 const MODEL_CHAINS = {
-  text: ['glm-4.7-flash', 'glm-4-flash', 'qwen3.5:9b', 'qwen2.5:7b'],
-  reasoning: ['glm-4.7-flash', 'qwen3.5:9b', 'deepseek-r1:7b'],
-  vision: ['glm-4.6v-flash', 'qwen3.5:9b', 'qwen2.5vl:7b'],
+  text: ['gpt-4o', 'gpt-4o-mini', 'glm-4-flash', 'qwen3.5:9b', 'qwen2.5:7b'],
+  reasoning: ['gpt-4o', 'glm-4-flash', 'qwen3.5:9b', 'deepseek-r1:7b'],
+  vision: ['gpt-4o', 'glm-4.6v-flash', 'qwen3.5:9b', 'qwen2.5vl:7b'],
   image: ['cogview-3-flash', 'x/flux2-klein:4b-fp4'],
   embedding: ['nomic-embed-text:latest']
 };
 
-// 云端模型列表
+// 云端模型列表（GLM 官方）
 const CLOUD_MODELS = new Set([
   'glm-4.7-flash', 'glm-4-flash', 'glm-4.6v-flash',
   'cogview-3-flash', 'doubao-seed-2-1-turbo'
+]);
+
+// GPT中转站（openai_proxy，OpenAI 兼容格式）提供的模型列表
+const OPENAI_PROXY_MODELS = new Set([
+  'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo',
+  'claude-3-5-sonnet', 'gemini-2.0-flash'
 ]);
 
 // 本地模型列表
@@ -79,7 +88,8 @@ const FAILOVER_ALLOWED_TYPES = new Set([
   'timeout', 'abort', 'connection_refused', 'econnrefused',
   'network_error', 'ollama_unavailable', 'slow_response',
   'rate_limited', 'service_unavailable', 'not_configured',
-  'config_error', 'empty_response', 'parse_error'
+  'config_error', 'empty_response', 'parse_error',
+  'model_not_available'  // 404: 该模型在当前账号/中转组不可用，应尝试链条下一个模型
 ]);
 
 // 禁止故障转移的错误类型
@@ -245,6 +255,17 @@ function isLocalModel(model) {
 }
 
 /**
+ * 判断模型归属的 Provider
+ * @param {string} model - 模型名称
+ * @returns {'openai_proxy'|'glm'|'ollama'} provider 名称
+ */
+function getModelProvider(model) {
+  if (OPENAI_PROXY_MODELS.has(model)) return 'openai_proxy';
+  if (LOCAL_MODELS.has(model)) return 'ollama';
+  return 'glm';
+}
+
+/**
  * 调用本地 Ollama 模型
  * @param {Object} options - 调用选项
  * @param {string} options.model - 模型名称
@@ -350,40 +371,63 @@ async function callLocalModel(options) {
 }
 
 /**
- * 调用云端模型（真实智谱 GLM API 实现，OpenAI 兼容格式）
- * @param {Object} options - 调用选项
+ * 读取 api_config.json（供云端 Provider 共用）
+ * @returns {Object|null} 配置对象，读取失败返回 null
+ */
+function loadApiConfig() {
+  try {
+    const cfgPath = require('path').join(__dirname, 'api_config.json');
+    return JSON.parse(require('fs').readFileSync(cfgPath, 'utf8'));
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * 通用 OpenAI 兼容 chat/completions 调用（GLM 与 openai_proxy 共用）
+ * 故障转移语义：
+ *   - 401/403 → invalid_api_key（禁止故障转移，配置错误必须人工修正）
+ *   - 429/5xx → 携带 statusCode，允许故障转移
+ *   - timeout / 网络错误 → 允许故障转移
+ *   - apiKey 为空 → not_configured，允许故障转移
+ * @param {Object} options - 调用选项 { model, prompt, timeoutMs, mockProvider }
+ * @param {Object} providerCfg - Provider 配置 { endpoint, apiKey, timeout, label }
  * @returns {Promise<Object>} 调用结果
  */
-async function callCloudModel(options) {
-  const { model, prompt, mockProvider, timeoutMs } = options;
+async function callOpenAICompatible(options, providerCfg) {
+  const { model, prompt, timeoutMs, mockProvider } = options;
 
   // 如果有 mock provider，使用 mock（测试用）
   if (mockProvider) {
     return mockProvider({ model, prompt });
   }
 
-  // 从 api_config.json 读取 GLM 配置
-  let apiConfig = null;
-  try {
-    const cfgPath = require('path').join(__dirname, 'api_config.json');
-    apiConfig = JSON.parse(require('fs').readFileSync(cfgPath, 'utf8'));
-  } catch (e) {
-    return { success: false, model, error: { type: 'config_error', message: '无法读取 api_config.json: ' + e.message } };
-  }
+  const label = providerCfg.label || 'provider';
+  const apiKey = providerCfg.apiKey || '';
+  const endpoint = (providerCfg.endpoint || '').replace(/\/$/, '');
+  const timeout = timeoutMs || providerCfg.timeout || 30000;
 
-  const glmCfg = (apiConfig && apiConfig.glm) || {};
-  const apiKey = glmCfg.apiKey || '';
-  const endpoint = (glmCfg.endpoint || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/$/, '');
-  const timeout = timeoutMs || glmCfg.timeout || 30000;
-
-  // API Key 为空时返回明确错误，触发故障转移到本地模型
+  // API Key 为空时返回明确错误，触发故障转移
   if (!apiKey || apiKey.length === 0) {
     return {
       success: false,
       model,
       error: {
         type: 'not_configured',
-        message: 'GLM API Key 未配置（api_config.json 中 glm.apiKey 为空），已自动故障转移到本地模型',
+        message: label + ' API Key 未配置，已自动故障转移到下一个模型',
+        recoverable: true
+      }
+    };
+  }
+
+  // endpoint 未配置无法调用，触发故障转移
+  if (!endpoint) {
+    return {
+      success: false,
+      model,
+      error: {
+        type: 'not_configured',
+        message: label + ' endpoint 未配置，已自动故障转移到下一个模型',
         recoverable: true
       }
     };
@@ -424,13 +468,32 @@ async function callCloudModel(options) {
       res.on('end', () => {
         try {
           const parsed = JSON.parse(data);
-          // 处理错误响应
-          if (parsed.error) {
+
+          // 401/403 → 认证失败，标记 invalid_api_key，禁止故障转移（配置错误）
+          if (res.statusCode === 401 || res.statusCode === 403) {
             resolve({
               success: false,
               model,
               error: {
-                type: 'api_error',
+                type: 'invalid_api_key',
+                message: label + ' 认证失败(' + res.statusCode + '): ' + ((parsed.error && parsed.error.message) || '请检查 API Key'),
+                statusCode: res.statusCode
+              },
+              statusCode: res.statusCode
+            });
+            return;
+          }
+
+          // 处理其他错误响应
+          if (parsed.error) {
+            // 404 或 error.code 提示模型不存在 → model_not_available，允许故障转移到下一个模型
+            const isModelNotFound = res.statusCode === 404 ||
+              (parsed.error.code && /model|not_?found|not_?exist|invalid_?model/i.test(String(parsed.error.code)));
+            resolve({
+              success: false,
+              model,
+              error: {
+                type: isModelNotFound ? 'model_not_available' : 'api_error',
                 message: parsed.error.message || JSON.stringify(parsed.error),
                 code: parsed.error.code,
                 statusCode: res.statusCode
@@ -488,12 +551,59 @@ async function callCloudModel(options) {
       resolve({
         success: false,
         model,
-        error: { type: 'timeout', message: '请求超时（' + timeout + 'ms）', timeoutMs: timeout }
+        error: { type: 'timeout', message: label + ' 请求超时（' + timeout + 'ms）', timeoutMs: timeout }
       });
     });
 
     req.write(postData);
     req.end();
+  });
+}
+
+/**
+ * 调用智谱 GLM 云端模型（OpenAI 兼容格式）
+ * @param {Object} options - 调用选项 { model, prompt, timeoutMs, mockProvider }
+ * @returns {Promise<Object>} 调用结果
+ */
+async function callCloudModel(options) {
+  const apiConfig = loadApiConfig();
+  if (!apiConfig) {
+    return {
+      success: false,
+      model: options.model,
+      error: { type: 'config_error', message: '无法读取 api_config.json' }
+    };
+  }
+  const glmCfg = apiConfig.glm || {};
+  return callOpenAICompatible(options, {
+    label: 'GLM',
+    endpoint: glmCfg.endpoint || 'https://open.bigmodel.cn/api/paas/v4',
+    apiKey: glmCfg.apiKey,
+    timeout: glmCfg.timeout
+  });
+}
+
+/**
+ * 调用 GPT 中转站（openai_proxy，OpenAI 兼容格式）
+ * 支持 gpt-4o / gpt-4o-mini / gpt-4-turbo / claude-3-5-sonnet / gemini-2.0-flash
+ * @param {Object} options - 调用选项 { model, prompt, timeoutMs, mockProvider }
+ * @returns {Promise<Object>} 调用结果
+ */
+async function callOpenAIProxy(options) {
+  const apiConfig = loadApiConfig();
+  if (!apiConfig) {
+    return {
+      success: false,
+      model: options.model,
+      error: { type: 'config_error', message: '无法读取 api_config.json' }
+    };
+  }
+  const proxyCfg = apiConfig.openai_proxy || {};
+  return callOpenAICompatible(options, {
+    label: 'OpenAI Proxy',
+    endpoint: proxyCfg.endpoint || '',
+    apiKey: proxyCfg.apiKey,
+    timeout: proxyCfg.timeout
   });
 }
 
@@ -560,10 +670,12 @@ async function generate(options = {}) {
       }
 
       try {
-        // 调用模型
+        // 调用模型：按 provider 分发（本地 Ollama / GPT中转站 / GLM）
         let result;
         if (isLocalModel(model)) {
           result = await callLocalModel({ model, prompt, numCtx, mockProvider, images });
+        } else if (getModelProvider(model) === 'openai_proxy') {
+          result = await callOpenAIProxy({ model, prompt, mockProvider });
         } else {
           result = await callCloudModel({ model, prompt, mockProvider });
         }
@@ -674,10 +786,33 @@ async function generate(options = {}) {
  * @returns {Object} 模型健康状态
  */
 function getModelHealth() {
+  // 读取 provider 配置状态（不返回完整 apiKey，仅返回是否已配置）
+  const apiConfig = loadApiConfig();
+  const proxyCfg = (apiConfig && apiConfig.openai_proxy) || {};
+  const glmCfg = (apiConfig && apiConfig.glm) || {};
+
   return {
     chains: { ...MODEL_CHAINS },
     cloudModels: Array.from(CLOUD_MODELS),
+    openaiProxyModels: Array.from(OPENAI_PROXY_MODELS),
     localModels: Array.from(LOCAL_MODELS),
+    providerOrder: (apiConfig && apiConfig.providerOrder) || ['glm', 'ollama'],
+    providers: {
+      openai_proxy: {
+        enabled: proxyCfg.enabled !== false,
+        configured: !!(proxyCfg.apiKey && proxyCfg.apiKey.length > 0),
+        name: proxyCfg.name || 'GPT中转站',
+        model: proxyCfg.model || null,
+        models: proxyCfg.models || [],
+        endpoint: proxyCfg.endpoint || null
+      },
+      glm: {
+        enabled: glmCfg.enabled !== false,
+        configured: !!(glmCfg.apiKey && glmCfg.apiKey.length > 0),
+        model: glmCfg.model || null,
+        endpoint: glmCfg.endpoint || null
+      }
+    },
     slowModels: Array.from(slowResponseState.slowModels.entries()).map(([model, state]) => ({
       model,
       since: state.since,
@@ -699,6 +834,7 @@ function getModelHealth() {
 module.exports = {
   MODEL_CHAINS,
   CLOUD_MODELS,
+  OPENAI_PROXY_MODELS,
   LOCAL_MODELS,
   DEFAULT_CONFIG,
   FAILOVER_ALLOWED_CODES,
@@ -711,8 +847,10 @@ module.exports = {
   clearSlowResponseState,
   isCloudModel,
   isLocalModel,
+  getModelProvider,
   callLocalModel,
   callCloudModel,
+  callOpenAIProxy,
   generate,
   getModelHealth
 };

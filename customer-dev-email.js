@@ -115,6 +115,81 @@
   var CD_SIGNATURE = 'Best regards,\nLeo Li\nKaiLionCrafts\nWhatsApp: +86 131-3800-6564\nWeb: https://kailioncrafts.com';
 
   // ============================================================
+  // Feature 3.4: Customer-tier differentiated outreach style
+  // S/A/B/C derived from countryTier + intentLevel
+  // ============================================================
+  var CD_TIER_STYLES = {
+    S: {
+      label: 'S级 · 品牌大客户',
+      desc: '欧美品牌商 / 大型进口商 — 专业定制、品牌导向',
+      style: 'Write like a senior account manager addressing a European/American brand buyer. Formal, respectful, premium tone. Focus on customization capability, brand-building, private label, quality certifications, and direct founder contact.',
+      sellingPointIds: ['logowrap', 'oem', 'certs', 'leo', 'freemedia'],
+      cta: 'Would you be open to a 15-minute video call to discuss your private label needs?',
+      tone: 'Formal, respectful, professional',
+      words: [120, 180]
+    },
+    A: {
+      label: 'A级 · 中型进口商',
+      desc: '欧美中型进口商 / 分销商 — 价值导向、专业友好',
+      style: 'Professional and balanced, value-oriented. Confident and helpful. Focus on factory-direct pricing, stable supply, free marketing assets, one-stop sourcing.',
+      sellingPointIds: ['directprice', 'onestop', 'freemedia', 'export'],
+      cta: 'May I send our latest catalog and sample options for your review?',
+      tone: 'Professional, friendly',
+      words: [100, 150]
+    },
+    B: {
+      label: 'B级 · 区域进口商/电商',
+      desc: '中东/东南亚/拉美进口商、电商卖家 — 简洁价格导向',
+      style: 'Concise, price- and practicality-oriented. Get to the point quickly. Focus on price advantage, low MOQ, ready stock, fast delivery.',
+      sellingPointIds: ['directprice', 'yangjiang', 'onestop'],
+      cta: 'Shall I send our price list with MOQ options for a trial order?',
+      tone: 'Concise, direct',
+      words: [70, 110]
+    },
+    C: {
+      label: 'C级 · 新兴市场小买家',
+      desc: '非洲等新兴市场小买家 — 极简、现货低价',
+      style: 'Minimal, price- and ready-stock oriented. Very short, simple, direct. Focus on lowest price, ready stock, small-batch, fast shipping.',
+      sellingPointIds: ['directprice', 'yangjiang'],
+      cta: 'Would you like our ready-stock list with best prices for small orders?',
+      tone: 'Simple, direct',
+      words: [50, 80]
+    }
+  };
+
+  // Derive S/A/B/C tier from countryTier + intentLevel
+  function ceCalcTier(c){
+    var p = c.cdProfile || {};
+    var ct = String(p.countryTier || 'C').toUpperCase();
+    var il = String(p.intentLevel || '');
+    var high = /高|high/i.test(il);
+    var mid  = /中|mid/i.test(il);
+    var low  = /低|low/i.test(il);
+    if(ct === 'S') return high ? 'S' : (mid ? 'A' : 'B');
+    if(ct === 'A') return (high || mid) ? 'A' : 'B';
+    if(ct === 'B') return high ? 'A' : (mid ? 'B' : 'C');
+    // C country
+    return low ? 'C' : (mid ? 'B' : 'C');
+  }
+
+  // Resolve which tier style to use for an email: explicit override
+  // on the email object wins, otherwise auto-calculate from customer.
+  function ceResolveTier(c, email){
+    if(email && email.tierStyle && CD_TIER_STYLES[email.tierStyle]) return email.tierStyle;
+    return ceCalcTier(c);
+  }
+
+  // Resolve target language code for a customer/email
+  function ceResolveLang(c, email){
+    if(email && email.lang) return email.lang;
+    if(c.cdEmailLang) return c.cdEmailLang;
+    if(window.cdEnsureCustomerLang) window.cdEnsureCustomerLang(c);
+    if(c.cdEmailLang) return c.cdEmailLang;
+    if(window.cdRecommendLang) return window.cdRecommendLang(c.country);
+    return 'en';
+  }
+
+  // ============================================================
   // Local helpers
   // ============================================================
   function ceNowISO(){ return new Date().toISOString(); }
@@ -227,24 +302,30 @@
   // ============================================================
   // Feature 2.4: Quality check / forbidden words
   // ============================================================
-  function ceQualityCheck(bodyEn){
+  function ceQualityCheck(bodyEn, lang){
     if(!bodyEn) return { score:0, words:[], uppercase:0, exclam:0 };
     var text = String(bodyEn);
     var lower = text.toLowerCase();
     var found = [];
 
-    CD_FORBIDDEN.forEach(function(f){
-      var re = new RegExp('\\b' + f.word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b', 'i');
-      if(re.test(lower)){
-        found.push({ word:f.word, category:f.category, suggestion:f.suggestion });
-      }
-    });
+    // For non-English bodies, English forbidden-word scan is not meaningful;
+    // only count exclamation / uppercase heuristics that are script-agnostic.
+    var isEnglish = (!lang || lang === 'en');
 
-    // Consecutive uppercase >= 5 letters
-    var upperHits = text.match(/\b[A-Z]{5,}\b/g) || [];
-    upperHits.forEach(function(w){
-      found.push({ word:w, category:'大写过多', suggestion:'改为常规大小写（如 ' + w.charAt(0) + w.slice(1).toLowerCase() + '）' });
-    });
+    if(isEnglish){
+      CD_FORBIDDEN.forEach(function(f){
+        var re = new RegExp('\\b' + f.word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b', 'i');
+        if(re.test(lower)){
+          found.push({ word:f.word, category:f.category, suggestion:f.suggestion });
+        }
+      });
+
+      // Consecutive uppercase >= 5 letters
+      var upperHits = text.match(/\b[A-Z]{5,}\b/g) || [];
+      upperHits.forEach(function(w){
+        found.push({ word:w, category:'大写过多', suggestion:'改为常规大小写（如 ' + w.charAt(0) + w.slice(1).toLowerCase() + '）' });
+      });
+    }
 
     // Exclamation marks > 2
     var exclam = (text.match(/!/g) || []).length;
@@ -255,10 +336,10 @@
     // Score: start at 100, -8 per forbidden word, min 0
     var score = 100 - found.length * 8;
     if(score < 0) score = 0;
-    // Bonus: if body is within 150 words, +5
-    if(ceWordCount(bodyEn) <= 150 && ceWordCount(bodyEn) >= 60) score = Math.min(100, score + 5);
+    // Bonus: if body is within 150 words, +5 (English word count)
+    if(isEnglish && ceWordCount(bodyEn) <= 150 && ceWordCount(bodyEn) >= 60) score = Math.min(100, score + 5);
 
-    return { score: score, words: found, uppercase: upperHits.length, exclam: exclam };
+    return { score: score, words: found, uppercase: isEnglish ? (text.match(/\b[A-Z]{5,}\b/g) || []).length : 0, exclam: exclam };
   }
 
   function ceHighlightForbidden(bodyEn, forbiddenWords){
@@ -275,32 +356,33 @@
   // ============================================================
   // Feature 2.5 / 2.6: Selling point & link selection
   // ============================================================
-  function cePickSellingPoints(c){
+  function cePickSellingPoints(c, tierOverride){
     var p = c.cdProfile || {};
     var type = p.customerType || c.customerType || '';
-    var tier = p.countryTier || 'C';
+    var tier = tierOverride || ceCalcTier(c);
     var picks = [];
     function byId(id){ return CD_SELLING_POINTS_POOL.find(function(x){ return x.id === id; }); }
 
-    // Strategy by buyer type
+    // Feature 3.4: tier-style selling points take priority
+    var tierStyle = CD_TIER_STYLES[tier] || CD_TIER_STYLES.C;
+    tierStyle.sellingPointIds.forEach(function(id){
+      var sp = byId(id);
+      if(sp) picks.push(sp);
+    });
+
+    // Buyer-type personalization (still applied as secondary candidates)
     if(/brand/i.test(type)){
-      picks.push(byId('logowrap'), byId('oem'), byId('gov'));
+      if(!picks.find(function(x){ return x && x.id === 'logowrap'; })) picks.push(byId('logowrap'));
     }else if(/import/i.test(type)){
-      picks.push(byId('directprice'), byId('factories'), byId('onestop'));
-    }else if(/e-?commerce/i.test(type) || /电商/i.test(type)){
-      picks.push(byId('freemedia'), byId('oem'), byId('yangjiang'));
-    }else if(/distrib/i.test(type) || /分销/i.test(type)){
-      picks.push(byId('directprice'), byId('association'), byId('freemedia'));
-    }else{
-      picks.push(byId('yangjiang'), byId('leo'), byId('onestop'));
-    }
-    // Tier adjustment
-    if(tier === 'S' || tier === 'A'){
-      // quality + customization tilt
-      if(!picks.find(function(x){ return x && x.id === 'certs'; })) picks.push(byId('certs'));
-    }else{
       if(!picks.find(function(x){ return x && x.id === 'directprice'; })) picks.push(byId('directprice'));
+    }else if(/e-?commerce/i.test(type) || /电商/i.test(type)){
+      if(!picks.find(function(x){ return x && x.id === 'freemedia'; })) picks.push(byId('freemedia'));
+    }else if(/distrib/i.test(type) || /分销/i.test(type)){
+      if(!picks.find(function(x){ return x && x.id === 'onestop'; })) picks.push(byId('onestop'));
     }
+    // Founder direct contact as a universal trust signal
+    if(!picks.find(function(x){ return x && x.id === 'leo'; })) picks.push(byId('leo'));
+
     // de-dup, take 4 candidates
     var seen = {}; var out = [];
     picks.forEach(function(x){ if(x && !seen[x.id]){ seen[x.id]=1; out.push(x); } });
@@ -357,9 +439,13 @@
     return lines.length ? lines.join('；') : '（背调无具体摘要）';
   }
 
-  function ceBuildGenPrompt(c, emailType){
+  function ceBuildGenPrompt(c, emailType, email){
     var p = c.cdProfile || {};
-    var sp = cePickSellingPoints(c);
+    var tier = ceResolveTier(c, email);
+    var tierStyle = CD_TIER_STYLES[tier] || CD_TIER_STYLES.C;
+    var lang = ceResolveLang(c, email);
+    var langMeta = (window.cdGetLangMeta && window.cdGetLangMeta(lang)) || null;
+    var sp = cePickSellingPoints(c, tier);
     var lk = cePickLinks(c);
     var typeLabel = (CD_EMAIL_TYPES.find(function(t){ return t.key === emailType; }) || {}).label || emailType;
 
@@ -368,13 +454,41 @@
 
     var followupAngle = '';
     if(emailType === 'followup3'){
-      followupAngle = 'This is a Day-3 bump: keep it very short (60-90 words), gently floating the original message back up, add one small value (an industry observation or a quick question), no new hard sell.';
+      followupAngle = 'This is a Day-3 bump: keep it very short, gently floating the original message back up, add one small value (an industry observation or a quick question), no new hard sell.';
     }else if(emailType === 'followup7'){
       followupAngle = 'This is a Day-7 value email: lower the barrier by offering something useful (browsing the site collection, a specific category page), keep it low-pressure, give the reader an easy reason to reply.';
     }else if(emailType === 'followup14'){
       followupAngle = 'This is a Day-14 angle-shift email: switch to a different angle (e.g. how similar buyers use our products, or a new product/material update), give a graceful exit if not interested, stay professional.';
     }else{
       followupAngle = 'This is the FIRST outreach email: open by referencing something specific about the customer (their products / market / business scope from the briefing), then one pain point + 2-3 selling points, then a soft CTA linking to our site.';
+    }
+
+    // ── Feature 3.4: tier style block ──────────────────────
+    var wc = tierStyle.words || [100, 150];
+    var tierBlock = ''
+      + '【Customer tier: ' + tier + ' · ' + tierStyle.label + '】\n'
+      + 'Buyer profile: ' + tierStyle.desc + '\n'
+      + 'Writing style: ' + tierStyle.style + '\n'
+      + 'Required CTA (adapt naturally to the greeting, do not quote verbatim): ' + tierStyle.cta + '\n'
+      + 'Tone: ' + tierStyle.tone + '\n'
+      + 'Target length: ' + wc[0] + '-' + wc[1] + ' words in the body language.\n';
+
+    // ── Feature 3.1: target language block ────────────────
+    var langName = (langMeta && langMeta.nativeLabel) ? langMeta.nativeLabel : 'English';
+    var langBlock = '';
+    if(lang === 'en' || !langMeta){
+      langBlock = '【Target language: English. Write subjectEn and bodyEn in English.】\n';
+    }else{
+      langBlock = '【Target language: ' + langName + ' (' + lang + ')】\n'
+        + 'IMPORTANT: Write the SUBJECT (subjectEn field) and the BODY (bodyEn field) in ' + langName + '.\n'
+        + 'The signature block MUST stay in English (as given below).\n'
+        + 'Greeting, body paragraphs, and CTA must be natural, native-sounding ' + langName + '.\n'
+        + 'Do NOT mix English sentences into the body except brand names, product category names, URLs, and the signature.\n'
+        + 'subjectZh must be the Chinese translation of the chosen subject for internal review.\n'
+        + 'bodyZh must be an accurate Chinese translation of the entire email body (including signature) for internal review.\n';
+      if(langMeta.rtl){
+        langBlock += 'NOTE: ' + langName + ' is a right-to-left language. Write correct Arabic script. Use standard Arabic punctuation and numerals appropriate for B2B. Do not reverse Latin-script URLs or brand names.\n';
+      }
     }
 
     var prompt = ''
@@ -388,24 +502,25 @@
       + 'Intent: ' + (p.intentLevel || 'Unknown') + ' | Country tier: ' + (p.countryTier || 'C') + ' | Priority: ' + (p.priorityScore || 0) + '\n'
       + 'Recommended strategy: ' + (p.strategy || 'Standard OEM outreach') + '\n\n'
       + '【Customer intel briefing】\n' + ceIntelBrief(c) + '\n\n'
-      + '【Pre-selected selling points (choose 2-3, weave in naturally, do NOT list them like a menu)】\n' + spBlock + '\n\n'
+      + langBlock + '\n'
+      + tierBlock + '\n'
+      + '【Pre-selected selling points for this tier (choose 2-3, weave in naturally, do NOT list them like a menu)】\n' + spBlock + '\n\n'
       + '【Available site links (embed naturally where relevant; CTA may point to the matching product collection)】\n' + lkBlock + '\n\n'
       + '【Email type: ' + typeLabel + '】\n' + followupAngle + '\n\n'
       + '【Writing rules - MUST follow】\n'
-      + '- English body: under 150 words (first email), short paragraphs. Greeting -> 2-3 short body paragraphs -> soft CTA -> signature.\n'
+      + '- Short paragraphs. Greeting -> 2-3 short body paragraphs -> soft CTA -> signature.\n'
       + '- Personalize the opening with a SPECIFIC detail from the customer briefing above. Never say "I hope this email finds you well" as a generic opener.\n'
       + '- Use "we" / "our Yangjiang manufacturing partners". Do NOT claim we own factories; say "strategic manufacturing partners" or "local manufacturing network".\n'
       + '- Do NOT invent MOQ, lead time, price, certifications, customer cases, export numbers beyond what is given. No guarantees.\n'
-      + '- FORBIDDEN words (do NOT use): free, 100%, guarantee, best, cheapest, amazing, perfect, incredible, urgent, act now, limited time, click here, buy now, don\'t miss, exclusive, discount, sale, offer, special, deal, save, cheap. Use softer alternatives (e.g. "complimentary" instead of free).\n'
+      + '- FORBIDDEN English words (do NOT use even in English sections): free, 100%, guarantee, best, cheapest, amazing, perfect, incredible, urgent, act now, limited time, click here, buy now, don\'t miss, exclusive, discount, sale, offer, special, deal, save, cheap.\n'
       + '- Max 2 exclamation marks. Avoid long ALL-CAPS words.\n'
-      + '- CTA is light: invite them to browse a relevant collection or reply. Do NOT push a catalog / price list on the first email.\n'
-      + '- Signature MUST be exactly:\n' + CD_SIGNATURE + '\n\n'
+      + '- Signature MUST be exactly (keep in English even when body is translated):\n' + CD_SIGNATURE + '\n\n'
       + '【Output format - STRICT JSON, no markdown, no extra text】\n'
       + '{\n'
       + '  "subjectOptions": ["option1","option2","option3"],\n'
-      + '  "subjectEn": "the chosen best subject line (English)",\n'
+      + '  "subjectEn": "the chosen best subject line (in the target language)",\n'
       + '  "subjectZh": "中文对照主题",\n'
-      + '  "bodyEn": "English email body INCLUDING the signature block",\n'
+      + '  "bodyEn": "email body in the target language, INCLUDING the English signature block",\n'
       + '  "bodyZh": "accurate Chinese translation of the whole email body for review",\n'
       + '  "sellingPointsUsed": ["label of each selling point actually used, e.g. 阳江产业带"],\n'
       + '  "linksUsed": ["full URL of each link actually embedded"]\n'
@@ -449,7 +564,7 @@
           + facts.map(function(f,i){ return (i+1)+'. '+ (f.title||'') + ': ' + (f.shortEvidence||'').substring(0,120); }).join('\n')
         : '\n【Knowledge base】No confirmed facts retrieved. Do NOT state any company capability, MOQ, price, certification or case as fact.\n';
 
-      var prompt = ceBuildGenPrompt(c, type);
+      var prompt = ceBuildGenPrompt(c, type, email);
       prompt += kbBlock;
 
       var r = await callAI(
@@ -479,17 +594,27 @@
       email.bodyZh = data.bodyZh || '';
       email.sellingPointsUsed = Array.isArray(data.sellingPointsUsed) ? data.sellingPointsUsed : [];
       email.linksUsed = Array.isArray(data.linksUsed) ? data.linksUsed : [];
+
+      // Feature 3.1: stamp language metadata on the email
+      email.lang = ceResolveLang(c, email);
+      var lm = (window.cdGetLangMeta && window.cdGetLangMeta(email.lang)) || null;
+      email.langLabel = lm ? lm.nativeLabel : 'English';
+      email.rtl = !!(lm && lm.rtl);
+
+      // Feature 3.4: stamp tier style used
+      email.tierStyle = ceResolveTier(c, email);
+
       email.status = 'generated';
       email.updatedAt = ceNowISO();
       email.dateEn = ceDateEn(); email.dateZh = ceDateZh();
 
-      // Auto quality check
-      var qr = ceQualityCheck(email.bodyEn);
+      // Auto quality check (English forbidden-word scan only for English bodies)
+      var qr = ceQualityCheck(email.bodyEn, email.lang);
       email.qualityScore = qr.score;
       email.forbiddenWords = qr.words;
 
       persist();
-      toast('✅ 开发信已生成（质检 ' + qr.score + ' 分）');
+      toast('✅ 开发信已生成（' + email.langLabel + ' · ' + (CD_TIER_STYLES[email.tierStyle]||{}).label + ' · 质检 ' + qr.score + ' 分）');
       renderView();
     }catch(e){
       window._ceBusy = false;
@@ -614,7 +739,7 @@
       }
     }
     // re-run quality check
-    var qr = ceQualityCheck(e.bodyEn);
+    var qr = ceQualityCheck(e.bodyEn, e.lang);
     e.qualityScore = qr.score;
     e.forbiddenWords = qr.words;
     if(e.status !== 'sent') e.status = 'edited';
@@ -668,7 +793,7 @@
     e.aiAssistantHistory.push({ instruction:window._ceAssistantInstr||'(proposal)', oldBody:e.bodyEn, newBody:p.bodyEn, timestamp:ceNowISO() });
     e.bodyEn = p.bodyEn; e.bodyZh = p.bodyZh || e.bodyZh;
     e.status = 'edited';
-    var qr = ceQualityCheck(e.bodyEn);
+    var qr = ceQualityCheck(e.bodyEn, e.lang);
     e.qualityScore = qr.score; e.forbiddenWords = qr.words;
     window._ceAssistantProposal = null;
     persist();
@@ -708,6 +833,28 @@
 
   window.ceSetViewMode = function(m){ window._ceViewMode = m; renderView(); };
 
+  // Feature 3.1: set preferred email language for a customer
+  window.ceSetCustomerLang = function(cid, code){
+    var c = ceFindCustomer(cid); if(!c) return;
+    c.cdEmailLang = code;
+    c.cdEmailLangManual = true;
+    if(window.cdRecommendLang && window.cdRecommendLang(c.country) === code) c.cdEmailLangManual = false;
+    persist();
+    toast('✅ 客户开发信语言已设为 ' + (((window.cdGetLangMeta&&window.cdGetLangMeta(code))||{}).nativeLabel || code) + '，点击「重新生成」生效');
+    renderView();
+  };
+
+  // Feature 3.4: override tier style on a specific email
+  window.ceSetEmailTier = function(cid, type, tier){
+    var c = ceFindCustomer(cid); if(!c) return;
+    var e = ceEnsureEmail(c, type);
+    e.tierStyle = (CD_TIER_STYLES[tier] ? tier : null);
+    if(!e.tierStyle) delete e.tierStyle; // back to auto
+    persist();
+    toast('✅ 开发信风格已切换为 ' + (CD_TIER_STYLES[tier] ? CD_TIER_STYLES[tier].label : '自动') + '，点击「重新生成」生效');
+    renderView();
+  };
+
   // ============================================================
   // Rendering
   // ============================================================
@@ -725,12 +872,22 @@
     var e = ceFindEmail(c, t.key);
     if(!e) e = ceEnsureEmail(c, t.key);
     var expanded = window._ceExpandedType === t.key;
-    var h = '<div class="cd-group">';
+    var curLang = ceResolveLang(c, e);
+    var curLangMeta = (window.cdGetLangMeta && window.cdGetLangMeta(curLang)) || null;
+    var curTier = ceResolveTier(c, e);
+    var tierStyle = CD_TIER_STYLES[curTier] || CD_TIER_STYLES.C;
+
+    var h = '<div class="cd-group' + (e.rtl ? ' cd-rtl' : '') + '"' + (e.rtl ? ' dir="rtl"' : '') + '">';
     // header
     h += '<div class="cd-group-head' + (expanded?' on':'') + '" onclick="ceToggleGroup(\'' + t.key + '\')">'
       + '<span class="cd-group-arrow">' + (expanded ? '▼' : '▶') + '</span>'
       + '<span class="cd-group-title">' + t.label + ' <small class="text-muted">' + t.sub + '</small></span>'
       + ceStatusBadge(e.status);
+    // language + tier badges on generated emails
+    if(e.status && e.status !== 'not_generated'){
+      h += '<span class="cd-badge" style="background:#e9d8fd22;color:#553c9a">' + (curLangMeta?curLangMeta.flag:'') + ' ' + esc(e.langLabel || (curLangMeta&&curLangMeta.nativeLabel) || 'English') + '</span>';
+      h += '<span class="cd-badge" style="background:#fed7d722;color:#c53030">' + curTier + '级</span>';
+    }
     if(e.status === 'sent' && e.sentAt){
       h += '<span class="cd-group-date">发送于 ' + esc(new Date(e.sentAt).toLocaleDateString('zh-CN')) + '</span>';
     }else if(e.dateZh){
@@ -741,6 +898,22 @@
       h += '<span class="cd-group-summary">' + esc(e.subjectEn.substring(0,30)) + (e.subjectEn.length>30?'…':'') + '</span>';
     }
     h += '<span class="cd-group-actions" onclick="event.stopPropagation()">';
+    // Language selector (customer-level)
+    var langs = (window.cdLanguages || []);
+    if(langs.length){
+      h += '<select class="cd-mini-sel" title="选择客户开发信语言" onchange="ceSetCustomerLang(\'' + c.id + '\',this.value)">';
+      langs.forEach(function(l){
+        h += '<option value="' + l.code + '"' + (l.code === curLang ? ' selected' : '') + '>' + l.flag + ' ' + esc(l.nativeLabel) + '</option>';
+      });
+      h += '</select>';
+    }
+    // Tier style selector (email-level override)
+    h += '<select class="cd-mini-sel" title="选择开发信风格（S/A/B/C）" onchange="ceSetEmailTier(\'' + c.id + '\',\'' + t.key + '\',this.value)">';
+    h += '<option value="">自动（' + curTier + '级）</option>';
+    ['S','A','B','C'].forEach(function(k){
+      h += '<option value="' + k + '"' + (e.tierStyle===k?' selected':'') + '>' + esc(CD_TIER_STYLES[k].label) + '</option>';
+    });
+    h += '</select>';
     h += '<button class="btn btn-primary btn-sm" onclick="ceGenerate(\'' + c.id + '\',\'' + t.key + '\')" ' + (window._ceBusy?'disabled':'') + '>' + (e.status==='not_generated'?'生成':'重新生成') + '</button>';
     if(e.status !== 'not_generated'){
       h += '<button class="btn btn-outline btn-sm" onclick="ceMarkSent(\'' + c.id + '\',\'' + t.key + '\')">✓ 标记已发送</button>';
@@ -760,6 +933,12 @@
   function ceRenderEditor(c, e){
     var h = '';
     var mode = window._ceViewMode || 'both';
+    // Before generation, fall back to the customer's resolved language label
+    var resolvedLang = ceResolveLang(c, e);
+    var resolvedMeta = (window.cdGetLangMeta && window.cdGetLangMeta(resolvedLang)) || null;
+    var sendLabel = e.langLabel || (resolvedMeta && resolvedMeta.nativeLabel) || 'English';
+    var sendLangCode = e.lang || resolvedLang;
+    var rtl = !!e.rtl || !!(resolvedMeta && resolvedMeta.rtl);
 
     // Subject options picker
     h += '<div class="cd-edit-row"><label class="cd-edit-label">主题行（3个候选）</label><div class="cd-sub-opts">';
@@ -768,8 +947,8 @@
     });
     h += '</div></div>';
 
-    h += '<div class="cd-edit-row"><label class="cd-edit-label">英文主题</label>'
-      + '<input class="cd-input" value="' + esc(e.subjectEn) + '" oninput="ceEdit(\'' + c.id + '\',\'' + e.type + '\',\'subjectEn\',this.value)"></div>';
+    h += '<div class="cd-edit-row"><label class="cd-edit-label">' + esc(sendLabel) + '主题</label>'
+      + '<input class="cd-input" dir="' + (rtl?'rtl':'ltr') + '" value="' + esc(e.subjectEn) + '" oninput="ceEdit(\'' + c.id + '\',\'' + e.type + '\',\'subjectEn\',this.value)"></div>';
     h += '<div class="cd-edit-row"><label class="cd-edit-label">中文主题</label>'
       + '<input class="cd-input" value="' + esc(e.subjectZh) + '" oninput="ceEdit(\'' + c.id + '\',\'' + e.type + '\',\'subjectZh\',this.value)"></div>';
 
@@ -779,7 +958,7 @@
     // View mode toggle
     h += '<div class="cd-mode-toggle">'
       + '<span class="cd-mode-l">视图：</span>'
-      + '<span class="cd-mode' + (mode==='en'?' on':'') + '" onclick="ceSetViewMode(\'en\')">仅英文</span>'
+      + '<span class="cd-mode' + (mode==='en'?' on':'') + '" onclick="ceSetViewMode(\'en\')">发送版</span>'
       + '<span class="cd-mode' + (mode==='zh'?' on':'') + '" onclick="ceSetViewMode(\'zh\')">仅中文</span>'
       + '<span class="cd-mode' + (mode==='both'?' on':'') + '" onclick="ceSetViewMode(\'both\')">双语对照</span>'
       + '</div>';
@@ -791,8 +970,8 @@
     h += '<div class="cd-editor-main">';
 
     if(mode === 'en' || mode === 'both'){
-      h += '<div class="cd-mail-pane">';
-      h += '<div class="cd-mail-head">📤 发送版（英文） <span class="cd-wc">' + ceWordCount(e.bodyEn) + ' 词</span>'
+      h += '<div class="cd-mail-pane' + (rtl?' cd-rtl':'') + '"' + (rtl?' dir="rtl"':'') + '>';
+      h += '<div class="cd-mail-head">📤 发送版（' + esc(sendLabel) + (rtl?' · RTL':'') + '） <span class="cd-wc">' + ceWordCount(e.bodyEn) + ' 词</span>'
         + '<span class="cd-mail-actions">'
         + '<button class="btn btn-outline btn-sm" onclick="ceCopy(\'' + c.id + '\',\'' + e.type + '\',\'en\')">📋 复制</button>'
         + '<button class="btn btn-outline btn-sm" onclick="ceRestore(\'' + c.id + '\',\'' + e.type + '\')" title="从AI原始版本恢复">↩️ 恢复原始</button>'
@@ -937,12 +1116,18 @@
 
     // Profile summary bar (explains selling point choice)
     var p = c.cdProfile || {};
+    var autoTier = ceCalcTier(c);
+    var autoTierStyle = CD_TIER_STYLES[autoTier] || CD_TIER_STYLES.C;
+    var autoLang = ceResolveLang(c, null);
+    var autoLangMeta = (window.cdGetLangMeta && window.cdGetLangMeta(autoLang)) || null;
     h += '<div class="cd-profile-bar">';
     h += '<span class="cd-pb-item">🎯 意向：<b>' + esc(p.intentLevel||'—') + '</b></span>';
     h += '<span class="cd-pb-item">🌍 国家等级：<b>' + esc(p.countryTier||'—') + '</b></span>';
     h += '<span class="cd-pb-item">🏷️ 类型：<b>' + esc(p.customerType||'—') + '</b></span>';
     h += '<span class="cd-pb-item">🧭 品类：<b>' + esc((p.categoryMatch||[]).join('、')||c.productCategory||'—') + '</b></span>';
     h += '<span class="cd-pb-item">⭐ 优先级：<b>' + (p.priorityScore||0) + '</b></span>';
+    h += '<span class="cd-pb-item" title="根据国家等级+意向自动推算，可在每封开发信上手动覆盖">📝 推荐风格：<b>' + esc(autoTierStyle.label) + '</b></span>';
+    h += '<span class="cd-pb-item" title="根据国家自动推荐，可在多语言中心或下方下拉覆盖">🗣️ 推荐语言：<b>' + (autoLangMeta?autoLangMeta.flag+' ':'') + esc(autoLangMeta?autoLangMeta.nativeLabel:autoLang) + (autoLangMeta&&autoLangMeta.rtl?' (RTL)':'') + '</b></span>';
     h += '</div>';
 
     // Bulk generate button
@@ -1053,6 +1238,11 @@
     + '.cd-assist-hist-item{font-size:11.5px;color:#6b46c1;margin:3px 0;}'
     // badges & footer
     + '.cd-badge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:10px;}'
+    + '.cd-mini-sel{padding:3px 6px;border:1px solid #cbd5e0;border-radius:6px;font-size:11.5px;background:#fff;color:#2d3748;max-width:150px;}'
+    // RTL (Arabic) support
+    + '.cd-rtl .cd-ta,.cd-rtl .cd-input{text-align:right;}'
+    + '.cd-rtl .cd-forbidden-preview{text-align:right;}'
+    + '.cd-rtl .cd-mail-head{flex-direction:row-reverse;}'
     + '.cd-footer-bar{margin-top:16px;padding:12px;background:#fff5f5;border:1px solid #fed7d7;border-radius:10px;text-align:center;}'
     + '.cd-footer-bar .cd-hint{color:#c53030;}'
     // responsive

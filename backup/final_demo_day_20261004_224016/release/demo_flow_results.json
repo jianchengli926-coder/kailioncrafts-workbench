@@ -1,0 +1,178 @@
+{
+  "pages": [
+    {
+      "navKey": "dashboard",
+      "label": "数据看板",
+      "loadTime": 1525,
+      "passed": true,
+      "textLen": 5511,
+      "hasUndefined": false,
+      "consoleErrs": 0,
+      "netErrs": 0,
+      "buttons": [
+        "2",
+        "📄 导出HTML报告",
+        "📊 导出JSON数据",
+        "📋 导出数据摘要",
+        "📚 查看知识库",
+        "🔍 AI检索",
+        "🎯 智能匹配客户",
+        "📋 版本历史"
+      ]
+    },
+    {
+      "navKey": "customers",
+      "label": "客户台账",
+      "loadTime": 1516,
+      "passed": true,
+      "textLen": 1884,
+      "hasUndefined": false,
+      "consoleErrs": 0,
+      "netErrs": 0,
+      "buttons": [
+        "2",
+        "全部客户",
+        "新开发客户",
+        "老客户（已成交）",
+        "📋 列表",
+        "🗂️ 分组",
+        "📤 导出",
+        "📥 导入"
+      ]
+    },
+    {
+      "navKey": "drafts",
+      "label": "开发信",
+      "loadTime": 1508,
+      "passed": true,
+      "textLen": 3157,
+      "hasUndefined": false,
+      "consoleErrs": 0,
+      "netErrs": 0,
+      "buttons": [
+        "2",
+        "📋 草稿箱",
+        "✂️ 短开发信",
+        "🌍 多语言生成",
+        "🔁 跟进序列",
+        "📤 审核发送",
+        "📊 效果分析",
+        "🧪 A/B测试"
+      ]
+    },
+    {
+      "navKey": "inquiry",
+      "label": "询盘管理",
+      "loadTime": 1509,
+      "passed": true,
+      "textLen": 440,
+      "hasUndefined": false,
+      "consoleErrs": 0,
+      "netErrs": 0,
+      "buttons": [
+        "2",
+        "＋ 新建询盘",
+        "已响应",
+        "已响应",
+        "已响应",
+        "🤖",
+        "×",
+        "下一步 ➡️"
+      ]
+    },
+    {
+      "navKey": "dailyWork",
+      "label": "今日工作",
+      "loadTime": 1509,
+      "passed": true,
+      "textLen": 420,
+      "hasUndefined": false,
+      "consoleErrs": 0,
+      "netErrs": 0,
+      "buttons": [
+        "2",
+        "🤖",
+        "×",
+        "下一步 ➡️"
+      ]
+    },
+    {
+      "navKey": "settings",
+      "label": "设置",
+      "loadTime": 1521,
+      "passed": true,
+      "textLen": 7207,
+      "hasUndefined": false,
+      "consoleErrs": 0,
+      "netErrs": 0,
+      "buttons": [
+        "2",
+        "🔑 修改访问密码",
+        "📚 查看完整知识库",
+        "🔍 AI智能检索",
+        "📥 导入导出",
+        "📋 版本管理",
+        "💾 保存当前版本",
+        "▶ 开始AI拆解"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "page": "dashboard",
+      "action": "点击卡片",
+      "clicked": true
+    },
+    {
+      "page": "customers",
+      "action": "批量质量评分",
+      "found": true,
+      "text": "🤖 AI 批量背调（0 已选）"
+    },
+    {
+      "page": "customers",
+      "action": "进入客户详情",
+      "clicked": true
+    },
+    {
+      "page": "drafts",
+      "action": "批量质检",
+      "found": true,
+      "text": "📋 批量质检"
+    },
+    {
+      "page": "drafts",
+      "action": "打开草稿编辑器",
+      "clicked": true,
+      "text": "📋 批量质检"
+    },
+    {
+      "page": "inquiry",
+      "action": "SLA检查",
+      "hasSLA": true,
+      "hasRespondBtn": true
+    },
+    {
+      "page": "inquiry",
+      "action": "标记已响应",
+      "found": true,
+      "text": "已响应"
+    },
+    {
+      "page": "settings",
+      "action": "设置检查",
+      "hasModelConfig": true,
+      "smtpPassEmpty": true,
+      "smtpPlaceholder": "输入邮箱密码或SMTP授权码"
+    }
+  ],
+  "errors": [],
+  "summary": {
+    "pagesTotal": 6,
+    "pagesPassed": 6,
+    "maxLoadTime": 1525,
+    "consoleErrors": 0,
+    "networkErrors": 0,
+    "allPassed": true
+  }
+}

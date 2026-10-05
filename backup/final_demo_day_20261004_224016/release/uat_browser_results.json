@@ -1,0 +1,895 @@
+{
+  "desktopPages": [
+    {
+      "key": "dashboard",
+      "label": "数据看板",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_dashboard.png",
+      "error": null,
+      "pageHeadings": [
+        "数据看板",
+        "📋 全部线索",
+        "⭐ 高匹配"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "plans",
+      "label": "开发任务",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_plans.png",
+      "error": null,
+      "pageHeadings": [
+        "AI 开发任务",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "autosearch",
+      "label": "自动搜客",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_autosearch.png",
+      "error": null,
+      "pageHeadings": [
+        "自动搜客中心",
+        "🔍 总搜索次数",
+        "📋 找到客户数"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "prospect",
+      "label": "精准开发",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_prospect.png",
+      "error": null,
+      "pageHeadings": [
+        "AI精准客户开发",
+        "👤 目标客户画像设置",
+        "🔍 AI生成的搜索词（可编辑后执行）"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "devplans",
+      "label": "开发计划",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_devplans.png",
+      "error": null,
+      "pageHeadings": [
+        "开发计划中心",
+        "📋 总开发计划",
+        "⚡ 运行中"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "customers",
+      "label": "客户台账",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_customers.png",
+      "error": null,
+      "pageHeadings": [
+        "客户台账",
+        "🏷️ 标签云统计\n点击标签快速筛选客户",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "drafts",
+      "label": "开发信",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_drafts.png",
+      "error": null,
+      "pageHeadings": [
+        "开发信管理",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "outreachKB",
+      "label": "客户开发知识库",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_outreachKB.png",
+      "error": null,
+      "pageHeadings": [
+        "客户开发知识库",
+        "🗂️ 客户开发知识库",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "campaigns",
+      "label": "客户开发Campaign",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_campaigns.png",
+      "error": null,
+      "pageHeadings": [
+        "客户开发 Campaign",
+        "🚀 客户开发 Campaign",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "knowledgeFacts",
+      "label": "知识事实",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_knowledgeFacts.png",
+      "error": null,
+      "pageHeadings": [
+        "精准开发知识事实",
+        "✅ 精准开发知识事实",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "knowledgePacks",
+      "label": "精准开发配置",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_knowledgePacks.png",
+      "error": null,
+      "pageHeadings": [
+        "Knowledge Pack 配置",
+        "📦 精准开发配置（Knowledge Pack）",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "inbox",
+      "label": "AI收件箱",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_inbox.png",
+      "error": null,
+      "pageHeadings": [
+        "AI 收件箱",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "schedule",
+      "label": "跟进日程",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_schedule.png",
+      "error": null,
+      "pageHeadings": [
+        "跟进日程",
+        "📊 知识库跟进建议\n查看全部模板",
+        "逾期\n0"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "inquiry",
+      "label": "询盘管理",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_inquiry.png",
+      "error": null,
+      "pageHeadings": [
+        "询盘管理",
+        "独立站SEO",
+        "开发信"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "orders",
+      "label": "报价与订单",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_orders.png",
+      "error": null,
+      "pageHeadings": [
+        "报价与订单",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "products",
+      "label": "产品与样品",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_products.png",
+      "error": null,
+      "pageHeadings": [
+        "产品与样品",
+        "📦 样品寄送记录\n＋ 寄样品",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "knowledge",
+      "label": "知识库",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_knowledge.png",
+      "error": null,
+      "pageHeadings": [
+        "企业知识库",
+        "📚 KaiLionCrafts 公司知识库",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "market",
+      "label": "市场分析",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_market.png",
+      "error": null,
+      "pageHeadings": [
+        "亚马逊市场分析中心",
+        "🔬 亚马逊市场分析中心",
+        "📊 调研结果概览"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "seo",
+      "label": "SEO内容营销",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_seo.png",
+      "error": null,
+      "pageHeadings": [
+        "SEO与内容营销",
+        "📈 SEO与内容营销",
+        "关键词库（0）\n＋ 新增"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "expos",
+      "label": "展会管理",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_expos.png",
+      "error": null,
+      "pageHeadings": [
+        "展会管理",
+        "🎪 展会管理",
+        "📋 展后跟进SOP（黄金24h）"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "reports",
+      "label": "业绩战报",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_reports.png",
+      "error": null,
+      "pageHeadings": [
+        "业绩战报",
+        "🏆 业绩战报",
+        "📊 知识库业绩参考\n查看目标市场"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "pipeline",
+      "label": "销售漏斗",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_pipeline.png",
+      "error": null,
+      "pageHeadings": [
+        "销售漏斗",
+        "🎯 销售漏斗",
+        "📊 知识库阶段行动建议\n查看客户画像"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "agents",
+      "label": "AI Agent团队",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_agents.png",
+      "error": null,
+      "pageHeadings": [
+        "AI Agent团队",
+        "🤖 AI Agent 团队",
+        "📚 AI Agent 知识库参考\n查看完整知识库"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "activity",
+      "label": "操作日志",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_activity.png",
+      "error": null,
+      "pageHeadings": [
+        "操作日志与审计",
+        "📋 操作日志与审计",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "linkedin",
+      "label": "领英拓客",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_linkedin.png",
+      "error": null,
+      "pageHeadings": [
+        "领英智能拓客",
+        "🤝 领英好友",
+        "📨 已发申请"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "socialmonitor",
+      "label": "社媒监控",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_socialmonitor.png",
+      "error": null,
+      "pageHeadings": [
+        "社媒关键词监控",
+        "🔍 监控关键词",
+        "📰 监控到帖子"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "dailyWork",
+      "label": "今日工作",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_dailyWork.png",
+      "error": null,
+      "pageHeadings": [
+        "每日客户开发工作视图",
+        "待审核草稿",
+        "今日到期跟进"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "outreachQueue",
+      "label": "开发名单",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_outreachQueue.png",
+      "error": null,
+      "pageHeadings": [
+        "客户开发名单",
+        "A 类（优先开发）",
+        "B 类（补充资料）"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "reviewQueue",
+      "label": "审核队列",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_reviewQueue.png",
+      "error": null,
+      "pageHeadings": [
+        "人工审核队列",
+        "待审核",
+        "已通过未发送"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "followUpPlan",
+      "label": "跟进计划",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_followUpPlan.png",
+      "error": null,
+      "pageHeadings": [
+        "跟进计划",
+        "计划中",
+        "今日到期"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "outreachAnalytics",
+      "label": "开发复盘",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_outreachAnalytics.png",
+      "error": null,
+      "pageHeadings": [
+        "开发复盘",
+        "客户优先级分布",
+        "A 类（优先）"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "outreach",
+      "label": "触达中心",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_outreach.png",
+      "error": null,
+      "pageHeadings": [
+        "多渠道触达中心",
+        "开发信总数",
+        "沟通记录"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "bulkImport",
+      "label": "批量导入",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_bulkImport.png",
+      "error": null,
+      "pageHeadings": [
+        "客户批量导入",
+        "① 选择 CSV 文件",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "importHistory",
+      "label": "导入历史",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_importHistory.png",
+      "error": null,
+      "pageHeadings": [
+        "导入批次历史",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "tools",
+      "label": "工具箱",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_tools.png",
+      "error": null,
+      "pageHeadings": [
+        "工具箱",
+        "🧰 外贸工具箱",
+        "🎨 AI 智能生图（CogView-3-Flash · 免费）\n新功能 V31"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "settings",
+      "label": "设置",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_settings.png",
+      "error": null,
+      "pageHeadings": [
+        "设置",
+        "🔐 安全设置\n重要",
+        "👥 团队管理"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "manual",
+      "label": "使用说明书",
+      "viewport": "desktop",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/desktop_manual.png",
+      "error": null,
+      "pageHeadings": [
+        "工作台使用说明书",
+        "📖 工作台使用说明书",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    }
+  ],
+  "mobilePages": [
+    {
+      "key": "dashboard",
+      "label": "数据看板",
+      "viewport": "mobile",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/mobile_dashboard.png",
+      "error": null,
+      "pageHeadings": [
+        "数据看板",
+        "📋 全部线索",
+        "⭐ 高匹配"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "customers",
+      "label": "客户台账",
+      "viewport": "mobile",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/mobile_customers.png",
+      "error": null,
+      "pageHeadings": [
+        "客户台账",
+        "🏷️ 标签云统计\n点击标签快速筛选客户",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "drafts",
+      "label": "开发信",
+      "viewport": "mobile",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/mobile_drafts.png",
+      "error": null,
+      "pageHeadings": [
+        "开发信管理",
+        "欢迎使用 KaiLionCrafts 工作台"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "inquiry",
+      "label": "询盘管理",
+      "viewport": "mobile",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/mobile_inquiry.png",
+      "error": null,
+      "pageHeadings": [
+        "询盘管理",
+        "独立站SEO",
+        "开发信"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "dailyWork",
+      "label": "今日工作",
+      "viewport": "mobile",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/mobile_dailyWork.png",
+      "error": null,
+      "pageHeadings": [
+        "每日客户开发工作视图",
+        "待审核草稿",
+        "今日到期跟进"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    },
+    {
+      "key": "settings",
+      "label": "设置",
+      "viewport": "mobile",
+      "passed": true,
+      "title": "KaiLionCrafts Prospect",
+      "contentChanged": true,
+      "consoleErrors": [],
+      "networkErrors": [],
+      "screenshot": "/Volumes/Kingston 1TB NV1 40Gbps/豆包独立站SEO项目/外贸获客AI工作台/release/uat_screenshots/mobile_settings.png",
+      "error": null,
+      "pageHeadings": [
+        "设置",
+        "🔐 安全设置\n重要",
+        "👥 团队管理"
+      ],
+      "isLoginPage": false,
+      "isBlank": false
+    }
+  ],
+  "newFeatures": [
+    {
+      "feature": "P1-2 客户台账质量评分",
+      "qualityColumn": true,
+      "batchButton": true,
+      "passed": true
+    },
+    {
+      "feature": "P1-1 开发信质量检查",
+      "qualityColumn": true,
+      "qualityButton": true,
+      "passed": true
+    },
+    {
+      "feature": "P2-1 询盘SLA计时",
+      "slaColumn": true,
+      "respondButton": true,
+      "passed": true
+    },
+    {
+      "feature": "P1-3 Campaign Task增强",
+      "taskResilienceUI": true,
+      "passed": true
+    }
+  ],
+  "consoleErrors": [
+    {
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "url": "http://127.0.0.1:8080/api/ai/config"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "url": "http://127.0.0.1:8080/api/kb/status"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "url": "http://127.0.0.1:8080/api/ai/config"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "url": "http://127.0.0.1:8080/api/kb/status"
+    }
+  ],
+  "networkErrors": [],
+  "securityTests": [
+    {
+      "url": "http://127.0.0.1:8080/api/lead-quality/mx-check",
+      "status": 200,
+      "passed": false
+    },
+    {
+      "url": "http://127.0.0.1:8080/api/ai/config",
+      "status": 200,
+      "passed": false
+    },
+    {
+      "url": "http://127.0.0.1:8080/api/kb/status",
+      "status": 200,
+      "passed": false
+    },
+    {
+      "url": "/server.js",
+      "status": 403,
+      "passed": true
+    },
+    {
+      "url": "/api_config.json",
+      "status": 403,
+      "passed": true
+    },
+    {
+      "url": "/.env",
+      "status": 403,
+      "passed": true
+    }
+  ],
+  "startTime": "2026-10-03T11:47:06.025Z",
+  "endTime": "2026-10-03T11:48:32.260Z"
+}

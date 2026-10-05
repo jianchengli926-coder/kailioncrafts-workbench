@@ -16523,9 +16523,9 @@ function copyDraft(did){
 /* ============================================================
  * 视图：AI 收件箱（客户回复汇总）
  * ============================================================ */
-let inboxFilter = '全部';
+window.inboxFilter = window.inboxFilter || '全部';
 function viewInbox(root){
-  const list = (S.inbox||[]).filter(i=> inboxFilter==='全部' || i.status===inboxFilter);
+  const list = (S.inbox||[]).filter(i=> window.inboxFilter==='全部' || i.status===window.inboxFilter);
   const inboxStats = {
     total: (S.inbox||[]).length,
     unread: (S.inbox||[]).filter(i=>i.status==='未读').length,
@@ -16572,7 +16572,7 @@ function viewInbox(root){
       </div>
     </div>
     <div class="flex gap8 mb16">
-      ${['全部','未读','已读','已回复'].map(s=>`<button class="btn ${inboxFilter===s?'btn-gold':'btn-outline'}" onclick="inboxFilter='${s}';renderView()">${s}${s==='未读'?' ('+(S.inbox||[]).filter(i=>i.status==='未读').length+')':''}</button>`).join('')}
+      ${['全部','未读','已读','已回复'].map(s=>`<button class="btn ${window.inboxFilter===s?'btn-gold':'btn-outline'}" onclick="window.inboxFilter='${s}';renderView()">${s}${s==='未读'?' ('+(S.inbox||[]).filter(i=>i.status==='未读').length+')':''}</button>`).join('')}
     </div>
     <div class="grid-2">
       ${list.length? list.map(i=>`

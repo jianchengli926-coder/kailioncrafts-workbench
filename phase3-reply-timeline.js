@@ -665,8 +665,10 @@
 
   /* ---------- 13. Override viewInbox (enhanced with AI reply button) ---------- */
   window.viewInbox = function(root){
-    // Use module-level filter (cannot access app.js closure inboxFilter)
-    const list = (S.inbox||[]);
+    // Apply global filter (window.inboxFilter set by app.js)
+    window.inboxFilter = window.inboxFilter || '全部';
+    const allInbox = (S.inbox||[]);
+    const list = allInbox.filter(i=> window.inboxFilter==='全部' || i.status===window.inboxFilter);
     const inboxStats = {
       total: list.length,
       unread: list.filter(i=>i.status==='未读').length,
@@ -784,6 +786,9 @@
         <div style="margin-top:12px;padding:10px 14px;background:#fff;border-radius:6px;font-size:12px;color:#1e40af;line-height:1.6">
           💡 <b>今日回复建议</b>：优先处理${inboxStats.highUrgency}封高优先级邮件 → 跟进${inboxStats.priceInquiry}个报价询盘 → 推进${inboxStats.sampleRequest}个样品需求。点击「🤖 AI生成回复」一键生成双语草稿。
         </div>
+      </div>
+      <div class="flex gap8 mb16" style="flex-wrap:wrap">
+        ${['全部','未读','已读','已回复'].map(s=>`<button class="btn ${window.inboxFilter===s?'btn-gold':'btn-outline'}" onclick="window.inboxFilter='${s}';renderView()">${s}${s==='未读'?' ('+allInbox.filter(i=>i.status==='未读').length+')':''}</button>`).join('')}
       </div>
       ${cards}
     `;

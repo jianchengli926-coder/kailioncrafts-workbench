@@ -861,6 +861,117 @@ const AsyncJobManager = {
   }
 };
 
+// ============ Phase 4: Open REST API + Webhook 模块（/api/v1/） ============
+// Independent backend data store (the workbench business data lives in the
+// browser localStorage; this module owns its own JSON files under ./data).
+// Zero external npm deps: only http/https/fs/crypto/path.
+const V1_DATA_DIR = path.join(ROOT_DIR, 'data');
+try { if (!fs.existsSync(V1_DATA_DIR)) fs.mkdirSync(V1_DATA_DIR, { recursive: true }); }
+catch (e) { log('Phase4 data dir create failed: ' + e.message, 'ERROR'); }
+
+function v1LoadJSON(file, fallback) {
+  try {
+    const p = path.join(V1_DATA_DIR, file);
+    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf-8'));
+  } catch (e) { log('Phase4 load ' + file + ': ' + e.message, 'WARN'); }
+  return fallback;
+}
+function v1SaveJSON(file, data) {
+  try { fs.writeFileSync(path.join(V1_DATA_DIR, file), JSON.stringify(data, null, 2)); return true; }
+  catch (e) { log('Phase4 save ' + file + ': ' + e.message, 'ERROR'); return false; }
+}
+
+// Persistent collections
+let v1ApiKeys = v1LoadJSON('api_keys.json', []);        // [{id,name,keyPrefix,keyHash,createdAt,lastUsedAt,callCount,enabled}]
+let v1ApiLogs = v1LoadJSON('api_logs.json', []);        // [{time,endpoint,apiKeyId,status,ip,durationMs}]
+let v1Webhooks = v1LoadJSON('webhooks.json', []);       // [{id,url,secret,events:[],enabled,createdAt,lastTriggeredAt}]
+let v1WebhookLogs = v1LoadJSON('webhook_logs.json', []); // [{time,event,url,statusCode,ok,error,durationMs}]
+let v1Snapshot = v1LoadJSON('workbench_snapshot.json', { customers: [], drafts: [], sendTasks: [], sentCount: 0, replyCount: 0, updatedAt: null });
+
+// Admin token: env ADMIN_TOKEN wins; otherwise generate once and persist to data/admin_token.json.
+let V1_ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+if (!V1_ADMIN_TOKEN) {
+  const at = v1LoadJSON('admin_token.json', null);
+  if (at && at.token) {
+    V1_ADMIN_TOKEN = at.token;
+  } else {
+    V1_ADMIN_TOKEN = crypto.randomBytes(24).toString('hex');
+    v1SaveJSON('admin_token.json', { token: V1_ADMIN_TOKEN, createdAt: new Date().toISOString() });
+    console.log('\n🔌 Phase4 Open API admin token (header x-admin-token): ' + V1_ADMIN_TOKEN);
+    console.log('   (set env ADMIN_TOKEN to override; stored in data/admin_token.json)\n');
+  }
+}
+
+// Per-API-Key sliding-window rate limit: max 60 calls / minute / key.
+const V1_RATE_LIMIT = new Map(); // apiKeyId -> number[] (timestamps)
+function v1RateLimitOk(apiKeyId) {
+  const now = Date.now();
+  const winMs = 60000;
+  let arr = V1_RATE_LIMIT.get(apiKeyId) || [];
+  arr = arr.filter(t => now - t < winMs);
+  if (arr.length >= 60) { V1_RATE_LIMIT.set(apiKeyId, arr); return false; }
+  arr.push(now);
+  V1_RATE_LIMIT.set(apiKeyId, arr);
+  return true;
+}
+
+// Supported webhook event types
+const V1_WEBHOOK_EVENTS = ['customer.reply', 'inquiry.new', 'sendtask.completed', 'followup.due'];
+
+// Sign a webhook: signature = HMAC-SHA256(secret, timestamp + '.' + JSON.stringify(payload))
+function v1SignWebhook(secret, timestamp, payload) {
+  return crypto.createHmac('sha256', secret).update(timestamp + '.' + JSON.stringify(payload)).digest('hex');
+}
+
+// Deliver one webhook to its target URL. Resolves with delivery result metadata.
+function v1DeliverWebhook(webhook, event, payload) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const timestamp = Math.floor(started / 1000).toString();
+    const signature = v1SignWebhook(webhook.secret, timestamp, payload);
+    const envelope = JSON.stringify({ event: event, timestamp: timestamp, payload: payload, signature: signature });
+    let target;
+    try { target = new URL(webhook.url); } catch (e) { resolve({ ok: false, statusCode: 0, error: 'invalid url', durationMs: Date.now() - started }); return; }
+    const lib = (target.protocol === 'https:') ? https : http;
+    const req = lib.request(target, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(envelope),
+        'X-Webhook-Event': event,
+        'X-Webhook-Timestamp': timestamp,
+        'X-Webhook-Signature': signature
+      },
+      timeout: 10000
+    }, (resp) => {
+      let body = '';
+      resp.on('data', c => body += c);
+      resp.on('end', () => resolve({ ok: resp.statusCode >= 200 && resp.statusCode < 300, statusCode: resp.statusCode || 0, error: '', durationMs: Date.now() - started }));
+    });
+    req.on('error', (e) => resolve({ ok: false, statusCode: 0, error: e.message, durationMs: Date.now() - started }));
+    req.on('timeout', () => { req.destroy(new Error('timeout')); });
+    req.write(envelope);
+    req.end();
+  });
+}
+
+// Fire all enabled webhooks that subscribe to `event`. Fire-and-log, never blocks caller.
+async function v1FireWebhooks(event, payload) {
+  if (!V1_WEBHOOK_EVENTS.includes(event)) return;
+  const targets = v1Webhooks.filter(w => w.enabled !== false && Array.isArray(w.events) && w.events.includes(event));
+  for (const w of targets) {
+    const result = await v1DeliverWebhook(w, event, payload);
+    w.lastTriggeredAt = new Date().toISOString();
+    v1WebhookLogs.unshift({
+      time: new Date().toISOString(), event: event, url: w.url,
+      statusCode: result.statusCode, ok: result.ok, error: result.error, durationMs: result.durationMs
+    });
+    if (v1WebhookLogs.length > 500) v1WebhookLogs.length = 500;
+  }
+  v1SaveJSON('webhooks.json', v1Webhooks);
+  v1SaveJSON('webhook_logs.json', v1WebhookLogs);
+}
+
 // ============ 创建HTTP服务器 ============
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
@@ -875,9 +986,27 @@ const server = http.createServer(async (req, res) => {
 
   // CORS预检（同源策略，不使用通配符）
   if (req.method === 'OPTIONS') {
+    // Phase4 open API (/api/v1/) is consumed by external systems (Zapier/n8n/curl),
+    // so it allows cross-origin browser calls with the api-key headers.
+    if (pathname.startsWith('/api/v1/')) {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, x-api-key, x-admin-token',
+        'Access-Control-Max-Age': '86400'
+      });
+      res.end();
+      return;
+    }
     res.writeHead(204);
     res.end();
     return;
+  }
+
+  // Phase4 open API: attach CORS headers to all /api/v1/ responses.
+  if (pathname.startsWith('/api/v1/')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Expose-Headers', 'x-api-key, x-admin-token');
   }
 
   // ============ 可信代理边界判断 ============
@@ -4069,6 +4198,269 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ success: true, events: results }));
     return;
+  }
+
+  // ============ Phase 4: Open REST API + Webhooks (/api/v1/) ============
+  if (pathname.startsWith('/api/v1/')) {
+    const v1Path = pathname.replace(/^\/api\/v1/, '') || '/';
+
+    function v1Send(status, obj) {
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(obj));
+    }
+    function v1LogApi(apiKeyId, endpoint, status, ip, durationMs) {
+      try {
+        v1ApiLogs.unshift({ time: new Date().toISOString(), endpoint: endpoint, apiKeyId: apiKeyId || 'none', status: status, ip: ip || '', durationMs: durationMs || 0 });
+        if (v1ApiLogs.length > 500) v1ApiLogs.length = 500;
+        v1SaveJSON('api_logs.json', v1ApiLogs);
+      } catch (e) { /* non-fatal */ }
+    }
+    // Authenticate an incoming request by x-api-key header (sha256 comparison).
+    function v1AuthenticateApiKey(req) {
+      const presented = req.headers['x-api-key'];
+      if (!presented || typeof presented !== 'string') return null;
+      const h = crypto.createHash('sha256').update(presented.trim()).digest('hex');
+      for (const k of v1ApiKeys) {
+        if (k.enabled !== false && k.keyHash === h) return k;
+      }
+      return null;
+    }
+    // Admin = x-admin-token match OR a valid workbench login session (built-in UI).
+    function v1IsAdmin(req) {
+      const tok = req.headers['x-admin-token'];
+      if (tok && typeof tok === 'string' && tok === V1_ADMIN_TOKEN) return true;
+      if (typeof validateSession === 'function' && validateSession(req)) return true;
+      return false;
+    }
+
+    // ---- Health check (no auth) ----
+    if (v1Path === '/health' && req.method === 'GET') {
+      return v1Send(200, { status: 'ok', service: 'kailion-open-api', version: '1.0', time: new Date().toISOString() });
+    }
+
+    // ---- Admin guard for all /admin/* and /webhooks/trigger ----
+    const isAdminArea = v1Path.startsWith('/admin/') || v1Path === '/webhooks/trigger';
+    if (isAdminArea && !v1IsAdmin(req)) {
+      return v1Send(401, { error: 'Unauthorized', code: 'ADMIN_TOKEN_REQUIRED', hint: 'send header x-admin-token or log in to the workbench' });
+    }
+
+    // ---- Business-data endpoints require a valid API key ----
+    const isBusinessArea = ['/customers', '/drafts', '/send-tasks', '/analytics'].some(p => v1Path === p || v1Path.startsWith(p + '/'));
+    if (isBusinessArea) {
+      const started = Date.now();
+      const keyRec = v1AuthenticateApiKey(req);
+      if (!keyRec) return v1Send(401, { error: 'Unauthorized', code: 'API_KEY_INVALID', hint: 'send header x-api-key' });
+      if (!v1RateLimitOk(keyRec.id)) {
+        v1LogApi(keyRec.id, req.method + ' ' + v1Path, 429, getClientIp(req), Date.now() - started);
+        return v1Send(429, { error: 'Too Many Requests', code: 'RATE_LIMITED', hint: 'max 60 calls/minute per API key' });
+      }
+      // Touch key usage stats
+      keyRec.lastUsedAt = new Date().toISOString();
+      keyRec.callCount = (keyRec.callCount || 0) + 1;
+      v1SaveJSON('api_keys.json', v1ApiKeys);
+
+      // ---- GET /customers (list, filter, paginate, search) ----
+      if (v1Path === '/customers' && req.method === 'GET') {
+        const q = reqUrl.searchParams;
+        const category = q.get('category') || '';
+        const status = q.get('status') || '';
+        const search = (q.get('search') || '').toLowerCase();
+        const page = Math.max(1, parseInt(q.get('page') || '1', 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(q.get('limit') || '20', 10) || 20));
+        let list = (v1Snapshot.customers || []).slice();
+        if (category) list = list.filter(c => (c.productCategory || c.category || '') === category);
+        if (status) list = list.filter(c => (c.status || '') === status);
+        if (search) list = list.filter(c => [c.company, c.country, c.email, c.name].some(f => f && String(f).toLowerCase().includes(search)));
+        const total = list.length;
+        const items = list.slice((page - 1) * limit, page * limit);
+        v1LogApi(keyRec.id, 'GET /customers', 200, getClientIp(req), Date.now() - started);
+        return v1Send(200, { data: items, pagination: { page: page, limit: limit, total: total, pages: Math.ceil(total / limit) } });
+      }
+
+      // ---- GET /customers/:id ----
+      const custMatch = v1Path.match(/^\/customers\/([^/]+)$/);
+      if (custMatch && req.method === 'GET') {
+        const c = (v1Snapshot.customers || []).find(x => x.id === custMatch[1]);
+        v1LogApi(keyRec.id, 'GET /customers/:id', c ? 200 : 404, getClientIp(req), Date.now() - started);
+        return c ? v1Send(200, { data: c }) : v1Send(404, { error: 'not found', code: 'CUSTOMER_NOT_FOUND' });
+      }
+
+      // ---- POST /customers (create) ----
+      if (v1Path === '/customers' && req.method === 'POST') {
+        try {
+          const body = await readBody(req);
+          const nc = Object.assign({
+            id: 'ext_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            createdAt: new Date().toISOString(),
+            source: 'api'
+          }, body);
+          v1Snapshot.customers = v1Snapshot.customers || [];
+          v1Snapshot.customers.unshift(nc);
+          v1SaveJSON('workbench_snapshot.json', v1Snapshot);
+          v1LogApi(keyRec.id, 'POST /customers', 201, getClientIp(req), Date.now() - started);
+          return v1Send(201, { data: nc });
+        } catch (e) {
+          v1LogApi(keyRec.id, 'POST /customers', 400, getClientIp(req), Date.now() - started);
+          return v1Send(400, { error: e.message });
+        }
+      }
+
+      // ---- GET /drafts ----
+      if (v1Path === '/drafts' && req.method === 'GET') {
+        v1LogApi(keyRec.id, 'GET /drafts', 200, getClientIp(req), Date.now() - started);
+        return v1Send(200, { data: v1Snapshot.drafts || [], total: (v1Snapshot.drafts || []).length });
+      }
+
+      // ---- GET /send-tasks (today's tasks) ----
+      if (v1Path === '/send-tasks' && req.method === 'GET') {
+        const today = new Date().toISOString().slice(0, 10);
+        const tasks = (v1Snapshot.sendTasks || []).filter(t => {
+          const d = (t.dueAt || t.date || t.createdAt || '').slice(0, 10);
+          return !d || d === today;
+        });
+        v1LogApi(keyRec.id, 'GET /send-tasks', 200, getClientIp(req), Date.now() - started);
+        return v1Send(200, { data: tasks, date: today, total: tasks.length });
+      }
+
+      // ---- GET /analytics ----
+      if (v1Path === '/analytics' && req.method === 'GET') {
+        const customers = v1Snapshot.customers || [];
+        const sent = v1Snapshot.sentCount || 0;
+        const replies = v1Snapshot.replyCount || 0;
+        const conversion = sent > 0 ? Math.round((replies / sent) * 1000) / 10 : 0;
+        v1LogApi(keyRec.id, 'GET /analytics', 200, getClientIp(req), Date.now() - started);
+        return v1Send(200, {
+          customersTotal: customers.length,
+          sentTotal: sent,
+          replyTotal: replies,
+          replyRatePct: conversion,
+          activeApiKeys: v1ApiKeys.filter(k => k.enabled !== false).length,
+          totalApiCalls: v1ApiLogs.length,
+          updatedAt: v1Snapshot.updatedAt
+        });
+      }
+
+      v1LogApi(keyRec.id, req.method + ' ' + v1Path, 404, getClientIp(req), Date.now() - started);
+      return v1Send(404, { error: 'not found', code: 'ENDPOINT_NOT_FOUND' });
+    }
+
+    // ---- Admin: API Key management ----
+    if (v1Path === '/admin/api-keys') {
+      if (req.method === 'GET') {
+        // Mask the real key: only show prefix + meta, never the secret.
+        const list = v1ApiKeys.map(k => ({
+          id: k.id, name: k.name, keyPrefix: k.keyPrefix,
+          createdAt: k.createdAt, lastUsedAt: k.lastUsedAt,
+          callCount: k.callCount || 0, enabled: k.enabled !== false
+        }));
+        // Recent API call logs (time, endpoint, status, ip, duration).
+        const keyNameById = {};
+        v1ApiKeys.forEach(k => { keyNameById[k.id] = k.name; });
+        const logs = (v1ApiLogs || []).slice(0, 50).map(l => ({
+          time: l.time, endpoint: l.endpoint, status: l.status,
+          ip: l.ip, durationMs: l.durationMs,
+          apiKeyName: keyNameById[l.apiKeyId] || l.apiKeyId
+        }));
+        return v1Send(200, { data: list, logs: logs });
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = await readBody(req);
+          const name = (body.name || '').trim() || 'Unnamed key';
+          const secret = 'kl_' + crypto.randomBytes(24).toString('hex');
+          const rec = {
+            id: 'ak_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            name: name,
+            keyPrefix: secret.slice(0, 12) + '...',
+            keyHash: crypto.createHash('sha256').update(secret).digest('hex'),
+            createdAt: new Date().toISOString(),
+            lastUsedAt: null,
+            callCount: 0,
+            enabled: true
+          };
+          v1ApiKeys.unshift(rec);
+          v1SaveJSON('api_keys.json', v1ApiKeys);
+          // Return the FULL secret exactly once.
+          return v1Send(201, { data: { id: rec.id, name: rec.name, apiKey: secret, createdAt: rec.createdAt }, warning: 'Save this key now — it will not be shown again.' });
+        } catch (e) { return v1Send(400, { error: e.message }); }
+      }
+    }
+    const akDel = v1Path.match(/^\/admin\/api-keys\/([^/]+)$/);
+    if (akDel && req.method === 'DELETE') {
+      const before = v1ApiKeys.length;
+      v1ApiKeys = v1ApiKeys.filter(k => k.id !== akDel[1]);
+      v1SaveJSON('api_keys.json', v1ApiKeys);
+      return v1Send(200, { success: true, revoked: before !== v1ApiKeys.length });
+    }
+
+    // ---- Admin: Webhook management ----
+    if (v1Path === '/admin/webhooks') {
+      if (req.method === 'GET') {
+        return v1Send(200, { data: v1Webhooks, logs: v1WebhookLogs.slice(0, 50) });
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = await readBody(req);
+          if (!body.url || typeof body.url !== 'string') return v1Send(400, { error: 'url is required' });
+          let u; try { u = new URL(body.url); } catch (e) { return v1Send(400, { error: 'invalid url' }); }
+          const events = (body.events || []).filter(e => V1_WEBHOOK_EVENTS.includes(e));
+          const wh = {
+            id: 'wh_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            url: u.toString(),
+            secret: crypto.randomBytes(16).toString('hex'),
+            events: events,
+            enabled: body.enabled !== false,
+            createdAt: new Date().toISOString(),
+            lastTriggeredAt: null
+          };
+          v1Webhooks.unshift(wh);
+          v1SaveJSON('webhooks.json', v1Webhooks);
+          return v1Send(201, { data: wh });
+        } catch (e) { return v1Send(400, { error: e.message }); }
+      }
+    }
+    const whDel = v1Path.match(/^\/admin\/webhooks\/([^/]+)$/);
+    if (whDel && req.method === 'DELETE') {
+      const before = v1Webhooks.length;
+      v1Webhooks = v1Webhooks.filter(w => w.id !== whDel[1]);
+      v1SaveJSON('webhooks.json', v1Webhooks);
+      return v1Send(200, { success: true, deleted: before !== v1Webhooks.length });
+    }
+
+    // ---- Admin: sync workbench business-data snapshot from the frontend ----
+    if (v1Path === '/admin/sync-snapshot' && req.method === 'POST') {
+      try {
+        const body = await readBody(req);
+        const incoming = Array.isArray(body.customers) ? body.customers : [];
+        // Merge by id: keep customers that were created via the open API (source:'api')
+        // but are not yet in the browser store, so external writes are not clobbered.
+        const existingApi = (v1Snapshot.customers || []).filter(c => c.source === 'api' && !incoming.some(x => x.id === c.id));
+        v1Snapshot = {
+          customers: incoming.concat(existingApi),
+          drafts: Array.isArray(body.drafts) ? body.drafts : [],
+          sendTasks: Array.isArray(body.sendTasks) ? body.sendTasks : [],
+          sentCount: body.sentCount || 0,
+          replyCount: body.replyCount || 0,
+          updatedAt: new Date().toISOString()
+        };
+        v1SaveJSON('workbench_snapshot.json', v1Snapshot);
+        return v1Send(200, { success: true, customers: v1Snapshot.customers.length, at: v1Snapshot.updatedAt });
+      } catch (e) { return v1Send(400, { error: e.message }); }
+    }
+
+    // ---- Internal: trigger webhooks (e.g. from the test button) ----
+    if (v1Path === '/webhooks/trigger' && req.method === 'POST') {
+      try {
+        const body = await readBody(req);
+        const event = body.event;
+        if (!V1_WEBHOOK_EVENTS.includes(event)) return v1Send(400, { error: 'invalid event', allowed: V1_WEBHOOK_EVENTS });
+        const payload = body.payload || { test: true };
+        v1FireWebhooks(event, payload); // fire-and-log (async, not awaited for response)
+        return v1Send(202, { success: true, event: event, message: 'webhook delivery queued' });
+      } catch (e) { return v1Send(400, { error: e.message }); }
+    }
+
+    return v1Send(404, { error: 'not found', code: 'ENDPOINT_NOT_FOUND' });
   }
 
   // ============ 静态文件 ============

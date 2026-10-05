@@ -6138,12 +6138,25 @@ function getTimelineEvents(cid, limit=50){
   S.replyDrafts = DB.load('replyDrafts') || [];
   S.dormantCustomers = DB.load('dormantCustomers') || [];
   S.wakeupDrafts = DB.load('wakeupDrafts') || [];
+  // P4 Phase4: email warmup, API/webhook, AI images, WhatsApp
+  S.warmupConfig = DB.load('warmupConfig') || {};
+  S.warmupTasks = DB.load('warmupTasks') || [];
+  S.warmupProgress = DB.load('warmupProgress') || {};
+  S.apiKeys = DB.load('apiKeys') || [];
+  S.apiCallLogs = DB.load('apiCallLogs') || [];
+  S.webhooks = DB.load('webhooks') || [];
+  S.webhookLogs = DB.load('webhookLogs') || [];
+  S.aiImageHistory = DB.load('aiImageHistory') || [];
+  S.whatsappAccounts = DB.load('whatsappAccounts') || [];
+  S.whatsappTemplates = DB.load('whatsappTemplates') || [];
+  S.whatsappTasks = DB.load('whatsappTasks') || [];
+  S.whatsappRecords = DB.load('whatsappRecords') || [];
 
   // V74.5 全局null清理：把所有为null的数组初始化为空数组，防止页面渲染崩溃
   Object.keys(S).forEach(k => {
     if (S[k] === null) {
       // 根据属性名判断应该初始化为数组还是对象
-      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','importBatches','replyDrafts','dormantCustomers','wakeupDrafts'];
+      const arrayKeys = ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','apis','activityLog','mailQueue','mailLogs','devPlans','apiLogs','knowledge','ar','monitors','monitorLogs','abTests','socialRecords','keywords','contents','backlinks','agentLogs','exhibitions','negotiations','shipments','forwarders','aftersales','referrals','communications','orders','opportunities','followupTasks','campaigns','campaignCustomerTasks','campaignFollowUpTasks','importBatches','replyDrafts','dormantCustomers','wakeupDrafts','warmupTasks','apiKeys','apiCallLogs','webhooks','webhookLogs','aiImageHistory','whatsappAccounts','whatsappTemplates','whatsappTasks','whatsappRecords'];
       if (arrayKeys.includes(k)) S[k] = [];
       else S[k] = {};
     }
@@ -6201,6 +6214,19 @@ function persist(){
   DB.save('replyDrafts', S.replyDrafts||[]);
   DB.save('dormantCustomers', S.dormantCustomers||[]);
   DB.save('wakeupDrafts', S.wakeupDrafts||[]);
+  // P4 Phase4: persist new data fields
+  DB.save('warmupConfig', S.warmupConfig||{});
+  DB.save('warmupTasks', S.warmupTasks||[]);
+  DB.save('warmupProgress', S.warmupProgress||{});
+  DB.save('apiKeys', S.apiKeys||[]);
+  DB.save('apiCallLogs', S.apiCallLogs||[]);
+  DB.save('webhooks', S.webhooks||[]);
+  DB.save('webhookLogs', S.webhookLogs||[]);
+  DB.save('aiImageHistory', S.aiImageHistory||[]);
+  DB.save('whatsappAccounts', S.whatsappAccounts||[]);
+  DB.save('whatsappTemplates', S.whatsappTemplates||[]);
+  DB.save('whatsappTasks', S.whatsappTasks||[]);
+  DB.save('whatsappRecords', S.whatsappRecords||[]);
 }
 
 /* V74.6 导出客户数据为CSV */

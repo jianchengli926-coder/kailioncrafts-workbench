@@ -41,6 +41,9 @@ access_config.json
 access_config.json.bak*
 __pycache__/
 
+# Phase4 API/Webhook 运行时数据（含API Key、Admin Token、Webhook Secret，不进Git）
+data/
+
 # IDE 和编辑器
 .vscode/
 .idea/

@@ -6188,6 +6188,8 @@ function getTimelineEvents(cid, limit=50){
   S.p7GeoContents = DB.load('p7GeoContents') || [];
   S.p7McpConfig = DB.load('p7McpConfig') || {enabled:false,port:8765,apiKey:'',logs:[]};
   S.p7ModelRouting = DB.load('p7ModelRouting') || {research:'deepseek-r1:7b',writing:'gpt-5.6-terra',summary:'glm-4-flash',enabled:true};
+  // Customer Dev Phase5: task management & send history integration
+  S.cdPhase5 = DB.load('cdPhase5') || {taskLog:[],customerStage:{},mailboxHealth:{},calendarTasks:{},uiPrefs:{}};
 
   // V74.5 全局null清理：把所有为null的数组初始化为空数组，防止页面渲染崩溃
   Object.keys(S).forEach(k => {
@@ -6301,6 +6303,8 @@ function persist(){
   DB.save('p7GeoContents', S.p7GeoContents||[]);
   DB.save('p7McpConfig', S.p7McpConfig||{});
   DB.save('p7ModelRouting', S.p7ModelRouting||{});
+  // Customer Dev Phase5: persist unified data object
+  DB.save('cdPhase5', S.cdPhase5||{taskLog:[],customerStage:{},mailboxHealth:{},calendarTasks:{},uiPrefs:{}});
 }
 
 /* V74.6 导出客户数据为CSV */

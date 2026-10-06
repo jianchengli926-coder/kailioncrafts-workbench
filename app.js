@@ -31612,9 +31612,10 @@ function viewAutoSearch(root){
     <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:2px solid #f59e0b;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
       <div style="font-size:28px">⚠️</div>
       <div style="flex:1">
-        <div style="font-weight:800;color:#92400e;font-size:15px;margin-bottom:2px">AI 模拟结果，非真实客户</div>
-        <div style="font-size:12px;color:#78350f;line-height:1.5">本页的"自动搜客"使用预置示例数据演示流程，<b>不会连接真实搜索引擎</b>，返回的公司名称、联系方式均为模拟数据，不可用于实际开发。真实联网搜客请使用左侧导航「<b>精准开发</b>」新功能（Tavily 真实搜索 + 公司深度分析）。</div>
+        <div style="font-weight:800;color:#92400e;font-size:15px;margin-bottom:2px">⚠️ 本页为演示流程，非真实客户（已废弃为正式搜客入口）</div>
+        <div style="font-size:12px;color:#78350f;line-height:1.5">本页的"自动搜客"使用预置示例数据演示流程，<b>不会连接真实搜索引擎</b>，仅生成 Google 搜索指令，返回的公司名称、联系方式均为模拟数据，不可用于实际开发。<br>👉 <b>请使用新版「全网搜客」</b>（左侧导航）：Tavily 真实联网搜索 + AI 自动提取客户卡片 + 一键导入客户台账。</div>
       </div>
+      <button class="btn btn-primary" style="white-space:nowrap;background:#b45309;border-color:#b45309" onclick="go('customerDevSearch')">🔍 前往「全网搜客」<br><small style="font-weight:400">真实联网搜客 → 导入台账</small></button>
     </div>
     ${catSelectorHtml()}
     <!-- V75.3 自然语言智能搜客（参考CRM工作台） -->

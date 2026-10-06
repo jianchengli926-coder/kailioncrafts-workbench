@@ -92,7 +92,8 @@ const FAILOVER_ALLOWED_TYPES = new Set([
   'network_error', 'ollama_unavailable', 'slow_response',
   'rate_limited', 'service_unavailable', 'not_configured',
   'config_error', 'empty_response', 'parse_error',
-  'model_not_available'  // 404: 该模型在当前账号/中转组不可用，应尝试链条下一个模型
+  'model_not_available',  // 404: 该模型在当前账号/中转组不可用，应尝试链条下一个模型
+  'cloudflare_blocked'    // P1-1: Cloudflare 1010 WAF ban (HTTP 403), NOT an API-key error → fail over
 ]);
 
 // 禁止故障转移的错误类型
@@ -111,6 +112,11 @@ const FAILOVER_FORBIDDEN_TYPES = new Set([
  */
 function shouldFailover(error) {
   if (!error) return false;
+
+  // P1-1: A Cloudflare 1010 block arrives as HTTP 403 but is NOT an auth/API-key error
+  // (the IP or User-Agent is WAF-banned). Check the type BEFORE the forbidden-403 code
+  // short-circuit so this specific error may fail over to the next model in the chain.
+  if (error.type && String(error.type).toLowerCase() === 'cloudflare_blocked') return true;
 
   // 检查状态码
   if (error.statusCode) {
@@ -461,7 +467,12 @@ async function callOpenAICompatible(options, providerCfg) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'Authorization': 'Bearer ' + apiKey,
+        // P1-1: wawapi.top sits behind Cloudflare WAF (error 1010, browser signature
+        // banned). A Node.js default UA gets rejected at the edge; send a normal browser
+        // UA so the request is not treated as a banned bot.
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Content-Length': Buffer.byteLength(postData)
       },
       timeout: timeout
@@ -469,6 +480,29 @@ async function callOpenAICompatible(options, providerCfg) {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        // P1-1: Cloudflare error 1010 (browser signature banned) returns a 403 HTML block
+        // page, NOT a JSON auth error. It is an IP/UA WAF ban, not a bad API key, so type it
+        // as 'cloudflare_blocked' and allow failover instead of wrongly treating it as a
+        // permanent config error (invalid_api_key). Inspect the raw body BEFORE JSON.parse.
+        const rawBody = String(data || '');
+        const rawLower = rawBody.toLowerCase();
+        if (res.statusCode === 403 && (
+              rawLower.includes('cloudflare') ||
+              rawLower.includes('error 1010') ||
+              rawLower.includes('browser signature'))) {
+          resolve({
+            success: false,
+            model,
+            error: {
+              type: 'cloudflare_blocked',
+              message: label + ' blocked by Cloudflare (error 1010 / browser signature banned); failover to next model',
+              statusCode: res.statusCode
+            },
+            statusCode: res.statusCode
+          });
+          return;
+        }
+
         try {
           const parsed = JSON.parse(data);
 

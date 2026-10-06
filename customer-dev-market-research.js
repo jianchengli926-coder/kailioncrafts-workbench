@@ -371,6 +371,183 @@
   };
 
   // ============================================================
+  // P1-3: Built-in baseline matrix (offline fallback)
+  // ============================================================
+  // Builds a 4-category x all-country heat matrix from the static category/country
+  // constants so the page is never blank on first open. Values are qualitative buckets
+  // only (high/medium/low; up/flat/down; 1-5 priority), matching the AI JSON schema.
+  // Strong/secondary markets are modeled explicitly; the rest fall back to generic
+  // region-aware defaults. No precise figures are invented.
+  function cdMrBuildBaseline(){
+    // Explicitly modeled markets per category (derived from each category's hotCountries).
+    var explicit = {
+      outdoor_knives: {
+        US:{marketSize:'high',  growth:'up',   competition:'high',   priceSensitivity:'medium', priority:5, confidence:'high',   note:'Biggest hunting/EDC/tactical importer; needs FDA & US blade-law compliance.'},
+        DE:{marketSize:'high',  growth:'flat', competition:'high',   priceSensitivity:'medium', priority:5, confidence:'high',   note:'Mature outdoor/camping market; demands LFGB and solid build quality.'},
+        JP:{marketSize:'high',  growth:'flat', competition:'medium', priceSensitivity:'low',    priority:4, confidence:'high',   note:'Premium EDC/collector demand; strict blade ownership rules.'},
+        AU:{marketSize:'medium',growth:'up',   competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'Growing outdoor/hunting; strict knife laws.'},
+        CA:{marketSize:'medium',growth:'flat', competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'Outdoor demand similar to US, smaller scale.'},
+        SE:{marketSize:'medium',growth:'flat', competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'Nordic outdoor / premium knife culture.'},
+        UK:{marketSize:'medium',growth:'flat', competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'EDC/camping niche; strict offensive-weapon laws.'}
+      },
+      kitchen_knives: {
+        US:{marketSize:'high',  growth:'up',   competition:'high',   priceSensitivity:'medium', priority:5, confidence:'high',   note:'Large chef/household and block-set importers; FDA compliance.'},
+        DE:{marketSize:'high',  growth:'flat', competition:'high',   priceSensitivity:'medium', priority:5, confidence:'high',   note:'Cutlery powerhouse; expects LFGB and edge-holding quality.'},
+        UK:{marketSize:'medium',growth:'flat', competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'Mid-size household cutlery market.'},
+        JP:{marketSize:'high',  growth:'flat', competition:'high',   priceSensitivity:'low',    priority:4, confidence:'high',   note:'Santoku/gyuto culture; high quality expectations, premium price.'},
+        FR:{marketSize:'medium',growth:'flat', competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'Cuisine culture; mid-range block sets.'}
+      },
+      professional_scissors: {
+        US:{marketSize:'high',  growth:'up',   competition:'high',   priceSensitivity:'medium', priority:5, confidence:'high',   note:'Garden/kitchen/industrial and tailoring scissors demand.'},
+        DE:{marketSize:'medium',growth:'flat', competition:'high',   priceSensitivity:'medium', priority:3, confidence:'medium', note:'High quality barber/garden scissors, strong competition.'},
+        UK:{marketSize:'medium',growth:'flat', competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'Tailoring and kitchen scissors mid-market.'},
+        JP:{marketSize:'medium',growth:'flat', competition:'medium', priceSensitivity:'low',    priority:3, confidence:'medium', note:'Premium hairdressing / scissors craft market.'},
+        IT:{marketSize:'medium',growth:'flat', competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'Tailoring and kitchen scissors demand.'}
+      },
+      kitchen_accessories: {
+        US:{marketSize:'high',  growth:'up',   competition:'high',   priceSensitivity:'medium', priority:5, confidence:'high',   note:'BBQ/cookware/cutting-board importers; FDA compliance.'},
+        DE:{marketSize:'medium',growth:'flat', competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'Cookware and BBQ mid-market; LFGB expected.'},
+        UK:{marketSize:'medium',growth:'flat', competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'Kitchen gadget and bakeware market.'},
+        AU:{marketSize:'medium',growth:'up',   competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'BBQ/outdoor cooking culture growing.'},
+        CA:{marketSize:'medium',growth:'flat', competition:'medium', priceSensitivity:'medium', priority:3, confidence:'medium', note:'Household kitchenware, smaller scale.'}
+      }
+    };
+
+    // Generic fallback for unlisted countries, nudged by region.
+    function fallback(code){
+      var region = regionOfCountry(code);
+      var isMena  = (region === '中东');
+      var isLatAm = (region === '拉美');
+      var isSea   = (region === '亚太');
+      var isAfrica= (region === '非洲');
+      return {
+        marketSize: isMena || isLatAm ? 'medium' : 'low',
+        growth:     isMena || isLatAm || isSea ? 'up' : 'flat',
+        competition:'low',
+        priceSensitivity: isAfrica || isSea || isLatAm ? 'high' : 'medium',
+        priority:   isMena ? 3 : 2,
+        confidence: 'low',
+        note:       'Generic ' + region + ' baseline; verify with customs data / inquiries.'
+      };
+    }
+
+    var matrix = {};
+    var overview = {};
+    CD_CATEGORIES.forEach(function(cat){
+      matrix[cat.key] = {};
+      var ex = explicit[cat.key] || {};
+      allCountryCodes().forEach(function(code){
+        var base = ex[code] || fallback(code);
+        matrix[cat.key][code] = {
+          marketSize:       base.marketSize,
+          growth:           base.growth,
+          competition:      base.competition,
+          priceSensitivity: base.priceSensitivity,
+          priority:         base.priority,
+          hotScenarios:     cat.hotTypes.join(', '),
+          notes:            base.note,
+          confidence:       base.confidence
+        };
+      });
+      overview[cat.key] = {
+        global: cat.en + ' baseline (built-in industry heuristic, not live AI). Mature demand concentrated in US/DE/JP; emerging opportunity in Middle East gift sets and LatAm BBQ.',
+        topCountries: cat.hotCountries.slice(),
+        hotScenarios: cat.hotTypes.join(' / '),
+        opportunities: 'OEM/ODM/private-label from Yangjiang cluster (~75% of China knives & scissors supply).',
+        risks: 'Blade-law restrictions in AU/UK/JP; import tariffs; price-sensitive emerging markets.'
+      };
+    });
+
+    return {
+      generatedAt: nowISO(),
+      source: 'baseline',
+      overview: overview,
+      matrix: matrix,
+      emerging: JSON.parse(JSON.stringify(CD_EMERGING_BASE))
+    };
+  }
+
+  // ============================================================
+  // P1-3: Silent auto-generate on first page open
+  // ============================================================
+  // No confirm dialog. Tries the AI once; on error OR after a 15s timeout, falls back
+  // to the built-in baseline so the page always shows data within seconds instead of a
+  // blank state. The user can still press "重新生成" later for a full AI refresh.
+  window.cdMrAutoGenerate = async function(){
+    if(window._cdMrAutoGenerating) return;
+    window._cdMrAutoGenerating = true;
+    window._cdMrBusy = true;
+    window._cdMrStepMsg = '正在加载市场研究数据…（AI分析中，失败将自动使用内置行业基准）';
+    renderView();
+
+    var settled = false;
+    try {
+      // Resolve AI result, swallowing rejections so the 15s watchdog never turns into
+      // an unhandled rejection.
+      var aiSettled = callAI(
+        [
+          { role:'system', content: buildSystemPrompt() },
+          { role:'user',   content: buildUserPrompt() }
+        ],
+        { purpose:'cd_market_research', temperature:0.3, model:'gpt-5.6-terra', timeout:180000, taskType:'text', numCtx:16384 }
+      ).then(
+        function(r){ return { type:'ai', r:r }; },
+        function(e){ return { type:'ai_error', r:{ error:(e && e.message) || String(e) } }; }
+      );
+      var watchdog = new Promise(function(res){ setTimeout(function(){ res({type:'timeout'}); }, 15000); });
+
+      var outcome = await Promise.race([aiSettled, watchdog]);
+
+      if(outcome.type === 'ai' && outcome.r && !outcome.r.error){
+        var data = parseAIJSON(outcome.r.content);
+        if(data && data.matrix){
+          // Normalize every category x country cell with safe defaults (same rules as cdMrGenerate)
+          var normalized = {};
+          CD_CATEGORIES.forEach(function(cat){
+            normalized[cat.key] = {};
+            var srcCat = (data.matrix || {})[cat.key] || {};
+            allCountryCodes().forEach(function(code){
+              var cell = srcCat[code] || {};
+              normalized[cat.key][code] = {
+                marketSize:       ['high','medium','low'].indexOf(cell.marketSize) >= 0 ? cell.marketSize : 'medium',
+                growth:           ['up','flat','down'].indexOf(cell.growth) >= 0 ? cell.growth : 'flat',
+                competition:      ['high','medium','low'].indexOf(cell.competition) >= 0 ? cell.competition : 'medium',
+                priceSensitivity:['high','medium','low'].indexOf(cell.priceSensitivity) >= 0 ? cell.priceSensitivity : 'medium',
+                priority:         Math.max(1, Math.min(5, parseInt(cell.priority,10) || 3)),
+                hotScenarios:     String(cell.hotScenarios || cat.hotTypes.join(', ')).slice(0,120),
+                notes:            String(cell.notes || '').slice(0,200),
+                confidence:       ['high','medium','low'].indexOf(cell.confidence) >= 0 ? cell.confidence : 'medium'
+              };
+            });
+          });
+          S.cdMarketResearch = {
+            generatedAt: nowISO(),
+            source: 'ai',
+            overview: data.overview || {},
+            matrix: normalized,
+            emerging: data.emerging || JSON.parse(JSON.stringify(CD_EMERGING_BASE))
+          };
+          persist();
+          settled = true;
+        }
+      }
+    } catch(e){
+      console.warn('[cd-mr] auto-generate failed:', e);
+    }
+
+    // AI failed / timed out / unparseable -> use built-in baseline so page is never blank
+    if(!settled){
+      S.cdMarketResearch = cdMrBuildBaseline();
+      persist();
+    }
+
+    window._cdMrBusy = false;
+    window._cdMrAutoGenerating = false;
+    window._cdMrStepMsg = '';
+    renderView();
+  };
+
+  // ============================================================
   // Filter / selection state
   // ============================================================
   window.cdMrSetTab = function(t){ window._cdMrTab = t; renderView(); };
@@ -436,6 +613,14 @@
     var h = '';
 
     if(!hasData){
+      if(window._cdMrBusy || window._cdMrAutoGenerating){
+        h += '<div class="cd-empty">';
+        h += '  <div style="font-size:40px;margin-bottom:10px">⏳</div>';
+        h += '  <div style="font-weight:700;margin-bottom:6px">正在加载市场研究数据…</div>';
+        h += '  <div class="cd-hint" style="max-width:520px;margin:0 auto">首次打开正在静默生成基准数据；AI 不可用时将自动使用内置行业热度矩阵，无需手动点击。</div>';
+        h += '</div>';
+        return h;
+      }
       h += '<div class="cd-empty">';
       h += '  <div style="font-size:40px;margin-bottom:10px">📊</div>';
       h += '  <div style="font-weight:700;margin-bottom:6px">市场研究矩阵尚未生成</div>';
@@ -886,6 +1071,13 @@
   var _cdMrOrigRV = window.renderView;
   window.renderView = function(){
     if(currentView === 'customerDevMarketResearch'){
+      // P1-3: Auto-load on first open. If cached data exists, render it directly.
+      // Otherwise trigger a silent AI attempt (15s fallback to built-in baseline) so the
+      // user never lands on a blank page requiring a manual "一键生成" click.
+      var mr = S.cdMarketResearch || {};
+      if(!mr.generatedAt && !window._cdMrAutoGenerating && !window._cdMrBusy){
+        cdMrAutoGenerate();
+      }
       renderPage(document.getElementById('mainContent'));
       return;
     }

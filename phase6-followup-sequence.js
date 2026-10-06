@@ -38,10 +38,10 @@
   // ── Nav injection ──────────────────────────────────────────
   NAV.push({
     key: 'followupSequence',
-    icon: '🔄',
-    label: '跟进序列',
-    title: '跟进序列与客户分级',
-    crumb: 'Day1/3/7/14 · A/B/C分级 · 渠道fallback'
+    icon: '📚',
+    label: '序列模板分级',
+    title: '跟进序列模板与客户分级（旧版·Day1/3/7/14）',
+    crumb: 'Day1/3/7/14 · A/B/C分级 · 渠道fallback · 新版6轮跟进见「跟进序列」'
   });
 
   // ── Local helpers ───────────────────────────────────────────

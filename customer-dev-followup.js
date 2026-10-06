@@ -185,6 +185,34 @@
     });
   }
 
+  // Reconcile a saved step array against the current 6-step template.
+  // Preserves runtime state (status/emailId/sentAt/skipped) for steps that
+  // already exist by key; appends any missing steps (e.g. legacy data that
+  // only had Day0/3/7/14) in the correct order. This guarantees the
+  // timeline always renders Day0/3/7/14/21/30.
+  function cfNormalizeSteps(fu){
+    if(!fu || !Array.isArray(fu.steps)) return;
+    var byKey = {};
+    fu.steps.forEach(function(s){ if(s && s.key) byKey[s.key] = s; });
+    var rebuilt = CD_FOLLOWUP_STEPS.map(function(def){
+      var existing = byKey[def.key];
+      if(existing){
+        // realign day/label/angle to the current template
+        existing.day = def.day;
+        existing.label = def.label;
+        existing.angle = def.angle;
+        return existing;
+      }
+      // missing step (e.g. followup21 / followup30 in old data) → fresh pending
+      return {
+        key: def.key, day: def.day, label: def.label, angle: def.angle,
+        status: 'pending', emailId:null, generatedAt:null, sentAt:null,
+        skipped:false, skippedReason:''
+      };
+    });
+    fu.steps = rebuilt;
+  }
+
   window.cdFollowupInit = function(cid){
     var c = cfFindCustomer(cid);
     if(!c){ toast('未找到客户', 'err'); return; }
@@ -214,6 +242,7 @@
   function cfRefreshStatus(fu){
     if(!fu || !fu.active) return;
     if(!fu.firstSentAt) return;
+    cfNormalizeSteps(fu); // ensure all 6 nodes exist before status calc
     fu.steps.forEach(function(st){
       if(st.status === 'sent' || st.status === 'skipped') return;
       var due = new Date(fu.firstSentAt);

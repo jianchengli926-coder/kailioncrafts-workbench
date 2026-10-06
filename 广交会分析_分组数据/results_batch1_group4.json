@@ -1,0 +1,1445 @@
+{
+  "customers": [
+    {
+      "id": "canton_b1_g4_001",
+      "company": "KINCAID FURNITURE COMPANY, INC.",
+      "website": "https://www.kincaidfurniture.com",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "Mr. MARVIN L. OLIVER",
+        "title": "待确认",
+        "email": "marvin oliver@kincaidfurniture.com",
+        "phone": "001 828 7262814",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 25,
+        "product": 10,
+        "companyType": 60,
+        "purchaseSignal": 30,
+        "contactQuality": 70,
+        "total": 39,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "家具制造",
+        "低意向"
+      ],
+      "notes": "美国北卡州实木家具与定制软包制造商，主营床、餐椅、餐桌、沙发等，品牌定位中高端美国家具。采购品类为家具五金（铰链、拉手），非刀剪。联系人Marvin L. Oliver。邮箱中含空格，发送前需核实正确拼写(marvin.oliver@kincaidfurniture.com待确认)。",
+      "country": "USA",
+      "customerType": "制造商",
+      "productCategory": "不匹配",
+      "products": "实木卧房/餐厅家具、定制软包沙发",
+      "profile": {
+        "business": "美国北卡州历史悠久的实木家具品牌，主打solid wood与custom upholstery，通过家具零售商渠道销售。",
+        "productLine": "Plank Road、Weatherford等系列实木家具+定制软包。",
+        "needs": "家具五金配件（铰链、拉手、滑轨），非刀剪类。",
+        "painPoints": "1)家具五金采购成本；2)供应链稳定性；3)定制交期。",
+        "angle": "刀剪品类匹配度低，可从阳江产业带的厨房/餐桌配套小五金OEM角度轻触达，或列为低优先级。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "北卡州Budson NC的实木家具制造商，官网展示多系列卧房餐厅家具及定制软包。",
+        "decisionMaker": "Marvin L. Oliver（职位待确认）。",
+        "contactInfo": "邮箱marvin oliver@kincaidfurniture.com（原始含空格，疑似格式问题，待核实）；电话828-726-2814。",
+        "painPoints": "家具五金采购成本、交期与品质稳定。",
+        "purchaseIntent": "低 — 主营家具制造，采购需求为家具五金，与刀剪/厨房用品匹配度低。",
+        "competitorAnalysis": "官网为自有品牌家具，未零售第三方五金品牌。",
+        "supplyChain": "美国本土制造为主，五金配件来源待确认。",
+        "entryPoint": "以阳江OEM小五金/餐桌配套厨具角度轻触，不主推刀剪。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "制造商",
+        "countryTier": "S",
+        "categoryMatch": "低（家具制造，非刀剪）",
+        "priorityScore": 30,
+        "recommendedStrategy": "低优先级，通用五金OEM角度轻触，不投入过多资源。"
+      },
+      "intentCategories": [
+        "不匹配"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 30,
+      "companySize": "待确认",
+      "decisionMaker": "Marvin L. Oliver",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_002",
+      "company": "KIM GUAN HUAT HARDWARE CO., PTE. LTD.",
+      "website": "https://www.kimguanhuat.com",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "NG SEE SING",
+        "title": "待确认",
+        "email": "kimguanhuat@pacific.com.sg",
+        "phone": "0065 62871386",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 55,
+        "product": 40,
+        "companyType": 70,
+        "purchaseSignal": 60,
+        "contactQuality": 60,
+        "total": 57,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "五金工具",
+        "中意向"
+      ],
+      "notes": "新加坡五金进口商/分销商，位于Defu Industrial Park。据Volza数据，有约70票进口记录，主要从中国4家供应商采购，是活跃的中国采购方。联系人Ng See Sing。与第3家Kim Bee Huat信息高度重合（同联系人/电话/地址），疑为关联公司。",
+      "country": "Singapore",
+      "customerType": "进口商",
+      "productCategory": "综合五金",
+      "products": "五金工具、建材、综合五金进口分销",
+      "profile": {
+        "business": "新加坡本地五金进口分销商，Defu工业区，长期从中国进口五金产品。",
+        "productLine": "综合五金、工具、建材类进口分销。",
+        "needs": "持续从中国采购高性价比五金工具，可能扩充品类。",
+        "painPoints": "1)需要稳定中国供应商；2)价格竞争力；3)品类扩充。",
+        "angle": "以阳江刀剪/厨房用品工厂直供价+中国采购经验切入，作为其现有中国供应链的补充。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "新加坡五金进口商，Volza记录70票进口，来自中国4家供应商。",
+        "decisionMaker": "Ng See Sing（职位待确认）。",
+        "contactInfo": "邮箱kimguanhuat@pacific.com.sg；电话+65 6287 1386。官网当前无法访问。",
+        "painPoints": "需要稳定、有价格优势的中国五金货源。",
+        "purchaseIntent": "中 — 有明确从中国进口记录，是活跃采购方，但品类为综合五金。",
+        "competitorAnalysis": "待确认（官网无法访问）。",
+        "supplyChain": "主要从中国进口（Volza数据）。",
+        "entryPoint": "工厂直供价低于贸易商20%+阳江刀剪产业带，作为其中国供应链补充。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "进口商",
+        "countryTier": "A",
+        "categoryMatch": "中（综合五金进口，可扩充刀剪/厨房用品）",
+        "priorityScore": 57,
+        "recommendedStrategy": "中优先级，以中国采购经验+工厂直供价切入，索取catalog。"
+      },
+      "intentCategories": [
+        "综合五金",
+        "厨房用品"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 57,
+      "companySize": "待确认",
+      "decisionMaker": "Ng See Sing",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_003",
+      "company": "KIM BEE HUAT HARDWARE (M) SDN. BHD.",
+      "website": "http://www.kimguanhuat.com",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "NG SEE SING",
+        "title": "待确认",
+        "email": "kimguanhuat@pacific.net.sg",
+        "phone": "0065 62871386",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 50,
+        "product": 38,
+        "companyType": 65,
+        "purchaseSignal": 55,
+        "contactQuality": 55,
+        "total": 53,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "五金工具",
+        "中意向",
+        "关联公司"
+      ],
+      "notes": "与第2家Kim Guan Huat共用联系人Ng See Sing、电话、地址(Defu Lane 12)，疑为同一集团的马来西亚注册实体(SDN.BHD.)。邮箱域名为pacific.net.sg（第2家为pacific.com.sg）。建议与第2家合并跟进，避免重复开发。",
+      "country": "Singapore",
+      "customerType": "进口商",
+      "productCategory": "综合五金",
+      "products": "五金工具、建材进口分销（与Kim Guan Huat关联）",
+      "profile": {
+        "business": "马来西亚注册(SDN.BHD.)但登记于新加坡地址，与Kim Guan Huat高度关联。",
+        "productLine": "综合五金、工具进口。",
+        "needs": "同关联公司，从中国采购五金。",
+        "painPoints": "同关联公司。",
+        "angle": "与Kim Guan Huat合并跟进，避免重复打扰。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "与Kim Guan Huat共用联系人/电话/地址，疑为关联马来西亚实体。",
+        "decisionMaker": "Ng See Sing。",
+        "contactInfo": "邮箱kimguanhuat@pacific.net.sg；电话+65 6287 1386。",
+        "painPoints": "同关联公司。",
+        "purchaseIntent": "中 — 关联活跃进口商，但需避免与第2家重复开发。",
+        "competitorAnalysis": "待确认。",
+        "supplyChain": "主要从中国进口（推断）。",
+        "entryPoint": "与Kim Guan Huat合并，统一对接。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "进口商",
+        "countryTier": "A",
+        "categoryMatch": "中（综合五金）",
+        "priorityScore": 52,
+        "recommendedStrategy": "与Kim Guan Huat合并跟进，避免重复开发。"
+      },
+      "intentCategories": [
+        "综合五金"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 52,
+      "companySize": "待确认",
+      "decisionMaker": "Ng See Sing",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_004",
+      "company": "KENG WAH HARDWARE CO. PTE. LTD.",
+      "website": "http://www.kengwah.com",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "GOH TUAN PAY",
+        "title": "待确认",
+        "email": "kengwah1@singnet.com.sg",
+        "phone": "0065 63924896",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 30,
+        "product": 15,
+        "companyType": 55,
+        "purchaseSignal": 30,
+        "contactQuality": 60,
+        "total": 38,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "船用五金/起重设备",
+        "低意向"
+      ],
+      "notes": "新加坡成立于1983年的五金公司，主营船具/索具/轮船用品(ship chandlery)及起重产品，服务油田、起重机、海事、石化等行业。约15名员工。官网已失效(Plesk默认页)。注意：有记录显示该UEN实体已停止运营，需核实。刀剪匹配度低。",
+      "country": "Singapore",
+      "customerType": "分销商",
+      "productCategory": "不匹配",
+      "products": "船用五金、起重设备、索具、小五金、工具、油漆、钢材",
+      "profile": {
+        "business": "1983年成立，船用(chandlery)+工业起重产品分销商，服务海事/油田/石化。",
+        "productLine": "船具索具、起重产品、小五金工具、油漆钢材。",
+        "needs": "船用及工业五金，非刀剪。",
+        "painPoints": "海事/工业供应链专业要求高。",
+        "angle": "刀剪匹配度低，仅可从通用五金OEM角度轻触。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "1983年成立，船用五金与起重产品分销商，约15人，服务海事/油田/石化。",
+        "decisionMaker": "Goh Tuan Pay（职位待确认）。",
+        "contactInfo": "邮箱kengwah1@singnet.com.sg；电话+65 6392 4896。官网已失效。",
+        "painPoints": "专业海事/工业五金供应链。",
+        "purchaseIntent": "低 — 主营船用与起重设备，与刀剪匹配度低；且有停止运营记录待核实。",
+        "competitorAnalysis": "待确认。",
+        "supplyChain": "待确认。",
+        "entryPoint": "通用五金OEM角度轻触，优先核实公司是否仍在运营。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "分销商",
+        "countryTier": "A",
+        "categoryMatch": "低（船用/起重设备）",
+        "priorityScore": 35,
+        "recommendedStrategy": "低优先级，先核实运营状态，通用五金角度轻触。"
+      },
+      "intentCategories": [
+        "不匹配"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 35,
+      "companySize": "约15人",
+      "decisionMaker": "Goh Tuan Pay",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_005",
+      "company": "Jackdaw Tools Ltd",
+      "website": "http://www.jackdaw.co.uk",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "S. Paskin",
+        "title": "待确认",
+        "email": "jackd@ukindustry.co.uk",
+        "phone": "0044 1902 366551",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 50,
+        "product": 25,
+        "companyType": 60,
+        "purchaseSignal": 40,
+        "contactQuality": 65,
+        "total": 48,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "工业工具",
+        "低意向"
+      ],
+      "notes": "英国Willenhall/Telford的工业工具供应商(engineer's merchant)，面向制造业，销售切削刀具、钻头、FFP2口罩、切削液、金刚石锯片等。有两个大型trade counter/showroom。属工业MRO工具分销，非刀剪。",
+      "country": "UK",
+      "customerType": "分销商",
+      "productCategory": "不匹配",
+      "products": "工业切削刀具、钻头、PPE、切削液、金刚石锯片等MRO工具",
+      "profile": {
+        "business": "英国中部工业工具供应商，两个门店，服务制造业客户。",
+        "productLine": "切削刀具、孔锯、切割油、金刚石锯片、PPE口罩。",
+        "needs": "工业MRO工具，非消费刀剪。",
+        "painPoints": "工业工具供应链、技术支持。",
+        "angle": "可从实用刀/美工刀/工业刀具角度轻触，匹配度有限。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "英国Willenhall总部+Telford分店的工业工具供应商，定位manufacturing supply solutions。",
+        "decisionMaker": "S. Paskin（职位待确认）。",
+        "contactInfo": "邮箱jackd@ukindustry.co.uk；电话+44 1902 366551。",
+        "painPoints": "工业工具品类扩充与价格。",
+        "purchaseIntent": "低 — 主营工业MRO切削工具，与消费刀剪匹配度低。",
+        "competitorAnalysis": "自有trade counter零售多品牌工业工具。",
+        "supplyChain": "待确认。",
+        "entryPoint": "以工业实用刀/美工刀/户外刀角度轻触。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "分销商",
+        "countryTier": "S",
+        "categoryMatch": "低（工业MRO工具）",
+        "priorityScore": 42,
+        "recommendedStrategy": "低优先级，以工业/户外刀具角度轻触。"
+      },
+      "intentCategories": [
+        "不匹配"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 42,
+      "companySize": "待确认",
+      "decisionMaker": "S. Paskin",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_006",
+      "company": "INTERSTATE HARDWARE CO",
+      "website": "http://www.interstatehardware.com",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "DAVE LYTLE",
+        "title": "Owner/Manager(待确认)",
+        "email": "inthard@aol.com",
+        "phone": "001 303 755 4590",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 55,
+        "product": 40,
+        "companyType": 50,
+        "purchaseSignal": 35,
+        "contactQuality": 70,
+        "total": 50,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "五金批发",
+        "中意向"
+      ],
+      "notes": "美国丹佛(CO)小型五金批发商/零售店。据Cortera/Moody's数据：私营，销售额低于50万美元，员工5-10人。联系人Dave Lytle。官网域名已出售(Afternic)，邮箱为AOL个人邮箱，规模较小。",
+      "country": "USA",
+      "customerType": "五金零售商",
+      "productCategory": "综合五金",
+      "products": "综合五金、电气、工业用品、水暖",
+      "profile": {
+        "business": "丹佛小型五金批发/零售，5-10人，年销售额低于50万美元。",
+        "productLine": "综合五金、电气、工业及水暖用品。",
+        "needs": "补充高性价比五金品类，可能含刀剪/厨房用品。",
+        "painPoints": "小规模采购议价能力弱，需要小MOQ供应商。",
+        "angle": "以低MOQ(100pcs)+工厂直供价切入，适合小批量补货。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "丹佛小型五金商，Cortera记录5-10人，销售额低于50万美元。",
+        "decisionMaker": "Dave Lytle（职位待确认，疑为业主）。",
+        "contactInfo": "邮箱inthard@aol.com(AOL个人邮箱)；电话303-755-4590。官网域名已出售。",
+        "painPoints": "小规模采购、议价能力有限。",
+        "purchaseIntent": "中 — 五金零售/批发，可补充刀剪品类，但规模小。",
+        "competitorAnalysis": "待确认。",
+        "supplyChain": "待确认。",
+        "entryPoint": "低MOQ+工厂直供价，适合小批量补货。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "五金零售商",
+        "countryTier": "S",
+        "categoryMatch": "中（综合五金零售可含刀剪）",
+        "priorityScore": 48,
+        "recommendedStrategy": "中低优先级，以低MOQ小批量补货角度切入。"
+      },
+      "intentCategories": [
+        "综合五金",
+        "厨房用品"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 48,
+      "companySize": "5-10人",
+      "decisionMaker": "Dave Lytle",
+      "annualPurchase": "低于50万美元/年(待确认)"
+    },
+    {
+      "id": "canton_b1_g4_007",
+      "company": "INTERNATIONAL HARDWARE INC.",
+      "website": "http://www.ihinc.com",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "RON BRANDWEIN",
+        "title": "待确认",
+        "email": "info@ihinc.com",
+        "phone": "001 847 827 7000",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 55,
+        "product": 40,
+        "companyType": 65,
+        "purchaseSignal": 35,
+        "contactQuality": 50,
+        "total": 49,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "五金进口",
+        "中意向"
+      ],
+      "notes": "美国伊利诺伊州Glenview的五金公司，联系人Ron Brandwein。官网ihinc.com域名已被中国域名中介挂售，公司现状信息有限。从公司名'International Hardware'推断为五金进口/批发商。邮箱为通用info@。",
+      "country": "USA",
+      "customerType": "进口商",
+      "productCategory": "综合五金",
+      "products": "综合五金进口/批发（推断）",
+      "profile": {
+        "business": "伊利诺伊州Glenview五金公司，疑为进口/批发商。",
+        "productLine": "综合五金（待确认）。",
+        "needs": "进口五金产品。",
+        "painPoints": "待确认。",
+        "angle": "以进口商角度，阳江工厂直供刀剪品类切入。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "Glenview IL五金公司，Ron Brandwein。官网域名已出售，现状待确认。",
+        "decisionMaker": "Ron Brandwein（职位待确认）。",
+        "contactInfo": "邮箱info@ihinc.com(通用)；电话847-827-7000。",
+        "painPoints": "待确认。",
+        "purchaseIntent": "中 — 名称含International，疑为进口商，但现状待确认。",
+        "competitorAnalysis": "待确认。",
+        "supplyChain": "待确认。",
+        "entryPoint": "以进口商工厂直供刀剪角度切入。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "进口商",
+        "countryTier": "S",
+        "categoryMatch": "中（综合五金进口）",
+        "priorityScore": 48,
+        "recommendedStrategy": "中低优先级，先邮件试探回复率。"
+      },
+      "intentCategories": [
+        "综合五金"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 48,
+      "companySize": "待确认",
+      "decisionMaker": "Ron Brandwein",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_008",
+      "company": "IJsseltools CV",
+      "website": "http://www.ijsseltools.com",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "W.G. Kalkman",
+        "title": "待确认",
+        "email": "sales@ijsseltools.nl",
+        "phone": "0031 180 592929",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 55,
+        "product": 30,
+        "companyType": 60,
+        "purchaseSignal": 35,
+        "contactQuality": 55,
+        "total": 47,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "工具批发",
+        "低意向"
+      ],
+      "notes": "荷兰Krimpen a.d. IJssel的工具公司，联系人W.G. Kalkman。从公司名(IJssel tools)推断为工具批发/分销商。官网已死链。荷兰为A级市场。",
+      "country": "Netherlands",
+      "customerType": "分销商",
+      "productCategory": "综合五金",
+      "products": "工具批发/分销（推断）",
+      "profile": {
+        "business": "荷兰Krimpen aan den IJssel工具公司，疑为批发商。",
+        "productLine": "工具（待确认）。",
+        "needs": "补充工具品类。",
+        "painPoints": "待确认。",
+        "angle": "以阳江刀剪/剪刀/手动工具工厂直供切入。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "荷兰工具公司，地址Parallelweg 1A, Krimpen a.d. IJssel。官网死链。",
+        "decisionMaker": "W.G. Kalkman（职位待确认）。",
+        "contactInfo": "邮箱sales@ijsseltools.nl；电话+31 180 592929。",
+        "painPoints": "待确认。",
+        "purchaseIntent": "低-中 — 工具分销商，可补充刀剪/手动工具，信息有限。",
+        "competitorAnalysis": "待确认。",
+        "supplyChain": "待确认。",
+        "entryPoint": "以剪刀/手动工具工厂直供切入。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "分销商",
+        "countryTier": "A",
+        "categoryMatch": "中（工具分销可含刀剪）",
+        "priorityScore": 45,
+        "recommendedStrategy": "中低优先级，邮件试探。"
+      },
+      "intentCategories": [
+        "综合五金",
+        "剪刀"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 45,
+      "companySize": "待确认",
+      "decisionMaker": "W.G. Kalkman",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_009",
+      "company": "Hwalett Hardware Pte Ltd",
+      "website": "http://www.hweco.sg",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "",
+        "title": "",
+        "email": "hwabo@singnet.com.sg",
+        "phone": "0065 63668118",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 50,
+        "product": 35,
+        "companyType": 55,
+        "purchaseSignal": 30,
+        "contactQuality": 30,
+        "total": 40,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "五金贸易",
+        "低意向"
+      ],
+      "notes": "新加坡Mandai Estate的五金公司(HWECO)，无具体联系人姓名。官网hweco.sg无法访问。从公司名推断为新加坡五金贸易商。联系方式质量较低(无联系人名)。",
+      "country": "Singapore",
+      "customerType": "分销商",
+      "productCategory": "综合五金",
+      "products": "五金贸易（推断）",
+      "profile": {
+        "business": "新加坡五金贸易商，Mandai Estate。",
+        "productLine": "五金（待确认）。",
+        "needs": "五金采购。",
+        "painPoints": "待确认。",
+        "angle": "以综合五金/刀剪工厂直供切入，但因无联系人，回复率可能低。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "新加坡五金公司，Hua Yu Ind Building, Mandai Estate。官网无法访问。",
+        "decisionMaker": "无具体联系人，待确认。",
+        "contactInfo": "邮箱hwabo@singnet.com.sg；电话+65 6366 8118。",
+        "painPoints": "待确认。",
+        "purchaseIntent": "低 — 信息有限，无联系人。",
+        "competitorAnalysis": "待确认。",
+        "supplyChain": "待确认。",
+        "entryPoint": "通用五金角度轻触。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "分销商",
+        "countryTier": "A",
+        "categoryMatch": "中（综合五金）",
+        "priorityScore": 38,
+        "recommendedStrategy": "低优先级，通用角度批量发送。"
+      },
+      "intentCategories": [
+        "综合五金"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 38,
+      "companySize": "待确认",
+      "decisionMaker": "待确认",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_010",
+      "company": "Hunter Tools Ltd",
+      "website": "https://www.huntertools.co.uk",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "Nicholas Jones",
+        "title": "待确认",
+        "email": "sales@huntertools.co.uk",
+        "phone": "0044 1275 851333",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 55,
+        "product": 30,
+        "companyType": 60,
+        "purchaseSignal": 40,
+        "contactQuality": 60,
+        "total": 49,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "工具分销",
+        "低意向"
+      ],
+      "notes": "英国Weston-super-Mare的工具分销商，联系人Nicholas Jones。有2024产品目录，销售手动/电动工具及配件。官网无法直接访问。英国S级市场。",
+      "country": "UK",
+      "customerType": "分销商",
+      "productCategory": "综合五金",
+      "products": "手动/电动工具及配件分销",
+      "profile": {
+        "business": "英国Weston-super-Mare工具分销商，有年度目录。",
+        "productLine": "手动/电动工具、配件、工业安全设备。",
+        "needs": "补充工具品类。",
+        "painPoints": "工具品类扩充与价格。",
+        "angle": "以手动刀剪/实用刀/户外刀工厂直供切入。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "英国工具分销商，Weston-super-Mare，有2024目录。",
+        "decisionMaker": "Nicholas Jones（职位待确认）。",
+        "contactInfo": "邮箱sales@huntertools.co.uk；电话+44 1275 851333。",
+        "painPoints": "工具品类扩充。",
+        "purchaseIntent": "低-中 — 工具分销商，可补充刀剪/手动工具。",
+        "competitorAnalysis": "目录含多品牌工具。",
+        "supplyChain": "待确认。",
+        "entryPoint": "以手动刀剪/户外刀工厂直供切入。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "分销商",
+        "countryTier": "S",
+        "categoryMatch": "中（工具分销可含刀剪）",
+        "priorityScore": 46,
+        "recommendedStrategy": "中低优先级，以手动工具/刀剪角度切入。"
+      },
+      "intentCategories": [
+        "综合五金",
+        "户外刀"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 46,
+      "companySize": "待确认",
+      "decisionMaker": "Nicholas Jones",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_011",
+      "company": "HSM Panel",
+      "website": "http://www.hsmpanelinc.com",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "Darmento Sentoso",
+        "title": "Owner",
+        "email": "smdbmp@hotmail.com",
+        "phone": "001 909-595-6329",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 25,
+        "product": 10,
+        "companyType": 55,
+        "purchaseSignal": 25,
+        "contactQuality": 60,
+        "total": 35,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "木工板材/橱柜",
+        "低意向"
+      ],
+      "notes": "美国Walnut(CA)的木板材加工厂，35年以上历史，定制裁切抽屉部件及厨房橱柜供家具行业。Owner为Darmento Sentoso。主营胶合板/木板材裁切，非刀剪。邮箱为Hotmail个人邮箱。",
+      "country": "USA",
+      "customerType": "制造商",
+      "productCategory": "不匹配",
+      "products": "定制裁切木板材、抽屉部件、厨房橱柜",
+      "profile": {
+        "business": "35年以上历史的木板材裁切与橱柜制造商，服务家具行业。",
+        "productLine": "按尺寸裁切木板材、抽屉部件、厨房橱柜。",
+        "needs": "木工刀具/锯片可能相关，但非消费刀剪。",
+        "painPoints": "家具行业供应链。",
+        "angle": "刀剪匹配度极低，仅可从通用五金/木工刀具角度轻触。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "Walnut CA木板材加工厂，35年以上，定制裁切供家具行业。",
+        "decisionMaker": "Darmento Sentoso（Owner）。",
+        "contactInfo": "邮箱smdbmp@hotmail.com；电话909-595-6329。",
+        "painPoints": "木加工供应链。",
+        "purchaseIntent": "低 — 木板材/橱柜制造，与刀剪匹配度极低。",
+        "competitorAnalysis": "待确认。",
+        "supplyChain": "待确认。",
+        "entryPoint": "通用五金角度轻触。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "制造商",
+        "countryTier": "S",
+        "categoryMatch": "低（木板材/橱柜）",
+        "priorityScore": 30,
+        "recommendedStrategy": "低优先级，通用五金角度轻触。"
+      },
+      "intentCategories": [
+        "不匹配"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 30,
+      "companySize": "待确认",
+      "decisionMaker": "Darmento Sentoso",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_012",
+      "company": "HOUSE-HASSON HARDWARE CO",
+      "website": "https://www.househasson.com",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "DONALD HASSON",
+        "title": "待确认",
+        "email": "info@househasson.com",
+        "phone": "001 865 525 0471",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 75,
+        "product": 60,
+        "companyType": 85,
+        "purchaseSignal": 50,
+        "contactQuality": 55,
+        "total": 65,
+        "grade": "B"
+      },
+      "tags": [
+        "广交会139届",
+        "五金批发",
+        "高意向",
+        "重点客户"
+      ],
+      "notes": "美国Knoxville(TN)百年五金批发巨头，7万+SKU，服务全美独立五金店。官网明确'YOUR PARTNER IN RETAIL SUCCESS'，支持独立五金店开店/转型。近期任命Jeff Land为CEO。联系人Donald Hasson。本组最高价值客户——真正的五金批发商，刀剪/厨房用品可作为SKU补充。",
+      "country": "USA",
+      "customerType": "分销商",
+      "productCategory": "综合五金",
+      "products": "7万+SKU综合五金批发，服务独立五金零售店",
+      "profile": {
+        "business": "百年历史五金批发分销商，7万+SKU，全美独立五金店供应商。",
+        "productLine": "全品类五金、工具、家居、厨房用品。",
+        "needs": "持续扩充SKU，需要有价格优势的中国货源。",
+        "painPoints": "1)SKU扩充成本；2)供应链价格；3)为独立零售店提供有竞争力品类。",
+        "angle": "以阳江刀剪产业带+工厂直供价+免费营销素材切入，作为其厨房用品/五金SKU补充。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "Knoxville TN百年五金批发商，7万+SKU，服务独立五金店，CEO Jeff Land。",
+        "decisionMaker": "Donald Hasson（家族成员，职位待确认）；CEO Jeff Land。",
+        "contactInfo": "邮箱info@househasson.com；电话865-525-0471 / 800-333-0520。",
+        "painPoints": "SKU扩充成本、供应链价格、零售竞争力。",
+        "purchaseIntent": "高 — 真正的五金批发商，持续扩充SKU，刀剪/厨房用品可作为新品类补充。",
+        "competitorAnalysis": "分销多品牌五金，服务独立零售店。",
+        "supplyChain": "多源采购，可能含中国进口。",
+        "entryPoint": "阳江刀剪产业带+工厂直供价(低于贸易商20%)+免费营销素材，作为厨房用品SKU补充。"
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "分销商",
+        "countryTier": "S",
+        "categoryMatch": "高（五金批发可含刀剪/厨房用品SKU）",
+        "priorityScore": 65,
+        "recommendedStrategy": "高优先级(B级)，重点跟进，索取catalog+样品，强调批发价与营销素材支持。"
+      },
+      "intentCategories": [
+        "综合五金",
+        "厨房用品",
+        "剪刀"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 65,
+      "companySize": "200-500人(待确认)",
+      "decisionMaker": "Donald Hasson / Jeff Land(CEO)",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_013",
+      "company": "HOPKINS-CARTER MARINE HARDWARE",
+      "website": "https://www.hopkins-carter.com",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "PARKS MASTERSON",
+        "title": "待确认",
+        "email": "info@hopkins-carter.com",
+        "phone": "001 305 6357377",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 35,
+        "product": 30,
+        "companyType": 45,
+        "purchaseSignal": 35,
+        "contactQuality": 55,
+        "total": 40,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "船用/渔具",
+        "低意向"
+      ],
+      "notes": "美国迈阿密船用供应与渔具零售商，自1916年经营。销售船用五金、渔具(Penn/Shimano)、Gopro、导航等。品牌包括Shimano, Penn, Garmin等。虽为船用/渔具，但渔具场景可切入鱼片刀/渔刀。",
+      "country": "USA",
+      "customerType": "五金零售商",
+      "productCategory": "不匹配",
+      "products": "船用五金、渔具、垂钓用品、船舶维护",
+      "profile": {
+        "business": "迈阿密1916年成立的船用供应与渔具零售商，服务游艇客和钓鱼客。",
+        "productLine": "船用五金、渔具卷线器(Penn/Shimano)、导航、垂钓配件。",
+        "needs": "渔具/户外用品，鱼片刀/渔刀可匹配。",
+        "painPoints": "渔具品类扩充。",
+        "angle": "以鱼片刀/渔刀/户外刀切入，契合渔具场景。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "迈阿密船用供应与渔具零售商，1916年成立，家族经营。",
+        "decisionMaker": "Parks Masterson（职位待确认）。",
+        "contactInfo": "邮箱info@hopkins-carter.com / sale@hopkins-carter.com；电话305-635-7377。",
+        "painPoints": "渔具/户外品类扩充。",
+        "purchaseIntent": "低-中 — 船用/渔具零售，鱼片刀/渔刀有场景匹配。",
+        "competitorAnalysis": "售Shimano, Penn, Okuma, Mustad, Gamakatsu等渔具品牌。",
+        "supplyChain": "多品牌分销。",
+        "entryPoint": "以鱼片刀/渔刀/户外刀切入渔具场景。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "五金零售商",
+        "countryTier": "S",
+        "categoryMatch": "低-中（船用/渔具，鱼片刀角度）",
+        "priorityScore": 38,
+        "recommendedStrategy": "低优先级，以鱼片刀/渔刀角度差异化切入。"
+      },
+      "intentCategories": [
+        "户外刀"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 38,
+      "companySize": "待确认",
+      "decisionMaker": "Parks Masterson",
+      "annualPurchase": ""
+    },
+    {
+      "id": "canton_b1_g4_014",
+      "company": "HIRONICHI KOGYO KK",
+      "website": "https://www.hironichi.co.jp",
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "UMEDA MINORU",
+        "title": "待确认",
+        "email": "info@hironichi.co.jp",
+        "phone": "0081 82 293 8333",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "scores": {
+        "industry": 25,
+        "product": 10,
+        "companyType": 55,
+        "purchaseSignal": 25,
+        "contactQuality": 55,
+        "total": 34,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "建材/保安器材",
+        "低意向"
+      ],
+      "notes": "日本广岛的土木建筑资材/工事保安器材商。主营土木建筑材料、工事用保安器材、交通安全器材、物加工品(钢铁/铝/不锈钢)。与刀剪完全不匹配。日本S级市场。",
+      "country": "Japan",
+      "customerType": "分销商",
+      "productCategory": "不匹配",
+      "products": "土木建筑资材、工事保安器材、交通安全器材、钢铁/铝/不锈钢加工品",
+      "profile": {
+        "business": "广岛县土木建筑资材与工事保安器材商。",
+        "productLine": "建材、保安器材、交通安全标识、金属加工品。",
+        "needs": "建材/保安器材，非刀剪。",
+        "painPoints": "建筑资材供应。",
+        "angle": "刀剪匹配度极低，仅通用五金角度。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "广岛市西区土木建筑资材/保安器材商。",
+        "decisionMaker": "Umeda Minoru（职位待确认）。",
+        "contactInfo": "邮箱info@hironichi.co.jp；电话082-293-8333。",
+        "painPoints": "建筑资材供应。",
+        "purchaseIntent": "低 — 建材/保安器材，与刀剪完全不匹配。",
+        "competitorAnalysis": "待确认。",
+        "supplyChain": "日本国内为主。",
+        "entryPoint": "通用五金角度轻触。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "分销商",
+        "countryTier": "S",
+        "categoryMatch": "低（建材/保安器材）",
+        "priorityScore": 28,
+        "recommendedStrategy": "低优先级，通用五金角度轻触。"
+      },
+      "intentCategories": [
+        "不匹配"
+      ],
+      "leadSource": "广交会139届-五金制品",
+      "leadScore": 28,
+      "companySize": "待确认",
+      "decisionMaker": "Umeda Minoru",
+      "annualPurchase": ""
+    }
+  ],
+  "drafts": [
+    {
+      "id": "draft_canton_b1_g4_001",
+      "customerId": "canton_b1_g4_001",
+      "customerName": "KINCAID FURNITURE COMPANY, INC.",
+      "country": "USA",
+      "language": "英语",
+      "subject": "Yangjiang OEM hardware partner for furniture brands",
+      "body": "Dear Mr. Oliver,\n\nI noticed Kincaid Furniture has built a respected name in solid wood and custom upholstered furniture from North Carolina. While reviewing your collections, I wanted to reach out from Yangjiang, China.\n\nKaiLionCrafts is a factory-direct partner for OEM/ODM hardware and kitchen-table accessories, with SGS LFGB and FDA certification. We support furniture and home brands with low MOQ (100 pcs), free marketing photos and videos, and founder-direct communication.\n\nWould you be open to a short WhatsApp call or a quick catalog review? I would be glad to send samples for your evaluation.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "content": "Dear Mr. Oliver,\n\nI noticed Kincaid Furniture has built a respected name in solid wood and custom upholstered furniture from North Carolina. While reviewing your collections, I wanted to reach out from Yangjiang, China.\n\nKaiLionCrafts is a factory-direct partner for OEM/ODM hardware and kitchen-table accessories, with SGS LFGB and FDA certification. We support furniture and home brands with low MOQ (100 pcs), free marketing photos and videos, and founder-direct communication.\n\nWould you be open to a short WhatsApp call or a quick catalog review? I would be glad to send samples for your evaluation.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "家具制造商，刀剪匹配度低，采用通用OEM五金角度",
+        "邮箱含空格，发送前需核实"
+      ],
+      "subjectOptions": [
+        "Yangjiang OEM hardware for furniture brands",
+        "Factory-direct hardware from Yangjiang",
+        "OEM/ODM supply for home brands"
+      ],
+      "chineseVersion": "尊敬的Oliver先生：\n\n我们注意到Kincaid Furniture在北卡实木家具与定制软包领域享有盛誉。在浏览您的系列产品时，我想从中国阳江与您联系。\n\nKaiLionCrafts是OEM/ODM五金及餐桌配套用品的工厂直供伙伴，拥有SGS LFGB与FDA认证。我们以低起订量(100件)、免费营销图片视频、创始人直接对接支持家具与家居品牌。\n\n您是否愿意进行简短的WhatsApp通话或快速查看产品目录？我很乐意寄送样品供您评估。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA认证",
+        "免费营销素材"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "wordCount": 120
+    },
+    {
+      "id": "draft_canton_b1_g4_002",
+      "customerId": "canton_b1_g4_002",
+      "customerName": "KIM GUAN HUAT HARDWARE CO., PTE. LTD.",
+      "country": "Singapore",
+      "language": "英语",
+      "subject": "Yangjiang cutlery supply for Singapore hardware importers",
+      "body": "Dear Mr. Ng,\n\nI see Kim Guan Huat has been a steady hardware importer in Singapore, sourcing a wide range of hardware from China. I am reaching out from Yangjiang, the heart of China's cutlery industry.\n\nKaiLionCrafts supplies factory-direct kitchen knives, scissors and kitchen accessories, at prices typically 20% below trading companies. We offer OEM/ODM from 100 pcs, SGS LFGB and FDA certification, and free product photos and videos for your marketing.\n\nCould I send you our latest catalog and a few sample units? Happy to discuss on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-knives/",
+      "content": "Dear Mr. Ng,\n\nI see Kim Guan Huat has been a steady hardware importer in Singapore, sourcing a wide range of hardware from China. I am reaching out from Yangjiang, the heart of China's cutlery industry.\n\nKaiLionCrafts supplies factory-direct kitchen knives, scissors and kitchen accessories, at prices typically 20% below trading companies. We offer OEM/ODM from 100 pcs, SGS LFGB and FDA certification, and free product photos and videos for your marketing.\n\nCould I send you our latest catalog and a few sample units? Happy to discuss on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-knives/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "活跃中国进口商，Volza有70票进口记录",
+        "与Kim Bee Huat疑为关联公司，注意去重"
+      ],
+      "subjectOptions": [
+        "Yangjiang cutlery supply for Singapore importers",
+        "Factory-direct knives from China's cutlery capital",
+        "OEM kitchen knives & scissors, MOQ 100pcs"
+      ],
+      "chineseVersion": "尊敬的Ng先生：\n\n我们了解到Kim Guan Huat是新加坡稳健的五金进口商，长期从中国采购各类五金产品。我从中国刀剪之都阳江与您联系。\n\nKaiLionCrafts工厂直供厨房刀、剪刀及厨房用品，价格通常比贸易商低20%。我们提供100件起订的OEM/ODM、SGS LFGB与FDA认证，并免费提供产品图片和视频用于营销。\n\n我能否寄送最新目录和少量样品？欢迎在WhatsApp上沟通。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-knives/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "工厂直供价低于贸易商20%",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA",
+        "免费营销素材"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/kitchen-knives/"
+      ],
+      "wordCount": 118
+    },
+    {
+      "id": "draft_canton_b1_g4_003",
+      "customerId": "canton_b1_g4_003",
+      "customerName": "KIM BEE HUAT HARDWARE (M) SDN. BHD.",
+      "country": "Singapore",
+      "language": "英语",
+      "subject": "Factory-direct scissors & knives for your hardware range",
+      "body": "Dear Mr. Ng,\n\nI understand Kim Bee Huat works closely with the Singapore hardware trade, sourcing quality hardware and tools from overseas. I am writing from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts offers factory-direct kitchen knives, scissors and kitchen accessories with OEM/ODM from 100 pcs, SGS LFGB and FDA certification, and free marketing photos and videos. Our direct factory pricing typically beats trading companies by around 20%.\n\nMay I send a catalog and samples for your review? I am glad to connect on WhatsApp at your convenience.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/professional-scissors/",
+      "content": "Dear Mr. Ng,\n\nI understand Kim Bee Huat works closely with the Singapore hardware trade, sourcing quality hardware and tools from overseas. I am writing from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts offers factory-direct kitchen knives, scissors and kitchen accessories with OEM/ODM from 100 pcs, SGS LFGB and FDA certification, and free marketing photos and videos. Our direct factory pricing typically beats trading companies by around 20%.\n\nMay I send a catalog and samples for your review? I am glad to connect on WhatsApp at your convenience.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/professional-scissors/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "与Kim Guan Huat关联，建议合并跟进",
+        "邮箱域名为pacific.net.sg"
+      ],
+      "subjectOptions": [
+        "Factory-direct scissors & knives from Yangjiang",
+        "OEM cutlery supply, MOQ 100 pcs",
+        "Yangjiang cutlery for hardware distributors"
+      ],
+      "chineseVersion": "尊敬的Ng先生：\n\n我们了解到Kim Bee Huat与新加坡五金贸易往来密切，从海外采购优质五金工具。我从中国刀剪之都阳江致信。\n\nKaiLionCrafts工厂直供厨房刀、剪刀及厨房用品，100件起订OEM/ODM，SGS LFGB与FDA认证，免费营销图片视频。我们的工厂直供价通常比贸易商低约20%。\n\n我能否寄送目录和样品供您审阅？欢迎在您方便时通过WhatsApp联系。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/professional-scissors/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "工厂直供价低于贸易商20%",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/professional-scissors/"
+      ],
+      "wordCount": 115
+    },
+    {
+      "id": "draft_canton_b1_g4_004",
+      "customerId": "canton_b1_g4_004",
+      "customerName": "KENG WAH HARDWARE CO. PTE. LTD.",
+      "country": "Singapore",
+      "language": "英语",
+      "subject": "Reliable OEM hardware supply from Yangjiang",
+      "body": "Dear Mr. Goh,\n\nI understand Keng Wah Hardware has served Singapore's marine, oilfield and industrial sectors with chandlery and lifting supplies since 1983. I am reaching out from Yangjiang, China.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for hardware and kitchen accessories, with SGS LFGB and FDA certification, low MOQ from 100 pcs, and free product photos and videos. We support distributors looking to add reliable, cost-effective product lines.\n\nWould you be open to a brief WhatsApp chat or a catalog review? I would be glad to share samples.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "content": "Dear Mr. Goh,\n\nI understand Keng Wah Hardware has served Singapore's marine, oilfield and industrial sectors with chandlery and lifting supplies since 1983. I am reaching out from Yangjiang, China.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for hardware and kitchen accessories, with SGS LFGB and FDA certification, low MOQ from 100 pcs, and free product photos and videos. We support distributors looking to add reliable, cost-effective product lines.\n\nWould you be open to a brief WhatsApp chat or a catalog review? I would be glad to share samples.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "船用/起重设备商，刀剪匹配度低",
+        "有停止运营记录，需先核实"
+      ],
+      "subjectOptions": [
+        "OEM hardware supply from Yangjiang, China",
+        "Factory-direct hardware, MOQ 100 pcs",
+        "Reliable hardware partner for distributors"
+      ],
+      "chineseVersion": "尊敬的Goh先生：\n\n我们了解到Keng Wah Hardware自1983年起为新加坡海事、油田及工业领域提供船用及起重用品。我从中国阳江致信。\n\nKaiLionCrafts是工厂直供的OEM/ODM五金及厨房用品伙伴，拥有SGS LFGB与FDA认证，100件起订，免费产品图片视频。我们支持希望增加可靠、高性价比产品线的分销商。\n\n您是否愿意进行简短的WhatsApp通话或查看目录？我很乐意分享样品。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA",
+        "免费营销素材"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "wordCount": 112
+    },
+    {
+      "id": "draft_canton_b1_g4_005",
+      "customerId": "canton_b1_g4_005",
+      "customerName": "Jackdaw Tools Ltd",
+      "country": "UK",
+      "language": "英语",
+      "subject": "OEM knives & hand tools for your trade counter",
+      "body": "Dear Mr. Paskin,\n\nI see Jackdaw Tools supplies manufacturing businesses across the West Midlands with cutting tools, drills and workshop consumables from your Willenhall and Telford trade counters.\n\nKaiLionCrafts is a Yangjiang-based factory-direct partner for OEM/ODM knives and hand tools, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. We could support your range with utility, outdoor and kitchen knives at direct factory pricing.\n\nMay I send our catalog and a few samples for your trade counter? Happy to discuss on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives/",
+      "content": "Dear Mr. Paskin,\n\nI see Jackdaw Tools supplies manufacturing businesses across the West Midlands with cutting tools, drills and workshop consumables from your Willenhall and Telford trade counters.\n\nKaiLionCrafts is a Yangjiang-based factory-direct partner for OEM/ODM knives and hand tools, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. We could support your range with utility, outdoor and kitchen knives at direct factory pricing.\n\nMay I send our catalog and a few samples for your trade counter? Happy to discuss on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "工业MRO工具商，刀剪匹配度低",
+        "可从实用刀/户外刀角度切入"
+      ],
+      "subjectOptions": [
+        "OEM knives & hand tools from Yangjiang",
+        "Factory-direct utility & outdoor knives",
+        "Cutlery supply for UK tool distributors"
+      ],
+      "chineseVersion": "尊敬的Paskin先生：\n\n我们了解到Jackdaw Tools通过Willenhall和Telford门店为西米德兰兹制造业供应切削刀具、钻头及车间耗材。\n\nKaiLionCrafts是阳江工厂直供的OEM/ODM刀具及手动工具伙伴，拥有SGS LFGB与FDA认证，100件起订，免费产品图片视频。我们可以工厂直供价为您的产品线提供实用刀、户外刀和厨房刀。\n\n我能否寄送目录和少量样品供您门店参考？欢迎在WhatsApp上沟通。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA",
+        "工厂直供价"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/outdoor-knives/"
+      ],
+      "wordCount": 118
+    },
+    {
+      "id": "draft_canton_b1_g4_006",
+      "customerId": "canton_b1_g4_006",
+      "customerName": "INTERSTATE HARDWARE CO",
+      "country": "USA",
+      "language": "英语",
+      "subject": "Low-MOQ kitchen cutlery for your hardware store",
+      "body": "Dear Mr. Lytle,\n\nI understand Interstate Hardware serves the Denver area with general hardware, electrical and plumbing supplies. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts supplies factory-direct kitchen knives, scissors and kitchen accessories with low MOQ from 100 pcs, SGS LFGB and FDA certification, and free product photos and videos. Our direct pricing suits smaller hardware buyers looking to add quality cutlery without large inventory risk.\n\nCould I send a catalog and samples? I am glad to discuss on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-accessories/",
+      "content": "Dear Mr. Lytle,\n\nI understand Interstate Hardware serves the Denver area with general hardware, electrical and plumbing supplies. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts supplies factory-direct kitchen knives, scissors and kitchen accessories with low MOQ from 100 pcs, SGS LFGB and FDA certification, and free product photos and videos. Our direct pricing suits smaller hardware buyers looking to add quality cutlery without large inventory risk.\n\nCould I send a catalog and samples? I am glad to discuss on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-accessories/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "小型五金商，5-10人，年销<50万刀",
+        "AOL个人邮箱，规模小"
+      ],
+      "subjectOptions": [
+        "Low-MOQ kitchen cutlery for hardware stores",
+        "Factory-direct knives & scissors, MOQ 100 pcs",
+        "Yangjiang cutlery for small hardware buyers"
+      ],
+      "chineseVersion": "尊敬的Lytle先生：\n\n我们了解到Interstate Hardware在丹佛地区供应综合五金、电气及水暖用品。我从中国刀剪之都阳江致信。\n\nKaiLionCrafts工厂直供厨房刀、剪刀及厨房用品，100件起订，SGS LFGB与FDA认证，免费产品图片视频。我们的直供价适合希望增加优质刀剪而不承担大库存风险的小型五金采购商。\n\n我能否寄送目录和样品？欢迎在WhatsApp上沟通。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-accessories/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "低MOQ 100pcs",
+        "SGS LFGB+FDA",
+        "工厂直供价",
+        "免费营销素材"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/kitchen-accessories/"
+      ],
+      "wordCount": 116
+    },
+    {
+      "id": "draft_canton_b1_g4_007",
+      "customerId": "canton_b1_g4_007",
+      "customerName": "INTERNATIONAL HARDWARE INC.",
+      "country": "USA",
+      "language": "英语",
+      "subject": "Factory-direct cutlery for US hardware importers",
+      "body": "Dear Mr. Brandwein,\n\nI understand International Hardware has supplied the US hardware market from the Chicago area. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for kitchen knives, scissors and kitchen accessories, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. Our direct factory pricing typically saves importers around 20% versus trading companies.\n\nMay I send you our latest catalog? I would be glad to discuss potential cooperation on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-knives/",
+      "content": "Dear Mr. Brandwein,\n\nI understand International Hardware has supplied the US hardware market from the Chicago area. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for kitchen knives, scissors and kitchen accessories, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. Our direct factory pricing typically saves importers around 20% versus trading companies.\n\nMay I send you our latest catalog? I would be glad to discuss potential cooperation on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-knives/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "官网域名已出售，现状待确认",
+        "通用info@邮箱"
+      ],
+      "subjectOptions": [
+        "Factory-direct cutlery for US importers",
+        "OEM kitchen knives, MOQ 100 pcs",
+        "Yangjiang cutlery supply, 20% below traders"
+      ],
+      "chineseVersion": "尊敬的Brandwein先生：\n\n我们了解到International Hardware从芝加哥地区供应美国五金市场。我从中国刀剪之都阳江致信。\n\nKaiLionCrafts是工厂直供的OEM/ODM厨房刀、剪刀及厨房用品伙伴，拥有SGS LFGB与FDA认证，100件起订，免费产品图片视频。我们的工厂直供价通常为进口商节省约20%(相比贸易商)。\n\n我能否寄送最新目录？欢迎在WhatsApp上探讨合作。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-knives/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "工厂直供价低于贸易商20%",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/kitchen-knives/"
+      ],
+      "wordCount": 113
+    },
+    {
+      "id": "draft_canton_b1_g4_008",
+      "customerId": "canton_b1_g4_008",
+      "customerName": "IJsseltools CV",
+      "country": "Netherlands",
+      "language": "英语",
+      "subject": "Professional scissors & knives from Yangjiang",
+      "body": "Dear Mr. Kalkman,\n\nI understand IJsseltools supplies the Dutch market from Krimpen aan den IJssel. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for professional scissors, kitchen knives and hand tools, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. Our direct factory pricing helps European distributors add quality lines competitively.\n\nMay I send our catalog and samples for your review? Happy to connect on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/professional-scissors/",
+      "content": "Dear Mr. Kalkman,\n\nI understand IJsseltools supplies the Dutch market from Krimpen aan den IJssel. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for professional scissors, kitchen knives and hand tools, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. Our direct factory pricing helps European distributors add quality lines competitively.\n\nMay I send our catalog and samples for your review? Happy to connect on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/professional-scissors/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "荷兰A级市场，工具分销商",
+        "官网死链，信息有限"
+      ],
+      "subjectOptions": [
+        "Professional scissors & knives from Yangjiang",
+        "OEM hand tools for European distributors",
+        "Factory-direct cutlery, MOQ 100 pcs"
+      ],
+      "chineseVersion": "尊敬的Kalkman先生：\n\n我们了解到IJsseltools从Krimpen aan den IJssel供应荷兰市场。我从中国刀剪之都阳江致信。\n\nKaiLionCrafts是工厂直供的OEM/ODM专业剪刀、厨房刀及手动工具伙伴，拥有SGS LFGB与FDA认证，100件起订，免费产品图片视频。我们的工厂直供价帮助欧洲分销商有竞争力地增加优质产品线。\n\n我能否寄送目录和样品供您审阅？欢迎在WhatsApp上联系。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/professional-scissors/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA",
+        "工厂直供价"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/professional-scissors/"
+      ],
+      "wordCount": 110
+    },
+    {
+      "id": "draft_canton_b1_g4_009",
+      "customerId": "canton_b1_g4_009",
+      "customerName": "Hwalett Hardware Pte Ltd",
+      "country": "Singapore",
+      "language": "英语",
+      "subject": "Factory-direct cutlery supply for hardware traders",
+      "body": "Dear Purchasing Team,\n\nI understand Hwalett Hardware supplies the Singapore market from Mandai Estate. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for kitchen knives, scissors and kitchen accessories, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. We help hardware traders add reliable, cost-effective cutlery lines.\n\nMay I send our catalog and samples? I am glad to discuss on WhatsApp at your convenience.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-knives/",
+      "content": "Dear Purchasing Team,\n\nI understand Hwalett Hardware supplies the Singapore market from Mandai Estate. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for kitchen knives, scissors and kitchen accessories, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. We help hardware traders add reliable, cost-effective cutlery lines.\n\nMay I send our catalog and samples? I am glad to discuss on WhatsApp at your convenience.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-knives/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "无具体联系人，回复率可能低",
+        "官网无法访问"
+      ],
+      "subjectOptions": [
+        "Factory-direct cutlery for hardware traders",
+        "OEM knives & scissors, MOQ 100 pcs",
+        "Yangjiang cutlery supply"
+      ],
+      "chineseVersion": "尊敬的采购团队：\n\n我们了解到Hwalett Hardware从Mandai Estate供应新加坡市场。我从中国刀剪之都阳江致信。\n\nKaiLionCrafts是工厂直供的OEM/ODM厨房刀、剪刀及厨房用品伙伴，拥有SGS LFGB与FDA认证，100件起订，免费产品图片视频。我们帮助五金贸易商增加可靠、高性价比的刀剪产品线。\n\n我能否寄送目录和样品？欢迎在您方便时通过WhatsApp沟通。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-knives/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA",
+        "免费营销素材"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/kitchen-knives/"
+      ],
+      "wordCount": 105
+    },
+    {
+      "id": "draft_canton_b1_g4_010",
+      "customerId": "canton_b1_g4_010",
+      "customerName": "Hunter Tools Ltd",
+      "country": "UK",
+      "language": "英语",
+      "subject": "OEM outdoor knives & hand tools for UK trade",
+      "body": "Dear Mr. Jones,\n\nI see Hunter Tools supplies the UK trade from Weston-super-Mare with a broad range of hand and power tools. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for outdoor knives, scissors and hand tools, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. Our direct factory pricing helps UK distributors add quality cutlery competitively.\n\nMay I send our latest catalog and samples? Happy to discuss on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives/",
+      "content": "Dear Mr. Jones,\n\nI see Hunter Tools supplies the UK trade from Weston-super-Mare with a broad range of hand and power tools. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for outdoor knives, scissors and hand tools, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. Our direct factory pricing helps UK distributors add quality cutlery competitively.\n\nMay I send our latest catalog and samples? Happy to discuss on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "英国S级市场，工具分销商",
+        "有2024目录"
+      ],
+      "subjectOptions": [
+        "OEM outdoor knives & hand tools for UK trade",
+        "Factory-direct cutlery, MOQ 100 pcs",
+        "Yangjiang knives for tool distributors"
+      ],
+      "chineseVersion": "尊敬的Jones先生：\n\n我们了解到Hunter Tools从Weston-super-Mare向英国贸易供应广泛的手动和电动工具。我从中国刀剪之都阳江致信。\n\nKaiLionCrafts是工厂直供的OEM/ODM户外刀、剪刀及手动工具伙伴，拥有SGS LFGB与FDA认证，100件起订，免费产品图片视频。我们的工厂直供价帮助英国分销商有竞争力地增加优质刀剪。\n\n我能否寄送最新目录和样品？欢迎在WhatsApp上沟通。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA",
+        "工厂直供价"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/outdoor-knives/"
+      ],
+      "wordCount": 108
+    },
+    {
+      "id": "draft_canton_b1_g4_011",
+      "customerId": "canton_b1_g4_011",
+      "customerName": "HSM Panel",
+      "country": "USA",
+      "language": "英语",
+      "subject": "Reliable OEM hardware sourcing for cabinet makers",
+      "body": "Dear Mr. Sentoso,\n\nI understand HSM Panel has specialized for over 35 years in custom cut-to-size wood panels, drawer parts and kitchen cabinets for the furniture industry.\n\nKaiLionCrafts is a Yangjiang-based factory-direct OEM/ODM partner for hardware and kitchen accessories, with SGS LFGB and FDA certification, low MOQ from 100 pcs, and free product photos and videos. We support furniture and cabinet makers with reliable, cost-effective sourcing.\n\nWould you be open to a brief WhatsApp call or a catalog review? I would be glad to share samples.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "content": "Dear Mr. Sentoso,\n\nI understand HSM Panel has specialized for over 35 years in custom cut-to-size wood panels, drawer parts and kitchen cabinets for the furniture industry.\n\nKaiLionCrafts is a Yangjiang-based factory-direct OEM/ODM partner for hardware and kitchen accessories, with SGS LFGB and FDA certification, low MOQ from 100 pcs, and free product photos and videos. We support furniture and cabinet makers with reliable, cost-effective sourcing.\n\nWould you be open to a brief WhatsApp call or a catalog review? I would be glad to share samples.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "木板材/橱柜制造商，刀剪匹配度极低",
+        "Owner直接对接"
+      ],
+      "subjectOptions": [
+        "OEM hardware sourcing for cabinet makers",
+        "Factory-direct hardware, MOQ 100 pcs",
+        "Yangjiang supply for furniture makers"
+      ],
+      "chineseVersion": "尊敬的Sentoso先生：\n\n我们了解到HSM Panel 35多年来专注于为家具行业定制裁切木板材、抽屉部件及厨房橱柜。\n\nKaiLionCrafts是阳江工厂直供的OEM/ODM五金及厨房用品伙伴，拥有SGS LFGB与FDA认证，100件起订，免费产品图片视频。我们以可靠、高性价比的采购支持家具和橱柜制造商。\n\n您是否愿意进行简短的WhatsApp通话或查看目录？我很乐意分享样品。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA",
+        "免费营销素材"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "wordCount": 108
+    },
+    {
+      "id": "draft_canton_b1_g4_012",
+      "customerId": "canton_b1_g4_012",
+      "customerName": "HOUSE-HASSON HARDWARE CO",
+      "country": "USA",
+      "language": "英语",
+      "subject": "Yangjiang cutlery supply for your 70,000+ SKU program",
+      "body": "Dear Mr. Hasson,\n\nI have followed House-Hasson's long-standing partnership with independent hardware stores, supporting over 70,000 SKUs across the US. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for kitchen knives, scissors and kitchen accessories, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos, videos and even factory films with your logo. Our direct factory pricing typically beats trading companies by around 20%.\n\nCould I send our catalog and samples for your buyers? I would welcome a WhatsApp call to discuss.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-accessories/",
+      "content": "Dear Mr. Hasson,\n\nI have followed House-Hasson's long-standing partnership with independent hardware stores, supporting over 70,000 SKUs across the US. I am reaching out from Yangjiang, China's cutlery capital.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for kitchen knives, scissors and kitchen accessories, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos, videos and even factory films with your logo. Our direct factory pricing typically beats trading companies by around 20%.\n\nCould I send our catalog and samples for your buyers? I would welcome a WhatsApp call to discuss.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-accessories/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "本组最高价值客户，百年五金批发商",
+        "强调批发价+免费营销素材+客户Logo工厂片"
+      ],
+      "subjectOptions": [
+        "Yangjiang cutlery for your hardware SKU program",
+        "Factory-direct knives & scissors, 20% below traders",
+        "OEM cutlery with free marketing assets, MOQ 100 pcs"
+      ],
+      "chineseVersion": "尊敬的Hasson先生：\n\n我们一直关注House-Hasson与全美独立五金店的长期合作，支持超过7万个SKU。我从中国刀剪之都阳江致信。\n\nKaiLionCrafts是工厂直供的OEM/ODM厨房刀、剪刀及厨房用品伙伴，拥有SGS LFGB与FDA认证，100件起订，免费提供产品图片、视频，甚至可制作带您Logo的工厂宣传片。我们的工厂直供价通常比贸易商低约20%。\n\n我能否为您的采购团队寄送目录和样品？欢迎通过WhatsApp通话探讨。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/kitchen-accessories/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "工厂直供价低于贸易商20%",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA",
+        "免费营销素材/工厂片打客户Logo"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/kitchen-accessories/"
+      ],
+      "wordCount": 128
+    },
+    {
+      "id": "draft_canton_b1_g4_013",
+      "customerId": "canton_b1_g4_013",
+      "customerName": "HOPKINS-CARTER MARINE HARDWARE",
+      "country": "USA",
+      "language": "英语",
+      "subject": "OEM fillet & outdoor knives for fishing tackle stores",
+      "body": "Dear Mr. Masterson,\n\nI see Hopkins-Carter has served South Florida boaters and anglers since 1916, with an impressive range from Penn and Shimano tackle to marine hardware.\n\nKaiLionCrafts is a Yangjiang-based factory-direct partner for OEM/ODM fillet and outdoor knives, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. We could supply reliable, cost-effective fillet knives for your fishing tackle customers.\n\nMay I send our knife catalog and samples? Happy to discuss on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives/",
+      "content": "Dear Mr. Masterson,\n\nI see Hopkins-Carter has served South Florida boaters and anglers since 1916, with an impressive range from Penn and Shimano tackle to marine hardware.\n\nKaiLionCrafts is a Yangjiang-based factory-direct partner for OEM/ODM fillet and outdoor knives, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. We could supply reliable, cost-effective fillet knives for your fishing tackle customers.\n\nMay I send our knife catalog and samples? Happy to discuss on WhatsApp.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "船用/渔具零售商，以鱼片刀角度差异化切入",
+        "售Shimano/Penn等品牌"
+      ],
+      "subjectOptions": [
+        "OEM fillet & outdoor knives for tackle stores",
+        "Factory-direct fillet knives, MOQ 100 pcs",
+        "Yangjiang knives for marine & fishing"
+      ],
+      "chineseVersion": "尊敬的Masterson先生：\n\n我们了解到Hopkins-Carter自1916年起服务南佛罗里达的船客和钓鱼客，产品涵盖Penn、Shimano渔具到船用五金。\n\nKaiLionCrafts是阳江工厂直供的OEM/ODM鱼片刀及户外刀伙伴，拥有SGS LFGB与FDA认证，100件起订，免费产品图片视频。我们可以为您的渔具客户供应可靠、高性价比的鱼片刀。\n\n我能否寄送刀具目录和样品？欢迎在WhatsApp上沟通。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA",
+        "工厂直供价"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/outdoor-knives/"
+      ],
+      "wordCount": 115
+    },
+    {
+      "id": "draft_canton_b1_g4_014",
+      "customerId": "canton_b1_g4_014",
+      "customerName": "HIRONICHI KOGYO KK",
+      "country": "Japan",
+      "language": "英语",
+      "subject": "Reliable OEM hardware sourcing from Yangjiang",
+      "body": "Dear Mr. Umeda,\n\nI understand Hironichi Kogyo supplies civil engineering and construction safety materials in the Hiroshima area. I am reaching out from Yangjiang, China.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for hardware and cutlery, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. We support Japanese trading partners with reliable, cost-effective sourcing from China's cutlery capital.\n\nWould you be open to a brief WhatsApp chat or a catalog review? I would be glad to share samples.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "content": "Dear Mr. Umeda,\n\nI understand Hironichi Kogyo supplies civil engineering and construction safety materials in the Hiroshima area. I am reaching out from Yangjiang, China.\n\nKaiLionCrafts is a factory-direct OEM/ODM partner for hardware and cutlery, with SGS LFGB and FDA certification, MOQ from 100 pcs, and free product photos and videos. We support Japanese trading partners with reliable, cost-effective sourcing from China's cutlery capital.\n\nWould you be open to a brief WhatsApp chat or a catalog review? I would be glad to share samples.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "aiNotes": [
+        "建材/保安器材商，刀剪完全不匹配",
+        "日本S级市场"
+      ],
+      "subjectOptions": [
+        "OEM hardware sourcing from Yangjiang, China",
+        "Factory-direct cutlery, MOQ 100 pcs",
+        "Reliable China supply for Japanese buyers"
+      ],
+      "chineseVersion": "尊敬的Umeda先生：\n\n我们了解到Hironichi Kogyo在广岛地区供应土木建筑及工事保安器材。我从中国阳江致信。\n\nKaiLionCrafts是工厂直供的OEM/ODM五金及刀剪伙伴，拥有SGS LFGB与FDA认证，100件起订，免费产品图片视频。我们以来自中国刀剪之都的可靠、高性价比采购支持日本贸易伙伴。\n\n您是否愿意进行简短的WhatsApp通话或查看目录？我很乐意分享样品。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs",
+        "SGS LFGB+FDA",
+        "免费营销素材"
+      ],
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "wordCount": 105
+    }
+  ]
+}

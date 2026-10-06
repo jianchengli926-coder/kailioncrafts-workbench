@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>广交会客户资源库统计报告 — 139届五金制品</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#f5f7fa; color:#333; line-height:1.6; }
+.container { max-width:1200px; margin:0 auto; padding:30px 20px; }
+h1 { font-size:28px; color:#1a365d; margin-bottom:8px; }
+.subtitle { color:#718096; margin-bottom:30px; font-size:14px; }
+.card { background:#fff; border-radius:12px; padding:24px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+.card h2 { font-size:20px; color:#2d3748; margin-bottom:16px; border-bottom:2px solid #e2e8f0; padding-bottom:8px; }
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:20px; }
+.stat-box { background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border-radius:10px; padding:20px; text-align:center; }
+.stat-box .num { font-size:36px; font-weight:700; }
+.stat-box .label { font-size:13px; opacity:0.9; margin-top:4px; }
+.stat-box.green { background:linear-gradient(135deg,#11998e 0%,#38ef7d 100%); }
+.stat-box.orange { background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%); }
+.stat-box.blue { background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%); }
+table { width:100%; border-collapse:collapse; margin-top:12px; }
+th { background:#edf2f7; padding:10px 12px; text-align:left; font-size:13px; color:#4a5568; border-bottom:2px solid #cbd5e0; }
+td { padding:10px 12px; border-bottom:1px solid #e2e8f0; font-size:13px; }
+tr:hover { background:#f7fafc; }
+.badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
+.badge-A { background:#c6f6d5; color:#22543d; }
+.badge-B { background:#fefcbf; color:#744210; }
+.badge-C { background:#fed7d7; color:#742a2a; }
+.badge-high { background:#c6f6d5; color:#22543d; }
+.badge-mid { background:#fefcbf; color:#744210; }
+.badge-low { background:#fed7d7; color:#742a2a; }
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media(max-width:768px) { .two-col { grid-template-columns:1fr; } }
+.bar-chart { margin-top:12px; }
+.bar-row { display:flex; align-items:center; margin-bottom:8px; }
+.bar-label { width:120px; font-size:13px; text-align:right; padding-right:10px; color:#4a5568; }
+.bar-track { flex:1; background:#e2e8f0; border-radius:4px; height:24px; position:relative; }
+.bar-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,#667eea,#764ba2); display:flex; align-items:center; justify-content:flex-end; padding-right:8px; color:#fff; font-size:11px; font-weight:600; }
+.footer { text-align:center; color:#a0aec0; font-size:12px; margin-top:30px; padding:20px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>📊 广交会客户资源库统计报告</h1>
+<p class="subtitle">139届中国进出口商品交易会 · 五金制品展区 · 生成时间：2026-10-05 22:26</p>
+
+<div class="stats-grid">
+<div class="stat-box"><div class="num">3462</div><div class="label">客户总数</div></div>
+<div class="stat-box green"><div class="num">2049</div><div class="label">有邮箱客户</div></div>
+<div class="stat-box blue"><div class="num">1009</div><div class="label">有网站客户</div></div>
+<div class="stat-box orange"><div class="num">104</div><div class="label">深度背调客户</div></div>
+<div class="stat-box"><div class="num">137</div><div class="label">开发信草稿</div></div>
+</div>
+
+<div class="card">
+<h2>🌍 大洲分布（全部客户）</h2>
+<div class="bar-chart">
+<div class="bar-row"><div class="bar-label">Asia</div><div class="bar-track"><div class="bar-fill" style="width:100.0%">1975</div></div></div>
+<div class="bar-row"><div class="bar-label">Europe</div><div class="bar-track"><div class="bar-fill" style="width:30.531645569620252%">603</div></div></div>
+<div class="bar-row"><div class="bar-label">North America</div><div class="bar-track"><div class="bar-fill" style="width:21.822784810126585%">431</div></div></div>
+<div class="bar-row"><div class="bar-label">Other</div><div class="bar-track"><div class="bar-fill" style="width:7.746835443037975%">153</div></div></div>
+<div class="bar-row"><div class="bar-label">未知</div><div class="bar-track"><div class="bar-fill" style="width:7.341772151898734%">145</div></div></div>
+<div class="bar-row"><div class="bar-label">Africa</div><div class="bar-track"><div class="bar-fill" style="width:3.848101265822785%">76</div></div></div>
+<div class="bar-row"><div class="bar-label">Oceania</div><div class="bar-track"><div class="bar-fill" style="width:2.8354430379746836%">56</div></div></div>
+<div class="bar-row"><div class="bar-label">South America</div><div class="bar-track"><div class="bar-fill" style="width:1.1645569620253164%">23</div></div></div>
+</div></div>
+
+<div class="two-col">
+<div class="card">
+<h2>🏆 国家等级分布</h2>
+<table>
+<tr><th>等级</th><th>客户数</th><th>占比</th></tr>
+<tr><td><span class="badge badge-A">S级</span></td><td>1326</td><td>38.3%</td></tr>
+<tr><td><span class="badge badge-A">A级</span></td><td>546</td><td>15.8%</td></tr>
+<tr><td><span class="badge badge-B">B级</span></td><td>520</td><td>15.0%</td></tr>
+<tr><td><span class="badge badge-C">C级</span></td><td>925</td><td>26.7%</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2>📋 客户状态分布</h2>
+<table>
+<tr><th>状态</th><th>客户数</th></tr>
+<tr><td>待筛选</td><td>3317</td></tr>
+<tr><td>待开发</td><td>104</td></tr>
+<tr><td>待跟进</td><td>22</td></tr>
+<tr><td>跟进中</td><td>9</td></tr>
+<tr><td>已回复</td><td>8</td></tr>
+<tr><td>新线索</td><td>1</td></tr>
+<tr><td>new</td><td>1</td></tr>
+</table>
+</div>
+</div>
+
+<div class="card">
+<h2>🔝 国家分布 Top 20（全部客户）</h2>
+<table>
+<tr><th>排名</th><th>国家</th><th>客户数</th><th>占比</th></tr>
+<tr><td>1</td><td>Japan</td><td>655</td><td>18.9%</td></tr>
+<tr><td>2</td><td>USA</td><td>406</td><td>11.7%</td></tr>
+<tr><td>3</td><td>Malaysia</td><td>224</td><td>6.5%</td></tr>
+<tr><td>4</td><td>Hong Kong</td><td>223</td><td>6.4%</td></tr>
+<tr><td>5</td><td>UK</td><td>150</td><td>4.3%</td></tr>
+<tr><td>6</td><td>India</td><td>148</td><td>4.3%</td></tr>
+<tr><td>7</td><td>台湾省</td><td>127</td><td>3.7%</td></tr>
+<tr><td>8</td><td>Singapore</td><td>119</td><td>3.4%</td></tr>
+<tr><td>9</td><td>France</td><td>73</td><td>2.1%</td></tr>
+<tr><td>10</td><td>Germany</td><td>62</td><td>1.8%</td></tr>
+<tr><td>11</td><td>Thailand</td><td>61</td><td>1.8%</td></tr>
+<tr><td>12</td><td>阿拉伯联合酋长国</td><td>57</td><td>1.6%</td></tr>
+<tr><td>13</td><td>巴基斯坦</td><td>56</td><td>1.6%</td></tr>
+<tr><td>14</td><td>Sweden</td><td>56</td><td>1.6%</td></tr>
+<tr><td>15</td><td>South Korea</td><td>53</td><td>1.5%</td></tr>
+<tr><td>16</td><td>Australia</td><td>48</td><td>1.4%</td></tr>
+<tr><td>17</td><td>Denmark</td><td>42</td><td>1.2%</td></tr>
+<tr><td>18</td><td>Norway</td><td>41</td><td>1.2%</td></tr>
+<tr><td>19</td><td>Philippines</td><td>40</td><td>1.2%</td></tr>
+<tr><td>20</td><td>斯里兰卡</td><td>39</td><td>1.1%</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2>🎯 104个深度背调客户 — 综合分析</h2>
+<div class="stats-grid" style="margin-bottom:16px;">
+<div class="stat-box green"><div class="num">45.4</div><div class="label">平均评分</div></div>
+<div class="stat-box orange"><div class="num">11</div><div class="label">≥60分高价值</div></div>
+<div class="stat-box blue"><div class="num">11</div><div class="label">B级客户</div></div>
+<div class="stat-box"><div class="num">93</div><div class="label">C级客户</div></div>
+</div>
+
+<div class="two-col">
+<div>
+<h3 style="font-size:15px;margin-bottom:8px;color:#4a5568;">意向等级分布</h3>
+<table>
+<tr><th>意向</th><th>数量</th></tr>
+<tr><td><span class="badge badge-high">高</span></td><td>3</td></tr>
+<tr><td><span class="badge badge-mid">中</span></td><td>29</td></tr>
+<tr><td><span class="badge badge-low">低</span></td><td>72</td></tr>
+</table>
+</div>
+<div>
+<h3 style="font-size:15px;margin-bottom:8px;color:#4a5568;">客户类型分布</h3>
+<table>
+<tr><th>类型</th><th>数量</th></tr>
+<tr><td>分销商</td><td>39</td></tr>
+<tr><td>制造商</td><td>21</td></tr>
+<tr><td>进口商</td><td>20</td></tr>
+<tr><td>五金零售商</td><td>20</td></tr>
+<tr><td>品牌商</td><td>4</td></tr>
+</table>
+</div>
+</div>
+
+<div style="margin-top:16px;">
+<h3 style="font-size:15px;margin-bottom:8px;color:#4a5568;">品类匹配分布</h3>
+<table>
+<tr><th>品类</th><th>数量</th><th>占比</th></tr>
+<tr><td>不匹配</td><td>61</td><td>58.7%</td></tr>
+<tr><td>综合五金</td><td>33</td><td>31.7%</td></tr>
+<tr><td>厨房用品</td><td>9</td><td>8.7%</td></tr>
+<tr><td>户外刀/厨房刀</td><td>1</td><td>1.0%</td></tr>
+</table>
+</div>
+</div>
+
+<div class="card">
+<h2>⭐ 高价值客户清单（≥60分，共11家）</h2>
+<table>
+<tr><th>排名</th><th>评分</th><th>公司</th><th>国家</th><th>类型</th><th>品类</th><th>意向</th><th>邮箱</th></tr>
+<tr><td>1</td><td><span class="badge badge-B">78</span></td><td>MEL GREGORY C/O ACE HARDWARE CORPORATION</td><td>United States</td><td>品牌商</td><td>综合五金</td><td><span class="badge badge-mid">中</span></td><td style="font-size:11px;">mgreg@acehardware.com</td></tr>
+<tr><td>2</td><td><span class="badge badge-B">72</span></td><td>MAGIC MILL KITCHEN PLUS PRODUCTS,INC.</td><td>United States</td><td>品牌商</td><td>厨房用品</td><td><span class="badge badge-high">高</span></td><td style="font-size:11px;">solomonroth@aol.com</td></tr>
+<tr><td>3</td><td><span class="badge badge-B">69</span></td><td>SING BROTHERS HARDWARE PTE LTD</td><td>Singapore</td><td>进口商</td><td>综合五金</td><td><span class="badge badge-high">高</span></td><td style="font-size:11px;">sbhardware@pacific.net.sg</td></tr>
+<tr><td>4</td><td><span class="badge badge-B">67</span></td><td>IRWIN INDUSTRIAL TOOL COMPANY</td><td>United States</td><td>品牌商</td><td>综合五金</td><td><span class="badge badge-mid">中</span></td><td style="font-size:11px;">peter.zou@irwin.com</td></tr>
+<tr><td>5</td><td><span class="badge badge-B">65</span></td><td>MICHAEL MCLOUGHLIN & SONS HARDWARE LTD (</td><td>Ireland</td><td>分销商</td><td>综合五金</td><td><span class="badge badge-mid">中</span></td><td style="font-size:11px;">kieran.mcloughlin@mmcloughlin.</td></tr>
+<tr><td>6</td><td><span class="badge badge-B">65</span></td><td>HOUSE-HASSON HARDWARE CO</td><td>USA</td><td>分销商</td><td>综合五金</td><td><span class="badge badge-high">高</span></td><td style="font-size:11px;">info@househasson.com</td></tr>
+<tr><td>7</td><td><span class="badge badge-B">65</span></td><td>SHARPES HARDWARE PTY LTD</td><td>Australia</td><td>五金零售商</td><td>户外刀/厨房刀</td><td><span class="badge badge-mid">中</span></td><td style="font-size:11px;">meactarau@powerup.com.au</td></tr>
+<tr><td>8</td><td><span class="badge badge-B">64</span></td><td>THE PANGAEA COMPANIES</td><td>United States</td><td>进口商</td><td>厨房用品</td><td><span class="badge badge-mid">中</span></td><td style="font-size:11px;">jkbyron@cox.net</td></tr>
+<tr><td>9</td><td><span class="badge badge-B">63</span></td><td>TABATA & COMPANY LIMITED</td><td>Japan</td><td>进口商</td><td>厨房用品</td><td><span class="badge badge-mid">中</span></td><td style="font-size:11px;">export2@tabata-russ.co.jp</td></tr>
+<tr><td>10</td><td><span class="badge badge-B">62</span></td><td>SEL JAPAN INC</td><td>Japan</td><td>进口商</td><td>厨房用品</td><td><span class="badge badge-mid">中</span></td><td style="font-size:11px;">sakurai@seljapan.co.jp</td></tr>
+<tr><td>11</td><td><span class="badge badge-B">60</span></td><td>Lian Cheong Hardware(Pte)Ltd</td><td>Singapore</td><td>分销商</td><td>综合五金</td><td><span class="badge badge-mid">中</span></td><td style="font-size:11px;">lchsale@singnet.com.sg</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2>📌 关键发现与建议</h2>
+<ol style="padding-left:20px;line-height:2;">
+<li><strong>客户基数大但精准度低</strong>：3462客户中仅104家完成深度背调，其中仅11家≥60分。广交会五金展区以工业五金/紧固件/建筑五金为主，刀剪品类直接匹配率约10%。</li>
+<li><strong>高价值客户集中在综合五金批发商</strong>：Ace Hardware（78分）、House-Hasson（65分）、Sing Brothers（69分）、McLoughlin（65分）均为多品类五金批发商，可引入刀剪/厨房工具作为新品类。</li>
+<li><strong>新加坡客户占比最高（32/104）</strong>：多为小型五金零售商，采购量有限但决策链短，适合小批量OEM切入。</li>
+<li><strong>美国客户质量最高</strong>：24+14=38家美国客户，其中Ace Hardware、Magic Mill、IRWIN、House-Hasson均为高价值线索。</li>
+<li><strong>开发建议优先级</strong>：①综合五金批发商（引入新品类）②厨房用品相关（Magic Mill、Tabata、Pangaea）③户外/渔具相关（Sharpes、Hopkins-Carter）④其余批量通用触达。</li>
+<li><strong>数据质量提醒</strong>：多家客户官网已失效/域名待售（Metalfil、Interstate、Keng Wah等），部分邮箱为老式ISP（aol/erols/singnet），发送前建议先验证邮箱有效性。</li>
+</ol>
+</div>
+
+<div class="footer">
+<p>本报告由外贸获客AI工作台自动生成 · 数据来源：139届广交会五金制品展区客户名录</p>
+<p>© 2026 KaiLionCrafts · 阳江市锴利国际贸易有限公司</p>
+</div>
+</div>
+</body>
+</html>

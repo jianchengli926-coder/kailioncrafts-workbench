@@ -1,0 +1,1152 @@
+{
+  "customers": [
+    {
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "Harry",
+        "title": "",
+        "email": "sales@thomaspotter.com",
+        "phone": "0044 191 265 3911",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "leadSource": "广交会139届-五金制品",
+      "companySize": "",
+      "decisionMaker": "Harry",
+      "annualPurchase": "",
+      "intentCategories": [],
+      "id": "canton_b1_g1_001",
+      "company": "Thomas Potter (Newcastle) Ltd.",
+      "website": "http://www.thomaspotter.com",
+      "scores": {
+        "industry": 40,
+        "product": 10,
+        "companyType": 60,
+        "purchaseSignal": 30,
+        "contactQuality": 65,
+        "total": 41,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "综合五金",
+        "低意向"
+      ],
+      "notes": "英国纽卡斯尔/克拉姆灵顿家族紧固件与管件stockist，1923年成立。主营工业紧固件、fixings、法兰、对焊/可锻铸铁管件，自称英国东北部管件库存最广。代理Paslode、Loctite、Rawl Fixings、Rocol品牌。纯工业管路/紧固件分销，与刀剪/厨房用品不匹配。有具名联系人Harry与部门邮箱。",
+      "country": "United Kingdom",
+      "customerType": "分销商",
+      "productCategory": "不匹配",
+      "products": "工业紧固件、fixings、法兰、对焊管件、可锻铸铁管件（工业管路五金）",
+      "profile": {
+        "business": "家族企业，1923年成立，英国东北部工业紧固件/管件stockist，刚迁入更大仓库，服务大型承包商与小型私企。",
+        "productLine": "工业紧固件、fixings、法兰、buttweld/3000lb/wrought iron/malleable iron fittings。",
+        "needs": "维持工业品类深度库存，无刀剪/厨房用品采购迹象。",
+        "painPoints": [
+          "依赖成熟英美品牌（Paslode/Loctite/Rawl）",
+          "stockist模式，无自有品牌刀剪线",
+          "无厨房/餐具品类"
+        ],
+        "angle": "品类不匹配，仅以阳江OEM金属五金通用角度轻触，回复预期低。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "1923年成立的家族工业紧固件/管件stockist，纽卡斯尔，现址Cramlington。",
+        "decisionMaker": "Harry（职位待确认）",
+        "contactInfo": "sales@thomaspotter.com / +44 191 265 3911，与Excel一致。",
+        "painPoints": "工业品类深度库存压力；品牌代理为主。",
+        "purchaseIntent": "低 — 纯工业管路/紧固件，无刀剪需求。",
+        "competitorAnalysis": "代理品牌：Paslode、Loctite、Rawl Fixings、Rocol。",
+        "supplyChain": "成熟英国/欧洲品牌供应商，本地库存模式。",
+        "entryPoint": "通用五金OEM角度；如实说明品类差异，仅留catalog/WhatsApp入口。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "分销商",
+        "countryTier": "S",
+        "categoryMatch": "不匹配",
+        "priorityScore": 41,
+        "recommendedStrategy": "低优先级，通用五金OEM开发信轻触，回复概率低。"
+      },
+      "leadScore": 41
+    },
+    {
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "",
+        "title": "",
+        "email": "info@sgshardware.com",
+        "phone": "001 877 7472888",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "leadSource": "广交会139届-五金制品",
+      "companySize": "",
+      "decisionMaker": "",
+      "annualPurchase": "",
+      "intentCategories": [],
+      "id": "canton_b1_g1_002",
+      "company": "THE SUPERIOR GOODS & SERVICE COMPANY (SGS Hardware)",
+      "website": "https://www.sgshardware.com",
+      "scores": {
+        "industry": 45,
+        "product": 10,
+        "companyType": 60,
+        "purchaseSignal": 35,
+        "contactQuality": 40,
+        "total": 38,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "门五金",
+        "低意向"
+      ],
+      "notes": "美国华盛顿州Tacoma家族门铰链分销商。主营住宅/商用门铰链、门挡、ball catch、搁板支架、螺丝、flush bolt、PVD cassette bolt。自有SGS品牌铰链。以快速发货与采购外包服务著称。无具名联系人，仅通用info邮箱。门五金，与刀剪不匹配。",
+      "country": "United States",
+      "customerType": "分销商",
+      "productCategory": "不匹配",
+      "products": "住宅/商用门铰链、门挡、ball catch、搁板杆支架、螺丝、flush bolt、PVD插销",
+      "profile": {
+        "business": "家族拥有的门铰链分销商，Tacoma WA，定位Superior Goods & Service，快速发货，兼作客户采购部门延伸。",
+        "productLine": "门铰链为主，延伸门挡、ball catch、搁板支架、螺丝、flush bolt等小件五金。",
+        "needs": "补充门五金SKU、控制采购成本、快速补货。",
+        "painPoints": [
+          "品类集中于门铰链",
+          "快发库存模式",
+          "无刀剪/厨房品类"
+        ],
+        "angle": "作为五金分销商，可试探阳江小五金OEM/定制金属件；品类不匹配。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "家族门铰链分销商，Tacoma WA，自有SGS品牌铰链，强调质量与快速发货。",
+        "decisionMaker": "待确认（无具名联系人）",
+        "contactInfo": "info@sgshardware.com / 877-747-2888，与Excel一致。",
+        "painPoints": "门五金品类窄；依赖亚洲铰链供应与本地库存。",
+        "purchaseIntent": "低 — 门铰链分销，无刀剪需求。",
+        "competitorAnalysis": "自有品牌SGS Hardware铰链。",
+        "supplyChain": "海外铰链制造商（疑似亚洲），Tacoma本地库存。",
+        "entryPoint": "通用五金OEM角度；询问是否有小金属件/定制件外包需求。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "分销商",
+        "countryTier": "S",
+        "categoryMatch": "不匹配",
+        "priorityScore": 38,
+        "recommendedStrategy": "低优先级，通用五金OEM角度，无具名联系人需先触达info邮箱。"
+      },
+      "leadScore": 38
+    },
+    {
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "Caroline Carnahan",
+        "title": "",
+        "email": "chimo168@aol.com",
+        "phone": "001 417 7252667",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "leadSource": "广交会139届-五金制品",
+      "companySize": "",
+      "decisionMaker": "Caroline Carnahan",
+      "annualPurchase": "",
+      "intentCategories": [],
+      "id": "canton_b1_g1_003",
+      "company": "THE SPRINGFIELD MARINE COMPANY",
+      "website": "https://www.springfieldgrp.com",
+      "scores": {
+        "industry": 30,
+        "product": 5,
+        "companyType": 70,
+        "purchaseSignal": 20,
+        "contactQuality": 50,
+        "total": 35,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "船用五金",
+        "低意向"
+      ],
+      "notes": "美国密苏里州Nixa，Springfield Aluminum Company(1952年Garnett Carnahan创立)旗下，全球休闲船用座椅龙头。主营helm chair、pedestal、table system等船用座椅及五金。关键：在中国自有并运营工厂，仅服务自身产品线，OEM合作空间小。联系人Carnahan家族成员，但邮箱为个人AOL邮箱chimo168@aol.com。船用五金，与刀剪不匹配。",
+      "country": "United States",
+      "customerType": "制造商",
+      "productCategory": "不匹配",
+      "products": "船用座椅、helm chair、pedestal座架、table system、船用座椅五金",
+      "profile": {
+        "business": "Springfield Aluminum Company(1952)分部，全球船用座椅及座椅五金领导者，服务OEM船厂；在中国自有工厂。",
+        "productLine": "helm座椅、高背椅、pedestal、电动slide、table pedestal等。",
+        "needs": "自有中国工厂生产，外部新供应商切入空间小。",
+        "painPoints": [
+          "已自有中国工厂，外包需求弱",
+          "船用ABYC认证门槛",
+          "与刀剪无关"
+        ],
+        "angle": "极弱；其自有产能覆盖，冷邮转化预期很低。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "1952年起家铝铸造，现休闲船用座椅number one品牌，Nixa MO；Metstrade展商，中国自有工厂。",
+        "decisionMaker": "Caroline Carnahan（家族成员，职位待确认）；另见Danny Sweeney/Kori Mohn为销售联系人。",
+        "contactInfo": "Excel邮箱chimo168@aol.com为个人AOL邮箱，弱；官网公开邮箱为@springfieldgrp.com。",
+        "painPoints": "船用座椅定制化与认证；自有中国产能。",
+        "purchaseIntent": "低 — 自有中国工厂，外部采购刀剪/五金需求不明。",
+        "competitorAnalysis": "自有品牌Springfield Marine / Shark Seating。",
+        "supplyChain": "中国自有工厂（owned & operated）。",
+        "entryPoint": "弱，仅作品牌曝光；不建议投入过多。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "制造商",
+        "countryTier": "S",
+        "categoryMatch": "不匹配",
+        "priorityScore": 35,
+        "recommendedStrategy": "低优先级；自有中国工厂，切入难，通用角度轻触即可。"
+      },
+      "leadScore": 35
+    },
+    {
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "George He",
+        "title": "",
+        "email": "penrodcn@thepenrodcompany.com",
+        "phone": "001 757 4980186",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "leadSource": "广交会139届-五金制品",
+      "companySize": "",
+      "decisionMaker": "George He",
+      "annualPurchase": "",
+      "intentCategories": [],
+      "id": "canton_b1_g1_004",
+      "company": "THE PENROD COMPANY",
+      "website": "https://www.thepenrodcompany.com",
+      "scores": {
+        "industry": 55,
+        "product": 15,
+        "companyType": 75,
+        "purchaseSignal": 50,
+        "contactQuality": 65,
+        "total": 52,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "门五金/紧固件",
+        "中低意向"
+      ],
+      "notes": "美国弗吉尼亚Virginia Beach，1888年成立，全球最大木业/金属/PVC供应商之一，服务住宅与商用建筑市场。Hardware & Hinges部门是NAFTA门铰链/紧固件/通用五金领导者，24小时发货。联系人George He，邮箱penrodcn@显示其设有中国采购办公室，主动从中国采购五金。本批中五金进口属性最强者，但品类仍为门/建筑五金，与刀剪不匹配。",
+      "country": "United States",
+      "customerType": "进口商",
+      "productCategory": "不匹配",
+      "products": "门铰链、紧固件、通用五金、木业单板、PVC建材",
+      "profile": {
+        "business": "1888年成立的全球贸易网络型企业，多洲配送中心，硬件部门为NAFTA专业市场铰链/紧固件领导者。",
+        "productLine": "门铰链、fasteners、general hardware（住宅/商用多种表面处理）；木业单板；XO PVC建材。",
+        "needs": "持续在中国评估新五金供应商，控制成本、24小时发货、新品开发。",
+        "painPoints": [
+          "大型多元化买家，供应商评估常态化",
+          "George He为中国采购窗口",
+          "五金线为门/建筑类，非厨房刀剪"
+        ],
+        "angle": "本批最佳通用五金OEM对象：以阳江工厂直供、自有品牌OEM、免费营销素材切入，可提议小金属件/工具类试单。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "130+年历史，世界最大木业/金属/PVC供应商之一，Virginia Beach总部，全球办公室与配送中心。",
+        "decisionMaker": "George He（中国采购，邮箱penrodcn@thepenrodcompany.com）。",
+        "contactInfo": "penrodcn@thepenrodcompany.com / 757-498-0186，与Excel一致；cn后缀表明中国采购职能。",
+        "painPoints": "成本竞争、新品方案、合规与可持续林业。",
+        "purchaseIntent": "中低 — 主动从中国采购五金（George He），但品类为门/建筑五金，刀剪匹配度低。",
+        "competitorAnalysis": "自有品牌Penrod、XO by Penrod；St-Raymond Veneer（旗下）。",
+        "supplyChain": "全球采购，明确含中国（penrodcn采购窗口）。",
+        "entryPoint": "阳江OEM金属五金+工厂直供价+免费营销素材；以小五金/工具类试单切入。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "进口商",
+        "countryTier": "S",
+        "categoryMatch": "不匹配",
+        "priorityScore": 52,
+        "recommendedStrategy": "组内最高优先级之一；针对中国采购窗口George He发通用五金OEM开发信，争取小批量试单。"
+      },
+      "leadScore": 52
+    },
+    {
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "Allen Gou",
+        "title": "",
+        "email": "agou@theindustrialdepot.com",
+        "phone": "001 678 2493944",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "leadSource": "广交会139届-五金制品",
+      "companySize": "",
+      "decisionMaker": "Allen Gou",
+      "annualPurchase": "",
+      "intentCategories": [],
+      "id": "canton_b1_g1_005",
+      "company": "THE INDUSTRIAL DEPOT",
+      "website": "https://www.theindustrialdepot.com",
+      "scores": {
+        "industry": 55,
+        "product": 15,
+        "companyType": 65,
+        "purchaseSignal": 45,
+        "contactQuality": 70,
+        "total": 50,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "工业五金/紧固件",
+        "中低意向"
+      ],
+      "notes": "美国佐治亚州Lawrenceville工业MRO分销商，1973年成立，2022年被Bamal Fastener Corporation(1953年)收购为关联公司。主营紧固件(14682 SKU)、工具(3356 SKU)、焊接、胶粘/胶带/密封、电气、物料搬运。联系人Allen Gou为采购方。C类件/紧固件分销，与刀剪不匹配，但属活跃五金进口分销。",
+      "country": "United States",
+      "customerType": "分销商",
+      "productCategory": "不匹配",
+      "products": "紧固件、手动工具、焊接用品、胶粘胶带密封剂、电气线材、物料搬运",
+      "profile": {
+        "business": "1973年成立，2022年并入Bamal Fastener集团，C类件与紧固件工业分销商，佐治亚。",
+        "productLine": "紧固件1.4万+SKU、工具3千+SKU、焊接、胶粘、电气、起重索具。",
+        "needs": "高周转C类件成本优化、扩品类、稳定供应。",
+        "painPoints": [
+          "紧固件/工具低毛利高频补货",
+          "Allen Gou负责采购",
+          "无刀剪/厨房品类"
+        ],
+        "angle": "通用五金OEM角度；可提议实用刀/工具类作为补充品类试单。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "工业MRO分销商，隶属Bamal Fastener Corp（1953年），线上目录+库存。",
+        "decisionMaker": "Allen Gou（采购，agou@theindustrialdepot.com）。",
+        "contactInfo": "agou@theindustrialdepot.com / 678-249-3944，与Excel一致。",
+        "painPoints": "C类件成本与交付；SKU极多需高效供应商。",
+        "purchaseIntent": "中低 — 活跃工业五金采购，但品类为紧固件/工具，刀剪匹配低。",
+        "competitorAnalysis": "分销多品牌（如Powermatic），自有目录。",
+        "supplyChain": "全球紧固件/工具供应，含亚洲。",
+        "entryPoint": "阳江工厂直供+OEM；以utility knife/工具或小五金补充品类切入。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "分销商",
+        "countryTier": "S",
+        "categoryMatch": "不匹配",
+        "priorityScore": 50,
+        "recommendedStrategy": "组内高优先级；针对Allen Gou发通用五金/工具OEM开发信，提议补充品类试单。"
+      },
+      "leadScore": 50
+    },
+    {
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "Tom",
+        "title": "",
+        "email": "tgtools@sbcglobal.net",
+        "phone": "001 6305844122",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "leadSource": "广交会139届-五金制品",
+      "companySize": "",
+      "decisionMaker": "Tom",
+      "annualPurchase": "",
+      "intentCategories": [],
+      "id": "canton_b1_g1_006",
+      "company": "TG TOOLS UNITED CO",
+      "website": "https://www.tgtools.com",
+      "scores": {
+        "industry": 20,
+        "product": 5,
+        "companyType": 40,
+        "purchaseSignal": 20,
+        "contactQuality": 35,
+        "total": 25,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "待确认",
+        "低意向"
+      ],
+      "notes": "美国伊利诺伊州St. Charles。注意：tgtools.com当前实际为Finale制谱软件插件（TGTools Plug-In Collection，德国制作），与五金贸易公司名称不符，疑似网站过期/错配。联系人Tom，邮箱tgtools@sbcglobal.net为个人ISP邮箱。公司真实业务待确认。品类不匹配。",
+      "country": "United States",
+      "customerType": "分销商",
+      "productCategory": "不匹配",
+      "products": "待确认（公司名指向工具贸易，但官网显示为音乐软件插件）",
+      "profile": {
+        "business": "St. Charles IL小买家，邮箱为sbcglobal个人ISP；官网内容与五金不符，业务待确认。",
+        "productLine": "待确认。",
+        "needs": "待确认。",
+        "painPoints": [
+          "身份/业务无法核实",
+          "个人邮箱，采购可信度弱",
+          "无明确产品线"
+        ],
+        "angle": "先核实身份，暂不投入开发资源。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "待确认；官网tgtools.com现为音乐制谱软件插件页面，与五金无关。",
+        "decisionMaker": "Tom（职位待确认）。",
+        "contactInfo": "tgtools@sbcglobal.net（个人ISP邮箱）/ 630-584-4122，与Excel一致。",
+        "painPoints": "网站与公司名不符，可信度低。",
+        "purchaseIntent": "低 — 业务无法核实。",
+        "competitorAnalysis": "待确认。",
+        "supplyChain": "待确认。",
+        "entryPoint": "低；通用五金角度轻触，等待回复中核实业务。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "分销商",
+        "countryTier": "S",
+        "categoryMatch": "不匹配",
+        "priorityScore": 25,
+        "recommendedStrategy": "低优先级；先核实公司真实业务，再决定是否跟进。"
+      },
+      "leadScore": 25
+    },
+    {
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "Vivian Weaver",
+        "title": "",
+        "email": "technitool@yahoo.com",
+        "phone": "001 714 3630661",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "leadSource": "广交会139届-五金制品",
+      "companySize": "",
+      "decisionMaker": "Vivian Weaver",
+      "annualPurchase": "",
+      "intentCategories": [],
+      "id": "canton_b1_g1_007",
+      "company": "TECHNI-TOOL PRODUCTS INC",
+      "website": "https://www.techni-toolproducts.com",
+      "scores": {
+        "industry": 35,
+        "product": 5,
+        "companyType": 50,
+        "purchaseSignal": 20,
+        "contactQuality": 50,
+        "total": 30,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "精密机械件",
+        "低意向"
+      ],
+      "notes": "美国加州Orange，1954年起服务制造/工业市场。生产spring plunger、ball plunger、手伸缩plunger、spring stop、leveling pad等弹簧加载精密元件，CNC车削，可定制。属精密机械件制造商，非消费五金/刀剪。邮箱为yahoo个人邮箱。",
+      "country": "United States",
+      "customerType": "制造商",
+      "productCategory": "不匹配",
+      "products": "弹簧柱塞、球柱塞、手伸缩柱塞、spring stop、leveling pad等弹簧加载精密件",
+      "profile": {
+        "business": "1954年成立，加州Orange，CNC精密车削弹簧加载元件，服务夹具/模具/装配/医疗/运动器材。",
+        "productLine": "spring plunger、ball plunger、hand retractable plunger、spring stops、leveling/toggle pads。",
+        "needs": "自身精密加工产能，定制件报价。",
+        "painPoints": [
+          "自产精密件，外部成品刀剪需求弱",
+          "工程类买家",
+          "与刀剪无关"
+        ],
+        "angle": "弱；其为元件制造者，非分销/采购刀剪。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "1954年成立的精密弹簧加载元件制造商，低开销大批量生产，交期短。",
+        "decisionMaker": "Vivian Weaver（职位待确认）。",
+        "contactInfo": "technitool@yahoo.com（个人邮箱）/ 714-363-0661，与Excel一致。",
+        "painPoints": "定制件快速报价；与美国制造商紧密合作。",
+        "purchaseIntent": "低 — 自产精密元件，无刀剪采购迹象。",
+        "competitorAnalysis": "自有品牌Techni-Tool。",
+        "supplyChain": "自有CNC加工，钢材/不锈钢/黄铜棒料。",
+        "entryPoint": "弱；仅在其有OEM机加工外耗时可能相关。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "制造商",
+        "countryTier": "S",
+        "categoryMatch": "不匹配",
+        "priorityScore": 30,
+        "recommendedStrategy": "低优先级；制造商自产为主，通用角度轻触。"
+      },
+      "leadScore": 30
+    },
+    {
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "",
+        "title": "",
+        "email": "swtool@swedishtool.se",
+        "phone": "0046 8 514 307 00",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "leadSource": "广交会139届-五金制品",
+      "companySize": "",
+      "decisionMaker": "",
+      "annualPurchase": "",
+      "intentCategories": [],
+      "id": "canton_b1_g1_008",
+      "company": "Swedish Tool AB",
+      "website": "http://www.swedishtool.se",
+      "scores": {
+        "industry": 30,
+        "product": 5,
+        "companyType": 35,
+        "purchaseSignal": 20,
+        "contactQuality": 30,
+        "total": 24,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "待确认",
+        "低意向"
+      ],
+      "notes": "瑞典Vallentuna。官网swedishtool.se为一个极简瑞典语博客（最后更新2015年），内容为深拉伸/板材冲压工艺介绍，提及Ingelsten & CO(1937)，无清晰产品目录或公司介绍。无具名联系人。业务性质待确认。",
+      "country": "Sweden",
+      "customerType": "制造商",
+      "productCategory": "不匹配",
+      "products": "待确认（官网仅板材冲压/深拉伸工艺博客）",
+      "profile": {
+        "business": "瑞典Vallentuna公司；网络形象极弱（2015年后无更新），内容为板材成形工艺。",
+        "productLine": "待确认。",
+        "needs": "待确认。",
+        "painPoints": [
+          "网络信息极少",
+          "无具名联系人",
+          "是否进口不明"
+        ],
+        "angle": "信息不足，暂列低优先级。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "待确认；官网为薄博客，疑似板材冲压/深拉伸相关。",
+        "decisionMaker": "待确认（无具名联系人）。",
+        "contactInfo": "swtool@swedishtool.se / +46 8 514 307 00，与Excel一致。",
+        "painPoints": "线上信息缺失。",
+        "purchaseIntent": "低 — 无法核实采购需求。",
+        "competitorAnalysis": "待确认。",
+        "supplyChain": "待确认。",
+        "entryPoint": "低；通用五金OEM角度轻触，等待回复核实。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "制造商",
+        "countryTier": "A",
+        "categoryMatch": "不匹配",
+        "priorityScore": 24,
+        "recommendedStrategy": "低优先级；信息不足，先轻触核实。"
+      },
+      "leadScore": 24
+    },
+    {
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "Roman Striebel",
+        "title": "",
+        "email": "roman@suncorstainless.com",
+        "phone": "001 781-829-8899",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "leadSource": "广交会139届-五金制品",
+      "companySize": "",
+      "decisionMaker": "Roman Striebel",
+      "annualPurchase": "",
+      "intentCategories": [],
+      "id": "canton_b1_g1_009",
+      "company": "SUNCOR STAINLESS",
+      "website": "https://www.suncorstainless.com",
+      "scores": {
+        "industry": 40,
+        "product": 10,
+        "companyType": 65,
+        "purchaseSignal": 25,
+        "contactQuality": 70,
+        "total": 38,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "不锈钢索具",
+        "低意向"
+      ],
+      "notes": "美国马萨诸塞州Pembroke/Plymouth，1985年成立，不锈钢五金制造商。3500+ SKU：不锈钢链条、钢丝绳、卸扣、花兰螺丝、吊钩、pad eye、swage sleeve等船用/工业/建筑索具五金。获MIL-DTL-781政府认证。自产为主，与刀剪不匹配。",
+      "country": "United States",
+      "customerType": "制造商",
+      "productCategory": "不匹配",
+      "products": "不锈钢链条、钢丝绳、卸扣、花兰螺丝、吊钩、pad eye、swage sleeve等索具五金",
+      "profile": {
+        "business": "1985年成立，马萨诸塞，现代厂房，全球最完整不锈钢索具五金之一，服务船用/工业/建筑/OEM/政府。",
+        "productLine": "316/304不锈钢chain、wire rope、shackles、turnbuckles、hooks、pad eyes、swage sleeves。",
+        "needs": "自身制造，政府/军标质量门槛高。",
+        "painPoints": [
+          "自产不锈钢索具",
+          "军标/MIL认证门槛",
+          "与刀剪无关"
+        ],
+        "angle": "弱；自产为主，仅在其需要定制不锈钢件时可能相关。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "1985年成立的不锈钢五金制造商，3500+件，Plymouth/Pembroke MA，MIL-DTL-781认证。",
+        "decisionMaker": "Roman Striebel（职位待确认）。",
+        "contactInfo": "roman@suncorstainless.com / 781-829-8899，与Excel一致（具名+直邮，质量较好）。",
+        "painPoints": "高规格不锈钢铸造/机加工；耐腐蚀要求。",
+        "purchaseIntent": "低 — 自产不锈钢索具，刀剪需求不相关。",
+        "competitorAnalysis": "自有品牌Suncor（通过Mazzella、Ace Industries等分销）。",
+        "supplyChain": "自有美国制造，不锈钢原材料。",
+        "entryPoint": "弱；通用金属OEM角度，质量门槛高。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "制造商",
+        "countryTier": "S",
+        "categoryMatch": "不匹配",
+        "priorityScore": 38,
+        "recommendedStrategy": "低优先级；制造商自产为主，仅留通用OEM入口。"
+      },
+      "leadScore": 38
+    },
+    {
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "Morris Smolarski",
+        "title": "",
+        "email": "email@superiorbrass.com",
+        "phone": "0061 3 95533559",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "leadSource": "广交会139届-五金制品",
+      "companySize": "",
+      "decisionMaker": "Morris Smolarski",
+      "annualPurchase": "",
+      "intentCategories": [],
+      "id": "canton_b1_g1_010",
+      "company": "SUPERIOR BRASS PTY. LTD.",
+      "website": "https://www.superiorbrass.com",
+      "scores": {
+        "industry": 55,
+        "product": 15,
+        "companyType": 65,
+        "purchaseSignal": 55,
+        "contactQuality": 60,
+        "total": 52,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "建筑/门五金",
+        "中低意向"
+      ],
+      "notes": "澳大利亚墨尔本Moorabbin，1982年成立，黄铜/建筑门五金制造商与全球分销商。自有品牌Superior/Austyle/Builders Choice，3000+产品，内部设计团队，ISO9000。进口黄铜门窗建筑五金（Volza有进口记录）。主动从中国/亚洲采购金属五金，是本批通用五金OEM角度最佳对象之一。品类为门/建筑五金，与刀剪不匹配。",
+      "country": "Australia",
+      "customerType": "进口商",
+      "productCategory": "不匹配",
+      "products": "门拉手、窗五金、门环、橱柜/大门五金、304/316不锈钢拉手、智能锁、铰链",
+      "profile": {
+        "business": "1982年成立，Moorabbin VIC，制造商+全球分销商，自有品牌Superior/Austyle/Builders Choice，3000+产品，ISO9000。",
+        "productLine": "传统黄铜门家具、建筑/设计师不锈钢拉手、住宅门五金、智能锁、铰链、窗五金。",
+        "needs": "具成本竞争力的黄铜/不锈钢建筑五金OEM；内部设计团队持续开发新品。",
+        "painPoints": [
+          "需成本优势的金属五金OEM供应",
+          "新品开发节奏",
+          "品类为门/建筑，非刀剪"
+        ],
+        "angle": "本批最佳通用五金OEM对象之一：阳江金属铸造/冲压OEM、工厂直供价、免费营销素材/工厂片打客户Logo。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "1982年成立的澳大利亚黄铜建筑五金制造商与分销商，多品牌，内部设计，ISO9000。",
+        "decisionMaker": "Morris Smolarski（职位待确认）。",
+        "contactInfo": "email@superiorbrass.com / +61 3 9553 3559，与Excel一致；官网另见customerservice@superiorbrass.com.au。",
+        "painPoints": "成本竞争、新品设计、品质稳定（ISO9000）。",
+        "purchaseIntent": "中低 — 持续进口黄铜建筑五金（Volza进口记录），刀剪不匹配但金属五金OEM需求真实。",
+        "competitorAnalysis": "自有品牌Superior / Austyle / Builders Choice。",
+        "supplyChain": "进口黄铜建筑五金（Volza记录：brass builders hardware for doors/windows），来源疑似中国/亚洲。",
+        "entryPoint": "阳江金属五金OEM+工厂直供价+免费营销素材（工厂片打客户Logo）。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "进口商",
+        "countryTier": "S",
+        "categoryMatch": "不匹配",
+        "priorityScore": 52,
+        "recommendedStrategy": "组内最高优先级之一；通用五金OEM角度，主打工厂直供价+自有品牌+免费营销素材。"
+      },
+      "leadScore": 52
+    },
+    {
+      "source": "广交会139届-五金制品",
+      "type": "潜在客户",
+      "status": "待开发",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "contact": {
+        "name": "Ada Corbett",
+        "title": "",
+        "email": "ptron@bellsouth.net",
+        "phone": "001 9043544508",
+        "whatsapp": "",
+        "linkedin": ""
+      },
+      "leadSource": "广交会139届-五金制品",
+      "companySize": "",
+      "decisionMaker": "Ada Corbett",
+      "annualPurchase": "",
+      "intentCategories": [],
+      "id": "canton_b1_g1_011",
+      "company": "SUNN BATTERY COMPANY",
+      "website": "https://www.sunnbattery.com",
+      "scores": {
+        "industry": 10,
+        "product": 0,
+        "companyType": 30,
+        "purchaseSignal": 10,
+        "contactQuality": 35,
+        "total": 18,
+        "grade": "C"
+      },
+      "tags": [
+        "广交会139届",
+        "电池零售",
+        "低意向"
+      ],
+      "notes": "美国佛罗里达州Jacksonville本地电池零售商，经营近40年。主营汽车/摩托车电池，本地小店，无进口/五金项目。邮箱ptron@bellsouth.net为个人邮箱。与五金刀剪完全不相关。",
+      "country": "United States",
+      "customerType": "五金零售商",
+      "productCategory": "不匹配",
+      "products": "汽车电池、摩托车电池（本地零售）",
+      "profile": {
+        "business": "Jacksonville市中心近40年本地电池零售，'If it's a battery we have it'，小型本地店。",
+        "productLine": "汽车、摩托车电池。",
+        "needs": "无进口/刀剪需求。",
+        "painPoints": [
+          "纯电池零售",
+          "本地小店无进口项目",
+          "与五金刀剪完全无关"
+        ],
+        "angle": "无切入点；可不投入。"
+      },
+      "backgroundCheck": {
+        "companyOverview": "近40年Jacksonville本地电池零售商，小店模式。",
+        "decisionMaker": "Ada Corbett（职位待确认）。",
+        "contactInfo": "ptron@bellsouth.net（个人邮箱）/ 904-354-4508，与Excel一致。",
+        "painPoints": "本地零售，无供应链项目。",
+        "purchaseIntent": "低 — 电池零售，与刀剪/五金进口无关。",
+        "competitorAnalysis": "本地电池零售。",
+        "supplyChain": "本地电池分销。",
+        "entryPoint": "无。"
+      },
+      "portrait": {
+        "intentLevel": "低",
+        "customerType": "五金零售商",
+        "countryTier": "S",
+        "categoryMatch": "不匹配",
+        "priorityScore": 18,
+        "recommendedStrategy": "最低优先级；品类完全无关，不建议投入。"
+      },
+      "leadScore": 18
+    }
+  ],
+  "drafts": [
+    {
+      "language": "英语",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "id": "draft_canton_b1_g1_001",
+      "customerId": "canton_b1_g1_001",
+      "customerName": "Thomas Potter (Newcastle) Ltd.",
+      "country": "United Kingdom",
+      "subject": "Yangjiang OEM metal hardware for UK stockists",
+      "body": "Hi Harry,\n\nI came across Thomas Potter while researching UK fastener and fittings stockists — your deep holding of non-preferred items since 1923 really stands out.\n\nI'm Leo from KaiLionCrafts, based in Yangjiang, China, the country's hardware and cutlery capital. We partner with four family-backed factories on OEM/ODM metal products, MOQ from 100 pcs, backed by SGS/LFGB/FDA standards. We also supply free product photos, videos and factory footage under your own brand, and factory-direct pricing typically runs about 20% below trading houses.\n\nWould a short WhatsApp call or a quick catalog be useful if you are ever evaluating alternative metal-hardware sourcing?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "chineseVersion": "Harry 你好：\n我在调研英国紧固件与管件stockist时注意到贵司——自1923年起对非常规件的深度库存令人印象深刻。\n我是KaiLionCrafts的Leo，位于中国阳江（中国五金刀剪之都）。我们与四家家族控股工厂合作做OEM/ODM金属产品，MOQ 100件起，符合SGS/LFGB/FDA标准；并免费提供产品图、视频及打客户Logo的工厂素材，工厂直供价通常比贸易商低约20%。\n若您未来评估替代金属五金供应，是否方便WhatsApp简短交流或索取目录？\n签名：Leo Li, KaiLionCrafts, WhatsApp +86 131-3800-6564, kailioncrafts.com/oem-odm/",
+      "subjectOptions": [
+        "Yangjiang OEM metal hardware for UK stockists",
+        "Factory-direct OEM hardware from Yangjiang, China",
+        "A Yangjiang alternative source for your hardware range"
+      ],
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "4家合作工厂",
+        "OEM/ODM MOQ 100pcs起",
+        "工厂直供价低贸易商20%",
+        "免费营销素材"
+      ],
+      "aiNotes": [
+        "品类不匹配，按通用五金OEM角度撰写",
+        "未发送，仅生成内容待审核"
+      ],
+      "content": "Hi Harry,\n\nI came across Thomas Potter while researching UK fastener and fittings stockists — your deep holding of non-preferred items since 1923 really stands out.\n\nI'm Leo from KaiLionCrafts, based in Yangjiang, China, the country's hardware and cutlery capital. We partner with four family-backed factories on OEM/ODM metal products, MOQ from 100 pcs, backed by SGS/LFGB/FDA standards. We also supply free product photos, videos and factory footage under your own brand, and factory-direct pricing typically runs about 20% below trading houses.\n\nWould a short WhatsApp call or a quick catalog be useful if you are ever evaluating alternative metal-hardware sourcing?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "wordCount": 110
+    },
+    {
+      "language": "英语",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "id": "draft_canton_b1_g1_002",
+      "customerId": "canton_b1_g1_002",
+      "customerName": "THE SUPERIOR GOODS & SERVICE COMPANY (SGS Hardware)",
+      "country": "United States",
+      "subject": "Yangjiang OEM hardware — factory-direct for US distributors",
+      "body": "Hi,\n\nI noticed SGS Hardware as a family-owned door-hinge distributor known for quick shipping and acting as an extension of customers' purchasing teams.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We run OEM/ODM with four partner factories, MOQ from 100 pcs, SGS/LFGB/FDA supported, and we provide free product photos, videos and branded factory footage. Factory-direct pricing usually sits about 20% below trading houses, and we ship to 130+ countries.\n\nIf you are ever adding private-label metal hardware or small parts to your range, would a short catalog or WhatsApp chat be helpful?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "chineseVersion": "您好：\n我注意到SGS Hardware是一家以快速发货、充当客户采购延伸著称的家族门铰链分销商。\n我是KaiLionCrafts的Leo，位于中国阳江（中国五金刀剪之都）。我们与四家合作工厂做OEM/ODM，MOQ 100件起，符合SGS/LFGB/FDA；并免费提供产品图、视频及打客户Logo的工厂素材，工厂直供价通常比贸易商低约20%，产品出口130+国家。\n若您未来想在品类中增加自有品牌金属五金或小件，是否方便索取目录或WhatsApp交流？\n签名：Leo Li, KaiLionCrafts, WhatsApp +86 131-3800-6564, kailioncrafts.com/oem-odm/",
+      "subjectOptions": [
+        "Yangjiang OEM hardware — factory-direct for US distributors",
+        "Private-label metal hardware from China's hardware capital",
+        "Factory-direct small parts, MOQ 100 pcs"
+      ],
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs起",
+        "工厂直供价低贸易商20%",
+        "出口130+国家",
+        "免费营销素材"
+      ],
+      "aiNotes": [
+        "品类不匹配，按通用五金OEM角度撰写",
+        "未发送，仅生成内容待审核"
+      ],
+      "content": "Hi,\n\nI noticed SGS Hardware as a family-owned door-hinge distributor known for quick shipping and acting as an extension of customers' purchasing teams.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We run OEM/ODM with four partner factories, MOQ from 100 pcs, SGS/LFGB/FDA supported, and we provide free product photos, videos and branded factory footage. Factory-direct pricing usually sits about 20% below trading houses, and we ship to 130+ countries.\n\nIf you are ever adding private-label metal hardware or small parts to your range, would a short catalog or WhatsApp chat be helpful?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "wordCount": 105
+    },
+    {
+      "language": "英语",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "id": "draft_canton_b1_g1_003",
+      "customerId": "canton_b1_g1_003",
+      "customerName": "THE SPRINGFIELD MARINE COMPANY",
+      "country": "United States",
+      "subject": "Yangjiang metal hardware OEM — a backup supply option",
+      "body": "Hi Caroline,\n\nI've followed Springfield Marine's leadership in boat seating and pedestals — the ELEVATE table pedestal line shows strong OEM innovation.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We partner with four factories on OEM/ODM metal products, MOQ from 100 pcs, SGS/LFGB/FDA supported, with free product photos, videos and branded factory footage. While I know you run your own China facility, we often serve marine OEMs as a flexible backup or overflow source at factory-direct pricing.\n\nWould it be worth a short WhatsApp chat to keep us on your approved-vendor list for smaller metal parts?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "chineseVersion": "Caroline 你好：\n我一直关注Springfield Marine在船用座椅与座架领域的领先地位——ELEVATE桌柱产品线展现了很强的OEM创新能力。\n我是KaiLionCrafts的Leo，位于中国阳江（中国五金刀剪之都）。我们与四家工厂合作做OEM/ODM金属产品，MOQ 100件起，符合SGS/LFGB/FDA，免费提供产品图、视频及打客户Logo的工厂素材。了解贵司在中国自有工厂，我们常作为船用OEM的弹性备份或溢量供应源，工厂直供价。\n是否值得WhatsApp简短交流，让我们进入您的小金属件备选供应商名单？\n签名：Leo Li, KaiLionCrafts, WhatsApp +86 131-3800-6564, kailioncrafts.com/oem-odm/",
+      "subjectOptions": [
+        "Yangjiang metal hardware OEM — a backup supply option",
+        "Overflow/backup metal parts source for marine OEMs",
+        "Factory-direct OEM hardware from Yangjiang"
+      ],
+      "sellingPointsUsed": [
+        "4家合作工厂",
+        "OEM/ODM MOQ 100pcs起",
+        "工厂直供价",
+        "免费营销素材"
+      ],
+      "aiNotes": [
+        "品类不匹配，按通用五金OEM角度撰写",
+        "未发送，仅生成内容待审核"
+      ],
+      "content": "Hi Caroline,\n\nI've followed Springfield Marine's leadership in boat seating and pedestals — the ELEVATE table pedestal line shows strong OEM innovation.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We partner with four factories on OEM/ODM metal products, MOQ from 100 pcs, SGS/LFGB/FDA supported, with free product photos, videos and branded factory footage. While I know you run your own China facility, we often serve marine OEMs as a flexible backup or overflow source at factory-direct pricing.\n\nWould it be worth a short WhatsApp chat to keep us on your approved-vendor list for smaller metal parts?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "wordCount": 109
+    },
+    {
+      "language": "英语",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "id": "draft_canton_b1_g1_004",
+      "customerId": "canton_b1_g1_004",
+      "customerName": "THE PENROD COMPANY",
+      "country": "United States",
+      "subject": "Yangjiang OEM hardware for Penrod's hardware & hinges division",
+      "body": "Hi George,\n\nI saw Penrod's Hardware & Hinges division is a NAFTA leader in hinges, fasteners and general hardware shipping within 24 hours — impressive for a company with 130+ years of trade network.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We run OEM/ODM with four family-backed factories, MOQ from 100 pcs, SGS/LFGB/FDA supported, plus free product photos, videos and factory footage under your brand. Factory-direct pricing is typically about 20% below trading houses.\n\nSince your team sources from China already, would a quick catalog or WhatsApp call be useful to compare pricing on small metal hardware or tool items?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "chineseVersion": "George 你好：\n我注意到Penrod的Hardware & Hinges部门是NAFTA门铰链/紧固件/通用五金领导者，且能24小时发货——对于一家拥有130多年贸易网络的企业非常出色。\n我是KaiLionCrafts的Leo，位于中国阳江（中国五金刀剪之都）。我们与四家家族控股工厂做OEM/ODM，MOQ 100件起，符合SGS/LFGB/FDA，并免费提供打贵司品牌的产品图、视频与工厂素材；工厂直供价通常比贸易商低约20%。\n既然贵司已从中国采购，是否方便索取目录或WhatsApp通话，就小金属件/工具类比价？\n签名：Leo Li, KaiLionCrafts, WhatsApp +86 131-3800-6564, kailioncrafts.com/oem-odm/",
+      "subjectOptions": [
+        "Yangjiang OEM hardware for Penrod's hardware division",
+        "Factory-direct metal hardware, already a China buyer?",
+        "Compare OEM pricing — Yangjiang, MOQ 100 pcs"
+      ],
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "4家合作工厂",
+        "OEM/ODM MOQ 100pcs起",
+        "工厂直供价低贸易商20%",
+        "免费营销素材"
+      ],
+      "aiNotes": [
+        "品类不匹配，按通用五金OEM角度撰写",
+        "未发送，仅生成内容待审核"
+      ],
+      "content": "Hi George,\n\nI saw Penrod's Hardware & Hinges division is a NAFTA leader in hinges, fasteners and general hardware shipping within 24 hours — impressive for a company with 130+ years of trade network.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We run OEM/ODM with four family-backed factories, MOQ from 100 pcs, SGS/LFGB/FDA supported, plus free product photos, videos and factory footage under your brand. Factory-direct pricing is typically about 20% below trading houses.\n\nSince your team sources from China already, would a quick catalog or WhatsApp call be useful to compare pricing on small metal hardware or tool items?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "wordCount": 113
+    },
+    {
+      "language": "英语",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "id": "draft_canton_b1_g1_005",
+      "customerId": "canton_b1_g1_005",
+      "customerName": "THE INDUSTRIAL DEPOT",
+      "country": "United States",
+      "subject": "Yangjiang OEM tools & hardware for The Industrial Depot",
+      "body": "Hi Allen,\n\nI noticed The Industrial Depot's deep range — over 14,000 fastener SKUs and 3,300+ tool items — now as part of the Bamal Fastener group.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We partner with four factories on OEM/ODM, MOQ from 100 pcs, SGS/LFGB/FDA supported, and we supply free product photos, videos and branded factory footage. Factory-direct pricing typically runs about 20% below trading houses.\n\nAs you keep broadening your tool and small-hardware categories, would a short catalog or WhatsApp chat be useful to explore factory-direct options?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "chineseVersion": "Allen 你好：\n我注意到The Industrial Depot品类深度——紧固件超1.4万SKU、工具3300+，现已并入Bamal Fastener集团。\n我是KaiLionCrafts的Leo，位于中国阳江（中国五金刀剪之都）。我们与四家工厂合作做OEM/ODM，MOQ 100件起，符合SGS/LFGB/FDA，并免费提供产品图、视频及打客户Logo的工厂素材；工厂直供价通常比贸易商低约20%。\n在您持续扩充工具与小件五金品类时，是否方便索取目录或WhatsApp交流，探讨工厂直供方案？\n签名：Leo Li, KaiLionCrafts, WhatsApp +86 131-3800-6564, kailioncrafts.com/oem-odm/",
+      "subjectOptions": [
+        "Yangjiang OEM tools & hardware for Industrial Depot",
+        "Factory-direct tools & small hardware, MOQ 100 pcs",
+        "Expand your tool range — Yangjiang OEM pricing"
+      ],
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs起",
+        "工厂直供价低贸易商20%",
+        "免费营销素材"
+      ],
+      "aiNotes": [
+        "品类不匹配，按通用五金OEM角度撰写",
+        "未发送，仅生成内容待审核"
+      ],
+      "content": "Hi Allen,\n\nI noticed The Industrial Depot's deep range — over 14,000 fastener SKUs and 3,300+ tool items — now as part of the Bamal Fastener group.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We partner with four factories on OEM/ODM, MOQ from 100 pcs, SGS/LFGB/FDA supported, and we supply free product photos, videos and branded factory footage. Factory-direct pricing typically runs about 20% below trading houses.\n\nAs you keep broadening your tool and small-hardware categories, would a short catalog or WhatsApp chat be useful to explore factory-direct options?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "wordCount": 102
+    },
+    {
+      "language": "英语",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "id": "draft_canton_b1_g1_006",
+      "customerId": "canton_b1_g1_006",
+      "customerName": "TG TOOLS UNITED CO",
+      "country": "United States",
+      "subject": "Yangjiang OEM tools — factory-direct from China's hardware capital",
+      "body": "Hi Tom,\n\nI came across TG Tools United at the Canton Fair hardware section and would like to understand your current tool sourcing better.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We run OEM/ODM with four partner factories, MOQ from 100 pcs, SGS/LFGB/FDA supported, with free product photos, videos and branded factory footage. Factory-direct pricing typically sits about 20% below trading houses, and we export to 130+ countries.\n\nCould you share what tool lines you currently buy? A quick WhatsApp call or catalog exchange would be a good start.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "chineseVersion": "Tom 你好：\n我在广交会上注意到TG Tools United，想进一步了解贵司当前的工具采购情况。\n我是KaiLionCrafts的Leo，位于中国阳江（中国五金刀剪之都）。我们与四家合作工厂做OEM/ODM，MOQ 100件起，符合SGS/LFGB/FDA，免费提供产品图、视频及打客户Logo的工厂素材；工厂直供价通常比贸易商低约20%，产品出口130+国家。\n可否告知贵司目前采购哪些工具线？WhatsApp简短交流或互换目录是个好的开始。\n签名：Leo Li, KaiLionCrafts, WhatsApp +86 131-3800-6564, kailioncrafts.com/oem-odm/",
+      "subjectOptions": [
+        "Yangjiang OEM tools — factory-direct from hardware capital",
+        "Canton Fair follow-up: tool sourcing from Yangjiang",
+        "Factory-direct OEM tools, MOQ 100 pcs"
+      ],
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs起",
+        "工厂直供价低贸易商20%",
+        "出口130+国家"
+      ],
+      "aiNotes": [
+        "品类不匹配，按通用五金OEM角度撰写",
+        "未发送，仅生成内容待审核"
+      ],
+      "content": "Hi Tom,\n\nI came across TG Tools United at the Canton Fair hardware section and would like to understand your current tool sourcing better.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We run OEM/ODM with four partner factories, MOQ from 100 pcs, SGS/LFGB/FDA supported, with free product photos, videos and branded factory footage. Factory-direct pricing typically sits about 20% below trading houses, and we export to 130+ countries.\n\nCould you share what tool lines you currently buy? A quick WhatsApp call or catalog exchange would be a good start.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "wordCount": 102
+    },
+    {
+      "language": "英语",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "id": "draft_canton_b1_g1_007",
+      "customerId": "canton_b1_g1_007",
+      "customerName": "TECHNI-TOOL PRODUCTS INC",
+      "country": "United States",
+      "subject": "Yangjiang OEM precision metal parts — a cost-competitive option",
+      "body": "Hi Vivian,\n\nI noticed Techni-Tool Products' precision spring plungers and ball plungers, serving manufacturing since 1954 with custom spring-loaded devices.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We partner with four factories on OEM/ODM metal components, MOQ from 100 pcs, SGS/LFGB/FDA supported, with free product photos, videos and branded factory footage. Factory-direct pricing is typically about 20% below trading houses.\n\nFor any secondary or custom machined metal parts where cost matters, would a quick catalog or WhatsApp chat be useful?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "chineseVersion": "Vivian 你好：\n我注意到Techni-Tool Products的精密弹簧柱塞与球柱塞，自1954年起服务制造业并提供定制弹簧加载件。\n我是KaiLionCrafts的Leo，位于中国阳江（中国五金刀剪之都）。我们与四家工厂合作做OEM/ODM金属元件，MOQ 100件起，符合SGS/LFGB/FDA，免费提供产品图、视频及打客户Logo的工厂素材；工厂直供价通常比贸易商低约20%。\n对于任何需要控制成本的二类或定制机加工金属件，是否方便索取目录或WhatsApp交流？\n签名：Leo Li, KaiLionCrafts, WhatsApp +86 131-3800-6564, kailioncrafts.com/oem-odm/",
+      "subjectOptions": [
+        "Yangjiang OEM precision metal parts — cost-competitive",
+        "Custom machined metal components, factory-direct",
+        "A Yangjiang source for secondary metal parts"
+      ],
+      "sellingPointsUsed": [
+        "4家合作工厂",
+        "OEM/ODM MOQ 100pcs起",
+        "工厂直供价低贸易商20%"
+      ],
+      "aiNotes": [
+        "品类不匹配，按通用五金OEM角度撰写",
+        "未发送，仅生成内容待审核"
+      ],
+      "content": "Hi Vivian,\n\nI noticed Techni-Tool Products' precision spring plungers and ball plungers, serving manufacturing since 1954 with custom spring-loaded devices.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We partner with four factories on OEM/ODM metal components, MOQ from 100 pcs, SGS/LFGB/FDA supported, with free product photos, videos and branded factory footage. Factory-direct pricing is typically about 20% below trading houses.\n\nFor any secondary or custom machined metal parts where cost matters, would a quick catalog or WhatsApp chat be useful?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "wordCount": 93
+    },
+    {
+      "language": "英语",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "id": "draft_canton_b1_g1_008",
+      "customerId": "canton_b1_g1_008",
+      "customerName": "Swedish Tool AB",
+      "country": "Sweden",
+      "subject": "Yangjiang OEM metal hardware — factory-direct for Swedish buyers",
+      "body": "Hej,\n\nI came across Swedish Tool AB while researching hardware companies at the Canton Fair and would like to learn more about your sourcing needs.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We run OEM/ODM with four partner factories, MOQ from 100 pcs, SGS/LFGB/FDA supported, and we supply free product photos, videos and branded factory footage. Factory-direct pricing typically runs about 20% below trading houses, and we export to 130+ countries.\n\nCould you tell me which metal hardware items you currently source? A quick WhatsApp call or catalog exchange would help.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "chineseVersion": "您好：\n我在广交会调研五金企业时注意到Swedish Tool AB，想进一步了解贵司的采购需求。\n我是KaiLionCrafts的Leo，位于中国阳江（中国五金刀剪之都）。我们与四家合作工厂做OEM/ODM，MOQ 100件起，符合SGS/LFGB/FDA，免费提供产品图、视频及打客户Logo的工厂素材；工厂直供价通常比贸易商低约20%，产品出口130+国家。\n可否告知贵司目前采购哪些金属五金？WhatsApp简短交流或互换目录会有帮助。\n签名：Leo Li, KaiLionCrafts, WhatsApp +86 131-3800-6564, kailioncrafts.com/oem-odm/",
+      "subjectOptions": [
+        "Yangjiang OEM metal hardware — factory-direct",
+        "Canton Fair follow-up: hardware sourcing from Yangjiang",
+        "Factory-direct OEM hardware, MOQ 100 pcs"
+      ],
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs起",
+        "工厂直供价低贸易商20%",
+        "出口130+国家"
+      ],
+      "aiNotes": [
+        "品类不匹配，按通用五金OEM角度撰写",
+        "未发送，仅生成内容待审核"
+      ],
+      "content": "Hej,\n\nI came across Swedish Tool AB while researching hardware companies at the Canton Fair and would like to learn more about your sourcing needs.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We run OEM/ODM with four partner factories, MOQ from 100 pcs, SGS/LFGB/FDA supported, and we supply free product photos, videos and branded factory footage. Factory-direct pricing typically runs about 20% below trading houses, and we export to 130+ countries.\n\nCould you tell me which metal hardware items you currently source? A quick WhatsApp call or catalog exchange would help.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "wordCount": 104
+    },
+    {
+      "language": "英语",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "id": "draft_canton_b1_g1_009",
+      "customerId": "canton_b1_g1_009",
+      "customerName": "SUNCOR STAINLESS",
+      "country": "United States",
+      "subject": "Yangjiang OEM stainless & metal hardware — factory-direct",
+      "body": "Hi Roman,\n\nI've followed Suncor Stainless' wide line of chain, turnbuckles and rigging hardware since 1985 — your MIL-spec certifications are impressive.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We partner with four factories on OEM/ODM metal products, MOQ from 100 pcs, SGS/LFGB/FDA supported, with free product photos, videos and branded factory footage. Factory-direct pricing typically runs about 20% below trading houses.\n\nFor any standard or custom stainless/metal parts where a cost-competitive secondary source helps, would a quick catalog or WhatsApp chat be worth it?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "chineseVersion": "Roman 你好：\n我一直关注Suncor Stainless自1985年以来丰富的链条、花兰螺丝与索具五金产品线——贵司的军标认证令人印象深刻。\n我是KaiLionCrafts的Leo，位于中国阳江（中国五金刀剪之都）。我们与四家工厂合作做OEM/ODM金属产品，MOQ 100件起，符合SGS/LFGB/FDA，免费提供产品图、视频及打客户Logo的工厂素材；工厂直供价通常比贸易商低约20%。\n对于任何需要成本竞争力的标准或定制不锈钢/金属件作为二供，是否方便索取目录或WhatsApp交流？\n签名：Leo Li, KaiLionCrafts, WhatsApp +86 131-3800-6564, kailioncrafts.com/oem-odm/",
+      "subjectOptions": [
+        "Yangjiang OEM stainless & metal hardware — factory-direct",
+        "A cost-competitive secondary source for metal parts",
+        "Factory-direct OEM hardware, MOQ 100 pcs"
+      ],
+      "sellingPointsUsed": [
+        "4家合作工厂",
+        "OEM/ODM MOQ 100pcs起",
+        "工厂直供价低贸易商20%"
+      ],
+      "aiNotes": [
+        "品类不匹配，按通用五金OEM角度撰写",
+        "未发送，仅生成内容待审核"
+      ],
+      "content": "Hi Roman,\n\nI've followed Suncor Stainless' wide line of chain, turnbuckles and rigging hardware since 1985 — your MIL-spec certifications are impressive.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We partner with four factories on OEM/ODM metal products, MOQ from 100 pcs, SGS/LFGB/FDA supported, with free product photos, videos and branded factory footage. Factory-direct pricing typically runs about 20% below trading houses.\n\nFor any standard or custom stainless/metal parts where a cost-competitive secondary source helps, would a quick catalog or WhatsApp chat be worth it?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "wordCount": 98
+    },
+    {
+      "language": "英语",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "id": "draft_canton_b1_g1_010",
+      "customerId": "canton_b1_g1_010",
+      "customerName": "SUPERIOR BRASS PTY. LTD.",
+      "country": "Australia",
+      "subject": "Yangjiang OEM brass & metal hardware for Austyle/Superior",
+      "body": "Hi Morris,\n\nI've followed Superior Brass' growth from 10 lever handles in 1982 to 3,000+ products across Superior, Austyle and Builders Choice — a strong design-led brand story.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We run OEM/ODM with four family-backed factories, MOQ from 100 pcs, SGS/LFGB/FDA supported, plus free product photos, videos and even a factory film branded with your logo. Factory-direct pricing is typically about 20% below trading houses.\n\nGiven your active brass hardware sourcing, would a quick WhatsApp call or catalog exchange be useful to compare OEM pricing?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "chineseVersion": "Morris 你好：\n我一直关注Superior Brass从1982年10款拉手发展到Superior/Austyle/Builders Choice三品牌3000+产品——非常强的设计驱动品牌故事。\n我是KaiLionCrafts的Leo，位于中国阳江（中国五金刀剪之都）。我们与四家家族控股工厂做OEM/ODM，MOQ 100件起，符合SGS/LFGB/FDA，并免费提供产品图、视频，甚至打贵司Logo的工厂宣传片；工厂直供价通常比贸易商低约20%。\n鉴于贵司活跃的黄铜五金采购，是否方便WhatsApp简短交流或互换目录，对比OEM价格？\n签名：Leo Li, KaiLionCrafts, WhatsApp +86 131-3800-6564, kailioncrafts.com/oem-odm/",
+      "subjectOptions": [
+        "Yangjiang OEM brass & metal hardware for Austyle",
+        "Factory-direct OEM hardware, branded factory video",
+        "Compare OEM pricing — Yangjiang, MOQ 100 pcs"
+      ],
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "4家合作工厂",
+        "OEM/ODM MOQ 100pcs起",
+        "工厂直供价低贸易商20%",
+        "工厂宣传片打客户Logo"
+      ],
+      "aiNotes": [
+        "品类不匹配，按通用五金OEM角度撰写",
+        "未发送，仅生成内容待审核"
+      ],
+      "content": "Hi Morris,\n\nI've followed Superior Brass' growth from 10 lever handles in 1982 to 3,000+ products across Superior, Austyle and Builders Choice — a strong design-led brand story.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We run OEM/ODM with four family-backed factories, MOQ from 100 pcs, SGS/LFGB/FDA supported, plus free product photos, videos and even a factory film branded with your logo. Factory-direct pricing is typically about 20% below trading houses.\n\nGiven your active brass hardware sourcing, would a quick WhatsApp call or catalog exchange be useful to compare OEM pricing?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "wordCount": 104
+    },
+    {
+      "language": "英语",
+      "status": "待检查",
+      "createdAt": "2026-10-06T00:00:00Z",
+      "sentAt": null,
+      "linksUsed": [
+        "https://kailioncrafts.com/oem-odm/"
+      ],
+      "id": "draft_canton_b1_g1_011",
+      "customerId": "canton_b1_g1_011",
+      "customerName": "SUNN BATTERY COMPANY",
+      "country": "United States",
+      "subject": "Yangjiang OEM metal hardware — factory-direct supplier",
+      "body": "Hi Ada,\n\nI noticed Sunn Battery has served Jacksonville for nearly 40 years — a strong local reputation built on availability and friendly service.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We partner with four factories on OEM/ODM metal hardware, MOQ from 100 pcs, SGS/LFGB/FDA supported, with free product photos, videos and branded factory footage. Factory-direct pricing typically runs about 20% below trading houses, and we export to 130+ countries.\n\nIf you ever consider adding tool or small-hardware lines to your store, a short catalog or WhatsApp chat could be useful.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "chineseVersion": "Ada 你好：\n我注意到Sunn Battery已服务Jacksonville近40年——基于备货充足与友好服务建立了很强的本地口碑。\n我是KaiLionCrafts的Leo，位于中国阳江（中国五金刀剪之都）。我们与四家工厂合作做OEM/ODM金属五金，MOQ 100件起，符合SGS/LFGB/FDA，免费提供产品图、视频及打客户Logo的工厂素材；工厂直供价通常比贸易商低约20%，产品出口130+国家。\n若您未来考虑在门店增加工具或小件五金品类，索取目录或WhatsApp交流可能有帮助。\n签名：Leo Li, KaiLionCrafts, WhatsApp +86 131-3800-6564, kailioncrafts.com/oem-odm/",
+      "subjectOptions": [
+        "Yangjiang OEM metal hardware — factory-direct supplier",
+        "Add tool & hardware lines — factory-direct pricing",
+        "OEM metal hardware from China's hardware capital"
+      ],
+      "sellingPointsUsed": [
+        "阳江产业带",
+        "OEM/ODM MOQ 100pcs起",
+        "工厂直供价低贸易商20%",
+        "出口130+国家"
+      ],
+      "aiNotes": [
+        "品类不匹配，按通用五金OEM角度撰写",
+        "未发送，仅生成内容待审核"
+      ],
+      "content": "Hi Ada,\n\nI noticed Sunn Battery has served Jacksonville for nearly 40 years — a strong local reputation built on availability and friendly service.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's hardware and cutlery capital. We partner with four factories on OEM/ODM metal hardware, MOQ from 100 pcs, SGS/LFGB/FDA supported, with free product photos, videos and branded factory footage. Factory-direct pricing typically runs about 20% below trading houses, and we export to 130+ countries.\n\nIf you ever consider adding tool or small-hardware lines to your store, a short catalog or WhatsApp chat could be useful.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/oem-odm/",
+      "wordCount": 104
+    }
+  ]
+}

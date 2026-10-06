@@ -1,0 +1,242 @@
+{
+  "category": "kitchen_knives",
+  "categoryName": "厨房刀",
+  "generatedAt": "2026-10-06",
+  "customers": [
+    {
+      "id": "kk_001",
+      "company": "Messermeister",
+      "website": "https://www.messermeister.com",
+      "email": "orders@messermeister.com",
+      "emailType": "通用邮箱",
+      "contact": {
+        "name": "Kirsten Dressler & Chelcea Dressler",
+        "title": "Co-owners / Second Generation, Women-owned",
+        "linkedin": ""
+      },
+      "country": "USA",
+      "city": "Ojai, California",
+      "customerType": "品牌商",
+      "source": "https://www.messermeister.com/pages/mm-story",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "Founded in 1981 by Bernd & Debra Dressler, Messermeister is a premium handcrafted chef knife brand based in Ojai, California. Now women-owned and operated by second-generation sisters Kirsten and Chelcea Dressler. Product lines include Oliva Elite, Avanta (made in China with German 1.4116 steel), Mu Fusion (Seki, Japan), Overland Chef, and Tom Aikens collection. They serve both professional chefs and home cooks, distributing through DTC website and authorized retailers.",
+        "decisionMaker": "Kirsten Dressler & Chelcea Dressler — Co-owners, second generation. They actively source globally for manufacturing quality at the right price. Contact via orders@messermeister.com (authorized retailer inquiries go to this email). Recommend LinkedIn lookup for direct procurement contact.",
+        "contactInfo": "Email: orders@messermeister.com | Website: messermeister.com | Location: Ojai, California, USA | Founded 1981 | Women-owned business",
+        "painPoints": "As a premium brand with multiple product tiers, they likely face pressure to keep mid-range lines (like Avanta) competitively priced while maintaining quality consistency. Their global sourcing model means they need reliable factory partners with consistent quality control. As a women-owned SMB, they value direct, responsive communication — not layered sales channels.",
+        "purchaseIntent": "Medium-High. They already source from China (Avanta line) and Japan (Mu Fusion). They likely evaluate new factories for cost efficiency, quality improvement, or expanding product lines. Typical purchasing cycle for a new collection: 3-6 months development + production.",
+        "competitorAnalysis": "Competitive set includes Wüsthof, Shun (KAI), Global, Mac Knives. Their price range: Oliva Elite $100-200, Avanta $50-100, Overland Chef $80-150. They position as 'German heritage, California lifestyle' premium but accessible.",
+        "supplyChain": "Multi-country sourcing: Germany (forged premium), China (Avanta mid-range, 1.4116 steel), Japan (Mu Fusion, Seki). They've been doing this since the 1980s when Bernd Dressler started DAMCO distributing German & Japanese cutlery.",
+        "entryAngle": "Approach from Yangjiang manufacturing expertise angle. Highlight that we understand German 1.4116 steel processing and can support Avanta-quality production. Emphasize founder-direct communication (they value personal relationships) and free marketing assets (product photos/videos) to support their DTC growth."
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "品牌商",
+        "countryGrade": "S",
+        "categoryMatch": "厨房刀",
+        "priorityScore": 88,
+        "recommendedStrategy": "Professional but warm tone, acknowledge their brand heritage and women-owned story. Focus on manufacturing quality + Yangjiang expertise + direct founder communication. Mention Avanta line specifically to prove research."
+      },
+      "email": {
+        "subjectLines": [
+          "Yangjiang knife partner for your next collection",
+          "Avanta-quality OEM knives from China's knife capital",
+          "Direct factory contact for your kitchen knife line"
+        ],
+        "english": "Hi Kirsten & Chelcea,\n\nI've followed Messermeister for a while — your Avanta line with German 1.4116 steel and the new Overland Chef collection really stood out.\n\nAs someone based in Yangjiang, where ~75% of China's knives are produced, I work with 4 partner factories specializing in chef knives, Santoku, Nakiri and knife sets. We offer OEM/ODM production in SGS LFGB and FDA certified facilities, plus free marketing photos and videos to support your launches.\n\nWould you be open to a quick conversation about your next collection's production needs?\n\nhttps://kailioncrafts.com/kitchen-knives/\n\nBest regards,\nLeo Li\nKaiLionCrafts\nWhatsApp: +86 131-3800-6564\nWeb: kailioncrafts.com",
+        "chinese": "Kirsten & Chelcea 你们好，\n\n我关注 Messermeister 有一段时间了——你们的 Avanta 系列（德国1.4116钢材）和全新的 Overland Chef 系列让我印象深刻。\n\n我常驻阳江，中国约75%的刀剪产自这里。我与4家深度合作工厂协作，专业生产主厨刀、三德刀、菜切和套刀。我们提供 SGS LFGB 和 FDA 认证工厂的 OEM/ODM 代工服务，还免费提供产品图片和视频素材，助力你们的新品发布。\n\n是否方便简单聊聊你们下一季新品的生产需求？\n\n厨房刀产品页：https://kailioncrafts.com/kitchen-knives/\n\n此致，\nLeo Li\nKaiLionCrafts（锴利国际贸易）\nWhatsApp: +86 131-3800-6564\n官网: kailioncrafts.com",
+        "wordCount": 128,
+        "sellingPointsUsed": ["阳江产业带", "4家深度合作工厂", "OEM/ODM", "SGS LFGB + FDA认证（合作工厂持有）", "免费营销素材套餐"],
+        "linksUsed": ["https://kailioncrafts.com/kitchen-knives/"]
+      }
+    },
+    {
+      "id": "kk_002",
+      "company": "Matsato",
+      "website": "https://matsato.com",
+      "email": "support@matsato.com",
+      "emailType": "通用邮箱",
+      "contact": {
+        "name": "",
+        "title": "",
+        "linkedin": "未找到，建议LinkedIn查找创始人"
+      },
+      "country": "USA",
+      "city": "Virginia (phone: +1 434 area code)",
+      "customerType": "电商卖家",
+      "source": "https://matsato.com/ | https://en-matsato.us/",
+      "confidence": "中",
+      "backgroundCheck": {
+        "companyOverview": "Matsato is a direct-to-consumer (DTC) kitchen knife brand targeting the US market. Their flagship product is a Santoku-style chef knife featuring 4CR14 high-carbon stainless steel, hammered non-stick finish, and premium beech wood/rosewood handle. They sell exclusively through their own website (not Amazon/eBay), positioning as 'Japanese-inspired craftsmanship at an accessible price point.' They emphasize a 30-day guarantee and direct-to-consumer model.",
+        "decisionMaker": "Founder/CEO unknown — likely a small team or solo founder running a DTC e-commerce brand. Support email: support@matsato.com, phone: +1 434-425-7300. Recommend LinkedIn search for founder using keywords 'Matsato knives founder' or checking their Facebook/Instagram pages.",
+        "contactInfo": "Email: support@matsato.com | Phone: +1 434-425-7300 | Website: matsato.com | DTC only, no Amazon/Walmart listings",
+        "painPoints": "As a small DTC brand, they likely face: (1) limited product range — currently mostly one SKU (Santoku chef knife), need to expand to chef knife, bread knife, paring knife, etc.; (2) reliance on a single supplier means supply chain risk; (3) need for high-quality marketing content (photos, videos) to compete on paid ads; (4) cost pressure as DTC ad costs rise.",
+        "purchaseIntent": "High. DTC brands constantly iterate on product line expansion. With 4CR14 steel (a Chinese mainstream steel grade), they are almost certainly already sourcing from China. They need more SKUs, better pricing, and marketing content support.",
+        "competitorAnalysis": "Competitive set: other DTC knife brands like Dalstrong, Tuo, Enso, Imarku. Price point ~$50-80 per knife. They position as premium but accessible Japanese-style.",
+        "supplyChain": "Likely sourcing from Chinese factories directly or via trading companies. 4CR14 steel is standard in Yangjiang. They may be using a trading agent rather than direct factory, which means we can offer better pricing and more direct communication.",
+        "entryAngle": "Perfect fit for our DTC-focused value proposition. Emphasize: (1) expand product range easily — we do full kitchen knife category; (2) free marketing assets (product photos, videos) — critical for DTC ad creative; (3) factory showcase video branded as their own; (4) founder-direct communication means fast iteration for new SKUs."
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "电商卖家",
+        "countryGrade": "S",
+        "categoryMatch": "厨房刀",
+        "priorityScore": 82,
+        "recommendedStrategy": "Fast, punchy tone focused on DTC growth. Lead with product expansion + marketing content. Show we understand the DTC e-commerce model (ad costs, SKU expansion, content needs)."
+      },
+      "email": {
+        "subjectLines": [
+          "Expand your Santoku line — Yangjiang factory direct",
+          "OEM kitchen knives + free marketing assets for DTC",
+          "Next SKU for Matsato? Factory-direct from Yangjiang"
+        ],
+        "english": "Hi Matsato Team,\n\nI came across your Santoku chef knife — the 4CR14 steel and hammered finish are a great match for the DTC market.\n\nI'm Leo from KaiLionCrafts, based in Yangjiang, China's knife-making capital. We work with 4 partner factories producing chef knives, Santoku, Nakiri, bread knives and sets for US brands. We can support your expansion with OEM/ODM production, free product photos and videos, and even a factory showcase video branded with your logo.\n\nWould you be interested in exploring a supply partnership for your next SKU?\n\nhttps://kailioncrafts.com/kitchen-knives/\n\nBest,\nLeo Li\nKaiLionCrafts\nWhatsApp: +86 131-3800-6564\nkailioncrafts.com",
+        "chinese": "Matsato 团队你们好，\n\n我看到了你们的三德主厨刀——4CR14钢材和锤纹处理非常契合DTC市场。\n\n我是 Leo，来自 KaiLionCrafts，常驻中国刀剪之都阳江。我们与4家深度合作工厂协作，为美国品牌生产主厨刀、三德刀、菜切、面包刀和套刀。我们可以支持你们的产品线扩展：OEM/ODM代工、免费产品图片和视频素材，甚至可以为你们拍摄带品牌Logo的工厂宣传片。\n\n是否有兴趣探讨一下下一个SKU的供应合作？\n\n厨房刀产品页：https://kailioncrafts.com/kitchen-knives/\n\n此致，\nLeo Li\nKaiLionCrafts（锴利国际贸易）\nWhatsApp: +86 131-3800-6564\n官网: kailioncrafts.com",
+        "wordCount": 118,
+        "sellingPointsUsed": ["阳江产业带", "4家深度合作工厂", "OEM/ODM", "免费营销素材套餐", "工厂宣传片打客户Logo"],
+        "linksUsed": ["https://kailioncrafts.com/kitchen-knives/"]
+      }
+    },
+    {
+      "id": "kk_003",
+      "company": "KATO Deutschland GmbH (Kato Group)",
+      "website": "https://www.katogroup.eu",
+      "email": "info@katogroup.eu",
+      "emailType": "通用邮箱",
+      "contact": {
+        "name": "",
+        "title": "",
+        "linkedin": "未找到，建议LinkedIn查找采购负责人"
+      },
+      "country": "Germany",
+      "city": "Emmerich am Rhein (German office)",
+      "customerType": "分销商",
+      "source": "https://www.katogroup.eu/",
+      "confidence": "中",
+      "backgroundCheck": {
+        "companyOverview": "Kato Group is a European kitchen and houseware distributor with headquarters in Apeldoorn, Netherlands and a German subsidiary KATO Deutschland GmbH in Emmerich am Rhein. They distribute multiple brands and develop their own products — including the Grailer 1 premium pocket knife created in partnership with Italian manufacturer Lionsteel and Dutch designer Dirk de Wit. They operate across the DACH region and broader Europe.",
+        "decisionMaker": "Procurement / product development team. Email: info@katogroup.eu. Phone: +49 69 643 509 595. Recommend LinkedIn search for 'Kato Group buyer' or 'Kato Deutschland Einkäufer'.",
+        "contactInfo": "Email: info@katogroup.eu | Phone: +49 69 643 509 595 | German office: Stadtweide 17, 46446 Emmerich am Rhein, Germany | HQ: Laan van Westenenk 8, 7336 AZ Apeldoorn, Netherlands",
+        "painPoints": "As a distributor developing own-brand products (like Grailer), they likely need: (1) competitive manufacturing partners for private label / own-brand lines; (2) reliable supply chain for European quality standards (LFGB certification is essential in Germany); (3) flexibility on MOQs for new product testing; (4) one-stop sourcing across kitchen categories.",
+        "purchaseIntent": "Medium. They already collaborate with Italian manufacturer Lionsteel for knives. They may be looking to expand their own-brand knife range into kitchen knives, or diversify suppliers. German market demands LFGB certification — our certified factories qualify.",
+        "competitorAnalysis": "They distribute various kitchen/houseware brands. Own-brand Grailer positions at premium EDC/pocket knife level. For kitchen knives, they would compete with established European distributors.",
+        "supplyChain": "European manufacturing partnerships (Lionsteel, Italy). They likely also source from Asia for mid-range products. German/EU market requires LFGB food contact certification.",
+        "entryAngle": "Lead with LFGB + FDA certified production (critical for German market). Emphasize factory-direct pricing advantage vs. trading companies. Mention one-stop procurement across kitchen categories. Position as a reliable Yangjiang manufacturing partner for their own-brand kitchen knife expansion."
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "分销商",
+        "countryGrade": "A",
+        "categoryMatch": "厨房刀",
+        "priorityScore": 75,
+        "recommendedStrategy": "Professional, compliance-focused tone. Lead with certifications (LFGB/FDA) — this is non-negotiable for German buyers. Emphasize reliability and export experience across 130+ countries."
+      },
+      "email": {
+        "subjectLines": [
+          "LFGB-certified kitchen knives from Yangjiang — factory direct",
+          "OEM kitchen knife supply for European distribution",
+          "Expand your knife range — Yangjiang manufacturing partner"
+        ],
+        "english": "Hi Kato Group Team,\n\nI noticed your Grailer knife collaboration with Lionsteel — excellent design work. I'm reaching out because you may be looking to expand your kitchen knife range for the DACH market.\n\nWe're KaiLionCrafts, based in Yangjiang, China — home to ~75% of China's knife production. Our 4 partner factories produce chef knives, Santoku, bread knives and sets with SGS LFGB and FDA certified materials. We offer factory-direct pricing (typically 20% below trading companies), export experience across 130+ countries, and one-stop sourcing across kitchen categories.\n\nWould a brief introduction be useful?\n\nhttps://kailioncrafts.com/kitchen-knives/\n\nBest regards,\nLeo Li\nKaiLionCrafts\nWhatsApp: +86 131-3800-6564\nkailioncrafts.com",
+        "chinese": "Kato Group 团队你们好，\n\n我注意到你们与 Lionsteel 合作的 Grailer 刀具系列——设计非常出色。我联系你们是因为了解到你们可能在拓展德语区市场的厨房刀产品线。\n\n我们是 KaiLionCrafts，常驻中国阳江——中国约75%的刀剪产自这里。我们的4家深度合作工厂生产主厨刀、三德刀、面包刀和套刀，材料通过 SGS LFGB 和 FDA 认证。我们提供工厂直供价（通常比贸易商低20%），出口经验覆盖130+国家，并提供厨房品类一站式采购。\n\n是否方便做个简单介绍？\n\n厨房刀产品页：https://kailioncrafts.com/kitchen-knives/\n\n此致，\nLeo Li\nKaiLionCrafts（锴利国际贸易）\nWhatsApp: +86 131-3800-6564\n官网: kailioncrafts.com",
+        "wordCount": 125,
+        "sellingPointsUsed": ["阳江产业带", "4家深度合作工厂", "SGS LFGB + FDA认证（合作工厂持有）", "工厂直供价 — 低于贸易商20%", "出口130+国家", "一站式采购"],
+        "linksUsed": ["https://kailioncrafts.com/kitchen-knives/"]
+      }
+    },
+    {
+      "id": "kk_004",
+      "company": "Kitchen Craft (Lifetime Brands Europe Ltd)",
+      "website": "https://www.kitchencraft.co.uk",
+      "email": "sales@kitchencraft.co.uk",
+      "emailType": "通用邮箱",
+      "contact": {
+        "name": "Emma Lewis-Jones (mentioned in Wiza profile)",
+        "title": "Unknown role at KitchenCraft",
+        "linkedin": "https://wiza.co/d/kitchencraft/52b0/emma-lewis-jones"
+      },
+      "country": "UK",
+      "city": "Birmingham, England",
+      "customerType": "进口商",
+      "source": "https://thekitchencraft.co.uk/contact/ | https://www.importgenius.com/ukraine/suppliers/lifetime-brands-europe-birmingham-ltd",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "Kitchen Craft is one of the UK's largest kitchenware companies, founded in 1850 as a family business. Now part of Lifetime Brands Europe Ltd, headquartered at The Hub, Nobel Way, Birmingham B6 7EU. Owns multiple consumer brands: KitchenCraft, MasterClass, Colourworks, KC by KitchenCraft. They supply retailers across the UK and internationally, with a huge product range spanning kitchen tools, bakeware, tableware, and cutlery.",
+        "decisionMaker": "Procurement / buying team. General sales email: sales@kitchencraft.co.uk. Known contact: Emma Lewis-Jones (email format e*****@kitche***.co.uk per Wiza). Recommend LinkedIn search for 'KitchenCraft buyer' or 'Lifetime Brands Europe sourcing'.",
+        "contactInfo": "Email: sales@kitchencraft.co.uk | Phone: +44 (0)121 604 6000 | Address: The Hub, Nobel Way, Birmingham, B6 7EU, UK | Part of Lifetime Brands Europe | Founded 1850",
+        "painPoints": "As a large kitchenware importer with private label brands (MasterClass), they constantly need: (1) competitive factory pricing to maintain margins in a cost-pressured retail environment; (2) supply chain stability — diversifying away from over-reliance on single suppliers; (3) faster turnaround on new product development; (4) quality consistency across large volumes.",
+        "purchaseIntent": "High. ImportGenius data confirms they already import from China (e.g., Foshan Qiqiang Hardware Appliance Co., Ltd. for kitchen tools). They have an established import operation and are always evaluating new suppliers. Their MasterClass knife line needs ongoing production.",
+        "competitorAnalysis": "Their MasterClass brand competes with other value-to-mid range kitchenware brands in UK retail (John Lewis, Argos, Amazon). Price point: mid-range value.",
+        "supplyChain": "Already importing from China (Foshan, Guangdong area confirmed). They work through multiple factories and likely trading companies. Being in Yangjiang, we can offer closer factory relationships and potentially better pricing than their current Guangzhou-based suppliers.",
+        "entryAngle": "Lead with Yangjiang knife specialization — they may currently source knives through general hardware factories in Foshan/Guangzhou. We are knife specialists in the knife capital. Emphasize: (1) knife-focused expertise vs. general hardware factories; (2) factory-direct pricing; (3) founder-direct communication (Leo directly, not sales reps); (4) free marketing assets to support their retail accounts."
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "进口商",
+        "countryGrade": "A",
+        "categoryMatch": "厨房刀",
+        "priorityScore": 90,
+        "recommendedStrategy": "Professional, B2B-traditional tone. Lead with credibility: Yangjiang knife specialization, existing China sourcing experience (we know they already import), factory-direct pricing advantage. Reference MasterClass brand specifically."
+      },
+      "email": {
+        "subjectLines": [
+          "Yangjiang knife specialist for your MasterClass range",
+          "OEM kitchen knives — factory-direct from China's knife capital",
+          "Stable Yangjiang supply for your next knife collection"
+        ],
+        "english": "Hi Kitchen Craft Team,\n\nI've long admired how KitchenCraft has grown since 1850, and the MasterClass knife range is a benchmark for value-quality in UK kitchenware.\n\nI'm Leo from KaiLionCrafts, based in Yangjiang, China — where approximately 75% of China's knives and scissors are produced. We work with 4 partner factories specializing in kitchen knife OEM/ODM, with SGS LFGB and FDA certified facilities. My founder-direct model means you deal directly with me — no sales layers. We also provide free marketing assets: product photos, videos, and factory footage branded with your logo.\n\nWould you be open to a quick chat about your next knife collection?\n\nhttps://kailioncrafts.com/kitchen-knives/\n\nBest,\nLeo Li\nKaiLionCrafts\nWhatsApp: +86 131-3800-6564\nkailioncrafts.com",
+        "chinese": "Kitchen Craft 团队你们好，\n\n我一直很欣赏 KitchenCraft 自1850年以来的发展，MasterClass 刀系列是英国厨具性价比的标杆。\n\n我是 Leo，来自 KaiLionCrafts，常驻中国阳江——中国约75%的刀剪产自这里。我们与4家深度合作工厂协作，专业做厨房刀 OEM/ODM，合作工厂持有 SGS LFGB 和 FDA 认证。创始人直接对接模式意味着你们直接和我沟通——没有销售层层转手。我们还免费提供营销素材：产品图片、视频，以及带你们品牌Logo的工厂宣传片。\n\n是否方便聊聊你们下一季刀系列的采购计划？\n\n厨房刀产品页：https://kailioncrafts.com/kitchen-knives/\n\n此致，\nLeo Li\nKaiLionCrafts（锴利国际贸易）\nWhatsApp: +86 131-3800-6564\n官网: kailioncrafts.com",
+        "wordCount": 132,
+        "sellingPointsUsed": ["阳江产业带", "4家深度合作工厂", "OEM/ODM", "SGS LFGB + FDA认证（合作工厂持有）", "创始人Leo直接对接", "免费营销素材套餐", "工厂宣传片打客户Logo"],
+        "linksUsed": ["https://kailioncrafts.com/kitchen-knives/"]
+      }
+    },
+    {
+      "id": "kk_005",
+      "company": "Kitasho Co., Ltd. (Kanetsune Seki)",
+      "website": "https://www.kanetsune.com",
+      "email": "info@kanetsune.com",
+      "emailType": "通用邮箱",
+      "contact": {
+        "name": "Kiyohiro Furuta",
+        "title": "International Sales Manager",
+        "linkedin": ""
+      },
+      "country": "Japan",
+      "city": "Seki City, Gifu Prefecture",
+      "customerType": "品牌商",
+      "source": "https://www.kanetsune.com/about/",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "Kitasho Co., Ltd. is the maker of Kanetsune Seki knives, based in Seki City, Gifu Prefecture — Japan's famous knife-making city (600+ years of blade tradition). President: Hitoshi Tanoue. They produce high-quality fixed-blade and kitchen knives under the Kanetsune brand, with a strong reputation among outdoor enthusiasts and chefs. They have an established international sales department.",
+        "decisionMaker": "Kiyohiro Furuta — International Sales Manager (furuta@kt-kitasho.co.jp). Koji Aiba — International Sales (aiba@kt-kitasho.co.jp). President: Hitoshi Tanoue. They actively handle export inquiries.",
+        "contactInfo": "Email: info@kanetsune.com | Furuta: furuta@kt-kitasho.co.jp | Aiba: aiba@kt-kitasho.co.jp | Address: 5-1-11 Sakae-machi, Seki City, Gifu-Pref, 501-3253 Japan | President: Hitoshi Tanoue",
+        "painPoints": "As a Japanese premium knife brand, they face: (1) cost pressure — Japanese labor costs make mid-range product lines expensive; (2) expanding product range to reach broader markets without diluting the 'Made in Japan' premium brand; (3) competing with cheaper Chinese-made Japanese-style knives in global markets; (4) need for complementary product lines (entry-level) to funnel customers toward premium products.",
+        "purchaseIntent": "Medium. They are primarily a Japanese manufacturer, but Japanese knife companies increasingly develop lower-priced OEM lines for export markets, leveraging Chinese manufacturing while keeping the premium 'Made in Japan' core line. They may be open to OEM partnerships for value-oriented export products.",
+        "competitorAnalysis": "Kanetsune competes with other Seki-based knife makers: Misono, Glest, Tojiro, Mcusta. Their price range spans mid to premium. They have strong following in outdoor/camping community.",
+        "supplyChain": "Fully Japanese manufacturing in Seki for their core premium line. However, many Japanese knife brands have begun using Chinese OEM for entry-level or accessory lines to stay competitive globally.",
+        "entryAngle": "Approach from 'supporting your export value line' angle. Position ourselves as a manufacturing partner for their mid-range/entry-level export products — maintaining Japanese design quality at a competitive price point. Highlight that we can produce to Japanese 15° edge specifications, with VG10 Damascus and 5Cr15MoV options. Emphasize understanding of Japanese knife quality standards."
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "品牌商",
+        "countryGrade": "A",
+        "categoryMatch": "厨房刀",
+        "priorityScore": 72,
+        "recommendedStrategy": "Respectful, quality-focused tone. Acknowledge their Seki craftsmanship heritage. Frame the value proposition as supporting their export product line expansion — not replacing their Japanese manufacturing. Show technical understanding of Japanese knife specifications (15° edge, VG10, etc.)."
+      },
+      "email": {
+        "subjectLines": [
+          "OEM kitchen knife production in Yangjiang for export lines",
+          "Value-tier knife manufacturing partner — Yangjiang, China",
+          "Expand your export range with cost-competitive OEM production"
+        ],
+        "english": "Dear Mr. Furuta,\n\nI've followed Kanetsune Seki's craftsmanship from Seki for years — your knives represent the best of Japanese blade making tradition.\n\nI'm Leo from KaiLionCrafts, based in Yangjiang, China. We work with 4 partner factories specializing in OEM/ODM kitchen knives — chef knives, Santoku, Nakiri, bread knives and sets. Our factories can produce to Japanese 15° edge specifications, with options including 5Cr15MoV, VG10 Damascus and German 1.4116 steel. We support MOQs from 50–300 pieces for single knives, with SGS LFGB/FDA certified production.\n\nWould your team be open to exploring OEM partnerships for export-oriented product lines?\n\nhttps://kailioncrafts.com/kitchen-knives/\n\nBest regards,\nLeo Li\nKaiLionCrafts\nWhatsApp: +86 131-3800-6564\nkailioncrafts.com",
+        "chinese": "Furuta 先生您好，\n\n我多年来一直关注关市（Seki）的 Kanetsune 品牌——你们的刀具代表了日本刃物制作的顶尖工艺传统。\n\n我是 Leo，来自 KaiLionCrafts，常驻中国阳江。我们与4家深度合作工厂协作，专业做 OEM/ODM 厨房刀——主厨刀、三德刀、菜切、面包刀和套刀。我们的工厂可按日式15°开刃标准生产，钢材可选5Cr15MoV、VG10大马士革、德国1.4116。单刀MOQ低至50-300把，生产通过 SGS LFGB/FDA 认证。\n\n贵司是否有兴趣探讨出口导向产品线的 OEM 合作？\n\n厨房刀产品页：https://kailioncrafts.com/kitchen-knives/\n\n此致，\nLeo Li\nKaiLionCrafts（锴利国际贸易）\nWhatsApp: +86 131-3800-6564\n官网: kailioncrafts.com",
+        "wordCount": 126,
+        "sellingPointsUsed": ["4家深度合作工厂", "OEM/ODM", "阳江产业带", "SGS LFGB + FDA认证（合作工厂持有）", "日式15°开刃标准"],
+        "linksUsed": ["https://kailioncrafts.com/kitchen-knives/"]
+      }
+    }
+  ]
+}

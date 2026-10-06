@@ -1,0 +1,287 @@
+{
+  "category": "kitchen_accessories",
+  "categoryName": "厨房用品",
+  "generatedAt": "2026-10-06",
+  "customers": [
+    {
+      "id": "ka_001",
+      "company": "Norpro, Inc.",
+      "website": "https://www.norpro.com",
+      "email": "order@norpro.com",
+      "emailType": "通用邮箱（订单/批发专用邮箱，来自官方产品目录PDF）",
+      "contact": {
+        "name": "",
+        "title": "未找到，建议LinkedIn查找 Sourcing Manager / VP of Purchasing",
+        "linkedin": ""
+      },
+      "country": "美国 (USA)",
+      "city": "Everett, Washington (2215 Merrill Creek Parkway, 98203)",
+      "customerType": "品牌商/批发商（B2B厨房工具品牌，不自营零售，只通过零售商分销）",
+      "source": "https://www.norpro.com/contact-us/ ；官方产品目录PDF https://www.norpro.com/wp-content/uploads/2022/07/ExtendedStayEssentialsEpub.pdf",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "Norpro, Inc. 是一家总部位于华盛顿州Everett的家族式厨房工具/小器具设计与批发企业，B2B运营（明确不直接服务消费者）。产品线极广，涵盖削皮器、开罐器、量杯量勺、刨丝器、BBQ夹、烘焙工具等数千SKU，通过全美厨房用品零售商、百货和餐厅用品渠道销售。",
+        "decisionMaker": "公开页面未披露具体采购负责人。该类企业通常由 Sourcing Manager 或 Purchasing Director 决定新供应商。建议在LinkedIn搜索 'Norpro sourcing' 或 'Norpro purchasing'。",
+        "contactInfo": "邮箱 order@norpro.com（官方目录公布的批发下单邮箱）；电话 1-800-722-0202 / 传真 1-425-261-1001；地址 2215 Merrill Creek Parkway, Everett, WA 98203。",
+        "painPoints": "作为SKU极多的批发商，高度依赖海外代工；常见痛点：现有供应商质量不稳定、交期波动、海运成本上升、需要第二供应源保证连续性、新品开发需要低门槛MOQ试单。",
+        "purchaseIntent": "强。其整个目录即为外购厨房小工具，常年滚动采购，采购量大、周期性强，对新品类（削皮器/刨丝器/砧板/BBQ工具）有持续补位需求。",
+        "competitorAnalysis": "同价位竞品为 OXO、Progressive (Prep Solutions)、Chef'n、Good Cook；零售单价区间约 $3–20，定位中端大众厨房。",
+        "supplyChain": "高度推测为以中国（广东/浙江/义乌）及台湾代工为主，结合部分欧美本地采购。属典型亚洲进口依赖型批发商。",
+        "entryAngle": "以'阳江本地工厂网络'提供削皮器/刨丝器/BBQ工具/竹木砧板的工厂直供价（低于贸易商约20%），强调4家深度合作工厂带来的供应稳定性，叠加新品低MOQ+免费产品图/视频（可直接供其零售客户用）。切入点是'第二供应源+新品开发支持'。"
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "品牌商/批发商",
+        "countryGrade": "S",
+        "categoryMatch": "厨房用品",
+        "priorityScore": 88,
+        "recommendedStrategy": "专业、务实、价值导向的B2B冷邮件。突出工厂直供价+稳定供货+新品低MOQ，避免花哨；用其目录中具体品类（peelers/can openers/BBQ tongs）做个性化钩子。"
+      },
+      "email": {
+        "subjectLines": [
+          "Yangjiang kitchen tool network — Norpro supply backup?",
+          "Peelers, graters & BBQ tools, factory-direct for Norpro",
+          "Reliable OEM kitchen gadget supply from Yangjiang"
+        ],
+        "english": "Dear Norpro Sourcing Team,\n\nI browsed your peelers, can openers and BBQ tongs range — the breadth of your gadget catalog is impressive.\n\nI'm Leo, founder of KaiLionCrafts in Yangjiang, China, the region behind ~75% of China's knives and cutlery. Through 4 vetted local factories we produce peelers, graters, BBQ tools and bamboo/plastic cutting boards, with LFGB/FDA food-contact compliance held by our partner plants.\n\nFor a wholesaler of your scale, stable supply and cost control matter. We offer factory-direct pricing (~20% below trading houses), low MOQ for new SKUs, and free product photos and videos to support your retail customers.\n\nWould you be open to a quick look at our kitchen accessories range?\n\nBest regards,\nLeo Li\nFounder, KaiLionCrafts\nWhatsApp: +86 131-3800-6564\nWeb: https://kailioncrafts.com/kitchen-accessories/",
+        "chinese": "尊敬的Norpro采购团队：\n\n我浏览了你们的削皮器、开罐器和BBQ夹系列——你们小器具目录的广度令人印象深刻。\n\n我是Leo，KaiLionCrafts创始人，来自中国阳江——中国约75%的刀剪产自这里。我们通过4家深度合作的本地工厂生产削皮器、刨丝器、BBQ工具和竹/塑料砧板，LFGB/FDA食品接触合规由我们的合作工厂持有。\n\n对你们这样规模的批发商而言，稳定供货和成本控制至关重要。我们提供工厂直供价（通常比贸易商低约20%）、新品低MOQ，以及免费的产品图片和视频来支持你们的零售客户。\n\n你们是否愿意快速看一眼我们的厨房用品系列？\n\n此致\nLeo Li\nKaiLionCrafts 创始人\nWhatsApp: +86 131-3800-6564\n网站: https://kailioncrafts.com/kitchen-accessories/",
+        "wordCount": 122,
+        "sellingPointsUsed": [
+          "阳江产业带（中国75%刀剪产自阳江）",
+          "4家深度合作工厂—稳定供货",
+          "工厂直供价—低于贸易商20%",
+          "免费营销素材套餐—产品图/视频",
+          "SGS LFGB + FDA认证（合作工厂持有）",
+          "低MOQ，快速交货"
+        ],
+        "linksUsed": [
+          "https://kailioncrafts.com/kitchen-accessories/"
+        ]
+      }
+    },
+    {
+      "id": "ka_002",
+      "company": "HIC, Harold Import Co. (Harold Import Company)",
+      "website": "https://www.haroldimport.com",
+      "email": "smulligan@haroldimport.com",
+      "emailType": "具体邮箱（行业目录披露的联系人 S. Mulligan；备用通用邮箱建议 info@haroldimport.com）",
+      "contact": {
+        "name": "S. Mulligan",
+        "title": "行业目录登记联系人（推测为销售/商务岗）；另据其官方博客，Nicole Herman 曾任 Director of Marketing（2016年资料，时效待核）",
+        "linkedin": "未找到，建议LinkedIn搜索 Harold Import purchasing / sourcing"
+      },
+      "country": "美国 (USA)",
+      "city": "Lakewood, New Jersey (747 Vassar Ave, 08701-6908)",
+      "customerType": "进口商（厨房工具/烘焙用具进口与批发）",
+      "source": "https://stage.fermag.com/manufacturer/hic-harold-import-co/ ；https://totalfood.com/tfs-source-it/listing/harold-import-co-inc/ ；官网博客 https://hickitchenblog.com",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "HIC (Harold Import Company) 是一家位于新泽西州Lakewood的老牌厨房工具进口商与批发商，产品涵盖烘焙用具、砧板、 citrus squeezer（ citrus榨汁器）、grill tools、瓷器烘焙等。其特色是代理专业进口品牌（如日本 Benriner 曼德琳切片刀），同时经营自有 HIC 品牌，供货给零售与餐饮渠道。",
+        "decisionMaker": "行业目录登记 smulligan@haroldimport.com（S. Mulligan）。公开资料显示 Nicole Herman 曾任市场总监。实际采购决策人未公开，建议LinkedIn核实 Purchasing / Import Manager。",
+        "contactInfo": "邮箱 smulligan@haroldimport.com；电话目录登记 303-210-3876；地址 747 Vassar Ave, Lakewood, NJ 08701；官方站点 hickitchen.com / haroldimport.com。",
+        "painPoints": "作为进口商需管理多国供应链（日本、中国、欧洲）；痛点包括：多供应商难以整合、FDA食品接触合规压力、海运交期不可控、亚马逊及大型零售带来的毛利挤压、需要更灵活的OEM新品来差异化。",
+        "purchaseIntent": "强。公司名即'Import'，常年进口厨房工具；代理Benriner说明其重视专业刀具/切片类产品，对削皮器、刨丝器、切片器、BBQ工具存在持续补位与替换采购。",
+        "competitorAnalysis": "中端厨房工具，自有HIC品牌+代理专业品牌；零售单价约 $5–30；与 Norpro、Chef'n、Tablecraft 等竞争。",
+        "supplyChain": "日本（Benriner）、中国、欧洲多源采购。中国段集中在广东/浙江厨房用品产业带。",
+        "entryAngle": "以'一站式整合采购'切入：用阳江网络提供削皮器/刨丝器/切片器/BBQ工具/砧板，强调LFGB/FDA合规由合作工厂背书、工厂直供价降低成本、免费产品图视频支持其零售伙伴。个性化钩子提及其代理的 Benriner 曼德琳与 citrus squeezer。"
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "进口商",
+        "countryGrade": "S",
+        "categoryMatch": "厨房用品",
+        "priorityScore": 86,
+        "recommendedStrategy": "专业进口商量级的邮件，强调合规（FDA/LFGB）、供应整合与成本；用其代理的Benriner/榨汁器做个性化证明非群发；语气稳重、采购导向。"
+      },
+      "email": {
+        "subjectLines": [
+          "Reliable kitchen tool sourcing for HIC — Yangjiang",
+          "Peelers, graters & slicers, factory-direct for HIC",
+          "One-stop OEM kitchen tools, food-contact certified"
+        ],
+        "english": "Dear Mr./Ms. Mulligan,\n\nI noticed HIC's long partnership with Benriner mandolins, plus your citrus squeezers and bakeware — a really specialist range.\n\nI'm Leo, founder of KaiLionCrafts in Yangjiang, China, home to ~75% of China's cutlery industry. Through 4 vetted local factories we make peelers, graters, slicers, BBQ tools and cutting boards, with LFGB/FDA food-contact compliance held by our partner plants.\n\nAs an importer, you already know how critical certification and on-time delivery are. We offer factory-direct pricing (~20% below trading houses), low MOQ for new SKUs, and free product photos and videos for your retail partners.\n\nCould I share our kitchen accessories range for your team?\n\nBest regards,\nLeo Li\nFounder, KaiLionCrafts\nWhatsApp: +86 131-3800-6564\nWeb: https://kailioncrafts.com/kitchen-accessories/",
+        "chinese": "尊敬的Mulligan先生/女士：\n\n我注意到HIC与Benriner曼德琳切片刀的长期合作，以及你们的 citrus 榨汁器和烘焙用具——非常专业的产品线。\n\n我是Leo，KaiLionCrafts创始人，来自中国阳江——中国约75%的刀剪产业所在地。我们通过4家深度合作的本地工厂生产削皮器、刨丝器、切片器、BBQ工具和砧板，LFGB/FDA食品接触合规由我们的合作工厂持有。\n\n作为进口商，您深知认证和准时交付有多关键。我们提供工厂直供价（通常比贸易商低约20%）、新品低MOQ，以及供您零售伙伴使用的免费产品图片和视频。\n\n我是否可以把我们的厨房用品系列分享给您的团队？\n\n此致\nLeo Li\nKaiLionCrafts 创始人\nWhatsApp: +86 131-3800-6564\n网站: https://kailioncrafts.com/kitchen-accessories/",
+        "wordCount": 128,
+        "sellingPointsUsed": [
+          "阳江产业带（中国75%刀剪产自阳江）",
+          "4家深度合作工厂—稳定供货",
+          "工厂直供价—低于贸易商20%",
+          "免费营销素材套餐—产品图/视频",
+          "SGS LFGB + FDA认证（合作工厂持有）",
+          "低MOQ，快速交货"
+        ],
+        "linksUsed": [
+          "https://kailioncrafts.com/kitchen-accessories/"
+        ]
+      }
+    },
+    {
+      "id": "ka_003",
+      "company": "Harms Import & Vertriebs GmbH & Co. KG",
+      "website": "https://www.harms-import.de",
+      "email": "info@harms-import.de",
+      "emailType": "通用邮箱（官网公布的通用联系邮箱）",
+      "contact": {
+        "name": "",
+        "title": "未找到，建议LinkedIn / 德国商业登记册（Handelsregister）查询 Einkaufsleiter（采购经理）",
+        "linkedin": ""
+      },
+      "country": "德国 (Germany)",
+      "city": "Westerstede, Niedersachsen (Sternkamp 18, 26655)",
+      "customerType": "进口商（家居/厨房用品进口与批发，供货给零售商）",
+      "source": "https://www.harms-import.de/kontakt/ ；GPSR制造商公示PDF https://www.hellweg.de/media/5b/38/18/1760373152/235659_4041908123954_GPSR-Herstellerinfo.pdf.pdf",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "Harms Import & Vertriebs GmbH & Co. KG 是一家位于德国下萨克森州Westerstede的进口批发商，主营家居用品（Haushaltswaren）、礼品、圣诞、花园及厨房用品，产品包括 Schneidbretter（砧板）、Küchenhelfer（厨房小工具）、Einkaufshilfen（购物辅助）等，供货给德国及周边的零售商（Wiederverkäufer）。",
+        "decisionMaker": "公开页面未披露具体采购负责人。建议查询德国 Handelsregister 或LinkedIn找 Einkaufsleiter / Import Manager。",
+        "contactInfo": "邮箱 info@harms-import.de；电话 +49 4488 52040-0；传真 +49 4488 52040-44；地址 Sternkamp 18, 26655 Westerstede。",
+        "painPoints": "德国/欧盟市场对食品接触材料要求严格（LFGB、REACH），加上包装法（VerpackG/EPR）合规成本上升；进口商痛点：需要真正懂欧盟食品接触法规的供应商、合规文件齐全、交期稳定、价格有竞争力以覆盖合规成本。",
+        "purchaseIntent": "中-高。公司名即'Import'，常年进口家居/厨房杂货，属配货式采购；对砧板、厨房小工具这类常规品有持续补货需求。",
+        "competitorAnalysis": "定位大众中端家居/厨房杂货，主要通过折扣店、百货、园艺/礼品渠道销售；与同类进口批发商竞争。",
+        "supplyChain": "高度推测以中国（义乌/广东）杂货进口为主，辅以欧洲本地采购。",
+        "entryAngle": "主打'欧盟食品接触合规+工厂直供'：强调LFGB由合作工厂背书、能提供完整合规文件，解决德国进口商最关心的合规痛点；产品聚焦砧板（FSC竹木/塑料）+厨房小工具；用工厂直供价对冲其合规成本。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "进口商",
+        "countryGrade": "A",
+        "categoryMatch": "厨房用品",
+        "priorityScore": 80,
+        "recommendedStrategy": "严谨、合规导向的邮件。德国买家重视认证与可靠文件，突出LFGB/FDA食品接触合规与稳定交付；用其砧板/厨房工具品类做个性化；英文即可，必要时附德文要点。"
+      },
+      "email": {
+        "subjectLines": [
+          "Cutting boards & kitchen tools, LFGB-certified, Yangjiang",
+          "Zuverlässiger Küchenhelfer-Import aus Yangjiang?",
+          "FSC cutting boards + kitchen tools for Harms Import"
+        ],
+        "english": "Dear Harms Import Team,\n\nI reviewed your household and kitchen assortment — your cutting boards (Schneidbretter) and kitchen helpers stood out.\n\nI'm Leo, founder of KaiLionCrafts in Yangjiang, China, the region behind ~75% of China's cutlery. Through 4 vetted local factories we produce FSC-certified bamboo/plastic cutting boards, peelers, graters and BBQ tools, with LFGB and FDA food-contact compliance held by our partner plants.\n\nFor a German importer, food-contact certification and reliable delivery are essential. We offer factory-direct pricing (~20% below trading houses), low MOQ, and free product photos and videos for your reseller network.\n\nWould a short overview of our kitchen accessories range be useful?\n\nBest regards,\nLeo Li\nFounder, KaiLionCrafts\nWhatsApp: +86 131-3800-6564\nWeb: https://kailioncrafts.com/kitchen-accessories/",
+        "chinese": "尊敬的Harms Import团队：\n\n我浏览了你们的家居与厨房产品系列——你们的砧板（Schneidbretter）和厨房小工具很抢眼。\n\n我是Leo，KaiLionCrafts创始人，来自中国阳江——中国约75%刀剪产业所在地。我们通过4家深度合作的本地工厂生产FSC认证竹/塑料砧板、削皮器、刨丝器和BBQ工具，LFGB与FDA食品接触合规由我们的合作工厂持有。\n\n对德国进口商而言，食品接触认证和可靠交付是硬指标。我们提供工厂直供价（通常比贸易商低约20%）、低MOQ，以及供您经销商网络使用的免费产品图片和视频。\n\n一份简短的厨房用品系列概览对您是否有用？\n\n此致\nLeo Li\nKaiLionCrafts 创始人\nWhatsApp: +86 131-3800-6564\n网站: https://kailioncrafts.com/kitchen-accessories/",
+        "wordCount": 124,
+        "sellingPointsUsed": [
+          "阳江产业带（中国75%刀剪产自阳江）",
+          "4家深度合作工厂—稳定供货",
+          "工厂直供价—低于贸易商20%",
+          "免费营销素材套餐—产品图/视频",
+          "砧板：FSC认证竹木/塑料/复合材质",
+          "SGS LFGB + FDA认证（合作工厂持有）"
+        ],
+        "linksUsed": [
+          "https://kailioncrafts.com/kitchen-accessories/"
+        ]
+      }
+    },
+    {
+      "id": "ka_004",
+      "company": "Heat & Grill",
+      "website": "https://www.heatgrill.com.au",
+      "email": "info@heatgrill.com.au",
+      "emailType": "通用邮箱（行业商业目录公开披露）",
+      "contact": {
+        "name": "",
+        "title": "未找到，建议LinkedIn查找 Owner / General Manager（墨尔本BBQ电商）",
+        "linkedin": ""
+      },
+      "country": "澳大利亚 (Australia)",
+      "city": "Melbourne, Victoria (电话区号03)",
+      "customerType": "电商卖家（BBQ专业线上零售商，click&collect+全国配送）",
+      "source": "https://www.heatgrill.com.au/ ；商业目录 https://campaigndata.mfw.org.au/business-directory/wpbdp_tag/homewares/",
+      "confidence": "中",
+      "backgroundCheck": {
+        "companyOverview": "Heat & Grill 是一家位于澳大利亚墨尔本的BBQ专业线上零售商，主售Weber系列烤炉（Q系列、炭烤、燃气、Pellet颗粒烤、Built-in、Griddle等），并经营BBQ配件与户外厨房；支持click&collect和全澳配送，有大促（Black Friday）运营。",
+        "decisionMaker": "公开页面未披露负责人。中小型电商通常由老板/总经理直接决策采购与选品。建议LinkedIn或电话 03 9429 6888 联系。",
+        "contactInfo": "邮箱 info@heatgrill.com.au；电话 +61 3 9429 6888；官网 heatgrill.com.au。",
+        "painPoints": "作为线上BBQ零售商，烤炉本身毛利有限且主要代理Weber大牌；痛点：需要高毛利配件类附加SKU（烤夹、烤刷、烤针、烤网、烤垫）提升客单价； listing需要大量高质量产品图/视频；自有品牌（private label）配件可显著改善毛利。",
+        "purchaseIntent": "中。当前主要通过澳洲本地分销商拿货，直接工厂采购（OEM/贴牌配件）是提升毛利的机会；澳洲春夏烧烤旺季前为采购窗口。",
+        "competitorAnalysis": "主要代理Weber配件，自有配件较少；竞品为澳洲其他BBQ零售商（如Beefeater/Ziegler&Brown体系）及亚马逊配件卖家。",
+        "supplyChain": "当前经澳洲本地分销商采购烤炉与配件；直接从中国工厂进口OEM配件是尚未开发的降本路径。",
+        "entryAngle": "这是'免费营销素材'卖点的最佳切入点：电商卖家极度需要listing图片/视频。主打'贴牌BBQ工具（烤夹/烤刷/烤针/烤网）+免费产品图视频+低MOQ+工厂直供价'，帮其用自有品牌配件提升毛利和客单价。"
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "电商卖家",
+        "countryGrade": "A",
+        "categoryMatch": "厨房用品（BBQ工具方向）",
+        "priorityScore": 82,
+        "recommendedStrategy": "结果导向、电商卖家语境的邮件。直击毛利和listing内容：主打贴牌BBQ配件+免费产品图视频+低MOQ，帮其做高毛利附加销售；用其Weber产品线做个性化钩子。"
+      },
+      "email": {
+        "subjectLines": [
+          "Private-label BBQ tools + free photos for Heat & Grill",
+          "Higher-margin BBQ accessories, factory-direct, Yangjiang",
+          "BBQ tongs, brushes & skewers — your own brand"
+        ],
+        "english": "Dear Heat & Grill Team,\n\nYour Weber Q and Genesis ranges look great — Australian customers really love the outdoor lifestyle.\n\nI'm Leo, founder of KaiLionCrafts in Yangjiang, China. Through 4 vetted local factories we make BBQ tools — tongs, brushes, skewers and grill mats — with LFGB/FDA food-contact compliance held by our partner plants.\n\nAs a BBQ e-commerce retailer, margin and listing content matter. We can produce private-label BBQ accessories at factory-direct prices (~20% below trading houses), low MOQ, and include free product photos and videos you can use straight on your store.\n\nWould you like to see our BBQ accessories range?\n\nBest regards,\nLeo Li\nFounder, KaiLionCrafts\nWhatsApp: +86 131-3800-6564\nWeb: https://kailioncrafts.com/kitchen-accessories/",
+        "chinese": "尊敬的Heat & Grill团队：\n\n你们的Weber Q和Genesis系列看起来很棒——澳大利亚客户确实热爱户外生活方式。\n\n我是Leo，KaiLionCrafts创始人，来自中国阳江。我们通过4家深度合作的本地工厂生产BBQ工具——烤夹、烤刷、烤针和烤垫，LFGB/FDA食品接触合规由我们的合作工厂持有。\n\n作为BBQ电商零售商，毛利和listing内容至关重要。我们可以按工厂直供价（通常比贸易商低约20%）生产贴牌BBQ配件，支持低MOQ，并免费提供产品图片和视频，可直接用于你们的店铺。\n\n你们想看看我们的BBQ配件系列吗？\n\n此致\nLeo Li\nKaiLionCrafts 创始人\nWhatsApp: +86 131-3800-6564\n网站: https://kailioncrafts.com/kitchen-accessories/",
+        "wordCount": 119,
+        "sellingPointsUsed": [
+          "阳江产业带",
+          "4家深度合作工厂—稳定供货",
+          "工厂直供价—低于贸易商20%",
+          "OEM/ODM代工—可贴牌",
+          "免费营销素材套餐—产品图/视频（对电商尤其有价值）",
+          "BBQ工具：烤刷/烤夹/烤针/烤网"
+        ],
+        "linksUsed": [
+          "https://kailioncrafts.com/kitchen-accessories/"
+        ]
+      }
+    },
+    {
+      "id": "ka_005",
+      "company": "Dexam (Dexam Group / Dexam International)",
+      "website": "https://www.dexam.co.uk",
+      "email": "sales@dexam.co.uk",
+      "emailType": "具体邮箱（其目录公布的销售办公室邮箱；客服邮箱 cs@dexam.co.uk）",
+      "contact": {
+        "name": "",
+        "title": "未找到，建议LinkedIn查找 Buying Controller / Merchandising Director（其拥有贸易/出口部门 trade.dexam.co.uk）",
+        "linkedin": ""
+      },
+      "country": "英国 (UK)",
+      "city": "Hampshire, England (电话区号01730，Petersfield/Liss一带)",
+      "customerType": "品牌商/分销商（约50年历史的厨房用品进口与批发集团，运营多品牌）",
+      "source": "https://dexam.co.uk/pages/contact-us ；https://trade.dexam.co.uk/ ；其2024/25新品目录（sales@dexam.co.uk, +44 1730 811811）",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "Dexam 是一家拥有约50年历史的英国厨房用品公司，从事厨房工具、烘焙、酒具、纺织等的进口与批发，旗下运营多品牌（Depam自有、Rushbrookes、RHS by Dexam、Chasseur、Chef's Choice、Sistema、School of Wok等），设有贸易/出口部门（trade.dexam.co.uk），每年发布新品目录。",
+        "decisionMaker": "销售办公室邮箱 sales@dexam.co.uk。具体采购决策人未公开，建议LinkedIn找 Buying / Merchandising 负责人。",
+        "contactInfo": "邮箱 sales@dexam.co.uk（销售）/ cs@dexam.co.uk（客服）；电话 +44 (0)1730 811811；贸易站 trade.dexam.co.uk。",
+        "painPoints": "英国脱欧后供应链摩擦与UKCA/LFGB合规；可持续压力大（其已推出recycled glass/recycled cotton系列）；需要持续的环保新品；年度目录需要新鲜OEM产品线来保持货架吸引力。",
+        "purchaseIntent": "中-高。作为每年更新目录的进口批发商，常年选品与OEM；对工具小器具（Tools & Gadgets 有116+ SKU）有持续采购。",
+        "competitorAnalysis": "中端厨房用品，自有品牌+代理品牌组合；与Kitchen Craft/Typhoon/Prestige等英国品牌竞争。",
+        "supplyChain": "中国、欧洲及英国本地（其Forest & Forge刀具在Sheffield生产）多源采购。",
+        "entryAngle": "主打OEM/ODM贴牌+环保趋势+免费营销素材：以阳江网络为其下一年度目录提供削皮器/刨丝器/厨具/BBQ工具，可做其品牌贴牌，强调LFGB合规、工厂直供价、低MOQ试新品，并提供免费产品图视频支持零售。个性化钩子提及其可持续/再生材料系列。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "品牌商/分销商",
+        "countryGrade": "A",
+        "categoryMatch": "厨房用品",
+        "priorityScore": 81,
+        "recommendedStrategy": "目录/选品导向的邮件。强调OEM/ODM贴牌能力、年度新品补充、LFGB合规与免费营销素材；用其Tools & Gadgets或再生材料系列做个性化；语气专业、有目录选品思维。"
+      },
+      "email": {
+        "subjectLines": [
+          "OEM kitchen gadgets + free media for Dexam's next range",
+          "Private-label peelers, graters & BBQ tools, Yangjiang",
+          "New kitchen gadget lines, low MOQ, LFGB-compliant"
+        ],
+        "english": "Dear Dexam Buying Team,\n\nI like how your Tools & Gadgets range and recycled collections keep evolving — 50 years of kitchenware expertise really shows.\n\nI'm Leo, founder of KaiLionCrafts in Yangjiang, China, the region behind ~75% of China's cutlery. Through 4 vetted local factories we make peelers, graters, utensils and BBQ tools, with LFGB compliance held by our partner plants, and full OEM/private-label capability.\n\nFor your next catalogue cycle, we offer factory-direct pricing (~20% below trading houses), low MOQ for new lines, and free product photos and videos to support your retail customers.\n\nCould I share our kitchen accessories range for your team?\n\nBest regards,\nLeo Li\nFounder, KaiLionCrafts\nWhatsApp: +86 131-3800-6564\nWeb: https://kailioncrafts.com/kitchen-accessories/",
+        "chinese": "尊敬的Dexam采购团队：\n\n我很欣赏你们Tools & Gadgets系列和再生材料系列的持续迭代——50年的厨房用品经验确实看得见。\n\n我是Leo，KaiLionCrafts创始人，来自中国阳江——中国约75%刀剪产业所在地。我们通过4家深度合作的本地工厂生产削皮器、刨丝器、厨具和BBQ工具，LFGB合规由我们的合作工厂持有，并具备完整的OEM/贴牌能力。\n\n为你们的下一个目录周期，我们提供工厂直供价（通常比贸易商低约20%）、新品低MOQ，以及支持你们零售客户的免费产品图片和视频。\n\n我是否可以把我们的厨房用品系列分享给您的团队？\n\n此致\nLeo Li\nKaiLionCrafts 创始人\nWhatsApp: +86 131-3800-6564\n网站: https://kailioncrafts.com/kitchen-accessories/",
+        "wordCount": 121,
+        "sellingPointsUsed": [
+          "阳江产业带（中国75%刀剪产自阳江）",
+          "4家深度合作工厂—稳定供货",
+          "工厂直供价—低于贸易商20%",
+          "OEM/ODM代工—可贴牌，可定制",
+          "免费营销素材套餐—产品图/视频",
+          "SGS LFGB认证（合作工厂持有）"
+        ],
+        "linksUsed": [
+          "https://kailioncrafts.com/kitchen-accessories/"
+        ]
+      }
+    }
+  ]
+}

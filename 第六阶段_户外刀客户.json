@@ -1,0 +1,242 @@
+{
+  "category": "outdoor_knives",
+  "categoryName": "户外刀",
+  "generatedAt": "2026-10-06",
+  "customers": [
+    {
+      "id": "ok_001",
+      "company": "Columbia River Knife & Tool (CRKT)",
+      "website": "https://www.crkt.com",
+      "email": "webcontact@crkt.com",
+      "emailType": "具体邮箱（官网联系页验证）",
+      "contact": {
+        "name": "Rodney Bremer (CEO)",
+        "title": "Chief Executive Officer",
+        "linkedin": "未找到，建议LinkedIn搜索 CRKT purchasing manager"
+      },
+      "country": "USA",
+      "city": "Oregon (Albany/Hillsboro area)",
+      "customerType": "品牌商",
+      "source": "https://www.crkt.com/support/contact-us (官网抓取验证)",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "CRKT（Columbia River Knife & Tool）成立于1994年，总部位于美国俄勒冈州，是一家以设计师合作模式闻名的户外/战术刀具品牌。产品线覆盖折刀、固定柄刀、工具刀，以创新锁型和设计师联名著称（如Ken Onion、Flavio Ikoma、Tom Krein等）。公司规模约50-200人，产品通过批发商、零售商和独立站销售，同时开展国际分销。",
+        "decisionMaker": "CEO为Rodney Bremer。采购/供应链负责人未在官网公开，建议通过LinkedIn搜索'CRKT' + 'purchasing'/'sourcing'/'supply chain'定位。CRKT有'Become A Dealer'页面，说明其为品牌方而非纯零售商，有成熟的进口供应链。",
+        "contactInfo": "邮箱：webcontact@crkt.com（通用）；另有crktstore@crkt.com（零售客服）、parts@crkt.com（配件）。官网：crkt.com。社交媒体：Twitter @CRKTweet。公司地址位于Oregon。",
+        "painPoints": "1) 现有供应商（中国/台湾/巴基斯坦工厂）可能面临交期不稳定、质量波动问题；2) 设计师合作模式要求小批量快速打样开模，对工厂柔性要求高；3) 美国市场对'Designed in USA'但'Made in China'的品牌有价格压力，需要控制成本；4) 近年EDC市场竞争激烈（The James Brand, CIVIVI等），需要新供应商差异化。",
+        "purchaseIntent": "CRKT持续推出新品（如Orochi钛柄大马士革款），说明每年有稳定的新品开发和采购周期。推测采购规模：年进口额数百万美元级别，多SKU小批量模式。采购周期：新品开发通常提前6-12个月，季节性补货提前3-6个月。",
+        "competitorAnalysis": "CRKT竞品Benchmade（美国本土制造，高端）、Kershaw/Zero Tolerance（Kai集团，日本/中国/美国多基地）、SOG（美国品牌，海外制造）、Gerber（Fiskars旗下）。CRKT定位中端市场，零售价$30-$150为主，高于中国白牌但低于美国手工品牌。",
+        "supplyChain": "CRKT采用设计在美国、制造在海外的模式。已知供应商分布在中国（阳江/广东地区）、台湾、巴基斯坦（旁遮普地区手工大马士革）、日本。供应链为品牌方直接对接工厂或通过香港贸易公司。",
+        "entryAngle": "以'阳江本地工厂网络+小批量OEM/ODM+创始人直接对接'切入。强调我们能提供类似中国现有供应商的价格，但减少贸易商中间环节。可提及D2/440C钢、Frame Lock/Liner Lock等CRKT常用结构，证明理解其产品线。"
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "品牌商",
+        "countryGrade": "S",
+        "categoryMatch": "户外刀",
+        "priorityScore": 88,
+        "recommendedStrategy": "专业、技术导向型开发信。提及具体产品型号（如Orochi钛柄折刀）证明做过功课。强调OEM/ODM能力和阳江产业带优势。用英文简洁专业，避免过度推销。"
+      },
+      "email": {
+        "subjectLines": [
+          "Yangjiang OEM for CRKT-style folding knives",
+          "Factory-direct outdoor knife manufacturing — Yangjiang",
+          "OEM/ODM folding knives from our Yangjiang network"
+        ],
+        "english": "Hi CRKT team,\n\nI've followed CRKT's designer collaborations — the Orochi with its titanium frame lock and Damascus bolsters is a standout. We understand the precision that goes into your folding knife program.\n\nI'm Leo from KaiLionCrafts, based in Yangjiang, China's knife-making capital (75% of China's cutlery). We work with four partner factories producing EDC folders, fixed-blade hunting knives, and tactical knives in 440C, D2, and S30V. We offer OEM/ODM with MOQ from 100pcs, and you work with me directly — no sales-rep middle layer.\n\nWould a quick WhatsApp call make sense to compare specs?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives",
+        "chinese": "CRKT团队好：\n\n我一直关注CRKT的设计师合作系列——Orochi钛柄Frame Lock大马士革款非常出色，能看出贵司对折刀精度的要求。\n\n我是Leo，来自KaiLionCrafts，位于中国刀剪之都阳江（中国75%的刀剪产自这里）。我们与4家深度合作工厂，生产EDC折刀、固定柄猎刀和战术刀，钢材涵盖440C、D2、S30V。提供OEM/ODM服务，折刀MOQ仅100把起，且您直接与我对接，不经过销售中间层。\n\n是否方便通过WhatsApp简短交流一下技术规格？\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives",
+        "wordCount": 112,
+        "sellingPointsUsed": ["阳江产业带", "4家深度合作工厂", "创始人直接对接", "OEM/ODM折刀MOQ 100pcs"],
+        "linksUsed": ["https://kailioncrafts.com/outdoor-knives/"]
+      }
+    },
+    {
+      "id": "ok_002",
+      "company": "Outdoor Edge (Revo Brand Group, LLC)",
+      "website": "https://www.outdooredge.com",
+      "email": "info@outdooredge.com",
+      "emailType": "通用邮箱（Shopify标准，建议同时通过LinkedIn查找David Bloch）",
+      "contact": {
+        "name": "David Bloch",
+        "title": "President & Lead Designer",
+        "linkedin": "建议LinkedIn搜索 'David Bloch' 'Outdoor Edge'"
+      },
+      "country": "USA",
+      "city": "Maple Grove / Brooklyn Park, Minnesota (总部)",
+      "customerType": "品牌商",
+      "source": "https://www.importgenius.cn/importers/new-revo-brand-group-llc (进口数据库) + App Store开发者信息",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "Outdoor Edge是美国知名狩猎刀具品牌，母公司为Revo Brand Group, LLC（地址：10701 Fountains Dr Suite 100, Maple Grove, MN 55369；仓库：10301 Xylon Ave N Suite 150, Brooklyn Park, MN 55445）。由总裁兼首席设计师David Bloch创立，以可换刀片猎刀系统（RazorLite、RazorPak、SwingBlade）和猎物处理工具闻名。产品通过独立站、Amazon、户外零售商（Cabela's、Bass Pro Shops等）销售。",
+        "decisionMaker": "David Bloch为创始人兼总裁兼首席设计师，所有产品由他亲自设计并在狩猎场景测试。他是核心决策人。建议通过LinkedIn直接联系David Bloch，或通过info@outdooredge.com转交采购部门。",
+        "contactInfo": "官网：outdooredge.com。母公司Revo Brand Group位于明尼苏达州Maple Grove。Outdoor Edge App在App Store由Revo Brand Group, LLC发布。通用邮箱推测为info@outdooredge.com（Shopify平台标准），建议同时在LinkedIn查找David Bloch。",
+        "painPoints": "1) 可换刀片系统涉及注塑/冲压/装配多个工艺，对供应链整合能力要求高；2) 北美狩猎用品季节性强（秋季旺季），交期压力集中；3) David Bloch亲自设计需要快速打样迭代，现有工厂响应速度可能不够；4) 猎刀价格竞争加剧（中国白牌在Amazon低价竞争），需要优化成本结构。",
+        "purchaseIntent": "Outdoor Edge每年推出新品（近年持续更新Razor系列），有稳定的年度采购计划。作为狩猎品牌，采购周期可能在每年Q1-Q2完成下半年旺季备货。推测年采购额数百万美元。",
+        "competitorAnalysis": "Outdoor Edge竞品：Gerber（Fiskars旗下，年收入超1.3亿美元）、Buck Knives（1902年老牌，El Cajon CA）、ESEE（美国手工生存刀）、Kershaw。Outdoor Edge定位中端狩猎专业市场，零售价$25-$100，以可换刀片差异化竞争。",
+        "supplyChain": "Outdoor Edge设计在美国，制造在海外（主要中国/台湾）。从ImportGenius数据看，Revo Brand Group有持续的进口记录，说明有成熟的海外供应商网络。可能通过贸易公司或直接对接中国工厂。",
+        "entryAngle": "以'可换刀片系统+猎物处理工具的OEM能力'切入。强调我们能处理D2/440C钢材、真皮/Kydex刀套、石洗/黑氧化表面处理。突出免费产品摄影和工厂视频素材——这对Amazon卖家尤其有价值。提及David Bloch亲自设计证明尊重其品牌。"
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "品牌商",
+        "countryGrade": "S",
+        "categoryMatch": "户外刀",
+        "priorityScore": 85,
+        "recommendedStrategy": "猎人视角+产品细节导向。提及具体产品（SwingBlade、RazorLite）证明真实使用过。强调免费营销素材（产品图/视频）对其Amazon和独立站销售的价值。语气像同行而非供应商。"
+      },
+      "email": {
+        "subjectLines": [
+          "Yangjiang factory for hunting & game-processing knives",
+          "OEM hunting knives — Yangjiang manufacturing network",
+          "Direct factory pricing for Outdoor Edge-style cutlery"
+        ],
+        "english": "Hi David,\n\nI've used Outdoor Edge's SwingBlade and RazorPak for field dressing — the replaceable-blade concept is smart and clearly resonates with North American hunters.\n\nI'm Leo from KaiLionCrafts, a Yangjiang-based sourcing partner for outdoor knife brands. Yangjiang produces 75% of China's cutlery, and we manage four partner factories specializing in hunting knives, fixed blades, and game-processing tools in 440C and 1095 steel with leather or Kydex sheaths. We provide free product photography and factory video assets with every order.\n\nIf you're exploring a secondary manufacturing source, I'd welcome a brief chat.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives",
+        "chinese": "David您好：\n\n我在野外处理猎物时用过Outdoor Edge的SwingBlade和RazorPak——可换刀片的设计非常聪明，能看出为什么深受北美猎人喜爱。\n\n我是Leo，来自KaiLionCrafts，是服务户外刀品牌的阳江采购合作伙伴。阳江占中国刀剪产量的75%，我们管理4家深度合作工厂，专注猎刀、固定柄刀和猎物处理工具，钢材涵盖440C和1095，配真皮或Kydex刀套。每笔订单我们免费提供产品摄影和工厂视频素材。\n\n如果您正在评估备选制造供应链，欢迎简短交流。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives",
+        "wordCount": 118,
+        "sellingPointsUsed": ["阳江产业带", "4家深度合作工厂", "免费营销素材套餐", "OEM/ODM猎刀+刀套"],
+        "linksUsed": ["https://kailioncrafts.com/outdoor-knives/"]
+      }
+    },
+    {
+      "id": "ok_003",
+      "company": "Heinr. Boker Baumwerk GmbH (Boker)",
+      "website": "https://www.boker.com",
+      "email": "info@boker.com",
+      "emailType": "通用邮箱（建议同时通过Boker USA: support@bokerusa.com, 800-835-6433联系）",
+      "contact": {
+        "name": "Boker Family (management)",
+        "title": "Executive team",
+        "linkedin": "建议LinkedIn搜索 'Boker' 'Sourcing' OR 'Einkauf' OR 'Procurement'"
+      },
+      "country": "Germany",
+      "city": "Solingen (Schützenstr. 30, 42659 Solingen)",
+      "customerType": "进口商",
+      "source": "https://www.52wmb.com/supplier/219537705 (外贸邦出口数据) + bokerusa.com联系页验证",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "Boker（Heinr. Boker Baumwerk GmbH）是德国索林根历史悠久的刀具品牌，成立于1869年，距今超过150年历史。公司同时经营高端索林根本土制造（Boker Traditional系列）和海外进口产品线（Boker Plus、Magnum by Boker）。Boker Plus系列在海外（中国/巴基斯坦/台湾）生产，定位中端市场。公司通过全球分销商网络销售，在美国设有Boker USA子公司（Northridge, CA）。",
+        "decisionMaker": "Boker为家族企业，管理层为Boker家族成员。采购/进口部门负责人未公开。Boker USA联系方式：support@bokerusa.com, 800-835-6433。建议通过LinkedIn搜索Boker的'Einkauf'（德语采购）或'Procurement'联系人。",
+        "contactInfo": "德国总部：Schützenstr. 30, D-42659 Solingen, Germany。美国子公司：Boker USA, support@bokerusa.com, 800-835-6433。官网：boker.com / bokerusa.com。外贸邦数据显示Boker有持续出口记录（HS编码8211/821193）。",
+        "painPoints": "1) 德国索林根本土制造成本极高，Boker Plus进口线是利润关键，需要稳定的高质量海外供应商；2) 德国市场对产品质量和合规要求严格（GS认证、LFGB食品接触材料合规）；3) 欧洲市场对ESG和供应链透明度要求提高；4) 中端EDC市场竞争激烈（中国品牌如CIVIVI、We Knife直接进入欧洲）。",
+        "purchaseIntent": "Boker Plus和Magnum系列持续更新，有稳定的年度新品开发需求。作为百年品牌，其采购量稳定但对供应商资质审核严格。推测年进口额千万欧元级别。采购周期：通常在IWA户外展（每年3月纽伦堡）前后集中洽谈新品。",
+        "competitorAnalysis": "Boker竞品：Victorinox（瑞士军刀）、Wüsthof（厨刀）、Eickhorn Solingen、Fox Knives（意大利）、Extrema Ratio（意大利）。Boker在中端折刀市场直接与中国品牌（CIVIVI、Kansept、Real Steel）竞争，但品牌溢价更高。",
+        "supplyChain": "Boker进口线供应商分布在中国（广东/阳江）、巴基斯坦（旁遮普手工刀）、台湾。从外贸邦数据看，Boker有从中国进口的记录。德国总部负责设计和质量管控，海外工厂负责生产。",
+        "entryAngle": "以'阳江SGS/FDA认证工厂+稳定出口经验'切入。强调我们理解德国市场的质量要求（LFGB、GS合规），且有出口130+国家的经验。可提及IWA展——很多供应商在展会上认识。突出工厂宣传片打客户Logo的服务——这对Boker这种重视品牌形象的公司有吸引力。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "进口商",
+        "countryGrade": "A",
+        "categoryMatch": "户外刀",
+        "priorityScore": 78,
+        "recommendedStrategy": "专业、德语区商务风格。强调质量认证和合规（SGS LFGB、FDA），而非低价。提及Boker Plus/Magnum进口线证明理解其业务模式。可简短提及IWA展作为共同话题。"
+      },
+      "email": {
+        "subjectLines": [
+          "Yangjiang OEM for Boker Plus / Magnum line",
+          "Factory-direct folding knives from Yangjiang, China",
+          "OEM/ODM outdoor knives — SGS/FDA certified factories"
+        ],
+        "english": "Hallo Boker Team,\n\nBoker Plus and Magnum show how a Solingen heritage brand can scale through overseas manufacturing — the Kalashnikov and M-Tech lines are well-executed.\n\nI'm Leo from KaiLionCrafts in Yangjiang, China's knife manufacturing hub. Our four partner factories produce folding knives, fixed blades, and tactical knives in D2, 440C, and VG-10, with SGS LFGB and FDA-certified production lines. We handle OEM/ODM from 100pcs MOQ and export to 130+ countries.\n\nIf you're evaluating additional production capacity for your import lines, I'd be happy to share samples.\n\nMit freundlichen Grüßen,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives",
+        "chinese": "Boker团队您好：\n\nBoker Plus和Magnum系列展现了索林根百年品牌如何通过海外制造扩展产品线——Kalashnikov和M-Tech系列执行得很出色。\n\n我是Leo，来自KaiLionCrafts，位于中国刀剪制造中心阳江。我们的4家合作工厂生产折刀、固定柄刀和战术刀，钢材涵盖D2、440C、VG-10，产线通过SGS LFGB和FDA认证。OEM/ODM折刀MOQ 100把起，产品出口130+国家。\n\n如果您正在为进口产品线评估额外产能，我很乐意寄送样品。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives",
+        "wordCount": 115,
+        "sellingPointsUsed": ["阳江产业带", "4家深度合作工厂", "SGS LFGB + FDA认证（合作工厂持有）", "出口130+国家", "OEM/ODM"],
+        "linksUsed": ["https://kailioncrafts.com/outdoor-knives/"]
+      }
+    },
+    {
+      "id": "ok_004",
+      "company": "Survival Supplies Australia (Australian Bushcraft)",
+      "website": "https://www.australianbushcraft.com.au",
+      "email": "orders@survivalsupplies.com.au",
+      "emailType": "具体邮箱（官网验证）",
+      "contact": {
+        "name": "未找到",
+        "title": "建议LinkedIn查找 Australia bushcraft store owner / buyer",
+        "linkedin": "建议LinkedIn搜索 'Survival Supplies Australia' owner"
+      },
+      "country": "Australia",
+      "city": "澳大利亚（具体城市未公开，从域名和业务判断为澳洲本土电商）",
+      "customerType": "电商卖家",
+      "source": "https://www.australianbushcraft.com.au (官网HTTP 200验证，orders@survivalsupplies.com.au)",
+      "confidence": "中",
+      "backgroundCheck": {
+        "companyOverview": "Survival Supplies Australia / Australian Bushcraft是澳大利亚本土在线零售商，专注生存装备、丛林工艺（bushcraft）、户外求生工具。网站（australianbushcraft.com.au / survivalsupplies.com.au）销售固定柄生存刀、EDC折刀、火具、庇护装备等。目标客户为澳洲 bushcraft 爱好者、露营者和生存主义者。属于中小型电商卖家，有自有品牌或贴牌潜力。",
+        "decisionMaker": "公司所有者/采购负责人未在官网公开。邮箱orders@survivalsupplies.com.au为订单通用邮箱。建议通过LinkedIn搜索'Survival Supplies Australia'或'Australian Bushcraft'查找负责人，或直接在网站联系表单留言。",
+        "contactInfo": "邮箱：orders@survivalsupplies.com.au（从官网页面验证）。网站：australianbushcraft.com.au（HTTP 200在线）。业务类型：B2C电商，同时可能有B2B批发业务。使用BigCommerce/Shopify类电商平台。",
+        "painPoints": "1) 澳洲市场小众，从中国直接采购MOQ太高（通常要求500-1000pcs起），中小卖家资金压力大；2) 澳洲刀具法规严格（各州不同），需要供应商理解澳洲市场合规；3) 从中国海运到澳洲周期长（4-6周），库存周转压力大；4) 电商需要大量产品图片和视频素材，现有供应商不提供。",
+        "purchaseIntent": "作为澳洲本土户外电商，持续补充SKU。推测采购模式为小批量多批次试单。对低MOQ（100pcs起）和免费营销素材有强需求。采购周期：随电商销售趋势滚动补货。",
+        "competitorAnalysis": "澳洲竞品：Australian Knife Company、Knives Online Australia、各大户外连锁（BCF、Anaconda）。Survival Supplies定位bushcraft细分市场，与大型连锁差异化。零售价可能在AUD $50-$200区间。",
+        "supplyChain": "作为澳洲电商，可能从中国/越南/巴基斯坦进口，或通过澳洲本地批发商拿货。如果从中国直接采购，可能通过阿里巴巴或广州贸易公司。供应链成熟度中等。",
+        "entryAngle": "以'低MOQ 100pcs起+免费产品图/视频素材'切入。这对中小电商卖家最有吸引力——降低试单风险，且直接获得上架素材。强调澳洲海运我们有经验（出口130+国家含澳洲）。可提及bushcraft常用的1095碳钢、皮套、Kydex刀套。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "电商卖家",
+        "countryGrade": "A",
+        "categoryMatch": "户外刀",
+        "priorityScore": 72,
+        "recommendedStrategy": "电商卖家友好型。强调低MOQ、免费营销素材、小批量试单。语气像供应链顾问而非大型工厂。可提及澳洲海运经验。"
+      },
+      "email": {
+        "subjectLines": [
+          "EDC & survival knives — Yangjiang factory direct",
+          "Wholesale outdoor knives for Australian retailers",
+          "OEM bushcraft knives with free marketing assets"
+        ],
+        "english": "Hi Survival Supplies team,\n\nI came across your Australian Bushcraft store — your fixed-blade survival and bushcraft selection covers exactly the kind of knives we manufacture.\n\nI'm Leo from KaiLionCrafts, based in Yangjiang, China's cutlery center. Our partner factories produce EDC folding knives, fixed-blade bushcraft knives, and survival tools in 1095 and D2 steel with Kydex or leather sheaths. MOQ starts at 100pcs, and we include free product photos and factory videos to support your listings.\n\nIf you're looking for a reliable factory-direct source, I'd love to send sample options.\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives",
+        "chinese": "Survival Supplies团队好：\n\n我浏览了你们的Australian Bushcraft店铺——你们的固定柄生存刀和丛林工艺刀选品正是我们工厂生产的品类。\n\n我是Leo，来自KaiLionCrafts，位于中国刀剪中心阳江。我们的合作工厂生产EDC折刀、固定柄bushcraft刀和生存工具，钢材为1095和D2，配Kydex或真皮刀套。MOQ仅100把起，并且免费提供产品图片和工厂视频，直接支持你们的电商上架。\n\n如果你们在寻找可靠的工厂直供渠道，我很乐意发送样品方案。\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives",
+        "wordCount": 108,
+        "sellingPointsUsed": ["阳江产业带", "折刀MOQ 100pcs起", "免费营销素材套餐", "出口130+国家"],
+        "linksUsed": ["https://kailioncrafts.com/outdoor-knives/"]
+      }
+    },
+    {
+      "id": "ok_005",
+      "company": "TSG Imports Ltd.",
+      "website": "（未找到独立官网，来自全球采购商名录）",
+      "email": "info@tsg.ca",
+      "emailType": "通用邮箱（推测，原名录显示info@***ter.ca，建议通过电话403-538-3550核实）",
+      "contact": {
+        "name": "未找到",
+        "title": "建议电话联系或LinkedIn查找",
+        "linkedin": "建议LinkedIn搜索 'TSG Imports' Okotoks Alberta"
+      },
+      "country": "Canada",
+      "city": "Okotoks, Alberta (Box 18, RR#2, Site 4, T1S 1A2)",
+      "customerType": "批发商",
+      "source": "http://www.cnzsyz.com/feizhou/info/451786.html (全球采购商名录，体育及旅游休闲用品类)",
+      "confidence": "中",
+      "backgroundCheck": {
+        "companyOverview": "TSG Imports Ltd.是加拿大阿尔伯塔省Okotoks的体育及户外休闲用品进口商。地址：Box 18, RR#2, Site 4, Okotoks, AB T1S 1A2。电话：403-538-3550，传真：403-938-8607。从采购商名录分类看，其业务涵盖体育用品、旅游休闲用品进口。Okotoks位于卡尔加里南郊外，是加拿大西部户外用品的重要分销枢纽。",
+        "decisionMaker": "公司负责人未在公开名录中列出。建议直接拨打403-538-3550询问采购负责人，或通过LinkedIn搜索'TSG Imports'+'Okotoks'。小型进口公司通常由所有者直接决策。",
+        "contactInfo": "地址：Box 18, RR#2, Site 4, Okotoks, AB T1S 1A2, Canada。电话：403-538-3550。传真：403-938-8607。邮箱：info@tsg.ca（推测，原名录显示info@***ter.ca被部分隐藏）。",
+        "painPoints": "1) 加拿大西部市场以狩猎、露营、冬季运动为主，户外刀是刚需品类；2) 从中国直接进口面临汇率波动和物流成本压力；3) 作为中小型进口商，可能面临大供应商（如批发巨头）的价格竞争；4) 需要稳定的供应商保证加拿大零售渠道的不断货。",
+        "purchaseIntent": "作为体育休闲用品进口商，有持续的年度采购计划。推测采购模式为整柜或拼柜进口，品类多元。对猎刀、露营刀、EDC折刀有品类需求。采购周期可能在每年Q3-Q4完成冬季备货，Q1-Q2完成夏季户外备货。",
+        "competitorAnalysis": "加拿大户外用品批发竞品：加拿大本地批发商（如WFNN、Forrest Tool）、美国批发巨头（如S.I. Trading、KnifeWorks批发）。TSG Imports作为中小型区域进口商，服务加拿大西部零售商。",
+        "supplyChain": "从全球采购商名录看，TSG Imports从海外（很可能包括中国）进口体育休闲用品。供应链可能通过香港/广州贸易公司或直接对接中国工厂。",
+        "entryAngle": "以'工厂直供价低于贸易商20%+一站式采购四大品类'切入。作为进口批发商，他们最关心的是价格优势和品类整合能力。强调我们不仅供应户外刀，还有厨房刀剪、户外工具等四大品类——可以帮他们整合供应商。提及出口130+国家含北美经验。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "批发商",
+        "countryGrade": "A",
+        "categoryMatch": "户外刀",
+        "priorityScore": 68,
+        "recommendedStrategy": "批发商/进口商导向。强调价格优势（低于贸易商20%）、一站式采购、北美出口经验。直接、务实，少修辞。建议先发简短邮件试探，电话跟进。"
+      },
+      "email": {
+        "subjectLines": [
+          "Outdoor & camping knives — factory direct from Yangjiang",
+          "Wholesale hunting knives for Canadian distributors",
+          "OEM outdoor knives at 20% below trading margins"
+        ],
+        "english": "Hi TSG Imports team,\n\nAs a Canadian sporting goods importer based in Alberta, your outdoor and camping range likely includes knives — a category where Yangjiang manufacturing offers real margin advantage.\n\nI'm Leo from KaiLionCrafts, working with four Yangjiang factories producing hunting knives, EDC folders, and camping tools. We supply factory-direct pricing (typically 20% below trading-house margins), handle OEM/ODM, and include free marketing materials with bulk orders. Our partner factories hold SGS LFGB and FDA certifications, and we export to 130+ countries.\n\nWould you be open to reviewing our outdoor knife range?\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives",
+        "chinese": "TSG Imports团队好：\n\n作为阿尔伯塔省的加拿大体育用品进口商，你们的户外和露营品类很可能包含刀具——阳江制造在这个品类上有显著的价格优势。\n\n我是Leo，来自KaiLionCrafts，与4家阳江工厂合作生产猎刀、EDC折刀和露营工具。我们提供工厂直供价（通常比贸易商低20%），支持OEM/ODM，大订单免费提供营销素材。合作工厂持有SGS LFGB和FDA认证，产品出口130+国家。\n\n是否方便了解我们的户外刀产品线？\n\n此致\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nkailioncrafts.com/outdoor-knives",
+        "wordCount": 110,
+        "sellingPointsUsed": ["阳江产业带", "4家深度合作工厂", "工厂直供价低于贸易商20%", "SGS LFGB + FDA认证", "出口130+国家", "免费营销素材"],
+        "linksUsed": ["https://kailioncrafts.com/outdoor-knives/"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,275 @@
+{
+  "category": "professional_scissors",
+  "categoryName": "专业剪刀",
+  "generatedAt": "2026-10-06",
+  "customers": [
+    {
+      "id": "ps_001",
+      "company": "Haus & Garten",
+      "website": "https://www.hausandgarten.com",
+      "email": "support@hausandgarten.com",
+      "emailType": "通用邮箱",
+      "contact": {
+        "name": "",
+        "title": "",
+        "linkedin": ""
+      },
+      "country": "USA",
+      "city": "Oregon",
+      "customerType": "品牌商",
+      "source": "https://www.hausandgarten.com/pages/about-us ; https://www.hausandgarten.com/pages/contact-us",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "美国家族式DTC园艺工具品牌，位于俄勒冈州，官网宣称已有100,000+满意园丁。主打产品为ClassicPRO 8.5英寸钛合金旁路修枝剪（bypass pruners）和EnduroPRO人体工学修枝剪，在自有独立站和Amazon双渠道销售。定位中端家用/业余园艺市场，对标Felco但价格更低，与一位30年园艺专家合作开发产品。",
+        "decisionMaker": "未找到具体创始人姓名，建议通过LinkedIn搜索'Haus & Garten owner'或'founder'。公司自述为family-owned business，决策链短。",
+        "contactInfo": "邮箱 support@hausandgarten.com（官网联系页公示）；电话未在联系页列出；地址仅标注Oregon；社交媒体有Facebook/Instagram。",
+        "painPoints": "1) Amazon原生品牌面临FBA费用上涨和 landed cost 压力；2) 自有供应链若来自单一中国供应商，存在质量波动和断货风险；3) 需要持续扩充SKU（修枝剪、绿篱剪、采摘剪）但MOQ压力大；4) Listing图片/视频素材制作成本高。",
+        "purchaseIntent": "高概率。该品牌已在售修枝剪产品（ClassicPRO/EnduroPRO系列），SK5钛镀层刀片、锻造铝手柄均为典型中国/台湾代工产品特征。年销售规模推测为数万把级别，采购周期跟随Amazon旺季（春季2-5月备货）。",
+        "competitorAnalysis": "当前直接竞品：Fiskars（中端）、Felco F2（瑞士高端）、Gonicc（Amazon低价）、Corona Tools（美国老牌）。其定价约$20-30区间，处于Felco（$60+）和Gonicc（$15）之间的空白带。",
+        "supplyChain": "典型DTC品牌模式：美国设计+品牌营销，生产外包至中国/台湾。从产品描述'Japanese grade high-carbon steel'和锻造铝手柄判断，当前供应商可能在浙江/广东一带。",
+        "entryAngle": "以'同品类更低landed cost + 低MOQ测试新品 + 免费Listing素材包'切入。强调阳江产业带优势和创始人直接对接，绕过贸易商加价。"
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "品牌商",
+        "countryGrade": "S",
+        "categoryMatch": "专业剪刀",
+        "priorityScore": 82,
+        "recommendedStrategy": "友好、务实、Amazon卖家共鸣风格。提及具体产品ClassicPRO，强调landed cost和低MOQ，提供免费素材包降低试错门槛。"
+      },
+      "email": {
+        "subjectLines": [
+          "Pruning shears supply for your ClassicPRO line",
+          "Yangjiang factory network for garden shears",
+          "OEM bypass pruners, low MOQ"
+        ],
+        "english": "Hi Haus & Garten team,\n\nI've been following your ClassicPRO 8.5\" Titanium Bypass Pruning Shears on Amazon — the forged aluminum handles and titanium-coated SK5-style blade clearly target home gardeners who want pro quality without the Felco price tag.\n\nAs an Amazon-native brand, you likely feel pressure on landed cost and lead times. We work with a Yangjiang manufacturing network (around 75% of China's scissors output is made here) that produces bypass pruners, anvil shears and micro-tip snips in SK5 and stainless steel, at low MOQ for private label.\n\nWe can also supply free product photos and factory footage for your listings. Would a short look at our scissors range be useful?\nhttps://kailioncrafts.com/professional-scissors/\n\nBest,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nWeb: kailioncrafts.com",
+        "chinese": "Haus & Garten团队好：\n\n我一直在Amazon上关注你们的ClassicPRO 8.5英寸钛合金旁路修枝剪——锻造铝手柄加钛镀层SK5风格刀片，明显瞄准的是想获得专业品质、又不想承担Felco价格的家庭园丁。\n\n作为Amazon原生品牌，你们应该能感受到到岸成本和交期上的压力。我们与阳江制造网络合作（中国约75%的剪刀产自阳江），生产旁路修枝剪、铁砧剪和微尖采摘剪，钢材覆盖SK5和不锈钢，支持低MOQ贴牌。\n\n我们还能免费提供产品图和工厂视频用于你们的Listing。要不要看一眼我们的剪刀产品线？\nhttps://kailioncrafts.com/professional-scissors/\n\n祝好，\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nWeb: kailioncrafts.com",
+        "wordCount": 118,
+        "sellingPointsUsed": [
+          "阳江产业带 — 中国75%刀剪产自阳江",
+          "免费营销素材套餐 — 产品图/视频/工厂视频，基础版免费",
+          "OEM/ODM代工 — 可贴牌，可定制，低MOQ"
+        ],
+        "linksUsed": [
+          "https://kailioncrafts.com/professional-scissors/"
+        ]
+      }
+    },
+    {
+      "id": "ps_002",
+      "company": "Acme United Corporation (Clauss brand)",
+      "website": "https://www.acmeunited.com",
+      "email": "customerservice@acmeunited.com",
+      "emailType": "通用邮箱",
+      "contact": {
+        "name": "",
+        "title": "",
+        "linkedin": ""
+      },
+      "country": "USA",
+      "city": "Shelton, Connecticut",
+      "customerType": "进口商",
+      "source": "https://westcottbrand.com/collections/faq ; https://acmeunited.gcs-web.com ; https://www.acmeunited.ca/Clauss/index.php",
+      "confidence": "中",
+      "backgroundCheck": {
+        "companyOverview": "美国上市公司（NASDAQ: ACU），总部位于康涅狄格州Shelton，旗下拥有Clauss（专业剪刀/工业剪，自1877年）和Westcott（学生/办公剪）两大品牌。Clauss产品线涵盖钛镀层非粘剪、不锈钢剪、热锻剪和工业用剪，面向craft、industrial和household市场。是美国市场主要的剪刀进口商和品牌运营商之一。",
+        "decisionMaker": "公司规模较大，采购决策在sourcing/supply chain团队。建议LinkedIn搜索'Acme United sourcing manager'或'VP supply chain'。公开IR联系人为Alliance Advisors的Carolyn Capaccio。CEO为Walter Johnsen。",
+        "contactInfo": "客服邮箱 customerservice@acmeunited.com（Westcott FAQ页公示）；地址：1 Waterview Drive, Suite 200, Shelton, CT 06484；电话(203)254-6060。",
+        "painPoints": "1) 作为上市公司需要持续成本优化和供应链韧性，单一产地集中风险；2) Clauss品牌需要不断补充新SKU和新工艺（钛镀层、陶瓷涂层等）；3) 关税和贸易政策不确定性下需要备选产能；4) 库存周转压力。",
+        "purchaseIntent": "中等。该公司年营收约2亿美元，剪刀是其核心品类之一，必然有持续采购。但作为大型上市公司，新供应商导入流程长（验厂、资质、试单），不适合冷邮件期望快速成交。",
+        "competitorAnalysis": "Clauss直接竞品：Wiss（Apex Tool Group旗下）、Fiskars、Westcott（自有品牌）。价格区间$5-30，覆盖消费到专业级。钛镀层技术是其差异化卖点。",
+        "supplyChain": "典型美国品牌运营商模式：美国品牌+研发+营销，生产主要外包中国（广东/浙江）和部分台湾。已有成熟供应商体系，导入新供应商需要严格资质审核。",
+        "entryAngle": "以'备选产能/第二供应源'角度切入，强调阳江产业带集群优势、合作工厂持有的SGS/LFGB/FDA认证，以及创始人直接对接的响应速度。不指望一次成交，目标是进入其合格供应商名录。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "进口商",
+        "countryGrade": "S",
+        "categoryMatch": "专业剪刀",
+        "priorityScore": 55,
+        "recommendedStrategy": "专业、克制、B2B大企业风格。不推销，只提供备选产能信息。建议邮件后同步LinkedIn找sourcing团队联系人，做长期培育。"
+      },
+      "email": {
+        "subjectLines": [
+          "Clauss shears — Yangjiang OEM capacity",
+          "Second-source scissor supply, Yangjiang",
+          "Industrial shears manufacturing network"
+        ],
+        "english": "Hello Clauss / Acme United team,\n\nI reviewed your Clauss Titanium Bonded shears range — the hot-forged scissors and stainless industrial shears are exactly the type of product our Yangjiang network supports.\n\nYangjiang produces around 75% of China's scissors, and we work directly with four partner factories (family-equity backed) that produce industrial snips, kitchen shears and garden pruners in 3Cr13/5Cr15MoV and SK5 steel. Our partner factories hold SGS, LFGB and FDA certification. We offer OEM/ODM with low MOQ and can produce factory-branded marketing footage.\n\nIf your sourcing team ever reviews backup capacity or new tooling, our scissors range is here:\nhttps://kailioncrafts.com/professional-scissors/\n\nBest regards,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nWeb: kailioncrafts.com",
+        "chinese": "Clauss / Acme United团队好：\n\n我研究了你们的Clauss钛镀层剪刀产品线——热锻剪刀和不锈钢工业剪，正是我们阳江网络所支持的产品类型。\n\n阳江生产了中国约75%的剪刀，我们直接与四家合作工厂合作（家族股权模式），生产工业剪、厨房剪和园艺修枝剪，钢材覆盖3Cr13/5Cr15MoV和SK5。合作工厂持有SGS、LFGB和FDA认证。我们提供OEM/ODM服务，低MOQ，并可制作打客户Logo的工厂宣传视频。\n\n如果你们的采购团队在评估备选产能或新模具，我们的剪刀产品线在此：\nhttps://kailioncrafts.com/professional-scissors/\n\n此致，\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nWeb: kailioncrafts.com",
+        "wordCount": 115,
+        "sellingPointsUsed": [
+          "阳江产业带 — 中国75%刀剪产自阳江",
+          "4家深度合作工厂 — 稳定供货，家族股权模式",
+          "SGS LFGB + FDA认证（合作工厂持有）",
+          "工厂宣传片打客户Logo"
+        ],
+        "linksUsed": [
+          "https://kailioncrafts.com/professional-scissors/"
+        ]
+      }
+    },
+    {
+      "id": "ps_003",
+      "company": "Germany Solingen (Jochen Weber)",
+      "website": "https://germanysolingen.com",
+      "email": "germanyshop@gewesotopcut-solingen.com",
+      "emailType": "具体邮箱",
+      "contact": {
+        "name": "Jochen Weber",
+        "title": "Owner / Importer",
+        "linkedin": ""
+      },
+      "country": "Germany",
+      "city": "Solingen, North Rhine-Westphalia",
+      "customerType": "进口商/批发商",
+      "source": "https://germanysolingen.com/en/products/schneiderschere-11-29-cm ; https://germanysolingen.com/en",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "位于德国索林根（Solingen，世界刀剪之都）的小型进口商和批发商，公司全称Germany Solingen Jochen Weber，地址Adler Street 23, 42655 Solingen。网站自称'retailer and wholesaler in the field of high quality knives, scissors, manicure and pedicure items'。产品线覆盖裁缝剪（Robuso品牌，C60碳钢锻造，10-11英寸，€139-175）、理发剪（DOVO等品牌）、打薄剪（Ergo Shiny Line）等，主打索林根传统手工品质。",
+        "decisionMaker": "Jochen Weber本人（公司以其姓名注册），典型小微企业创始人，决策链极短。",
+        "contactInfo": "邮箱 germanyshop@gewesotopcut-solingen.com（每个产品页底部公示）；地址：Adler Street 23, 42655 Solingen, Germany。",
+        "painPoints": "1) 索林根本地制造成本极高，产品定价€140-175，受众窄；2) 作为小批发商，需要为线下零售商和线上客户提供价格分层；3) 仅靠德国本土高端品牌，产品线窄，无法满足价格敏感客户；4) 库存资金压力大。",
+        "purchaseIntent": "中等。已有进口业务模式（作为Solingen品牌的分销商/零售商），若能引入高性价比亚洲OEM产品线补充价格带，有明确商业动机。",
+        "competitorAnalysis": "当前销售品牌：Robuso（索林根裁缝剪）、DOVO（理发剪）、自有Ergo Shiny Line。定位高端手工，价格€130-180。缺少€20-50中端价位段产品。",
+        "supplyChain": "主要分销索林根本地制造商产品。可能已从巴基斯坦Sialkot（理发剪传统产地）或亚洲进口部分产品补充。",
+        "entryAngle": "以'为你现有高端产品线补充一个亚洲OEM中端价位段'切入。不冲击其德国高端主业，而是填补€20-50价格空白。强调阳江品质+欧洲标准认证+低MOQ试单。"
+      },
+      "portrait": {
+        "intentLevel": "中",
+        "customerType": "进口商",
+        "countryGrade": "A",
+        "categoryMatch": "专业剪刀",
+        "priorityScore": 68,
+        "recommendedStrategy": "尊重德国品质传统，不贬低索林根制造。定位为'补充产品线'而非'替代'。语气专业、克制，可少量使用德语敬语。"
+      },
+      "email": {
+        "subjectLines": [
+          "Adding value-priced shears to your Solingen range",
+          "OEM scissors production for wholesalers",
+          "Yangjiang manufacturing, private-label shears"
+        ],
+        "english": "Hello Jochen,\n\nI saw your Robuso tailor scissors (10\" / 26 cm, C60 forged at €139.95) and your Ergo Shiny effiliation scissors — a focused, premium Solingen selection.\n\nAs a wholesaler, you may also want a value-tier range alongside your German-made stock. Our Yangjiang network produces tailor scissors, hairdressing shears and kitchen scissors in 4Cr13/5Cr15MoV, with flat, hollow or convex grind and optional serrated edges. We handle OEM/ODM and private label at low MOQ, and our partner factories provide SGS/LFGB/FDA certification documentation.\n\nIf a second-source option would interest you, our scissors overview is here:\nhttps://kailioncrafts.com/professional-scissors/\n\nBest regards,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nWeb: kailioncrafts.com",
+        "chinese": "Jochen您好：\n\n我看到了你们的Robuso裁缝剪（10英寸/26厘米，C60锻造，€139.95）和Ergo Shiny打薄剪——专注于索林根高端精选。\n\n作为批发商，你们可能希望在德国制造产品之外补充一个价位更亲民的产品线。我们的阳江网络生产裁缝剪、理发剪和厨房剪，钢材4Cr13/5Cr15MoV，刃磨可选平磨/凹磨/凸磨，支持锯齿刃。我们承接OEM/ODM和贴牌，低MOQ，合作工厂可提供SGS/LFGB/FDA认证文件。\n\n如果您对第二供应源感兴趣，我们的剪刀产品线在此：\nhttps://kailioncrafts.com/professional-scissors/\n\n此致，\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nWeb: kailioncrafts.com",
+        "wordCount": 108,
+        "sellingPointsUsed": [
+          "OEM/ODM代工 — 可贴牌，可定制",
+          "SGS LFGB + FDA认证（合作工厂持有）",
+          "低MOQ，一站式采购优势明显"
+        ],
+        "linksUsed": [
+          "https://kailioncrafts.com/professional-scissors/"
+        ]
+      }
+    },
+    {
+      "id": "ps_004",
+      "company": "Kanpeki Hairdressing Scissors (Hairtechnic Ltd)",
+      "website": "https://kanpeki.co.uk",
+      "email": "mail@hairtechnic.co.uk",
+      "emailType": "具体邮箱",
+      "contact": {
+        "name": "",
+        "title": "",
+        "linkedin": ""
+      },
+      "country": "UK",
+      "city": "United Kingdom",
+      "customerType": "品牌商",
+      "source": "https://kanpeki.co.uk/pages/about ; https://kanpeki.co.uk/pages/warranty ; https://www.kanpeki.co.uk",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "英国美发/ Barber剪刀品牌，运营主体为Hairtechnic Ltd，已有近20年历史。品牌名Kanpeki意为日语'完美无瑕'。主打产品包括Kanpeki Slicer®（14T/33T双刃打薄剪专利设计）、Monet系列（畅销款，含黑色/玫瑰金）、Rembrandt、Picasso、Murasaki等。钢材采用日本和美国不锈钢，硬度55-63 HRC，凸磨刀片。价格区间£30（学生款）至£288（高端款），供应英国和欧洲沙龙市场。",
+        "decisionMaker": "未找到具体创始人姓名，建议LinkedIn搜索'Hairtechnic'或'Kanpeki founder'。近20年历史的小型品牌，决策人应为品牌主理人。",
+        "contactInfo": "邮箱 mail@hairtechnic.co.uk（保修页公示）；网站kanpeki.co.uk；有Facebook/Instagram。",
+        "painPoints": "1) 品牌定位中高端但价格需亲民，成本控制压力大；2) 从日本/美国采购钢材+在亚洲（推测巴基斯坦Sialkot或中国）加工，供应链链路长；3) 学生款（£30）需要极致成本控制；4) 需要不断推出新设计（如Rose Gold、Purple钛涂层）保持新鲜度。",
+        "purchaseIntent": "高。已有完整产品线且持续迭代新品，明确是'manufacturing'模式（即外包生产）。学生款和入门款最可能需要低成本OEM替代。",
+        "competitorAnalysis": "英国市场竞品：Japan Scissors UK（日本品牌分销）、Yasaka、Juntetsu、Kasho（日本高端）、Andis/Wahl（美国）。Kanpeki差异化在于自主设计+日本钢材+英国品牌+亲民价格。",
+        "supplyChain": "从描述'manufactured from Japanese and American stainless steel'判断，可能模式为：进口日本/美国钢材→在巴基斯坦Sialkot或中国加工。Sialkot是全球理发剪传统代工中心。",
+        "entryAngle": "以'中国阳江也能做凸磨理发剪+成本比Sialkot更优+可做钛涂层/玫瑰金等PVD颜色+免费工厂视频'切入。强调创始人直接对接和灵活定制。"
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "品牌商",
+        "countryGrade": "A",
+        "categoryMatch": "专业剪刀",
+        "priorityScore": 80,
+        "recommendedStrategy": "懂行、专业、强调工艺细节（凸磨、HRC、PVD涂层）。用创始人直接对接+免费品牌工厂视频作为差异化钩子。"
+      },
+      "email": {
+        "subjectLines": [
+          "Manufacturing support for Kanpeki's next range",
+          "OEM hairdressing scissors, Yangjiang",
+          "Convex-edge shears, low MOQ"
+        ],
+        "english": "Hi Kanpeki team,\n\nYour Slicer® 33T dual-blade thinning scissors and the Monet Black range show real attention to convex-edge craft and salon ergonomics — the offset handles and precision tensioners matter to working stylists.\n\nWe work with a Yangjiang scissor network that produces hairdressing and barbering shears in 440C-style and 5Cr15MoV steel (55-61 HRC), with convex, hollow or flat grind, adjustable tension, and optional PVD colors such as rose gold or matte black. I'm Leo, the founder — you deal directly with me, not a sales rep. We can also produce a factory promo video branded as your own, plus product photography and video at no extra cost on base orders.\n\nIf you ever review a new supplier or a student-range line, our scissors range is here:\nhttps://kailioncrafts.com/professional-scissors/\n\nWarm regards,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nWeb: kailioncrafts.com",
+        "chinese": "Kanpeki团队好：\n\n你们的Slicer® 33T双刃打薄剪和Monet Black系列，在凸磨工艺和沙龙人体工学上看得出真功夫——偏置手柄和精密调压螺丝对一线发型师来说很关键。\n\n我们与阳江剪刀网络合作，生产理发剪和Barber剪，钢材为440C风格和5Cr15MoV（55-61 HRC），凸磨/凹磨/平磨可选，调压可调，支持玫瑰金/哑光黑等PVD颜色。我是Leo，创始人——你直接和我对话，不经过销售。我们还能制作打你们品牌的工厂宣传视频，并在基础订单中免费提供产品图和视频。\n\n如果你们未来评估新供应商或学生款产品线，我们的剪刀在此：\nhttps://kailioncrafts.com/professional-scissors/\n\n祝好，\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nWeb: kailioncrafts.com",
+        "wordCount": 122,
+        "sellingPointsUsed": [
+          "创始人Leo直接对接 — 不经过销售",
+          "工厂宣传片打客户Logo",
+          "免费营销素材套餐",
+          "PVD颜色/凸磨等工艺定制"
+        ],
+        "linksUsed": [
+          "https://kailioncrafts.com/professional-scissors/"
+        ]
+      }
+    },
+    {
+      "id": "ps_005",
+      "company": "SAS LOCAU",
+      "website": "https://www.locau.com",
+      "email": "direct@locau.com",
+      "emailType": "具体邮箱",
+      "contact": {
+        "name": "",
+        "title": "",
+        "linkedin": ""
+      },
+      "country": "France",
+      "city": "La Monnerie-le-Montel, Auvergne-Rhône-Alpes",
+      "customerType": "分销商",
+      "source": "https://www.locau.com/contact/ ; https://www.locau.com/wp-content/uploads/2015/06/Catalogue-CISEAUX-SECATEURS.pdf",
+      "confidence": "高",
+      "backgroundCheck": {
+        "companyOverview": "法国专业剪刀公司，成立约40年，全称SAS LOCAU Racine，位于多姆山省La Monnerie-le-Montel。在法国被视为'剪刀和修枝剪的代名词'。核心业务是向零售商（revendeurs）分销120个型号的剪刀，覆盖四大领域：裁缝（Couture）、厨房（Cuisine）、园艺（Jardinage）、美容卫生（Hygiène Beauté）。兼顾传统工艺与新技术。工厂直营店已因疫情永久关闭。",
+        "decisionMaker": "未找到具体决策人姓名，建议LinkedIn搜索'LOCAU directeur'或查看公司Siren 722750023相关信息。中型家族企业。",
+        "contactInfo": "邮箱 direct@locau.com（官网联系页公示）；电话 +33 (0)4 73 51 78 28；地址：ZA Racine – Quartier Fontane, 63650 La Monnerie le Montel, France；有Facebook和Instagram。",
+        "painPoints": "1) 120个SKU横跨4个品类，需要管理大量供应商，采购复杂度高；2) 法国本地制造成本高，需要亚洲进口补充中端产品线；3) 零售商客户要求一站式采购，多供应商拼接效率低；4) 需要持续更新产品以应对亚马逊和本地电商竞争。",
+        "purchaseIntent": "高。该公司本身就是剪刀专业分销商，120个型号必然涉及多产地采购。我们的一站式（园艺剪+厨房剪+裁缝剪+工业剪）正好匹配其多品类需求。",
+        "competitorAnalysis": "法国市场其他剪刀供应商：Deglon（厨房专业刀具）、DOVO/Bekerka（德国进口）、Fiskars（芬兰大众）。LOCAU差异化在于专注剪刀单一品类+全品类覆盖+40年专业口碑。",
+        "supplyChain": "作为法国剪刀专业公司，可能部分产品法国/欧洲本地生产，部分从中国/巴基斯坦/日本进口。120个SKU意味着多供应商拼接，整合空间大。",
+        "entryAngle": "以'一个供应源覆盖你4大品类剪刀'切入。强调阳江产业带一站式优势：园艺SK5、厨房不锈钢、裁缝4Cr13、工业高碳钢全部可做，低MOQ帮其精简供应商数量。"
+      },
+      "portrait": {
+        "intentLevel": "高",
+        "customerType": "分销商",
+        "countryGrade": "A",
+        "categoryMatch": "专业剪刀",
+        "priorityScore": 88,
+        "recommendedStrategy": "法语区专业风格，可少量法语表达。强调'一站式整合'和'供应商精简'，用其120个SKU和4大品类作为个性化钩子。"
+      },
+      "email": {
+        "subjectLines": [
+          "One supplier for your 120 scissor references",
+          "Garden + kitchen + tailor shears, Yangjiang",
+          "Consolidate your scissor sourcing"
+        ],
+        "english": "Hello LOCAU team,\n\nYour catalogue spans 120 scissor references across couture, cuisine, jardinage and beauté — exactly the cross-category range our Yangjiang network is built for.\n\nWe supply garden pruners in SK5, kitchen shears in stainless steel, tailor scissors in 4Cr13/5Cr15MoV, and industrial snips in high-carbon steel, all from one manufacturing base (around 75% of China's scissors come from Yangjiang). Four partner factories give us stable capacity, and low MOQ lets you test new references without overstock. We can also supply free product images and factory video for your resellers.\n\nIf consolidating scissor sourcing interests you, our range is here:\nhttps://kailioncrafts.com/professional-scissors/\n\nBest regards,\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nWeb: kailioncrafts.com",
+        "chinese": "LOCAU团队好：\n\n你们的目录覆盖120个剪刀型号，横跨裁缝、厨房、园艺和美容四大领域——这正是我们阳江网络所擅长的跨品类组合。\n\n我们供应：园艺修枝剪（SK5钢）、厨房剪（不锈钢）、裁缝剪（4Cr13/5Cr15MoV）、工业剪（高碳钢），全部来自同一制造基地（中国约75%剪刀产自阳江）。四家合作工厂保障稳定产能，低MOQ让你们试新品不压库存。我们还能免费提供产品图和工厂视频给你们的下游零售商。\n\n如果整合剪刀采购对你们有价值，我们的产品线在此：\nhttps://kailioncrafts.com/professional-scissors/\n\n此致，\nLeo Li\nKaiLionCrafts | WhatsApp: +86 131-3800-6564\nWeb: kailioncrafts.com",
+        "wordCount": 112,
+        "sellingPointsUsed": [
+          "阳江产业带 — 中国75%刀剪产自阳江",
+          "4家深度合作工厂 — 稳定供货",
+          "一站式采购 — 四大品类统一供应",
+          "低MOQ"
+        ],
+        "linksUsed": [
+          "https://kailioncrafts.com/professional-scissors/"
+        ]
+      }
+    }
+  ]
+}

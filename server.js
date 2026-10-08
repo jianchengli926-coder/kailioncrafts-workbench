@@ -28,6 +28,26 @@ const WebsiteEvidence = require('./website-evidence');
 // P2.3B: 客户优先级排序
 const ProspectPriority = require('./prospect-priority');
 
+// ============ A2: SQLite 客户资源库 前端只读模式（功能开关 + 只读连接） ============
+// 默认关闭。开启方式：SQLITE_READONLY_FRONTEND_ENABLED=true node server.js
+// 开启后 /api/customer-library/* 提供本地客户资源库的只读浏览能力。
+// 安全保障：{readonly:true} 打开 + PRAGMA query_only=ON 双重禁止任何写操作。
+const SQLITE_READONLY_FRONTEND_ENABLED = process.env.SQLITE_READONLY_FRONTEND_ENABLED === 'true' || false;
+let customerDb = null;
+if (SQLITE_READONLY_FRONTEND_ENABLED) {
+  try {
+    const Database = require('better-sqlite3');
+    customerDb = new Database(path.join(__dirname, 'data/operational/customer_development.sqlite'), { readonly: true });
+    customerDb.pragma('query_only = ON');
+    customerDb.pragma('journal_mode = WAL');
+    customerDb.pragma('foreign_keys = ON');
+    console.log('[A2] SQLite customer library read-only frontend ENABLED (readonly + query_only).');
+  } catch (dbErr) {
+    console.error('[A2] Failed to open customer_development.sqlite read-only:', dbErr.message);
+    customerDb = null;
+  }
+}
+
 // ============ 四大品类知识库（结构化摘要，只读） ============
 // 数据来源：公司知识库/02_产品知识库/00_四大品类产品参数汇总_确认版.md（v5.7，2026-09-28）
 // 原则：只收录已有资料确认数据；缺数据项标注"待工厂确认"，不编造。
@@ -877,10 +897,44 @@ function v1LoadJSON(file, fallback) {
   } catch (e) { log('Phase4 load ' + file + ': ' + e.message, 'WARN'); }
   return fallback;
 }
-function v1SaveJSON(file, data) {
-  try { fs.writeFileSync(path.join(V1_DATA_DIR, file), JSON.stringify(data, null, 2)); return true; }
-  catch (e) { log('Phase4 save ' + file + ': ' + e.message, 'ERROR'); return false; }
+// B2.3: atomic save with mandatory pre-write backup and post-write readback.
+// SQLite is the only operational source of truth; JSON files under data/
+// are derived caches and must be recoverable at all times.
+function v1SaveJSONWithBackup(file, data) {
+  try {
+    const target = path.join(V1_DATA_DIR, file);
+    const backupsDir = path.join(V1_DATA_DIR, 'operational', 'backups', 'b2.3_safety_gate');
+    fs.mkdirSync(backupsDir, { recursive: true });
+
+    // Element 4: backup current on-disk version before overwrite.
+    if (fs.existsSync(target)) {
+      const prevBuf = fs.readFileSync(target);
+      const prevHash = crypto.createHash('sha256').update(prevBuf).digest('hex');
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const bakName = `${file.replace(/\.json$/, '')}_${stamp}_${prevHash.slice(0, 12)}.json.bak`;
+      fs.writeFileSync(path.join(backupsDir, bakName), prevBuf);
+    }
+
+    // Atomic write: tmp file + rename (prevents half-written JSON on crash).
+    const tmp = target + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+    fs.renameSync(tmp, target);
+
+    // Element 6: read-back verify.
+    const readBack = JSON.parse(fs.readFileSync(target, 'utf-8'));
+    if ((readBack.customers || []).length !== (data.customers || []).length) {
+      throw new Error('post-write customer count mismatch');
+    }
+    return true;
+  } catch (e) {
+    log('v1SaveJSONWithBackup ' + file + ': ' + e.message, 'ERROR');
+    return false;
+  }
 }
+
+// Backwards-compatible wrapper: keep old call sites working, but route them
+// through the new safe writer.
+function v1SaveJSON(file, data) { return v1SaveJSONWithBackup(file, data); }
 
 // Persistent collections
 let v1ApiKeys = v1LoadJSON('api_keys.json', []);        // [{id,name,keyPrefix,keyHash,createdAt,lastUsedAt,callCount,enabled}]
@@ -1039,6 +1093,659 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
     return;
+  }
+
+  // ============ A2: SQLite 客户资源库 前端只读 API ============
+  // 所有路由仅允许 SELECT/PRAGMA/EXPLAIN，参数化查询，try/catch 包裹。
+  // 功能开关关闭时一律 503；数据库不可用时一律 503，绝不返回虚构数字。
+  if (pathname.startsWith('/api/customer-library/')) {
+    const cj = (code, obj) => {
+      res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(obj));
+    };
+    if (!SQLITE_READONLY_FRONTEND_ENABLED || !customerDb) {
+      return cj(503, { error: 'sqlite_readonly_frontend_disabled', message: '本地客户资源库前端只读模式未开启' });
+    }
+    if (req.method !== 'GET') {
+      return cj(405, { error: 'method_not_allowed', message: '仅支持 GET（只读模式）' });
+    }
+    const sp = reqUrl.searchParams;
+    const isDemo = sp.get('isDemo') === 'true' || sp.get('demo') === 'true';
+    const mode = isDemo ? 'demo' : 'real';
+    const demoFilter = isDemo ? 1 : 0; // customers_master.is_demo
+
+    // ---- B1 shared: 9-factor priority calculation (read-only, no DB writes) ----
+    const B1_ENGLISH_MARKETS = new Set(['United States','United Kingdom','Canada','Australia','New Zealand','Ireland']);
+    function b1BuyerTypeScore(bt){
+      if(!bt) return 0;
+      const s = String(bt).toLowerCase();
+      if(s.includes('importer') || s.includes('进口') || s.includes('distributor') || s.includes('分销') || s.includes('wholesale') || s.includes('批发')) return 12;
+      if(s.includes('brand') || s.includes('品牌')) return 10;
+      if(s.includes('manufacturer') || s.includes('制造')) return 10;
+      if(s.includes('retail') || s.includes('零售')) return 8;
+      return 0;
+    }
+    function b1ContactScore(hasEmail, hasPhone){
+      if(hasEmail && hasPhone) return 14;
+      if(hasEmail) return 8;
+      if(hasPhone) return 6;
+      return 0;
+    }
+    function b1CountryScore(country){
+      if(!country) return 4;
+      if(B1_ENGLISH_MARKETS.has(country)) return 8;
+      return 4;
+    }
+    function b1CalcPriority(cust){
+      const factors = {};
+      factors.productFit = 0;
+      factors.buyerType = b1BuyerTypeScore(cust.buyer_type);
+      factors.websiteEvidence = (cust.website_domain && String(cust.website_domain).trim()) ? 12 : 0;
+      factors.contact = b1ContactScore(cust.has_email===1, cust.has_phone===1);
+      factors.countryLanguage = b1CountryScore(cust.country_standardized);
+      factors.dataCredibility = cust.source_count > 0 ? 8 : 0;
+      factors.duplicateRisk = 6;
+      factors.complianceRisk = (cust.risk_level === 'high') ? 0 : 8;
+      factors.outreachStatus = 10;
+      const score = Object.values(factors).reduce((a,b)=>a+b, 0);
+      let level = score >= 75 ? 'P0' : score >= 55 ? 'P1' : score >= 35 ? 'P2' : 'P3';
+      if (cust.outreach_eligibility === 'do_not_contact' || cust.risk_level === 'high') level = 'DNC';
+      return { score, level, factors };
+    }
+
+    try {
+      // ---- API: /api/customer-library/summary ----
+      if (pathname === '/api/customer-library/summary') {
+        const whereDemo = 'WHERE is_demo = ?';
+        const total = customerDb.prepare(`SELECT COUNT(*) c FROM customers_master ${whereDemo}`).get(demoFilter).c;
+        const hw = customerDb.prepare(`SELECT COUNT(*) c FROM customers_master ${whereDemo} AND source_category='hardware'`).get(demoFilter).c;
+        const kw = customerDb.prepare(`SELECT COUNT(*) c FROM customers_master ${whereDemo} AND source_category='kitchenware'`).get(demoFilter).c;
+        const crossCat = customerDb.prepare(`
+          SELECT COUNT(*) c FROM (
+            SELECT cs.customer_id FROM customer_sources cs
+            JOIN customers_master m ON m.customer_id = cs.customer_id
+            WHERE m.is_demo = ?
+            GROUP BY cs.customer_id
+            HAVING SUM(CASE WHEN cs.source_category='hardware' THEN 1 ELSE 0 END)>0
+               AND SUM(CASE WHEN cs.source_category='kitchenware' THEN 1 ELSE 0 END)>0
+          )`).get(demoFilter).c;
+        const continentDist = customerDb.prepare(`SELECT continent, COUNT(*) c FROM customers_master ${whereDemo} GROUP BY continent ORDER BY c DESC`).all(demoFilter)
+          .map(r => ({ continent: r.continent || '未知', count: r.c }));
+        const countryDist = customerDb.prepare(`SELECT country_standardized AS country, COUNT(*) c FROM customers_master ${whereDemo} GROUP BY country_standardized ORDER BY c DESC LIMIT 20`).all(demoFilter)
+          .map(r => ({ country: r.country || '未知', count: r.c }));
+        const researchDist = customerDb.prepare(`SELECT research_status, COUNT(*) c FROM customers_master ${whereDemo} GROUP BY research_status ORDER BY c DESC`).all(demoFilter)
+          .map(r => ({ research_status: r.research_status || 'unknown', count: r.c }));
+        const riskDist = customerDb.prepare(`SELECT risk_level, COUNT(*) c FROM customers_master ${whereDemo} GROUP BY risk_level ORDER BY c DESC`).all(demoFilter)
+          .map(r => ({ risk_level: r.risk_level || 'not_assessed', count: r.c }));
+        const notAssessedRisk = customerDb.prepare(`SELECT COUNT(*) c FROM customers_master ${whereDemo} AND risk_level='not_assessed'`).get(demoFilter).c;
+        const hasWebsite = customerDb.prepare(`SELECT COUNT(*) c FROM customers_master ${whereDemo} AND website_domain IS NOT NULL AND website_domain<>''`).get(demoFilter).c;
+        const hasEmail = customerDb.prepare(`SELECT COUNT(DISTINCT cm.customer_id) c FROM contact_methods cm JOIN customers_master m ON m.customer_id=cm.customer_id WHERE m.is_demo=? AND cm.contact_type='email'`).get(demoFilter).c;
+        const hasPhone = customerDb.prepare(`SELECT COUNT(DISTINCT cm.customer_id) c FROM contact_methods cm JOIN customers_master m ON m.customer_id=cm.customer_id WHERE m.is_demo=? AND (cm.contact_type='phone' OR cm.contact_type='whatsapp')`).get(demoFilter).c;
+        const hasAnyContact = customerDb.prepare(`SELECT COUNT(DISTINCT cm.customer_id) c FROM contact_methods cm JOIN customers_master m ON m.customer_id=cm.customer_id WHERE m.is_demo=?`).get(demoFilter).c;
+        const possibleDup = customerDb.prepare(`SELECT COALESCE(SUM(possible_duplicates),0) c FROM import_batches`).get().c;
+        const orphanDrafts = customerDb.prepare(`SELECT COUNT(*) c FROM orphan_drafts_quarantine WHERE match_status='pending_manual_match'`).get().c;
+        const factsTotal = customerDb.prepare(`SELECT COUNT(*) c FROM company_facts`).get().c;
+        const factsApproved = customerDb.prepare(`SELECT COUNT(*) c FROM company_facts WHERE approved_for_external_use=1`).get().c;
+        const assetsTotal = customerDb.prepare(`SELECT COUNT(*) c FROM outreach_assets`).get().c;
+        const assetsSendable = customerDb.prepare(`SELECT COUNT(*) c FROM outreach_assets WHERE is_sendable=1`).get().c;
+        const demoCount = customerDb.prepare(`SELECT COUNT(*) c FROM customers_master WHERE is_demo=1`).get().c;
+        const productFitAssessed = customerDb.prepare(`SELECT COUNT(*) c FROM customer_product_fit`).get().c;
+        const out = {
+          total_real_customers: mode === 'real' ? total : undefined,
+          total_customers: total,
+          hardware_source_customers: hw,
+          kitchenware_source_customers: kw,
+          cross_category_customers: crossCat,
+          continent_distribution: continentDist,
+          country_distribution: countryDist,
+          research_status_distribution: researchDist,
+          product_fit_status: { assessed: productFitAssessed, not_assessed: total - productFitAssessed },
+          contact_completeness: { has_website: hasWebsite, has_email: hasEmail, has_phone: hasPhone, has_any_contact: hasAnyContact },
+          possible_duplicates_count: possibleDup,
+          not_assessed_risk_count: notAssessedRisk,
+          risk_level_distribution: riskDist,
+          orphan_drafts_count: orphanDrafts,
+          company_facts_approved_for_external: factsApproved,
+          company_facts_total: factsTotal,
+          outreach_assets_total: assetsTotal,
+          outreach_assets_sendable: assetsSendable,
+          demo_customers_count: demoCount,
+          mode: mode
+        };
+        if (mode === 'demo') out.demo_notice = '演示模式：当前展示非真实运营数据';
+        return cj(200, out);
+      }
+
+      // ---- API: /api/customer-library/search?q=... ----
+      if (pathname === '/api/customer-library/search') {
+        const q = (sp.get('q') || '').trim();
+        if (q.length < 2) return cj(400, { error: 'invalid_query', message: '搜索关键词至少2个字符' });
+        let limit = parseInt(sp.get('limit') || '20', 10);
+        if (isNaN(limit) || limit < 1) limit = 20;
+        if (limit > 50) limit = 50;
+        let rows = [];
+        // 1) FTS5 全文搜索（company_name_raw / country_standardized / buyer_type）
+        try {
+          rows = customerDb.prepare(`
+            SELECT m.customer_id, m.company_name_raw, m.country_standardized, m.buyer_type,
+                   m.source_category, m.continent, m.is_demo
+            FROM customers_fts f JOIN customers_master m ON m.customer_id = f.customer_id
+            WHERE customers_fts MATCH ? AND m.is_demo = ?
+            ORDER BY bm25(customers_fts) LIMIT ?`).all(q, demoFilter, limit);
+        } catch (ftsErr) {
+          // FTS MATCH 语法错误时降级为 LIKE，不暴露内部错误
+          rows = [];
+        }
+        // 2) LIKE 补充搜索（官网域名等 FTS 未覆盖字段）
+        if (rows.length < limit) {
+          const likeRows = customerDb.prepare(`
+            SELECT customer_id, company_name_raw, country_standardized, buyer_type,
+                   source_category, continent, is_demo
+            FROM customers_master
+            WHERE is_demo = ? AND (
+              website_domain LIKE ? OR company_name_raw LIKE ? OR country_standardized LIKE ?
+            ) LIMIT ?`).all(demoFilter, `%${q}%`, `%${q}%`, `%${q}%`, limit);
+          const seen = new Set(rows.map(r => r.customer_id));
+          for (const r of likeRows) if (!seen.has(r.customer_id)) rows.push(r);
+          rows = rows.slice(0, limit);
+        }
+        return cj(200, { results: rows, total: rows.length, query: q, mode: mode });
+      }
+
+      // ---- API: /api/customer-library/customers/:customerId (详情) ----
+      const detailMatch = pathname.match(/^\/api\/customer-library\/customers\/([^/]+)$/);
+      if (detailMatch) {
+        const cid = decodeURIComponent(detailMatch[1]);
+        const master = customerDb.prepare(`SELECT * FROM customers_master WHERE customer_id = ?`).get(cid);
+        if (!master) return cj(404, { error: 'not_found', message: '客户不存在' });
+        if (master.is_demo === 1 && mode !== 'demo') {
+          return cj(403, { error: 'demo_customer_in_real_mode', message: '演示客户仅在演示模式下可见' });
+        }
+        const sources = customerDb.prepare(`SELECT source_file, source_sheet, source_row, source_category, source_event, imported_at FROM customer_sources WHERE customer_id = ? ORDER BY imported_at`).all(cid);
+        const contacts = customerDb.prepare(`
+          SELECT c.contact_id, c.contact_name, c.contact_title, c.decision_maker_status,
+                 cm.contact_type, cm.contact_value, cm.format_status, cm.deliverability_status
+          FROM contacts_master c LEFT JOIN contact_methods cm ON cm.contact_id = c.contact_id
+          WHERE c.customer_id = ? ORDER BY c.created_at`).all(cid);
+        const productFit = customerDb.prepare(`SELECT * FROM customer_product_fit WHERE customer_id = ?`).all(cid);
+        const research = customerDb.prepare(`SELECT * FROM customer_research WHERE customer_id = ?`).all(cid);
+        const evidence = customerDb.prepare(`
+          SELECT evidence_id, evidence_type, evidence_url, page_title, checked_at,
+                 substr(COALESCE(evidence_summary,''),1,500) AS evidence_summary
+          FROM evidence_items WHERE customer_id = ? ORDER BY checked_at DESC`).all(cid);
+        const statusHistory = customerDb.prepare(`
+          SELECT field_name, old_value, new_value, changed_at, changed_by, reason
+          FROM customer_status_history WHERE customer_id = ? ORDER BY changed_at DESC LIMIT 10`).all(cid);
+        // 草稿元数据：绝不返回 body_text / subject_line 全文
+        const outreachAssets = customerDb.prepare(`
+          SELECT asset_id, language, content_type, human_review_status, is_sendable,
+                 outreach_eligibility, created_at,
+                 (CASE WHEN source_evidence_ids IS NOT NULL AND source_evidence_ids<>'' THEN 1 ELSE 0 END) AS has_evidence
+          FROM outreach_assets WHERE customer_id = ? ORDER BY created_at DESC`).all(cid);
+        const tags = customerDb.prepare(`
+          SELECT t.tag_id, t.tag_name, t.tag_category FROM customer_tags ct
+          JOIN tags t ON t.tag_id = ct.tag_id WHERE ct.customer_id = ?`).all(cid);
+        // 孤儿草稿提示：该客户 ID 是否出现在某条 quarantine 的 candidate_customer_ids 中
+        let orphanNotice = null;
+        const orphans = customerDb.prepare(`SELECT quarantine_id, draft_id, company_name, candidate_customer_ids FROM orphan_drafts_quarantine WHERE match_status='pending_manual_match'`).all();
+        for (const o of orphans) {
+          let cand = [];
+          try { cand = JSON.parse(o.candidate_customer_ids || '[]'); } catch (e) { cand = []; }
+          if (cand.includes(cid)) {
+            orphanNotice = `该客户出现在孤儿草稿 ${o.draft_id}（${o.company_name}）的候选匹配列表中，待人工确认归属。当前只读模式下不会自动匹配。`;
+            break;
+          }
+        }
+        const riskAssess = {
+          risk_level: master.risk_level || 'not_assessed',
+          note: (master.risk_level === 'not_assessed' || !master.risk_level) ? '尚未评估' : null
+        };
+        return cj(200, {
+          master: master,
+          sources: sources,
+          contacts: contacts,
+          product_fit: productFit,
+          product_fit_note: productFit.length === 0 ? '未评估' : null,
+          research: research,
+          research_note: research.length === 0 ? '暂无研究记录' : null,
+          evidence: evidence,
+          status_history: statusHistory,
+          outreach_assets: outreachAssets,
+          outreach_assets_note: '全部草稿处于 pending / not_sendable 状态，SQLite 只读模式下不可发送',
+          orphan_draft_notice: orphanNotice,
+          tags: tags,
+          possible_duplicate_notice: null,
+          risk_assessment: riskAssess,
+          mode: mode
+        });
+      }
+
+      // ---- API: /api/customer-library/customers (分页 + 筛选) ----
+      if (pathname === '/api/customer-library/customers') {
+        let page = parseInt(sp.get('page') || '1', 10);
+        if (isNaN(page) || page < 1) page = 1;
+        let pageSize = parseInt(sp.get('pageSize') || '50', 10);
+        if (isNaN(pageSize) || pageSize < 1) pageSize = 50;
+        if (pageSize > 100) pageSize = 100;
+        const offset = (page - 1) * pageSize;
+
+        const where = ['m.is_demo = ?'];
+        const params = [demoFilter];
+        const addEq = (col, val) => { if (val) { where.push(`${col} = ?`); params.push(val); } };
+        addEq('m.continent', sp.get('continent') || null);
+        addEq('m.country_standardized', sp.get('country') || null);
+        addEq('m.buyer_type', sp.get('buyerType') || null);
+        addEq('m.research_status', sp.get('researchStatus') || null);
+        addEq('m.risk_level', sp.get('riskLevel') || null);
+        const srcCat = sp.get('sourceCategory');
+        if (srcCat) {
+          if (srcCat === 'both') {
+            where.push(`m.customer_id IN (SELECT cs.customer_id FROM customer_sources cs GROUP BY cs.customer_id HAVING SUM(CASE WHEN cs.source_category='hardware' THEN 1 ELSE 0 END)>0 AND SUM(CASE WHEN cs.source_category='kitchenware' THEN 1 ELSE 0 END)>0)`);
+          } else {
+            addEq('m.source_category', srcCat);
+          }
+        }
+        if (sp.get('hasWebsite') === 'true') { where.push(`m.website_domain IS NOT NULL AND m.website_domain<>''`); }
+        if (sp.get('hasEmail') === 'true') {
+          where.push(`m.customer_id IN (SELECT DISTINCT cm.customer_id FROM contact_methods cm WHERE cm.contact_type='email')`);
+        }
+        // B1: sourceFile filter by customer_sources.source_file
+        const srcFile = (sp.get('sourceFile') || '').trim();
+        if (srcFile) {
+          where.push(`m.customer_id IN (SELECT cs.customer_id FROM customer_sources cs WHERE cs.source_file = ?)`);
+          params.push(srcFile);
+        }
+        // B1: hasContact filter: any/email/phone/none
+        const hasContact = (sp.get('hasContact') || '').trim();
+        if (hasContact === 'email') {
+          where.push(`m.customer_id IN (SELECT DISTINCT cm.customer_id FROM contact_methods cm WHERE cm.contact_type='email')`);
+        } else if (hasContact === 'phone') {
+          where.push(`m.customer_id IN (SELECT DISTINCT cm.customer_id FROM contact_methods cm WHERE cm.contact_type IN ('phone','whatsapp'))`);
+        } else if (hasContact === 'any') {
+          where.push(`m.customer_id IN (SELECT DISTINCT cm.customer_id FROM contact_methods cm)`);
+        } else if (hasContact === 'none') {
+          where.push(`m.customer_id NOT IN (SELECT DISTINCT cm.customer_id FROM contact_methods cm)`);
+        }
+        const search = (sp.get('search') || '').trim();
+        if (search) { where.push(`(m.company_name_raw LIKE ? OR m.country_standardized LIKE ? OR m.website_domain LIKE ?)`); params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
+
+        const whereSql = 'WHERE ' + where.join(' AND ');
+        const sortWhitelist = { customer_id:'customer_id', company_name_raw:'company_name_raw', country_standardized:'country_standardized', created_at:'created_at', risk_level:'risk_level', lead_score:'lead_score' };
+        let sortBy = sortWhitelist[sp.get('sortBy')] || 'customer_id';
+        let sortOrder = (sp.get('sortOrder') || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+        const priorityLevel = (sp.get('priorityLevel') || '').trim().toUpperCase();
+
+        let rows, total;
+        if (priorityLevel && ['P0','P1','P2','P3','DNC'].includes(priorityLevel)) {
+          // B1: compute priority in JS, filter, then paginate
+          const allRows = customerDb.prepare(`
+            SELECT m.customer_id, m.company_name_raw, m.company_name_normalized, m.country_standardized,
+                   m.continent, m.website_domain, m.buyer_type, m.source_category, m.research_status,
+                   m.risk_level, m.outreach_eligibility, m.is_demo, m.lead_score, m.created_at,
+                   (CASE WHEN m.website_domain IS NOT NULL AND m.website_domain<>'' THEN 1 ELSE 0 END) AS has_website,
+                   EXISTS(SELECT 1 FROM contact_methods cm WHERE cm.customer_id=m.customer_id AND cm.contact_type='email') AS has_email,
+                   EXISTS(SELECT 1 FROM contact_methods cm WHERE cm.customer_id=m.customer_id AND cm.contact_type IN ('phone','whatsapp')) AS has_phone,
+                   (SELECT COUNT(*) FROM customer_sources cs WHERE cs.customer_id=m.customer_id) AS source_count
+            FROM customers_master m ${whereSql}
+            ORDER BY m.${sortBy} ${sortOrder}`).all(...params);
+          const scored = allRows.map(r => { const p = b1CalcPriority(r); r.priority_score = p.score; r.priority_level = p.level; return r; });
+          const filtered = scored.filter(r => r.priority_level === priorityLevel);
+          total = filtered.length;
+          rows = filtered.slice(offset, offset + pageSize);
+        } else {
+          total = customerDb.prepare(`SELECT COUNT(*) c FROM customers_master m ${whereSql}`).get(...params).c;
+          rows = customerDb.prepare(`
+            SELECT m.customer_id, m.company_name_raw, m.company_name_normalized, m.country_standardized,
+                   m.continent, m.website_domain, m.buyer_type, m.source_category, m.research_status,
+                   m.risk_level, m.outreach_eligibility, m.is_demo, m.lead_score, m.created_at,
+                   (CASE WHEN m.website_domain IS NOT NULL AND m.website_domain<>'' THEN 1 ELSE 0 END) AS has_website,
+                   EXISTS(SELECT 1 FROM contact_methods cm WHERE cm.customer_id=m.customer_id AND cm.contact_type='email') AS has_email,
+                   EXISTS(SELECT 1 FROM contact_methods cm WHERE cm.customer_id=m.customer_id AND cm.contact_type IN ('phone','whatsapp')) AS has_phone
+            FROM customers_master m ${whereSql}
+            ORDER BY m.${sortBy} ${sortOrder}
+            LIMIT ? OFFSET ?`).all(...params, pageSize, offset);
+        }
+
+        const filters = {};
+        ['search','continent','country','sourceCategory','buyerType','researchStatus','riskLevel','hasWebsite','hasEmail','sourceFile','hasContact','priorityLevel','isDemo','sortBy','sortOrder'].forEach(k => { const v = sp.get(k); if (v) filters[k] = v; });
+        return cj(200, {
+          items: rows, total: total, page: page, pageSize: pageSize,
+          totalPages: Math.max(1, Math.ceil(total / pageSize)),
+          filters: filters, mode: mode
+        });
+      }
+
+      // ---- API: /api/customer-library/filters (B1: filter dimensions + counts) ----
+      if (pathname === '/api/customer-library/filters') {
+        const sources = customerDb.prepare(`
+          SELECT cs.source_file, cs.source_category, COUNT(DISTINCT cs.customer_id) AS cnt
+          FROM customer_sources cs JOIN customers_master m ON m.customer_id = cs.customer_id
+          WHERE m.is_demo = ?
+          GROUP BY cs.source_file, cs.source_category ORDER BY cnt DESC`).all(demoFilter)
+          .map(r => ({ source_file: r.source_file, source_category: r.source_category, count: r.cnt }));
+        const sourceCategories = customerDb.prepare(`
+          SELECT cs.source_category, COUNT(DISTINCT cs.customer_id) AS cnt
+          FROM customer_sources cs JOIN customers_master m ON m.customer_id = cs.customer_id
+          WHERE m.is_demo = ? GROUP BY cs.source_category ORDER BY cnt DESC`).all(demoFilter)
+          .map(r => ({ source_category: r.source_category, count: r.cnt }));
+        const continents = customerDb.prepare(`
+          SELECT continent, COUNT(*) AS cnt FROM customers_master WHERE is_demo = ?
+          GROUP BY continent ORDER BY cnt DESC`).all(demoFilter)
+          .map(r => ({ continent: r.continent || '未知', count: r.cnt }));
+        const countries = customerDb.prepare(`
+          SELECT country_standardized AS country, COUNT(*) AS cnt FROM customers_master WHERE is_demo = ?
+          GROUP BY country_standardized ORDER BY cnt DESC LIMIT 50`).all(demoFilter)
+          .map(r => ({ country: r.country || '未知', count: r.cnt }));
+        const buyerTypes = customerDb.prepare(`
+          SELECT buyer_type, COUNT(*) AS cnt FROM customers_master WHERE is_demo = ?
+          GROUP BY buyer_type ORDER BY cnt DESC`).all(demoFilter)
+          .map(r => ({ buyer_type: r.buyer_type || '未分类', count: r.cnt }));
+        const researchStatus = customerDb.prepare(`
+          SELECT research_status, COUNT(*) AS cnt FROM customers_master WHERE is_demo = ?
+          GROUP BY research_status ORDER BY cnt DESC`).all(demoFilter)
+          .map(r => ({ research_status: r.research_status || 'unknown', count: r.cnt }));
+        const riskLevels = customerDb.prepare(`
+          SELECT risk_level, COUNT(*) AS cnt FROM customers_master WHERE is_demo = ?
+          GROUP BY risk_level ORDER BY cnt DESC`).all(demoFilter)
+          .map(r => ({ risk_level: r.risk_level || 'not_assessed', count: r.cnt }));
+        return cj(200, {
+          sources: sources,
+          source_categories: sourceCategories,
+          continents: continents,
+          countries: countries,
+          buyer_types: buyerTypes,
+          research_status: researchStatus,
+          risk_levels: riskLevels,
+          mode: mode
+        });
+      }
+
+      // ---- API: /api/customer-library/priority-preview (B1: read-only priority calc) ----
+      if (pathname === '/api/customer-library/priority-preview') {
+        let page = parseInt(sp.get('page') || '1', 10);
+        if (isNaN(page) || page < 1) page = 1;
+        let pageSize = parseInt(sp.get('pageSize') || '100', 10);
+        if (isNaN(pageSize) || pageSize < 1) pageSize = 100;
+        if (pageSize > 500) pageSize = 500;
+        const offset = (page - 1) * pageSize;
+        const levelFilter = (sp.get('priorityLevel') || '').trim().toUpperCase();
+
+        // Fetch all customers with needed fields + contact/source flags
+        const allRows = customerDb.prepare(`
+          SELECT m.customer_id, m.company_name_raw, m.country_standardized, m.continent,
+                 m.buyer_type, m.source_category, m.research_status, m.risk_level,
+                 m.outreach_eligibility, m.website_domain,
+                 EXISTS(SELECT 1 FROM contact_methods cm WHERE cm.customer_id=m.customer_id AND cm.contact_type='email') AS has_email,
+                 EXISTS(SELECT 1 FROM contact_methods cm WHERE cm.customer_id=m.customer_id AND cm.contact_type IN ('phone','whatsapp')) AS has_phone,
+                 (SELECT COUNT(*) FROM customer_sources cs WHERE cs.customer_id=m.customer_id) AS source_count
+          FROM customers_master m WHERE m.is_demo = ?
+          ORDER BY m.customer_id`).all(demoFilter);
+
+        // Compute priority for each
+        const scored = allRows.map(r => {
+          const p = b1CalcPriority(r);
+          return {
+            customer_id: r.customer_id,
+            company_name_raw: r.company_name_raw,
+            country_standardized: r.country_standardized,
+            continent: r.continent,
+            buyer_type: r.buyer_type,
+            source_category: r.source_category,
+            priority_score: p.score,
+            priority_level: p.level,
+            factors: p.factors
+          };
+        });
+
+        // Filter by level if requested
+        let filtered = scored;
+        if (levelFilter && ['P0','P1','P2','P3','DNC'].includes(levelFilter)) {
+          filtered = scored.filter(r => r.priority_level === levelFilter);
+        }
+
+        const total = filtered.length;
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        const pageRows = filtered.slice(offset, offset + pageSize);
+
+        // Category breakdown for dashboard "who to develop today"
+        const catBreakdown = {
+          hardware: { P0: 0, P1: 0 },
+          kitchenware: { P0: 0, P1: 0 },
+          both: { P0: 0, P1: 0 }
+        };
+        scored.forEach(r => {
+          const cat = r.source_category === 'hardware' ? 'hardware' : r.source_category === 'kitchenware' ? 'kitchenware' : 'both';
+          if (r.priority_level === 'P0' || r.priority_level === 'P1') {
+            catBreakdown[cat][r.priority_level]++;
+          }
+        });
+
+        return cj(200, {
+          items: pageRows,
+          total: total,
+          page: page,
+          pageSize: pageSize,
+          totalPages: totalPages,
+          level_filter: levelFilter || null,
+          category_breakdown: catBreakdown,
+          mode: mode
+        });
+      }
+
+      // ---- API: /api/customer-library/company-facts (B1: read-only company facts list) ----
+      if (pathname === '/api/customer-library/company-facts') {
+        const where = [];
+        const params = [];
+        const apprStatus = (sp.get('approvalStatus') || '').trim();
+        if (apprStatus) { where.push('approval_status = ?'); params.push(apprStatus); }
+        const riskLvl = (sp.get('riskLevel') || '').trim();
+        if (riskLvl) { where.push('risk_level = ?'); params.push(riskLvl); }
+        const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+
+        let page = parseInt(sp.get('page') || '1', 10);
+        if (isNaN(page) || page < 1) page = 1;
+        let pageSize = parseInt(sp.get('pageSize') || '10', 10);
+        if (isNaN(pageSize) || pageSize < 1) pageSize = 10;
+        if (pageSize > 100) pageSize = 100;
+        const offset = (page - 1) * pageSize;
+
+        const total = customerDb.prepare(`SELECT COUNT(*) c FROM company_facts ${whereSql}`).get(...params).c;
+        const rows = customerDb.prepare(`
+          SELECT fact_id, fact_text, source_path, source_section, risk_note, risk_level,
+                 fact_category, approval_status, approved_for_external_use, correct_usage
+          FROM company_facts ${whereSql}
+          ORDER BY fact_id LIMIT ? OFFSET ?`).all(...params, pageSize, offset);
+
+        const riskDist = customerDb.prepare(`SELECT risk_level, COUNT(*) c FROM company_facts GROUP BY risk_level`).all()
+          .reduce((a,r)=>{a[r.risk_level||'unknown']=r.c;return a;},{});
+        const catDist = customerDb.prepare(`SELECT fact_category, COUNT(*) c FROM company_facts GROUP BY fact_category`).all()
+          .reduce((a,r)=>{a[r.fact_category||'unknown']=r.c;return a;},{});
+
+        return cj(200, {
+          items: rows,
+          total: total,
+          page: page,
+          pageSize: pageSize,
+          totalPages: Math.max(1, Math.ceil(total / pageSize)),
+          risk_distribution: riskDist,
+          category_distribution: catDist,
+          mode: mode
+        });
+      }
+
+      // ---- B3: 客户开发资料包（outreach_ready）只读浏览 API ----
+      // 安全铁律：全部 fs.readFileSync / fs.readdirSync 只读，绝不写入任何文件；
+      // 不设置任何 SMTP/WhatsApp/社媒凭据；不提供发送动作；导出为本地浏览器下载。
+      // customerId 经目录扫描匹配定位，绝不把用户输入直接拼进 fs 路径（防路径穿越）。
+      const OUTREACH_READY_DIR = path.join(ROOT_DIR, 'customer_library', 'outreach_ready');
+      const opReadJsonSafe = (fp) => { try { return JSON.parse(fs.readFileSync(fp, 'utf8')); } catch (e) { return null; } };
+      const opReadTextSafe = (fp) => { try { return fs.readFileSync(fp, 'utf8'); } catch (e) { return null; } };
+      const opListSubdirs = (base) => {
+        try { return fs.readdirSync(base, { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name); }
+        catch (e) { return null; } // 目录不存在
+      };
+      // 从 MD 顶部 YAML 前言抽取 key: value（够用即可，不引第三方依赖）
+      const opParseFrontmatter = (md) => {
+        const meta = {};
+        if (typeof md !== 'string') return meta;
+        const m = md.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+        if (!m) return meta;
+        m[1].split(/\r?\n/).forEach(line => {
+          const kv = line.match(/^([A-Za-z0-9_]+)\s*:\s*(.*)$/);
+          if (kv) { let v = kv[2].trim(); if (/^(true|false)$/.test(v)) v = (v === 'true'); meta[kv[1]] = v; }
+        });
+        return meta;
+      };
+      const opStripFrontmatter = (md) => {
+        if (typeof md !== 'string') return '';
+        return md.replace(/^---\r?\n[\s\S]*?\r?---\r?\n?/, '').trim();
+      };
+      // 按 customer_id 定位目录（目录名形如 {customer_id}_{slug}，或直接以内置 profile.customer_id 为准）
+      const opFindPackageDir = (customerId) => {
+        const subs = opListSubdirs(OUTREACH_READY_DIR);
+        if (!subs) return null;
+        const dec = decodeURIComponent(customerId);
+        for (const name of subs) {
+          const prof = opReadJsonSafe(path.join(OUTREACH_READY_DIR, name, 'customer_profile.json'));
+          if (prof && prof.customer_id === dec) return name;
+          if (name === dec || name.startsWith(dec + '_')) return name;
+        }
+        return null;
+      };
+      // 扫描 outreach_assets/ 下所有 *_vN.md 版本
+      const opScanVersions = (dirName) => {
+        const assetsDir = path.join(OUTREACH_READY_DIR, dirName, 'outreach_assets');
+        let entries = [];
+        try { entries = fs.readdirSync(assetsDir, { withFileTypes: true }); } catch (e) { return []; }
+        const out = [];
+        for (const e of entries) {
+          if (!e.isFile()) continue;
+          const raw = opReadTextSafe(path.join(assetsDir, e.name));
+          const meta = opParseFrontmatter(raw || '');
+          const mt = e.name.match(/^(.+)_v(\d+)\.md$/);
+          out.push({
+            file: e.name,
+            kind: mt ? mt[1] : e.name.replace(/\.md$/, ''),
+            version: mt ? ('v' + mt[2]) : (meta.version || 'unknown'),
+            generated_at: meta.generated_at || null,
+            source: meta.source || null,
+            review_status: meta.review_status || null,
+            human_review_status: meta.human_review_status || null,
+            is_sendable: (meta.is_sendable === true)
+          });
+        }
+        return out.sort((a, b) => String(a.version).localeCompare(String(b.version)));
+      };
+      // 组装单个资料包完整内容（JSON 解析 + MD 原文）
+      const opAssemblePackage = (dirName) => {
+        const base = path.join(OUTREACH_READY_DIR, dirName);
+        const profile = opReadJsonSafe(path.join(base, 'customer_profile.json'));
+        const evidenceIndex = opReadJsonSafe(path.join(base, 'evidence_index.json'));
+        const productFit = opReadJsonSafe(path.join(base, 'product_fit.json'));
+        const factRefs = opReadJsonSafe(path.join(base, 'company_fact_refs.json'));
+        const assets = {};
+        try {
+          for (const e of fs.readdirSync(path.join(base, 'outreach_assets'), { withFileTypes: true })) {
+            if (!e.isFile()) continue;
+            const raw = opReadTextSafe(path.join(base, 'outreach_assets', e.name));
+            assets[e.name] = { meta: opParseFrontmatter(raw || ''), body: opStripFrontmatter(raw || '') };
+          }
+        } catch (e) {}
+        return {
+          dir: dirName,
+          profile: profile,
+          evidence_index: evidenceIndex,
+          product_fit: productFit,
+          company_fact_refs: factRefs,
+          assets: assets,
+          review: { human_review_md: opReadTextSafe(path.join(base, 'review', 'human_review.md')) },
+          readme_md: opReadTextSafe(path.join(base, 'README.md')),
+          versions: opScanVersions(dirName),
+          generated_at: (profile && profile.generated_at) || null,
+          version: (profile && profile.version) || null,
+          review_status: (profile && profile.review_status) || 'pending_review'
+        };
+      };
+
+      // GET /api/customer-library/outreach-packages —— 资料包列表
+      if (pathname === '/api/customer-library/outreach-packages') {
+        const subs = opListSubdirs(OUTREACH_READY_DIR);
+        if (!subs) return cj(404, { error: 'outreach_ready_dir_missing', message: 'customer_library/outreach_ready 目录不存在' });
+        const packages = [];
+        for (const name of subs) {
+          const p = opReadJsonSafe(path.join(OUTREACH_READY_DIR, name, 'customer_profile.json'));
+          packages.push({
+            dir: name,
+            customer_id: (p && p.customer_id) || name,
+            company_name: (p && (p.company_name_standard || p.company_name_raw)) || name,
+            country: (p && (p.country_standardized || p.country_region)) || null,
+            continent: (p && p.continent) || null,
+            buyer_type: (p && p.buyer_type) || null,
+            review_status: (p && p.review_status) || 'pending_review',
+            outreach_eligibility: (p && p.outreach_eligibility) || 'not_eligible',
+            version: (p && p.version) || null,
+            generated_at: (p && p.generated_at) || null,
+            versions: opScanVersions(name)
+          });
+        }
+        return cj(200, { packages: packages, total: packages.length, mode: mode });
+      }
+
+      // GET /api/customer-library/outreach-packages/:customerId/versions —— 版本列表
+      const opVerMatch = pathname.match(/^\/api\/customer-library\/outreach-packages\/([^/]+)\/versions$/);
+      if (opVerMatch) {
+        const dirName = opFindPackageDir(opVerMatch[1]);
+        if (!dirName) return cj(404, { error: 'package_not_found', message: '未找到该客户的开发资料包' });
+        return cj(200, { customer_id: decodeURIComponent(opVerMatch[1]), dir: dirName, versions: opScanVersions(dirName), mode: mode });
+      }
+
+      // GET /api/customer-library/outreach-packages/:customerId/export?format=md|json —— 本地文件下载
+      const opExpMatch = pathname.match(/^\/api\/customer-library\/outreach-packages\/([^/]+)\/export$/);
+      if (opExpMatch) {
+        const dirName = opFindPackageDir(opExpMatch[1]);
+        if (!dirName) return cj(404, { error: 'package_not_found', message: '未找到该客户的开发资料包' });
+        const pkg = opAssemblePackage(dirName);
+        const cid = (pkg.profile && pkg.profile.customer_id) || decodeURIComponent(opExpMatch[1]);
+        const fmt = (sp.get('format') || 'json').toLowerCase();
+        if (fmt === 'md') {
+          const L = [];
+          L.push(`# 客户开发资料包导出 — ${cid}`);
+          L.push('');
+          L.push('> 只读导出 · 工作台不会自动发送 · 人工复制后自行发送');
+          L.push('');
+          L.push('## 资料包概览 (customer_profile.json)');
+          L.push('```json'); L.push(JSON.stringify(pkg.profile || {}, null, 2)); L.push('```');
+          if (pkg.evidence_index) { L.push(''); L.push('## 证据索引 (evidence_index.json)'); L.push('```json'); L.push(JSON.stringify(pkg.evidence_index, null, 2)); L.push('```'); }
+          if (pkg.product_fit) { L.push(''); L.push('## 产品匹配 (product_fit.json)'); L.push('```json'); L.push(JSON.stringify(pkg.product_fit, null, 2)); L.push('```'); }
+          if (pkg.company_fact_refs) { L.push(''); L.push('## 公司事实引用 (company_fact_refs.json)'); L.push('```json'); L.push(JSON.stringify(pkg.company_fact_refs, null, 2)); L.push('```'); }
+          for (const [fn, asset] of Object.entries(pkg.assets)) {
+            L.push(''); L.push(`## 开发素材：${fn}`); L.push(asset.body || '');
+          }
+          if (pkg.review && pkg.review.human_review_md) { L.push(''); L.push('## 人工审核稿 (review/human_review.md)'); L.push(pkg.review.human_review_md); }
+          res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Content-Disposition': `attachment; filename="outreach_package_${cid}.md"`, 'Cache-Control': 'no-store' });
+          return res.end(L.join('\n'));
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="outreach_package_${cid}.json"`, 'Cache-Control': 'no-store' });
+        return res.end(JSON.stringify(pkg, null, 2));
+      }
+
+      // GET /api/customer-library/outreach-packages/:customerId —— 单个资料包完整内容
+      const opDetailMatch = pathname.match(/^\/api\/customer-library\/outreach-packages\/([^/]+)$/);
+      if (opDetailMatch) {
+        const dirName = opFindPackageDir(opDetailMatch[1]);
+        if (!dirName) return cj(404, { error: 'package_not_found', message: '未找到该客户的开发资料包' });
+        const pkg = opAssemblePackage(dirName);
+        pkg.mode = mode;
+        return cj(200, pkg);
+      }
+
+      // 兜底：未知 customer-library 路由
+      return cj(404, { error: 'not_found', message: '未知的客户资源库接口' });
+
+    } catch (dbErr) {
+      console.error('[A2] customer-library query error:', dbErr.message, dbErr.stack);
+      return cj(503, { error: 'database_unavailable', message: '本地客户资源库暂不可读取' });
+    }
   }
 
   // 受控展示环境禁止搜索引擎抓取。
@@ -4592,24 +5299,99 @@ if (pathname === '/api/access/verify' && req.method === 'POST') {
       return v1Send(200, { success: true, deleted: before !== v1Webhooks.length });
     }
 
-    // ---- Admin: sync workbench business-data snapshot from the frontend ----
+    // =====================================================================
+    // B2.3 SNAPSHOT SAFETY GATE (added 2026-10-07)
+    // ---------------------------------------------------------------------
+    // DESIGN:
+    //   * SQLite (data/operational/customer_development.sqlite) is the ONLY
+    //     operational source of truth. workbench_snapshot.json is a derived
+    //     export / frontend cache. It must NEVER be overwritten by browser
+    //     localStorage or by a small ad-hoc payload.
+    //   * The old POST /admin/sync-snapshot caused the 2026-10-06 08:17
+    //     incident: 7,619 customers -> 61 customers in one POST. It is now
+    //     disabled by default and replaced with a guarded rebuild path.
+    // =====================================================================
+
+    // Element 1 + 2: disable the legacy reverse-overwrite endpoint by default.
+    // It returns 403 unless an explicit three-parameter escape hatch is given.
     if (v1Path === '/admin/sync-snapshot' && req.method === 'POST') {
       try {
+        const v1Query = reqUrl.searchParams;
+        const confirmed = (v1Query.get('confirm') === 'true');
+        const minCustomers = parseInt(v1Query.get('minCustomers') || '0', 10);
+        const baseHash = v1Query.get('baseHash') || '';
+
+        // Hard fail-closed: deny any caller that does not pass the 3-param gate.
+        if (!confirmed || !minCustomers || !/^[0-9a-f]{64}$/.test(baseHash)) {
+          console.warn('[B2.3] /admin/sync-snapshot REJECTED (missing gate params) by ip=' + getClientIp(req));
+          return v1Send(403, {
+            error: 'Forbidden',
+            code: 'SNAPSHOT_REVERSE_OVERWRITE_DISABLED',
+            hint: 'Reverse-overwrite of workbench_snapshot.json is disabled. Use POST /admin/export-from-sqlite to rebuild the snapshot from SQLite.'
+          });
+        }
+
         const body = await readBody(req);
         const incoming = Array.isArray(body.customers) ? body.customers : [];
-        // Merge by id: keep customers that were created via the open API (source:'api')
-        // but are not yet in the browser store, so external writes are not clobbered.
-        const existingApi = (v1Snapshot.customers || []).filter(c => c.source === 'api' && !incoming.some(x => x.id === c.id));
-        v1Snapshot = {
-          customers: incoming.concat(existingApi),
+
+        // Element 5: max-loss protection — reject if incoming < 90% of current.
+        const currentCount = (v1Snapshot.customers || []).length;
+        const MIN_RATIO = 0.90;
+        if (incoming.length < Math.floor(currentCount * MIN_RATIO)) {
+          console.warn('[B2.3] /admin/sync-snapshot REJECTED (count drop) incoming=' + incoming.length + ' current=' + currentCount);
+          return v1Send(409, {
+            error: 'Conflict',
+            code: 'SNAPSHOT_COUNT_DROP',
+            incoming: incoming.length,
+            current: currentCount,
+            minAccepted: Math.floor(currentCount * MIN_RATIO)
+          });
+        }
+
+        // Element 2b: baseHash must match current on-disk snapshot SHA256.
+        const currentHash = crypto.createHash('sha256')
+          .update(fs.readFileSync(path.join(V1_DATA_DIR, 'workbench_snapshot.json')))
+          .digest('hex');
+        if (currentHash !== baseHash) {
+          return v1Send(409, { error: 'Conflict', code: 'SNAPSHOT_BASE_HASH_MISMATCH',
+            expected: baseHash, actual: currentHash });
+        }
+
+        // Element 4: backup BEFORE overwrite (handled inside v1SaveJSONWithBackup).
+        const nextSnapshot = {
+          customers: incoming,
           drafts: Array.isArray(body.drafts) ? body.drafts : [],
           sendTasks: Array.isArray(body.sendTasks) ? body.sendTasks : [],
           sentCount: body.sentCount || 0,
           replyCount: body.replyCount || 0,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+          dataVersion: (body.dataVersion || 'v1.1'),
+          source: 'admin-sync',
+          loadedFromServer: true
         };
-        v1SaveJSON('workbench_snapshot.json', v1Snapshot);
-        return v1Send(200, { success: true, customers: v1Snapshot.customers.length, at: v1Snapshot.updatedAt });
+
+        // Element 6: post-write read-back verification.
+        const ok = v1SaveJSONWithBackup('workbench_snapshot.json', nextSnapshot);
+        if (!ok) return v1Send(500, { error: 'save failed', code: 'SNAPSHOT_WRITE_FAILED' });
+
+        return v1Send(200, { success: true, customers: nextSnapshot.customers.length, at: nextSnapshot.updatedAt });
+      } catch (e) { return v1Send(400, { error: e.message }); }
+    }
+
+    // Element 3: NEW controlled rebuild endpoint — snapshot may only be rebuilt
+    // FROM SQLite, never from browser payloads.
+    if (v1Path === '/admin/export-from-sqlite' && req.method === 'POST') {
+      try {
+        // TODO(B2.3): read customers_master / customer_sources / contacts_master
+        // from data/operational/customer_development.sqlite (read-only) and
+        // materialize a full workbench_snapshot.json (15 top-level fields,
+        // including kitchenwareSourceRecords and migration metadata).
+        // This endpoint is the ONLY sanctioned write path for the snapshot.
+        return v1Send(501, {
+          error: 'Not Implemented',
+          code: 'SQLITE_EXPORT_PENDING',
+          hint: 'B2.3 patch applied; SQLite export implementation pending.'
+        });
       } catch (e) { return v1Send(400, { error: e.message }); }
     }
 

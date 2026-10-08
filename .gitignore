@@ -79,3 +79,25 @@ ENV/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# 客户数据库与知识库（含真实客户数据，不进Git）
+customer_library/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+
+# 审计文档（含真实客户信息CSV，不进Git）
+docs/audits/
+
+# 备份文件
+*.pre_module*
+*backup*
+*备份*
+
+# 工作台运行时配置（含敏感信息）
+workbench_snapshot.json
+api_keys.json
+api_logs.json
+webhooks.json
+admin_token.json

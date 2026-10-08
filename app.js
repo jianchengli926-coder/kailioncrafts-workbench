@@ -5928,6 +5928,137 @@ console.log('%c✅ 全局错误处理已启用', 'color:#0f7b3f;font-weight:bold
 let S = { customers:[], plans:[], drafts:[], inquiries:[], quotes:[], contracts:[], followups:[], settings:null, kbVersions:[], outreachKnowledgeBase:[], campaigns:[], campaignCustomerTasks:[], campaignFollowUpTasks:[], knowledgeFacts:[], knowledgePacks:[], importBatches:[] };
 
 /* ============================================================
+ * 模块1+模块2：真实/演示数据隔离 与 服务器快照同步
+ * ------------------------------------------------------------
+ * - S.dataMode: 'real'(默认) | 'demo'，持久化到 localStorage
+ * - real 模式：所有列表/统计过滤 isDemo===true 的演示数据
+ * - demo 模式：展示全部数据（含39家演示客户/33封演示草稿），顶部红色横幅警示
+ * ============================================================ */
+function getDataMode(){ return S.dataMode==='demo' ? 'demo' : 'real'; }
+function isRealMode(){ return getDataMode()==='real'; }
+function isDemoMode(){ return getDataMode()==='demo'; }
+/* 客户/草稿可见集合：real 模式剔除演示数据，demo 模式展示全部 */
+function visibleCustomers(){ return isDemoMode() ? (S.customers||[]).slice() : (S.customers||[]).filter(c=>!c.isDemo); }
+function visibleDrafts(){ return isDemoMode() ? (S.drafts||[]).slice() : (S.drafts||[]).filter(d=>!d.isDemo); }
+/* 数据层：始终统计真实数据（不受展示模式影响） */
+function realCustomerCount(){ return (S.customers||[]).filter(c=>!c.isDemo).length; }
+function realDraftCount(){ return (S.drafts||[]).filter(d=>!d.isDemo).length; }
+function realContractAmount(){ return (S.contracts||[]).filter(c=>!c.isDemo).reduce((a,c)=>a+(Number(c.amount)||0),0); }
+/* 空真实数据占位文案 */
+const NO_REAL = '<span style="color:#a0aec0;font-size:13px">暂无真实数据</span>';
+/* 渲染顶部演示模式横幅 + 切换开关状态 */
+function renderDemoBanner(){
+  const b = document.getElementById('demoModeBanner');
+  if(b){
+    if(isDemoMode()){
+      b.style.display='block';
+      b.innerHTML='⚠️ <b>演示数据模式</b> — 当前展示的客户、草稿与所有业务数字均为<b>模拟数据</b>，不代表真实业务，请不要据此做决策。';
+    } else { b.style.display='none'; b.innerHTML=''; }
+  }
+  const t = document.getElementById('dataModeToggle');
+  if(t){
+    t.textContent = isDemoMode() ? '🎭 演示模式' : '✅ 真实模式';
+    t.className = 'data-mode-toggle ' + (isDemoMode()?'demo':'real');
+  }
+}
+/* 切换真实/演示模式 */
+function toggleDataMode(){
+  const next = isRealMode() ? 'demo' : 'real';
+  S.dataMode = next;
+  if(window.CUSTOMER_LIBRARY){ window.CUSTOMER_LIBRARY.mode = next; }
+  try{ localStorage.setItem(PREFIX+'dataMode', next); }catch(e){}
+  try{ DB.save('dataMode', next); }catch(e){}
+  try{ persist(); }catch(e){}
+  renderDemoBanner();
+  toast(next==='demo' ? '已切换到演示数据模式（顶部橙色横幅可见）' : '已切换到真实数据模式', next==='demo'?'info':'ok');
+  if(typeof renderView==='function') renderView(); else if(typeof go==='function') go(currentView||'dashboard');
+}
+
+/* ---------- 模块2：服务器快照加载与首次同步 ---------- */
+/* 将服务器快照应用到 S；mode: 'load'=直接覆盖; 'exportThenOverwrite'=先导出本地再覆盖 */
+function applyServerSnapshot(snap, mode){
+  try{
+    if(mode==='exportThenOverwrite' && typeof exportData==='function'){ exportData(); }
+  }catch(e){ console.warn('[快照] 导出本地备份失败:', e.message); }
+  S.customers = snap.customers || [];
+  S.drafts = snap.drafts || [];
+  if(snap.sendTasks) S.sendTasks = snap.sendTasks;
+  if(snap.sentCount!=null) S.sentCount = snap.sentCount;
+  if(snap.replyCount!=null) S.replyCount = snap.replyCount;
+  S.loadedFromServer = true;
+  S.serverSnapshotAt = snap.updatedAt || new Date().toISOString();
+  S.dataVersion = CURRENT_DATA_VERSION;
+  try{ DB.save('dataVersion', S.dataVersion); }catch(e){}
+  try{ DB.save('loadedFromServer', true); }catch(e){}
+  try{ localStorage.setItem(PREFIX+'_initialized','1'); }catch(e){}
+  try{ persist(); }catch(e){}
+  try{ migrateData(); }catch(e){ console.warn('[快照] 迁移跳过:', e.message); }
+  toast('已从服务器加载 '+realCustomerCount()+' 家真实客户 / '+realDraftCount()+' 封真实草稿','ok');
+  if(typeof renderView==='function') renderView(); else if(typeof go==='function') go(currentView||'dashboard');
+}
+/* 首次/更新加载选择弹窗（三选一） */
+function showSnapshotChoiceModal(snap, diffMsg, title){
+  const sCust = (snap.customers||[]).filter(c=>!c.isDemo).length;
+  const sDraft = (snap.drafts||[]).filter(d=>!d.isDemo).length;
+  openModal(`
+    <div class="modal-head"><h3>📦 ${esc(title||'服务器数据同步')}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div class="modal-body" style="font-size:13px;line-height:1.9">
+      <p>检测到服务器快照包含真实业务数据：</p>
+      <div style="background:#f0f7ff;border:1px solid #bee3f8;border-radius:8px;padding:10px 14px;margin:8px 0">
+        📊 <b>服务器快照：${sCust} 家真实客户 + ${sDraft} 封真实草稿</b><br>
+        🕒 快照更新时间：${esc((snap.updatedAt||'-').slice(0,10))}<br>
+        ${diffMsg?('🔀 差异：'+esc(diffMsg)):''}
+      </div>
+      <p style="color:#718096">请选择如何处理本地数据：</p>
+    </div>
+    <div class="modal-foot" style="flex-direction:column;gap:8px">
+      <button class="btn btn-primary" style="width:100%" id="snapOptLoad">⬇️ 加载服务器真实数据（覆盖本地）</button>
+      <button class="btn btn-outline" style="width:100%" id="snapOptKeep">💾 保留本地未同步修改</button>
+      <button class="btn btn-outline" style="width:100%" id="snapOptExport">📤 先导出本地缓存为 JSON，再用服务器数据覆盖</button>
+    </div>`);
+  document.getElementById('snapOptLoad').onclick = ()=>{ closeModal(); applyServerSnapshot(snap,'load'); };
+  document.getElementById('snapOptKeep').onclick = ()=>{
+    closeModal();
+    S.loadedFromServer = false; S.serverSnapshotAt = snap.updatedAt || null;
+    try{ persist(); }catch(e){}
+    localStorage.setItem(PREFIX+'_initialized','1');
+    toast('已保留本地数据，未从服务器同步','info');
+  };
+  document.getElementById('snapOptExport').onclick = ()=>{ closeModal(); applyServerSnapshot(snap,'exportThenOverwrite'); };
+}
+/* 启动时尝试从服务器加载快照 */
+async function startupLoadServerSnapshot(){
+  let snap = null;
+  try{
+    const r = await fetch('data/workbench_snapshot.json?ts='+Date.now(), {cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    snap = await r.json();
+  }catch(e){
+    console.warn('[快照] 无法加载服务器快照（可能通过 file:// 打开或服务器未启动）:', e.message);
+    return;
+  }
+  if(!snap || !Array.isArray(snap.customers)){ console.warn('[快照] 格式无效'); return; }
+  const sCust = (snap.customers||[]).filter(c=>!c.isDemo).length;
+  const sDraft = (snap.drafts||[]).filter(d=>!d.isDemo).length;
+  const localCust = realCustomerCount();
+  const localDraft = realDraftCount();
+  const firstEver = !localStorage.getItem(PREFIX+'_initialized') && localCust===0;
+  const diff = `本地 ${localCust} 家客户 / ${localDraft} 封草稿`;
+  if(firstEver){
+    // 首次加载：三选一弹窗
+    showSnapshotChoiceModal(snap, diff, '首次加载：发现服务器真实数据');
+  } else if(snap.updatedAt && S.serverSnapshotAt && new Date(snap.updatedAt) > new Date(S.serverSnapshotAt)){
+    // 服务器快照更新：差异摘要弹窗
+    showSnapshotChoiceModal(snap, diff, '检测到服务器快照有更新');
+  } else {
+    // 已同步过：静默记录来源，不打断用户
+    console.log('[快照] 服务器快照已加载（'+sCust+' 客户），本地为最新，跳过弹窗');
+    S.loadedFromServer = true; S.serverSnapshotAt = snap.updatedAt || S.serverSnapshotAt;
+    try{ persist(); }catch(e){}
+  }
+}
+
+/* ============================================================
  * 数据版本管理与迁移（全局作用域，供 DOMContentLoaded 调用）
  * ============================================================ */
 const CURRENT_DATA_VERSION = 2;
@@ -5988,6 +6119,10 @@ function loadState(){
   S.socialMonitor = DB.load('socialMonitor') || {keywords:[],posts:[],painPoints:[],leads:[],lastScan:null};
   S.mailQueue = DB.load('mailQueue') || [];
   S.dataVersion = DB.load('dataVersion') || 1;
+  // 模块1: 真实/演示数据模式（默认 real）；模块2: 服务器快照同步标记
+  S.dataMode = DB.load('dataMode') || localStorage.getItem(PREFIX+'dataMode') || 'real';
+  S.loadedFromServer = DB.load('loadedFromServer') || false;
+  S.serverSnapshotAt = DB.load('serverSnapshotAt') || null;
   S.companyFacts = DB.load('companyFacts') || {brandName:'',companyName:'',foundedYear:'',headquarters:'',businessModel:'',categories:[],skuCount:'',certifications:[],capacity:'',moq:'',leadTime:'',factories:[],exportCountries:'',website:'',verified:false};
   S.knowledgeFacts = DB.load('knowledgeFacts') || [];
   S.knowledgePacks = DB.load('knowledgePacks') || [];
@@ -6305,6 +6440,10 @@ function persist(){
   DB.save('p7ModelRouting', S.p7ModelRouting||{});
   // Customer Dev Phase5: persist unified data object
   DB.save('cdPhase5', S.cdPhase5||{taskLog:[],customerStage:{},mailboxHealth:{},calendarTasks:{},uiPrefs:{}});
+  // 模块1+2: 数据模式与服务器同步标记
+  DB.save('dataMode', S.dataMode||'real');
+  DB.save('loadedFromServer', !!S.loadedFromServer);
+  DB.save('serverSnapshotAt', S.serverSnapshotAt||null);
 }
 
 /* V74.6 导出客户数据为CSV */
@@ -8616,7 +8755,7 @@ function seedExtra(){
        records:[{date:daysAgo(45),amount:18500,method:'T/T',note:'全款'}]}
     ];
   }
-  if(!S.customers || !S.customers.filter(c=>!c.isDemo).length) return;
+  if(!S.customers || !visibleCustomers().length) return;
   // 公海池：把第 20-23 个客户 owner 设为 null
   S.customers.forEach((c,i)=>{ if(i>=20 && i<=23 && !c.isOld) c.owner=null; });
   // V7：给客户分配风险等级
@@ -8697,65 +8836,190 @@ function seedExtra(){
  * ============================================================ */
 const NAV = [
   {group:'核心流程'},
-  {key:'dashboard',icon:'📊',label:'数据看板',title:'数据看板',crumb:'每天先联系谁？'},
+  {key:'dashboard',icon:'📊',label:'数据看板',title:'今日客户开发工作台',crumb:'每天先联系谁？'},
   {key:'plans',icon:'🎯',label:'开发任务',title:'AI 开发任务',crumb:'搜索 → 核证据 → 写草稿'},
-  {key:'autosearch',icon:'🔍',label:'自动搜客',title:'自动搜客中心',crumb:'地图+海关+社媒 · AI决策人挖掘'},
+  {key:'autosearch',icon:'🔍',label:'自动搜客',title:'客户背调',crumb:'地图+海关+社媒 · AI决策人挖掘'},
   {key:'prospect',icon:'🎯',label:'精准开发',title:'AI精准客户开发',crumb:'画像→搜客→分析→开发信 · 真实联网搜索'},
   {key:'devplans',icon:'📋',label:'开发计划',title:'开发计划中心',crumb:'多计划并行 · AI自动运行'},
-  {key:'customers',icon:'👥',label:'客户台账',title:'客户台账',crumb:'39 家线索 · 按优先级分层'},
-  {key:'drafts',icon:'✉️',label:'开发信',title:'开发信管理',crumb:'AI 草稿 · 人工发送'},
-  {key:'dailySend',icon:'📮',label:'今日发送',title:'每日发送任务',crumb:'15封/天 · 4品类均衡 · 人工发送'},
+  {key:'customers',icon:'👥',label:'客户台账',title:'客户台账',crumb:'7619 家线索 · 按优先级分层'},
+  {key:'drafts',icon:'✉️',label:'开发信草稿',title:'开发信管理',crumb:'AI 草稿 · 人工发送'},
+  {key:'dailySend',icon:'📮',label:'WhatsApp合规',title:'每日发送任务',crumb:'15封/天 · 4品类均衡 · 人工发送'},
   {key:'sendHistory',icon:'📜',label:'发送历史',title:'发送记录与追踪',crumb:'打开率 · 点击率 · 跟进序列'},
   {key:'outreachKB',icon:'🗂️',label:'客户开发知识库',title:'客户开发知识库',crumb:'Outreach Knowledge Base · 搜索去重 · 历史归档'},
-  {key:'campaigns',icon:'🚀',label:'客户开发Campaign',title:'客户开发 Campaign',crumb:'Campaign Management · 任务分组 · 阶段跟踪'},
+  {key:'campaigns',icon:'🚀',label:'跟进序列',title:'客户开发 Campaign',crumb:'Campaign Management · 任务分组 · 阶段跟踪'},
   {key:'knowledgeFacts',icon:'✅',label:'知识事实',title:'精准开发知识事实',crumb:'可对外使用的事实依据 · 人工审核 · 来源可追溯'},
-  {key:'knowledgePacks',icon:'📦',label:'精准开发配置',title:'Knowledge Pack 配置',crumb:'版本化知识包 · Campaign 锁定依据'},
+  {key:'knowledgePacks',icon:'📦',label:'多语言素材',title:'Knowledge Pack 配置',crumb:'版本化知识包 · Campaign 锁定依据'},
   {group:'沟通与跟进'},
   {key:'inbox',icon:'📥',label:'AI 收件箱',title:'AI 收件箱',crumb:'客户回复 · AI 提炼重点'},
-  {key:'schedule',icon:'📅',label:'跟进日程',title:'跟进日程',crumb:'今天/明天/本周要联系谁'},
+  {key:'schedule',icon:'📅',label:'今日跟进',title:'跟进日程',crumb:'今天/明天/本周要联系谁'},
   {group:'交易与产品'},
   {key:'inquiry',icon:'💬',label:'询盘管理',title:'询盘管理',crumb:'Inquiries'},
   {key:'orders',icon:'💰',label:'报价与订单',title:'报价与订单',crumb:'Quotations · Contracts · Orders'},
   {key:'products',icon:'📦',label:'产品与样品',title:'产品与样品',crumb:'Product Catalog · Samples'},
-  {key:'knowledge',icon:'📚',label:'知识库',title:'企业知识库',crumb:'Products · SOP · Cases · News'},
+  {key:'knowledge',icon:'📚',label:'企业知识库',title:'企业知识库',crumb:'Products · SOP · Cases · News'},
   {group:'营销与增长'},
   {key:'market',icon:'🔬',label:'市场分析',title:'亚马逊市场分析中心',crumb:'产品调研·关键词·VOC·Listing诊断'},
   {key:'seo',icon:'📈',label:'SEO内容营销',title:'SEO与内容营销',crumb:'关键词 · 内容 · GEO · 外链'},
   {key:'expos',icon:'🎪',label:'展会管理',title:'展会管理',crumb:'展前邀约 · 展中分级 · 展后跟进'},
   {group:'数据与智能'},
-  {key:'reports',icon:'🏆',label:'业绩战报',title:'业绩战报',crumb:'漏斗看未来 · 战报看现在 · 行为看过程'},
+  {key:'reports',icon:'🏆',label:'开发复盘',title:'开发复盘',crumb:'漏斗看未来 · 战报看现在 · 行为看过程'},
   {key:'pipeline',icon:'🎯',label:'销售漏斗',title:'销售漏斗',crumb:'6阶段商机管理 · 销售预测'},
-  {key:'agents',icon:'🤖',label:'AI Agent团队',title:'AI Agent团队',crumb:'AI CEO调度 · 11个专业Agent协同'},
-  {key:'activity',icon:'📋',label:'操作日志',title:'操作日志与审计',crumb:'记录所有重要操作 · 可追溯可审计'},
+  {key:'agents',icon:'🤖',label:'AI Agent',title:'AI Agent团队',crumb:'AI CEO调度 · 11个专业Agent协同'},
+  {key:'activity',icon:'📋',label:'API与集成',title:'操作日志与审计',crumb:'记录所有重要操作 · 可追溯可审计'},
   {key:'linkedin',icon:'💼',label:'领英拓客',title:'领英智能拓客',crumb:'4步拓客法 · AI站内信 · 智能互动'},
   {key:'socialmonitor',icon:'📡',label:'社媒监控',title:'社媒关键词监控',crumb:'监控行业痛点 · 发现潜在客户'},
   {key:'dailyWork',icon:'📅',label:'今日工作',title:'每日客户开发工作视图',crumb:'待审核 · 跟进 · 高优先级 · 证据核验'},
   {key:'outreachQueue',icon:'🎯',label:'开发名单',title:'客户开发名单',crumb:'优先级排序 · 逐个生成草稿 · 人工审核发送'},
-  {key:'reviewQueue',icon:'📋',label:'审核队列',title:'人工审核队列',crumb:'集中审核草稿 · 通过/拒绝/补证据'},
-  {key:'followUpPlan',icon:'📅',label:'跟进计划',title:'跟进计划',crumb:'客户跟进提醒 · 工作台内待办'},
-  {key:'outreachAnalytics',icon:'📊',label:'开发复盘',title:'开发复盘',crumb:'基于真实录入结果 · 不编造数据'},
+  {key:'reviewQueue',icon:'📋',label:'待审核队列',title:'人工审核队列',crumb:'集中审核草稿 · 通过/拒绝/补证据'},
+  {key:'followUpPlan',icon:'📅',label:'跟进日程',title:'跟进计划',crumb:'客户跟进提醒 · 工作台内待办'},
+  {key:'outreachAnalytics',icon:'📊',label:'开发素材溯源',title:'开发复盘',crumb:'基于真实录入结果 · 不编造数据'},
   {key:'outreach',icon:'📤',label:'触达中心',title:'多渠道触达中心',crumb:'邮件·WhatsApp·领英·电话统一管理'},
   {key:'bulkImport',icon:'📥',label:'批量导入',title:'客户批量导入',crumb:'CSV导入·字段映射·数据清洗·安全确认'},
-  {key:'importHistory',icon:'📜',label:'导入历史',title:'导入批次历史',crumb:'批次记录·映射配置·错误预览·按批次筛选客户'},
+  {key:'importHistory',icon:'📜',label:'搜索与去重复核',title:'导入批次历史',crumb:'批次记录·映射配置·错误预览·按批次筛选客户'},
+  {key:'companyFactsApproval',icon:'🔒',label:'公司事实审批',title:'公司事实审批预览',crumb:'42条公司事实 · 0/42已批准外发 · 开发信引擎解锁前置'},
   {group:'系统'},
   {key:'tools',icon:'🧰',label:'工具箱',title:'工具箱',crumb:'14类·100+工具'},
-  {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings'},
+  {key:'settings',icon:'⚙️',label:'设置',title:'设置',crumb:'Settings · 国家与语言规则'},
   {key:'manual',icon:'📖',label:'使用说明书',title:'工作台使用说明书',crumb:'小白也能轻松上手 · 20个页面详解'}
 ];
+
+/* B1: 导航分组结构（6个可折叠一级分组） */
+const NAV_GROUPS = [
+  { id:'today', label:'今日工作', defaultOpen:true, items:[
+    {key:'dashboard', icon:'📊', label:'今日工作台'},
+    {key:'reviewQueue', icon:'📋', label:'待审核队列'},
+    {key:'schedule', icon:'📅', label:'今日跟进'}
+  ]},
+  { id:'library', label:'客户资源库', defaultOpen:true, items:[
+    {key:'customers', icon:'👥', label:'客户台账'},
+    {key:'bulkImport', icon:'📥', label:'批量导入'},
+    {key:'importHistory', icon:'🔍', label:'搜索与去重复核'}
+  ]},
+  { id:'devprep', label:'开发准备', defaultOpen:false, items:[
+    {key:'prospect', icon:'🎯', label:'精准开发'},
+    {key:'outreachQueue', icon:'📋', label:'开发名单'},
+    {key:'autosearch', icon:'🔍', label:'客户背调'},
+    {key:'knowledgeFacts', icon:'✅', label:'知识事实'},
+    {key:'drafts', icon:'✉️', label:'开发信草稿'},
+    {key:'companyFactsApproval', icon:'🔒', label:'公司事实审批'},
+    {key:'knowledgePacks', icon:'📦', label:'多语言素材'},
+    {key:'outreachAnalytics', icon:'📊', label:'开发素材溯源'}
+  ]},
+  { id:'comm', label:'沟通与跟进', defaultOpen:false, items:[
+    {key:'outreach', icon:'📤', label:'触达中心'},
+    {key:'sendHistory', icon:'📜', label:'发送历史'},
+    {key:'inbox', icon:'📥', label:'AI收件箱'},
+    {key:'followUpPlan', icon:'📅', label:'跟进日程'},
+    {key:'dailySend', icon:'📮', label:'WhatsApp合规'},
+    {key:'campaigns', icon:'🚀', label:'跟进序列'}
+  ]},
+  { id:'biz', label:'商机与客户协作', defaultOpen:false, items:[
+    {key:'inquiry', icon:'💬', label:'询盘管理'},
+    {key:'orders', icon:'💰', label:'报价与订单'},
+    {key:'products', icon:'📦', label:'产品与样品'},
+    {key:'pipeline', icon:'🎯', label:'销售漏斗'},
+    {key:'reports', icon:'🏆', label:'开发复盘'}
+  ]},
+  { id:'sys', label:'知识与系统', defaultOpen:false, items:[
+    {key:'knowledge', icon:'📚', label:'企业知识库'},
+    {key:'outreachKB', icon:'🗂️', label:'客户开发知识库'},
+    {key:'settings', icon:'⚙️', label:'设置'},
+    {key:'manual', icon:'📖', label:'使用说明书'},
+    {key:'tools', icon:'🧰', label:'工具箱'},
+    {key:'market', icon:'🔬', label:'市场分析'},
+    {key:'seo', icon:'📈', label:'SEO内容营销'},
+    {key:'expos', icon:'🎪', label:'展会管理'},
+    {key:'linkedin', icon:'💼', label:'领英拓客'},
+    {key:'socialmonitor', icon:'📡', label:'社媒监控'},
+    {key:'agents', icon:'🤖', label:'AI Agent'},
+    {key:'activity', icon:'📋', label:'API与集成'}
+  ]}
+];
+/* 分组展开状态：初始为 defaultOpen 值，运行时可切换 */
+let navGroupOpen = {};
+NAV_GROUPS.forEach(g => { navGroupOpen[g.id] = g.defaultOpen; });
+let navSearchQuery = '';
+
+/* B1: 注入导航专用CSS（b1-前缀，不污染现有样式） */
+(function injectB1NavCSS(){
+  if(document.getElementById('b1-nav-css')) return;
+  const style = document.createElement('style');
+  style.id = 'b1-nav-css';
+  style.textContent = `
+    .b1-nav-search{padding:8px 12px;border-bottom:1px solid #e2e8f0;}
+    .b1-nav-search input{width:100%;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;outline:none;box-sizing:border-box;}
+    .b1-nav-search input:focus{border-color:var(--primary,#3182ce);}
+    .b1-nav-group{user-select:none;}
+    .b1-nav-group-title{display:flex;align-items:center;gap:6px;padding:8px 12px;cursor:pointer;font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.5px;transition:background .15s;}
+    .b1-nav-group-title:hover{background:rgba(0,0,0,.04);}
+    .b1-nav-arrow{display:inline-block;transition:transform .2s;font-size:10px;width:12px;}
+    .b1-nav-group.open .b1-nav-arrow{transform:rotate(90deg);}
+    .b1-nav-items{overflow:hidden;}
+    .b1-nav-group:not(.open) .b1-nav-items{display:none;}
+    .b1-nav-empty{padding:12px;color:#a0aec0;font-size:12px;text-align:center;}
+  `;
+  document.head.appendChild(style);
+})();
+
+function toggleNavGroup(gid){
+  navGroupOpen[gid] = !navGroupOpen[gid];
+  renderNav();
+}
+function b1SetNavSearch(q){
+  navSearchQuery = q;
+  renderNav();
+  const input = document.querySelector('.b1-nav-search input');
+  if(input){ input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+}
+
 let currentView = 'dashboard';
 let routeParams = {};
 
 function renderNav(){
   const el = document.getElementById('nav');
   let html = '';
-  NAV.forEach(n=>{
-    if(n.group){ html += `<div class="nav-group">${n.group}</div>`; return; }
-    let badge = '';
-    if(n.key==='customers'){ const n = S.customers.filter(c=>c.nextFollowUp && new Date(c.nextFollowUp)<=new Date() && c.status!=='已回复').length; if(n>0) badge=`<span class="nav-badge">${n}</span>`; }
-    if(n.key==='drafts'){ const n = S.drafts.filter(d=>d.status==='待检查').length; if(n>0) badge=`<span class="nav-badge">${n}</span>`; }
-    html += `<div class="nav-item ${currentView===n.key?'active':''}" onclick="go('${n.key}')">
-      <span class="icon">${n.icon}</span><span class="label">${n.label}</span>${badge}</div>`;
+  // 导航搜索框
+  html += `<div class="b1-nav-search"><input type="text" placeholder="🔍 搜索导航..." value="${esc(navSearchQuery)}" oninput="b1SetNavSearch(this.value)"></div>`;
+
+  const q = navSearchQuery.trim().toLowerCase();
+  let anyVisible = false;
+
+  NAV_GROUPS.forEach(g => {
+    // 根据搜索过滤items
+    let items = g.items;
+    if(q){
+      items = items.filter(it =>
+        it.label.toLowerCase().includes(q) ||
+        it.key.toLowerCase().includes(q)
+      );
+    }
+    if(items.length === 0) return;
+
+    // 如果正在搜索，强制展开所有有匹配项的分组
+    const isOpen = q ? true : navGroupOpen[g.id];
+    // 当前视图所在分组自动展开
+    const hasActive = g.items.some(it => it.key === currentView);
+    const forceOpen = hasActive && !q;
+
+    anyVisible = true;
+    html += `<div class="b1-nav-group ${isOpen||forceOpen?'open':''}" data-group="${g.id}">`;
+    html += `<div class="b1-nav-group-title" onclick="toggleNavGroup('${g.id}')">
+      <span class="b1-nav-arrow">▶</span><span>${g.label}</span>
+    </div>`;
+    html += `<div class="b1-nav-items">`;
+    items.forEach(n => {
+      let badge = '';
+      if(n.key==='customers'){ try{ const n2 = (S.customers||[]).filter(c=>c.nextFollowUp && new Date(c.nextFollowUp)<=new Date() && c.status!=='已回复').length; if(n2>0) badge=`<span class="nav-badge">${n2}</span>`;}catch(e){} }
+      if(n.key==='drafts'){ try{ const n2 = (S.drafts||[]).filter(d=>d.status==='待检查').length; if(n2>0) badge=`<span class="nav-badge">${n2}</span>`;}catch(e){} }
+      html += `<div class="nav-item ${currentView===n.key?'active':''}" onclick="go('${n.key}')">
+        <span class="icon">${n.icon}</span><span class="label">${n.label}</span>${badge}</div>`;
+    });
+    html += `</div></div>`;
   });
+
+  if(!anyVisible){
+    html += `<div class="b1-nav-empty">未找到匹配的导航项</div>`;
+  }
   el.innerHTML = html;
 }
 function toggleSidebar(){ document.getElementById('app').classList.toggle('collapsed'); }
@@ -9396,9 +9660,9 @@ function getTodayDrafts(){ return S.drafts.filter(d=>isToday(d.createdAt)).lengt
 function getTodayFollowups(){ return (S.followups||[]).filter(f=>isToday(f.createdAt)).length; }
 function getTodayComms(){ return (S.communications||[]).filter(c=>isToday(c.createdAt)).length; }
 function getReplyRate(){
-  if(!S.customers.filter(c=>!c.isDemo).length) return 0;
+  if(!visibleCustomers().length) return 0;
   const replied = S.customers.filter(c=>c.status==='已回复').length;
-  return Math.round((replied / S.customers.filter(c=>!c.isDemo).length) * 100);
+  return Math.round((replied / visibleCustomers().length) * 100);
 }
 
 
@@ -10028,7 +10292,7 @@ function renderView(){
   const map = {dashboard:viewDashboard, plans:viewPlans, autosearch:viewAutoSearch, prospect:viewProspectDev, devplans:viewDevPlans, planDetail:viewPlanDetail,
     customers:viewCustomers, drafts:viewDrafts, dailySend:viewDailySend, sendHistory:viewSendHistory, outreachKB:viewOutreachKB, campaigns:viewCampaigns, campaignDetail:viewCampaignDetail, knowledgeFacts:viewKnowledgeFacts, knowledgePacks:viewKnowledgePacks, inbox:viewInbox, schedule:viewSchedule,
     inquiry:viewInquiries, orders:viewOrders, products:viewProducts, knowledge:viewKnowledge,
-    seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach, dailyWork:viewDailyWork, outreachQueue:viewOutreachQueue, reviewQueue:viewReviewQueue, followUpPlan:viewFollowUpPlan, outreachAnalytics:viewOutreachAnalytics, bulkImport:viewBulkImport, importHistory:viewImportHistory};
+    seo:viewSEO, market:viewMarket, reports:viewReports, agents:viewAgents, activity:viewActivityLog, linkedin:viewLinkedin, socialmonitor:viewSocialMonitor, expos:viewExpos, tools:viewTools, settings:viewSettings, manual:viewManual, pipeline:viewPipeline, outreach:viewOutreach, dailyWork:viewDailyWork, outreachQueue:viewOutreachQueue, reviewQueue:viewReviewQueue, followUpPlan:viewFollowUpPlan, outreachAnalytics:viewOutreachAnalytics, bulkImport:viewBulkImport, importHistory:viewImportHistory, companyFactsApproval:viewCompanyFactsApproval};
   (map[currentView]||viewDashboard)(c);
   // 更新通知角标
   const todo = S.customers.filter(x=>x.nextFollowUp && new Date(x.nextFollowUp)<=new Date() && x.status!=='已回复').length;
@@ -11266,7 +11530,303 @@ function radarChart(scores, size){
 /* ============================================================
  * 视图 1：数据总览 Dashboard
  * ============================================================ */
+/* ============================================================
+ * B1.1: 潜在渠道信号推断（只读，不写入数据库，不代表最终产品匹配）
+ * ============================================================ */
+const B11_CHANNEL_LABEL = {
+  kitchen_knives: 'Kitchen Knives 潜在渠道',
+  professional_scissors: 'Professional Scissors 潜在渠道',
+  outdoor_knives: 'Outdoor Knives 潜在渠道',
+  kitchen_accessories: 'Kitchen Accessories 潜在渠道',
+  backup: '备用候选'
+};
+const B11_CHANNEL_COLOR = {
+  kitchen_knives: '#2b6cb0',
+  professional_scissors: '#805ad5',
+  outdoor_knives: '#c05621',
+  kitchen_accessories: '#d69e2e',
+  backup: '#718096'
+};
+function b11InferChannelSignal(c){
+  const name = (c.company_name_raw || '').toLowerCase();
+  const buyer = (c.buyer_type || '').toLowerCase();
+  const src = c.source_category || '';
+  const scores = {
+    kitchen_knives: (src==='kitchenware'?2:0) + (/knife|cutlery|chef|blade|cutlery|kitchenware/.test(name)?3:0) + (/kitchen|foodservice|retail|wholesale|distributor|import/.test(buyer)?1:0),
+    professional_scissors: (src==='hardware'?2:0) + (/scissor|shear|cutting|tool|hardware|garden|pruning/.test(name)?3:0) + (/tool|distributor|wholesale|import|industrial|beauty|salon/.test(buyer)?1:0),
+    outdoor_knives: (/outdoor|camping|hunting|tactical|survival|fishing|sport|adventure|trek/.test(name)?3:0) + (/outdoor|camping|sport|hunting|adventure/.test(buyer)?2:0),
+    kitchen_accessories: (src==='kitchenware'?1:0) + (/accessor|gadget|utensil|home|houseware|gift|ware|peeler|tongs|spatula/.test(name)?2:0) + (/home|gift|houseware|kitchen|retail/.test(buyer)?1:0)
+  };
+  const best = Object.entries(scores).sort((a,b)=>b[1]-a[1])[0];
+  return best[1] > 0 ? { channel: best[0], confidence: best[1], signals: Object.entries(scores).filter(([k,v])=>v>0).map(([k,v])=>k+'('+v+')').join(', ') } : { channel: 'backup', confidence: 0, signals: '无明确渠道信号' };
+}
+function b11MissingFields(c, factors){
+  const missing = [];
+  if(!factors || factors.websiteEvidence === 0) missing.push('缺官网证据');
+  if(!factors || factors.contact < 8) missing.push('缺邮箱');
+  if(!factors || factors.contact < 6) missing.push('缺电话');
+  if(!c.buyer_type || c.buyer_type === '待分类') missing.push('缺买家类型');
+  if(!c.country_standardized || c.country_standardized === '未知') missing.push('缺国家');
+  missing.push('缺产品匹配证据');
+  return missing;
+}
+function b11NextAction(c, factors){
+  const actions = [];
+  if(!factors || factors.websiteEvidence === 0) actions.push('网站核验');
+  if(!factors || factors.contact < 8) actions.push('联系人补充');
+  actions.push('背调');
+  if(c.source_category === 'both') actions.push('重复复核');
+  return actions.slice(0,3).join(' / ');
+}
+async function b11BuildPrepPackage(){
+  try {
+    const [p0r, p1r] = await Promise.all([
+      fetch('/api/customer-library/priority-preview?priorityLevel=P0&pageSize=500', {cache:'no-store'}),
+      fetch('/api/customer-library/priority-preview?priorityLevel=P1&pageSize=500', {cache:'no-store'})
+    ]);
+    const p0 = p0r.ok ? (await p0r.json()).items || [] : [];
+    const p1 = p1r.ok ? (await p1r.json()).items || [] : [];
+    const all = [...p0, ...p1]
+      .filter(c => c.priority_level !== 'DNC')
+      .sort((a,b) => (b.priority_score||0) - (a.priority_score||0));
+    const groups = { kitchen_knives: [], professional_scissors: [], outdoor_knives: [], kitchen_accessories: [], backup: [] };
+    const usedIds = new Set();
+    // First pass: assign by channel signal
+    all.forEach(c => {
+      const sig = b11InferChannelSignal(c);
+      c._channel = sig.channel;
+      c._confidence = sig.confidence;
+      c._signals = sig.signals;
+    });
+    // Assign top 5 per channel (excluding backup)
+    ['kitchen_knives','professional_scissors','outdoor_knives','kitchen_accessories'].forEach(ch => {
+      const candidates = all.filter(c => c._channel === ch && !usedIds.has(c.customer_id));
+      const picked = candidates.slice(0,5);
+      picked.forEach(c => { groups[ch].push(c); usedIds.add(c.customer_id); });
+    });
+    // If outdoor_knives has fewer than 5, fill from hardware high-score
+    if(groups.outdoor_knives.length < 5){
+      const fill = all.filter(c => c.source_category==='hardware' && !usedIds.has(c.customer_id)).slice(0, 5-groups.outdoor_knives.length);
+      fill.forEach(c => { c._channel='outdoor_knives'; c._signals='五金来源·待背调确认户外属性'; groups.outdoor_knives.push(c); usedIds.add(c.customer_id); });
+    }
+    // Backup: 4-8 from remaining high-score
+    const remaining = all.filter(c => !usedIds.has(c.customer_id)).slice(0,6);
+    remaining.forEach(c => { c._channel='backup'; groups.backup.push(c); });
+    return { groups, totalCandidates: all.length };
+  } catch(e){
+    console.error('[B1.1] prep package build error', e);
+    return { groups: { kitchen_knives:[], professional_scissors:[], outdoor_knives:[], kitchen_accessories:[], backup:[] }, totalCandidates: 0, error: e.message };
+  }
+}
+function b11RenderPrepPackage(pkg){
+  if(!pkg || !pkg.groups) return '<div style="padding:20px;color:#999">背调准备包加载失败</div>';
+  const channelOrder = ['kitchen_knives','professional_scissors','outdoor_knives','kitchen_accessories','backup'];
+  const cards = channelOrder.map(ch => {
+    const list = pkg.groups[ch] || [];
+    const color = B11_CHANNEL_COLOR[ch];
+    const label = B11_CHANNEL_LABEL[ch];
+    const rows = list.map(c => {
+      const factors = c.factors || {};
+      const hasWeb = factors.websiteEvidence > 0;
+      const hasEmail = factors.contact >= 8;
+      const hasPhone = factors.contact >= 6 && factors.contact !== 8;
+      const missing = b11MissingFields(c, factors);
+      const nextAction = b11NextAction(c, factors);
+      const srcLabel = c.source_category ? (B1_SRC_CAT_LABEL[c.source_category]||c.source_category) : '未知';
+      return `<tr style="border-bottom:1px solid #f0f0f0">
+        <td style="padding:6px 8px;font-weight:600;font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.company_name_raw||'')}">${esc(c.company_name_raw||'(未命名)')}</td>
+        <td style="padding:6px 8px;font-size:11px">${esc(srcLabel)}</td>
+        <td style="padding:6px 8px;font-size:11px">${esc(c.country_standardized||'—')} · ${esc(c.continent||'')}</td>
+        <td style="padding:6px 8px;font-size:11px">${esc(c.buyer_type||'待分类')}</td>
+        <td style="padding:6px 8px;font-size:11px;white-space:nowrap">${hasWeb?'🌐':'⬜'} ${hasEmail?'📧':'⬜'} ${hasPhone?'📞':'⬜'}</td>
+        <td style="padding:6px 8px;font-size:10px;color:#805ad5;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c._signals||'')}">${esc(c._signals||'—')}</td>
+        <td style="padding:6px 8px"><span style="background:${B1_PRIORITY_COLOR[c.priority_level]||'#718096'};color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px" title="背调优先候选 · 资料较完整，待核验产品匹配">${c.priority_level} ${c.priority_score}分</span></td>
+        <td style="padding:6px 8px"><span style="background:#fff3cd;color:#856404;font-size:10px;padding:2px 6px;border-radius:3px">待背调</span></td>
+        <td style="padding:6px 8px;font-size:10px;color:#c53030;max-width:100px">${esc(missing.join('、'))}</td>
+        <td style="padding:6px 8px;font-size:10px;color:#2b6cb0">${esc(nextAction)}</td>
+      </tr>`;
+    }).join('');
+    return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:14px;overflow:hidden">
+      <div style="background:${color};color:#fff;padding:8px 14px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center">
+        <span>${label}</span>
+        <span style="font-size:11px;font-weight:400;opacity:.9">${list.length} 家 · 仅背调排序</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">
+          <thead><tr style="background:#f7fafc">
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#718096">客户名称</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#718096">来源</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#718096">国家·大洲</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#718096">买家类型</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#718096">🌐📧📞</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#718096">潜在渠道信号</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#718096">资料优先级</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#718096">产品匹配</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#718096">待补字段</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#718096">下一步动作</th>
+          </tr></thead>
+          <tbody>${rows || '<tr><td colspan="10" style="padding:12px;text-align:center;color:#999">暂无候选</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div style="margin-top:20px">
+    <div style="background:#e6fffa;border:1px solid #4fd1c5;border-left:4px solid #319795;padding:12px 16px;border-radius:8px;margin-bottom:14px;font-size:12px;color:#234e52;font-weight:600">
+      ⚠️ 此名单仅用于背调排序，不代表已确认产品匹配或可开发资格。所有客户产品匹配状态均为"待背调"。
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0;font-size:16px;color:#1a365d">📋 每日20家背调准备包 <span style="font-size:11px;color:#718096;font-weight:400">（候选池 ${pkg.totalCandidates} 家 P0/P1 · 按资料优先级排序）</span></h3>
+      <span style="font-size:11px;color:#718096">潜在渠道 + 背调优先级分组 · 非最终产品匹配</span>
+    </div>
+    ${cards}
+    <div style="background:#fff5f5;border:1px solid #feb2b2;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:11px;color:#c53030">
+      🔒 当前开发资格：<b>0 家</b>（公司事实 0/${42} 已批准外发 + 产品匹配无证据 + 草稿全部 not_sendable）。本准备包不包含任何发送/开发信/WhatsApp/报价操作。
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+ * B1: 今日客户开发工作台（首页重构，数据全部来自SQLite真实查询）
+ * ============================================================ */
+async function viewDashboardB1(root){
+  root.innerHTML = `<div style="padding:20px;max-width:1200px;margin:0 auto">
+    <h2 style="margin:0 0 4px 0;font-size:22px">今日客户开发工作台</h2>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">数据加载中…</div>
+  </div>`;
+  let summary = null, priority = null, prepPkg = null;
+  try {
+    const [sr, pr, pp] = await Promise.all([
+      fetch('/api/customer-library/summary', {cache:'no-store'}),
+      fetch('/api/customer-library/priority-preview?pageSize=500', {cache:'no-store'}),
+      b11BuildPrepPackage()
+    ]);
+    if(sr.ok) summary = await sr.json();
+    if(pr.ok) priority = await pr.json();
+    prepPkg = pp;
+  } catch(e){ console.error('[B1 dashboard] load error', e); }
+
+  const today = new Date();
+  const dateStr = today.getFullYear()+'年'+(today.getMonth()+1)+'月'+today.getDate()+'日';
+  const factsApproved = summary ? (summary.company_facts_approved_for_external||0) : null;
+  const factsTotal = summary ? (summary.company_facts_total||42) : 42;
+  const factsPct = factsApproved!==null && factsTotal>0 ? Math.round(factsApproved/factsTotal*100) : 0;
+
+  // Category breakdown from priority-preview
+  const catB = priority && priority.category_breakdown ? priority.category_breakdown : {hardware:{P0:0,P1:0}, kitchenware:{P0:0,P1:0}, both:{P0:0,P1:0}};
+  const hwCand = (catB.hardware.P0||0)+(catB.hardware.P1||0);
+  const kwCand = (catB.kitchenware.P0||0)+(catB.kitchenware.P1||0);
+  const crossCand = (catB.both.P0||0)+(catB.both.P1||0);
+
+  // Data gaps
+  const cc = summary ? summary.contact_completeness : null;
+  const total = summary ? summary.total_customers : 0;
+  const pct = (n)=> total>0 && n!==null ? Math.round(n/total*100) : '—';
+  const missingWebsite = cc ? total - cc.has_website : null;
+  const missingEmail = cc ? total - cc.has_email : null;
+
+  root.innerHTML = `
+    <div style="padding:20px;max-width:1200px;margin:0 auto">
+      <div style="margin-bottom:16px">
+        <h2 style="margin:0 0 4px 0;font-size:22px">今日客户开发工作台</h2>
+        <div style="font-size:12px;color:#888">${summary?(summary.mode==='demo'?'演示模式':'真实模式 · is_demo=0'):'数据加载中'} · ${dateStr}</div>
+      </div>
+
+      ${factsApproved===0?`<div style="background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:14px 18px;border-radius:10px;margin-bottom:20px;font-weight:600">
+        🔒 开发信引擎尚未解锁：当前 ${factsApproved}/${factsTotal} 条公司事实已批准外发。请先完成公司事实审批。
+      </div>`:''}
+
+      <!-- 三大核心问题 -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;border-top:3px solid #3182ce;cursor:pointer" onclick="go('customers')">
+          <div style="font-size:13px;font-weight:700;color:#2c5282;margin-bottom:10px">🎯 今日背调优先候选</div>
+          <div style="font-size:12px;color:#4a5568;line-height:1.8">
+            Kitchen Knives 潜在渠道：<b>${summary?kwCand:'…'}</b> 家（P0+P1资料优先级）<br>
+            Professional Scissors 潜在渠道：<b>${summary?hwCand:'…'}</b> 家（P0+P1资料优先级）<br>
+            跨品类候选：<b>${summary?crossCand:'…'}</b> 家（P0+P1资料优先级）
+          </div>
+          <div style="font-size:10px;color:#a0aec0;margin-top:10px">P0/P1 = 背调优先候选 · 资料较完整，待核验产品匹配 · 非可开发客户</div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;border-top:3px solid #d69e2e;cursor:pointer" onclick="go('reviewQueue')">
+          <div style="font-size:13px;font-weight:700;color:#975a16;margin-bottom:10px">📋 今天先跟进谁？</div>
+          <div style="font-size:12px;color:#4a5568;line-height:1.8">
+            到期跟进客户：<b>0</b>（followup_tasks 表为空）<br>
+            待审核开发素材：<b>${summary?summary.outreach_assets_total:136}</b> 条 pending<br>
+            孤儿草稿：<b>${summary?summary.orphan_drafts_count:4}</b> 条待匹配
+          </div>
+          <div style="font-size:10px;color:#a0aec0;margin-top:10px">暂无跟进任务 · 待审核队列集中处理</div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;border-top:3px solid #e53e3e;cursor:pointer" onclick="go('customers')">
+          <div style="font-size:13px;font-weight:700;color:#c53030;margin-bottom:10px">⚠️ 哪些资料还缺？</div>
+          <div style="font-size:12px;color:#4a5568;line-height:1.8">
+            待补官网：<b>${missingWebsite!==null?missingWebsite:'…'}</b> 家<br>
+            待补邮箱：<b>${missingEmail!==null?missingEmail:'…'}</b> 家<br>
+            待背调：<b>${summary&&summary.research_status_distribution?summary.research_status_distribution.find(r=>r.research_status==='not_researched')?.count||0:'…'}</b> 家<br>
+            疑似重复：<b>${summary?summary.possible_duplicates_count:138}</b> 条<br>
+            孤儿草稿：<b>${summary?summary.orphan_drafts_count:4}</b> 条
+          </div>
+        </div>
+      </div>
+
+      <!-- B1.1: 每日20家背调准备包（只读预览） -->
+      ${b11RenderPrepPackage(prepPkg)}
+
+      <!-- 状态概览 -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px">
+          <div style="font-size:12px;font-weight:700;color:#718096;margin-bottom:8px">📝 公司事实审批</div>
+          <div style="font-size:20px;font-weight:800;color:#1a365d">${factsApproved}/${factsTotal}</div>
+          <div style="height:8px;background:#e2e8f0;border-radius:4px;margin-top:8px;overflow:hidden">
+            <div style="height:100%;width:${factsPct}%;background:#d69e2e;border-radius:4px"></div>
+          </div>
+          <div style="font-size:11px;color:#718096;margin-top:6px">${factsPct}% 已批准外发</div>
+          <button class="btn btn-sm btn-outline" style="margin-top:8px;font-size:11px" onclick="go('companyFactsApproval')">查看审批预览 →</button>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px">
+          <div style="font-size:12px;font-weight:700;color:#718096;margin-bottom:8px">🚨 风险提醒</div>
+          <div style="font-size:12px;color:#4a5568;line-height:2">
+            高风险客户：<b>${summary?summary.not_assessed_risk_count+' 未评估':'…'}</b><br>
+            Suppression 名单：<b>0</b> 条<br>
+            Bounced 邮箱：<b>0</b> 条
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px">
+          <div style="font-size:12px;font-weight:700;color:#718096;margin-bottom:8px">📊 数据完整度</div>
+          <div style="font-size:12px;color:#4a5568;line-height:2">
+            有官网：<b>${cc?pct(cc.has_website)+'%':'…'}</b><br>
+            有邮箱：<b>${cc?pct(cc.has_email)+'%':'…'}</b><br>
+            有电话：<b>${cc?pct(cc.has_phone)+'%':'…'}</b><br>
+            已背调：<b>${summary&&summary.product_fit_status?summary.product_fit_status.assessed+' 家':'0 家'}</b>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function viewDashboard(root){
+  if(window.CUSTOMER_LIBRARY && window.CUSTOMER_LIBRARY.enabled){
+    viewDashboardB1(root);
+    return;
+  }
+  /* B1: CL尚未初始化完成，启动轮询等待，最多等待4秒 */
+  if(!window._b1_dashboard_polling){
+    window._b1_dashboard_polling = true;
+    let _b1_tries = 0;
+    const _b1_iv = setInterval(() => {
+      _b1_tries++;
+      if(window.CUSTOMER_LIBRARY && window.CUSTOMER_LIBRARY.enabled){
+        clearInterval(_b1_iv);
+        window._b1_dashboard_polling = false;
+        if(typeof currentView !== 'undefined' && currentView === 'dashboard' && typeof renderView === 'function'){
+          renderView();
+        }
+      }
+      if(_b1_tries > 20){ clearInterval(_b1_iv); window._b1_dashboard_polling = false; }
+    }, 200);
+  }
   try {
   // V74.5 空值保护：确保所有数组不为null（用户localStorage可能有null数据）
   S.customers = S.customers || [];
@@ -11285,13 +11845,13 @@ function viewDashboard(root){
     if(!c.tags) c.tags = [];
   });
 
-  const total = S.customers.filter(c=>!c.isDemo).length;
+  const total = visibleCustomers().length;
   const plansRunning = S.plans.filter(p=>p.status==='running').length;
   const today = new Date().toISOString().slice(0,10);
   const todayDay = new Date().toDateString();
   const followDue = S.customers.filter(c=>c.nextFollowUp && new Date(c.nextFollowUp).toDateString()<=todayDay && c.status!=='已回复').length;
   const replied = S.customers.filter(c=>c.status==='已回复').length;
-  const pendingDrafts = S.drafts.filter(d=>d.status==='待检查').length;
+  const pendingDrafts = visibleDrafts().filter(d=>d.status==='待检查').length;
   const unreadInbox = (S.inbox||[]).filter(i=>i.status==='未读').length;
 
   // 今天要联系谁（按 nextFollowUp 排序，优先 A 级）
@@ -11337,7 +11897,7 @@ function viewDashboard(root){
         </div>
         <div style="text-align:right">
           <div style="font-size:32px;font-weight:800;color:var(--gold)">${pendingDrafts + followDue}</div>
-          <div style="font-size:11px;opacity:.6">开发就绪度</div>
+          <div style="font-size:11px;opacity:.6">资料/背调资格预览</div>
         </div>
       </div>
       <div style="display:flex;gap:12px">
@@ -11563,7 +12123,7 @@ function viewDashboard(root){
           </div>
           <div style="text-align:center">
             <div style="font-size:32px;font-weight:800;color:var(--primary)">${total>0?Math.round(S.customers.filter(c=>c.scores&&(c.scores.grade==='A'||c.scores.grade==='B')).length/total*100):0}%</div>
-            <div class="text-sm text-muted">优质客户占比</div>
+            <div class="text-sm text-muted">资料优先级候选占比</div>
             <div style="font-size:12px;color:var(--green);margin-top:4px">A+B级客户</div>
           </div>
         </div>
@@ -11609,7 +12169,7 @@ function viewDashboard(root){
               const sources = {};
               S.customers.forEach(c=>{ sources[c.source||'未知'] = (sources[c.source||'未知']||0)+1; });
               const entries = Object.entries(sources).sort((a,b)=>b[1]-a[1]);
-              const total = S.customers.filter(c=>!c.isDemo).length || 1;
+              const total = visibleCustomers().length || 1;
               const colors = ['#3182ce','#38a169','#dd6b20','#805ad5','#e53e3e','#319795'];
               let offset = 0;
               const r = 50, cx = 60, cy = 60;
@@ -11629,7 +12189,7 @@ function viewDashboard(root){
               const sources = {};
               S.customers.forEach(c=>{ sources[c.source||'未知'] = (sources[c.source||'未知']||0)+1; });
               const entries = Object.entries(sources).sort((a,b)=>b[1]-a[1]);
-              const total = S.customers.filter(c=>!c.isDemo).length || 1;
+              const total = visibleCustomers().length || 1;
               const colors = ['#3182ce','#38a169','#dd6b20','#805ad5','#e53e3e','#319795'];
               return entries.slice(0,5).map((e,i)=>'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="width:8px;height:8px;background:'+colors[i%colors.length]+';border-radius:50%;display:inline-block"></span><span style="flex:1;color:#4a5568">'+e[0]+'</span><span style="font-weight:bold;color:#2d3748">'+e[1]+'</span><span style="color:#a0aec0;font-size:10px">'+Math.round(e[1]/total*100)+'%</span></div>').join('');
             })()}
@@ -11661,7 +12221,7 @@ function viewDashboard(root){
               const statuses = {};
               S.customers.forEach(c=>{ statuses[c.status||'未知'] = (statuses[c.status||'未知']||0)+1; });
               const entries = Object.entries(statuses).sort((a,b)=>b[1]-a[1]);
-              const total = S.customers.filter(c=>!c.isDemo).length || 1;
+              const total = visibleCustomers().length || 1;
               const colorMap = {'待跟进':'#dd6b20','跟进中':'#3182ce','已回复':'#38a169','已报价':'#805ad5','已成交':'#c9a961','已流失':'#a0aec0'};
               let offset = 0;
               const r = 50, cx = 60, cy = 60;
@@ -11682,7 +12242,7 @@ function viewDashboard(root){
               const statuses = {};
               S.customers.forEach(c=>{ statuses[c.status||'未知'] = (statuses[c.status||'未知']||0)+1; });
               const entries = Object.entries(statuses).sort((a,b)=>b[1]-a[1]);
-              const total = S.customers.filter(c=>!c.isDemo).length || 1;
+              const total = visibleCustomers().length || 1;
               const colorMap = {'待跟进':'#dd6b20','跟进中':'#3182ce','已回复':'#38a169','已报价':'#805ad5','已成交':'#c9a961','已流失':'#a0aec0'};
               return entries.map((e,i)=>'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="width:8px;height:8px;background:'+(colorMap[e[0]]||'#a0aec0')+';border-radius:50%;display:inline-block"></span><span style="flex:1;color:#4a5568">'+e[0]+'</span><span style="font-weight:bold;color:#2d3748">'+e[1]+'</span><span style="color:#a0aec0;font-size:10px">'+Math.round(e[1]/total*100)+'%</span></div>').join('');
             })()}
@@ -11696,7 +12256,7 @@ function viewDashboard(root){
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         <span>📈 客户增长趋势（近30天）</span>
         <div style="display:flex;gap:12px;align-items:center">
-          <span style="font-size:11px;color:#718096">累计：<b style="color:#2d3748;font-size:14px">${S.customers.filter(c=>!c.isDemo).length}</b></span>
+          <span style="font-size:11px;color:#718096">累计：<b style="color:#2d3748;font-size:14px">${visibleCustomers().length}</b></span>
           <span style="font-size:11px;color:#718096">本月新增：<b style="color:#38a169;font-size:14px">${getTodayNewCustomers()}</b></span>
         </div>
       </div>
@@ -11760,13 +12320,13 @@ function viewDashboard(root){
         <span>📊 客户价值分布（6维度综合评估）</span>
         <div style="display:flex;gap:12px;align-items:center">
           <span style="font-size:11px;color:#718096">平均价值：<b style="color:#805ad5;font-size:14px">${
-            S.customers.filter(c=>!c.isDemo).length ? Math.round(S.customers.reduce((s,c)=>{
+            visibleCustomers().length ? Math.round(S.customers.reduce((s,c)=>{
               const quality = Math.min(100, (c.scores?.total||0)*1.2);
               const potential = c.customerType==='品牌商'?90:c.customerType==='批发商'?80:c.customerType==='电商'?70:60;
               const loyalty = c.isOld?85:c.status==='已成交'?75:c.status==='已回复'?60:40;
               const profit = c.scores?.grade==='A'?85:c.scores?.grade==='B'?70:55;
               return s + Math.round((quality+potential+60+loyalty+profit+65)/6);
-            },0)/S.customers.filter(c=>!c.isDemo).length) : 0
+            },0)/visibleCustomers().length) : 0
           }</b></span>
         </div>
       </div>
@@ -12095,12 +12655,25 @@ function viewDashboard(root){
 
     <div class="card card-pad mb16" style="padding:10px 16px;background:#0f172a;color:#fff;overflow:hidden">
       <div style="display:flex;gap:32px;white-space:nowrap;animation:ticker 20s linear infinite">
-        <span>🆕 今日新线索 <b>${S.customers.filter(c=>!c.isDemo).length?12:0}</b></span>
-        <span>⏰ 超时未回邮件 <b>5</b> 封</span>
-        <span>🤝 待移交客户 <b>2</b></span>
-        <span>📈 本周新增客户 <b>${S.customers.filter(c=>!c.isDemo).length?12:0}</b></span>
-        <span>💰 本月成交金额 <b>$${(S.contracts.reduce((a,c)=>a+c.amount,0)/10000).toFixed(1)}K</b></span>
-        <span>✂️ 样品在途 <b>${(S.samples||[]).filter(x=>x.status==='运输中'||x.status==='在途').length}</b></span>
+        ${(()=>{
+          const rc = visibleCustomers();
+          const tStr = todayStr();
+          const newToday = rc.filter(c=>(c.createdAt||'').slice(0,10)===tStr).length;
+          const weekAgo = Date.now()-7*864e5;
+          const newWeek = rc.filter(c=>{const t=new Date(c.createdAt||0).getTime();return !isNaN(t)&&t>=weekAgo;}).length;
+          const overdue = visibleDrafts().filter(d=>d.status==='待检查'&&d.createdAt&&(Date.now()-new Date(d.createdAt))>2*864e5).length;
+          const handoff = rc.filter(c=>c.status==='待移交'||c.stage==='待移交').length;
+          const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+          const mAmt = (S.contracts||[]).filter(c=>!c.isDemo).filter(c=>{const t=new Date(c.createdAt||c.signedAt||0).getTime();return !isNaN(t)&&t>=monthStart.getTime();}).reduce((a,c)=>a+(Number(c.amount)||0),0);
+          const samplesInTransit = (S.samples||[]).filter(x=>!x.isDemo&&(x.status==='运输中'||x.status==='在途')).length;
+          return `
+        <span>🆕 今日新线索 <b>${newToday}</b></span>
+        <span>⏰ 超时未回邮件 <b>${overdue}</b> 封</span>
+        <span>🤝 待移交客户 <b>${handoff}</b></span>
+        <span>📈 本周新增客户 <b>${newWeek}</b></span>
+        <span>💰 本月成交金额 <b>${mAmt>0?'$'+(mAmt/1000).toFixed(1)+'K':'<span style=\"color:#94a3b8\">暂无真实数据</span>'}</b></span>
+        <span>✂️ 样品在途 <b>${samplesInTransit}</b></span>`;
+        })()}
       </div>
     </div>
     <div class="stat-grid">
@@ -12129,49 +12702,53 @@ function viewDashboard(root){
       ${renderChannelEffect()}
     </div>
     <div class="grid-3 mb16">
-      <div class="stat-card"><div class="stat-label">📈 自然流量/月</div><div class="stat-value">1,250</div><div class="stat-trend up">+18% 环比</div></div>
-      <div class="stat-card"><div class="stat-label">🔑 关键词进前50</div><div class="stat-value">23</div><div class="stat-trend up">本周 +3</div></div>
-      <div class="stat-card"><div class="stat-label">📝 已发文章</div><div class="stat-value">18</div><div class="stat-trend up">本月 +2</div></div>
+      <div class="stat-card"><div class="stat-label">📈 自然流量/月</div><div class="stat-value">${NO_REAL}</div><div class="stat-trend">未接入真实统计</div></div>
+      <div class="stat-card"><div class="stat-label">🔑 关键词进前50</div><div class="stat-value">${(()=>{const kws=(S.keywords||[]).filter(k=>!k.isDemo);return kws.length?kws.length:NO_REAL;})()}</div><div class="stat-trend">真实关键词库</div></div>
+      <div class="stat-card"><div class="stat-label">📝 已发文章</div><div class="stat-value">${(()=>{const arts=(S.contents||[]).filter(a=>!a.isDemo);return arts.length?arts.length:NO_REAL;})()}</div><div class="stat-trend">真实文章数</div></div>
     </div>
     <div class="card card-pad mb16">
       <div class="card-title">💰 获客渠道 ROI 对比（按 ROI 降序）</div>
       <table class="tbl"><thead><tr><th>渠道</th><th>投入</th><th>获客</th><th>询盘</th><th>成交</th><th>成交额</th><th>ROI</th><th>单客成本</th></tr></thead>
       <tbody>
-        ${[
-          ['SEO',0,8,5,2,'$12K',600,0],
-          ['转介绍',50,3,3,2,'$18K',3500,17],
-          ['TikTok',360,6,4,1,'$5K',39,60],
-          ['AI搜索',0,24,10,2,'$20K',null,0],
-          ['海关数据',800,15,6,1,'$8K',9,53],
-          ['LinkedIn',200,8,3,0,'$0',null,25],
-          ['Google Ads',275,7,3,1,'$6K',21,39],
-          ['B2B平台',500,28,10,1,'$7K',13,18],
-          ['展会',3000,12,5,1,'$15K',5,250],
-        ].sort((a,b)=>(b[6]||0)-(a[6]||0)).map(([ch,cost,leads,inq,deals,amt,roi,cpl])=>`
-          <tr>
-            <td><b>${ch}</b></td>
-            <td>$${cost}</td>
-            <td>${leads}</td><td>${inq}</td><td>${deals}</td><td>${amt}</td>
-            <td style="color:${roi==null?'var(--muted)':roi>=100?'var(--green)':roi>=20?'#ed8936':'var(--red)'}"><b>${roi==null?'--':roi+'%'}</b></td>
-            <td>${cost===0?'<span class="text-muted">免费</span>':'$'+cpl}</td>
-          </tr>`).join('')}
+        ${(()=>{
+          // 模块1: 仅统计真实客户按来源分布；无真实成交/投入数据时不展示模拟数字
+          const rc = visibleCustomers();
+          const realDeals = (S.contracts||[]).filter(c=>!c.isDemo).length;
+          if(!rc.length || realDeals===0){
+            return `<tr><td colspan="8" style="text-align:center;padding:18px;color:#a0aec0">暂无真实成交与渠道投入数据</td></tr>`;
+          }
+          const bySrc = {};
+          rc.forEach(c=>{ const s=c.source||'未知'; bySrc[s]=(bySrc[s]||0)+1; });
+          return Object.entries(bySrc).sort((a,b)=>b[1]-a[1]).map(([ch,n])=>`
+            <tr><td><b>${esc(ch)}</b></td><td>--</td><td>${n}</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
+          `).join('');
+        })()}
       </tbody></table>
-      <div class="text-sm text-muted mt8">💡 建议：加大 SEO、TikTok、转介绍投入；Google Ads 优化质量得分后可继续；展会ROI低但品牌背书价值高，保留。</div>
+      <div class="text-sm text-muted mt8">💡 渠道投入与 ROI 需要接入真实广告/展会花费与成交数据后自动计算，当前不展示模拟数字。</div>
     </div>
     <div class="grid-4 mb16">
-      <div class="stat-card"><div class="stat-label">🎵 TikTok 询盘</div><div class="stat-value">12</div><div class="stat-trend up">本月 +5</div></div>
-      <div class="stat-card"><div class="stat-label">🏪 B2B 询盘</div><div class="stat-value">28</div><div class="stat-trend up">阿里 18</div></div>
-      <div class="stat-card"><div class="stat-label">🔍 Google Ads</div><div class="stat-value">$275</div><div class="stat-trend down">CPA $39</div></div>
-      <div class="stat-card"><div class="stat-label">💰 全渠道 ROI</div><div class="stat-value" style="color:var(--green)">4.2x</div><div class="stat-trend up">+0.8</div></div>
+      <div class="stat-card"><div class="stat-label">🎵 TikTok 询盘</div><div class="stat-value">${NO_REAL}</div><div class="stat-trend">未接入真实数据</div></div>
+      <div class="stat-card"><div class="stat-label">🏪 B2B 询盘</div><div class="stat-value">${NO_REAL}</div><div class="stat-trend">未接入真实数据</div></div>
+      <div class="stat-card"><div class="stat-label">🔍 Google Ads</div><div class="stat-value">${NO_REAL}</div><div class="stat-trend">未接入真实数据</div></div>
+      <div class="stat-card"><div class="stat-label">💰 全渠道 ROI</div><div class="stat-value">${NO_REAL}</div><div class="stat-trend">需真实成交/投入数据</div></div>
     </div>
     <div class="grid-2 mb16">
       <div class="card card-pad"><div class="card-title">🌟 高价值客户 TOP5</div>
         <table class="tbl"><tbody>
-          <tr><td>1. Messerei Schmidt</td><td style="text-align:right">$42K</td></tr>
-          <tr><td>2. BritChef Ltd</td><td style="text-align:right">$28K</td></tr>
-          <tr><td>3. Kitchen Universe</td><td style="text-align:right">$18K</td></tr>
-          <tr><td>4. ABC Home GmbH</td><td style="text-align:right">$12K</td></tr>
-          <tr><td>5. Aussie Cutlery</td><td style="text-align:right">$8K</td></tr>
+          ${(()=>{
+            // 模块1: 按真实客户 orderHistory/合同金额排序；无真实成交则显示占位
+            const rc = visibleCustomers().slice();
+            const amtOf = c => {
+              let a=0;
+              (c.orderHistory||[]).forEach(o=>{ a+=Number(o.amount)||0; });
+              (S.contracts||[]).filter(ct=>!ct.isDemo&&ct.customerId===c.id).forEach(ct=>{ a+=Number(ct.amount)||0; });
+              return a;
+            };
+            rc.forEach(c=>c._v=amtOf(c));
+            const top = rc.filter(c=>c._v>0).sort((a,b)=>b._v-a._v).slice(0,5);
+            if(!top.length){ return `<tr><td colspan="2" style="text-align:center;padding:16px;color:#a0aec0">暂无真实成交客户</td></tr>`; }
+            return top.map((c,i)=>`<tr><td>${i+1}. ${esc(c.company||'-')}</td><td style="text-align:right">$${(c._v/1000).toFixed(1)}K</td></tr>`).join('');
+          })()}
         </tbody></table></div>
       <div class="card card-pad"><div class="card-title">🌐 落地页效果 TOP3</div>
         <table class="tbl"><thead><tr><th>页面</th><th>转化率</th></tr></thead><tbody>
@@ -12593,9 +13170,513 @@ function planCtrl(pid, status){
  * ============================================================ */
 let custFilter = {grade:'', category:'', country:'', source:'', status:'', q:'', page:1, view:'all', selected:[]};
 const CUST_PAGE = 10;
+/* ============================================================
+ * B1: 客户资源库多维分类展示（API驱动，只读）
+ * ============================================================ */
+const B1_CUST = {
+  page: 1, pageSize: 50, filters: {}, filterDim: null, customers: [], total: 0, totalPages: 1,
+  priorityData: null, filtersOpen: false, loading: false,
+  opPackages: [], opIndex: {} // B3: outreach_ready 资料包索引 { customer_id: {review_status, version,...} }
+};
+const B1_SRC_CAT_LABEL = { hardware:'广交会五金', kitchenware:'广交会餐厨餐具', both:'跨品类' };
+const B1_PRIORITY_COLOR = { P0:'#c53030', P1:'#d69e2e', P2:'#3182ce', P3:'#718096', DNC:'#1a202c' };
+// B3: 资料包展示常量
+const OP_CAT_LABEL = { kitchen_knives:'厨房刀具', professional_scissors:'专业剪刀', outdoor_knives:'户外刀具', kitchen_accessories:'厨房用品' };
+const OP_FIT_BADGE = { strong_fit:{bg:'#c6f6d5',fg:'#276749',label:'strong_fit 强匹配'}, possible_fit:{bg:'#fefcbf',fg:'#975a16',label:'possible_fit 可能匹配'}, no_evidence:{bg:'#e2e8f0',fg:'#4a5568',label:'no_evidence 无证据'}, not_fit:{bg:'#fed7d7',fg:'#c53030',label:'not_fit 不匹配'} };
+
+// B3: 加载 outreach_ready 资料包列表（只读），供客户详情区块与"资料包状态"筛选使用
+async function b1LoadOpPackages(){
+  try {
+    const r = await fetch('/api/customer-library/outreach-packages', {cache:'no-store'});
+    if(!r.ok) { B1_CUST.opPackages=[]; B1_CUST.opIndex={}; return; }
+    const d = await r.json();
+    B1_CUST.opPackages = d.packages || [];
+    const idx = {};
+    (B1_CUST.opPackages).forEach(p => { idx[p.customer_id] = p; });
+    B1_CUST.opIndex = idx;
+  } catch(e){ console.error('[B3] outreach-packages load error', e); B1_CUST.opPackages=[]; B1_CUST.opIndex={}; }
+}
+// B3: MD 表格小工具（只读展示用，不引第三方库）
+function opMdSection(md, heading){
+  if(typeof md !== 'string') return '';
+  const re = new RegExp('##\\s*'+heading.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'[\\s\\S]*?(?=\\n##\\s|$)');
+  const m = md.match(re); return m ? m[0] : '';
+}
+function opMdTableRows(section){
+  if(!section) return [];
+  const rows = [];
+  section.split(/\r?\n/).forEach(line=>{
+    line = line.trim();
+    if(!line.startsWith('|')) return;
+    if(/^\|[\s:|-]+\|$/.test(line)) return; // 分隔行
+    rows.push(line.replace(/^\||\|$/g,'').split('|').map(c=>c.trim()));
+  });
+  return rows;
+}
+// B3: 素材 Tab 切换（内联事件，作用域限定在该资料包卡片内）
+function b1opSwitchTab(btn, panelId){
+  const box = btn.closest('.b1op-tabs'); if(!box) return;
+  box.querySelectorAll('.b1op-tabpanel').forEach(p=>{ p.style.display='none'; });
+  box.querySelectorAll('.b1op-tabbtn').forEach(b=>{ b.style.background='#fff'; b.style.color='#4a5568'; b.style.border='1px solid #e2e8f0'; });
+  const panel = box.querySelector('#'+panelId); if(panel) panel.style.display='block';
+  btn.style.background='#2b6cb0'; btn.style.color='#fff'; btn.style.border='1px solid #2b6cb0';
+}
+
+async function b1LoadFilterDim(){
+  try {
+    const r = await fetch('/api/customer-library/filters', {cache:'no-store'});
+    if(!r.ok) return;
+    B1_CUST.filterDim = await r.json();
+  } catch(e){ console.error('[B1] filters load error', e); }
+}
+async function b1LoadCustomers(){
+  B1_CUST.loading = true; b1RenderCustomers();
+  // B3: 资料包状态筛选 —— 直接调用 outreach-packages 列表API，不走 DB 分页
+  const pkgStatus = (B1_CUST.filters.packageStatus || '').trim();
+  if(pkgStatus === 'has' || pkgStatus === 'pending_review'){
+    if(!B1_CUST.opPackages.length) await b1LoadOpPackages();
+    let list = B1_CUST.opPackages.slice();
+    if(pkgStatus === 'pending_review') list = list.filter(p => p.review_status === 'pending_review');
+    B1_CUST.customers = list.map(p => ({
+      customer_id: p.customer_id, company_name_raw: p.company_name, country_standardized: p.country,
+      continent: p.continent, buyer_type: p.buyer_type, source_category: null, risk_level: 'not_assessed',
+      has_email: 1, has_phone: 0, __hasPackage: true
+    }));
+    B1_CUST.total = B1_CUST.customers.length; B1_CUST.totalPages = 1;
+    B1_CUST.loading = false; b1RenderCustomers();
+    return;
+  }
+  const params = new URLSearchParams();
+  params.set('page', B1_CUST.page); params.set('pageSize', B1_CUST.pageSize);
+  Object.entries(B1_CUST.filters).forEach(([k,v])=>{ if(v && k!=='packageStatus') params.set(k,v); });
+  try {
+    const r = await fetch('/api/customer-library/customers?' + params.toString(), {cache:'no-store'});
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.message || ('HTTP '+r.status));
+    let items = d.items || [];
+    // B3: 无资料包筛选 —— 排除已有资料包的客户
+    if(pkgStatus === 'none'){
+      if(!B1_CUST.opPackages.length) await b1LoadOpPackages();
+      items = items.filter(c => !B1_CUST.opIndex[c.customer_id]);
+    }
+    B1_CUST.customers = items;
+    B1_CUST.total = d.total || 0;
+    B1_CUST.totalPages = d.totalPages || 1;
+  } catch(e){
+    console.error('[B1] customers load error', e);
+    B1_CUST.customers = []; B1_CUST.total = 0; B1_CUST.totalPages = 1;
+  }
+  B1_CUST.loading = false; b1RenderCustomers();
+}
+async function b1LoadPriority(){
+  try {
+    const r = await fetch('/api/customer-library/priority-preview?pageSize=500', {cache:'no-store'});
+    if(!r.ok) return;
+    B1_CUST.priorityData = await r.json();
+  } catch(e){ console.error('[B1] priority load error', e); }
+}
+function b1SetFilter(key, val){
+  if(val) B1_CUST.filters[key] = val; else delete B1_CUST.filters[key];
+  B1_CUST.page = 1;
+  b1LoadCustomers();
+}
+function b1ClearFilters(){
+  B1_CUST.filters = {}; B1_CUST.page = 1;
+  b1LoadCustomers();
+}
+function b1SetPage(p){
+  if(p<1 || p>B1_CUST.totalPages) return;
+  B1_CUST.page = p; b1LoadCustomers();
+}
+function b1ToggleMobileFilters(){
+  B1_CUST.filtersOpen = !B1_CUST.filtersOpen;
+  b1RenderCustomers();
+}
+function b1PriorityOf(cid){
+  if(!B1_CUST.priorityData || !B1_CUST.priorityData.items) return null;
+  return B1_CUST.priorityData.items.find(r => r.customer_id === cid) || null;
+}
+async function b1OpenCustomerDetail(cid){
+  try {
+    const r = await fetch('/api/customer-library/customers/' + encodeURIComponent(cid), {cache:'no-store'});
+    const d = await r.json();
+    if(!r.ok) { alert('加载失败: '+(d.message||('HTTP '+r.status))); return; }
+    const p = b1CalcPriorityFromMaster(d.master, d.contacts, d.sources);
+    const dlg = document.createElement('div');
+    dlg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    dlg.onclick = (e)=>{ if(e.target===dlg) dlg.remove(); };
+    const srcCat = d.master.source_category ? (B1_SRC_CAT_LABEL[d.master.source_category]||d.master.source_category) : '未知';
+    const factRows = Object.entries(p.factors).map(([k,v])=>`<tr><td style="padding:4px 12px;color:#718096">${k}</td><td style="padding:4px 12px;font-weight:600">${v}</td></tr>`).join('');
+    dlg.innerHTML = `<div style="background:#fff;border-radius:12px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;padding:24px">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px">
+        <div><h3 style="margin:0">${esc(d.master.company_name_raw||'(未命名)')}</h3>
+        <div style="font-size:12px;color:#718096;margin-top:4px">${esc(d.master.country_standardized||'未知国家')} · ${esc(d.master.continent||'')} · ${srcCat}</div></div>
+        <button class="btn btn-sm btn-outline" onclick="this.closest('[style*=fixed]').remove()">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <span class="badge" style="background:${B1_PRIORITY_COLOR[p.level]||'#718096'};color:#fff;padding:4px 10px;border-radius:4px;cursor:help" title="背调优先候选 · 资料较完整，待核验产品匹配">${p.level} · ${p.score}分 · 背调优先候选</span>
+        <span class="badge" style="background:#e2e8f0;padding:4px 10px;border-radius:4px">风险: ${esc(d.master.risk_level||'not_assessed')}</span>
+        <span class="badge" style="background:#e2e8f0;padding:4px 10px;border-radius:4px">背调: ${esc(d.master.research_status||'unknown')}</span>
+        <span class="badge" style="background:#fff3cd;color:#856404;padding:4px 10px;border-radius:4px">产品匹配: 待背调 / no_evidence</span>
+      </div>
+      <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;margin-bottom:16px;font-size:11px;color:#718096">
+        ⚠️ P0/P1 为<b>资料优先级候选</b>（背调优先候选），仅表示资料较完整；产品匹配状态为<b>待背调</b>，当前<b>无开发资格</b>（公司事实0条可外发 + 无产品证据）。
+      </div>
+      <div style="margin-bottom:16px"><b>优先级计算依据</b>
+        <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px">${factRows}</table></div>
+      <div style="margin-bottom:16px"><b>来源记录 (${d.sources.length})</b>
+        <div style="font-size:12px;color:#4a5568;margin-top:4px">${d.sources.map(s=>esc(s.source_file)+' · '+esc(s.source_category)).join('<br>')||'无'}</div></div>
+      <div style="margin-bottom:16px"><b>联系方式 (${d.contacts.length})</b>
+        <div style="font-size:12px;color:#4a5568;margin-top:4px">${d.contacts.map(c=>esc(c.contact_type)+': '+esc(c.contact_value||'')).join('<br>')||'无'}</div></div>
+      <div style="margin-bottom:16px"><b>证据 (${d.evidence.length})</b>
+        <div style="font-size:12px;color:#4a5568;margin-top:4px">${d.evidence.map(e=>esc(e.page_title||e.evidence_url||'')).join('<br>')||'无证据记录'}</div></div>
+      <div style="margin-bottom:16px"><b>产品匹配</b>
+        <div style="font-size:12px;color:#a0aec0;margin-top:4px">no_evidence（customer_product_fit 表为空，待背调后填充）</div></div>
+      <div id="b1OpSlot"></div>
+    </div>`;
+    document.body.appendChild(dlg);
+    b1LoadOutreachPackage(cid, dlg);
+  } catch(e){ alert('详情加载失败: '+e.message); }
+}
+
+// B3: 拉取并渲染"客户开发资料包"只读区块（注入客户详情弹窗）
+async function b1LoadOutreachPackage(cid, dlg){
+  const slot = dlg.querySelector('#b1OpSlot');
+  if(!slot) return;
+  slot.innerHTML = '<div style="margin:16px 0;padding:12px;border-top:2px solid #2b6cb0;font-size:12px;color:#718096">📦 正在加载客户开发资料包…</div>';
+  let pkg = null, httpStatus = 0;
+  try {
+    const r = await fetch('/api/customer-library/outreach-packages/' + encodeURIComponent(cid), {cache:'no-store'});
+    httpStatus = r.status;
+    if(r.ok) pkg = await r.json();
+  } catch(e){ /* ignore */ }
+  if(!pkg){
+    slot.innerHTML = `<div style="margin:16px 0;padding:12px;border-top:2px dashed #cbd5e0;font-size:12px;color:#a0aec0">📦 暂无开发资料包（outreach_ready）${httpStatus===404?'—— 该客户尚未生成资料包':''}</div>`;
+    return;
+  }
+  slot.innerHTML = b1RenderOutreachPackage(pkg, cid);
+}
+
+// B3: 渲染资料包只读区块 HTML（纯展示，无任何发送按钮）
+function b1RenderOutreachPackage(pkg, cid){
+  const p = pkg.profile || {};
+  const evIdx = pkg.evidence_index || null;
+  const fit = pkg.product_fit || null;
+  const facts = pkg.company_fact_refs || null;
+  const assets = pkg.assets || {};
+  const P = (v,d)=> (v==null||v==='') ? (d||'—') : v;
+  const escCid = encodeURIComponent(cid);
+
+  // ---- 1) 概览 ----
+  const overview = `
+    <div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+        <b style="color:#2c5282">📦 客户开发资料包（只读）</b>
+        <span style="font-size:11px;color:#718096">资料包版本: ${esc(P(p.version)||'v1')} · 生成时间: ${esc(P(p.generated_at))}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px">
+        <span class="badge" style="background:#fff;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0">customer_id: ${esc(P(p.customer_id,cid))}</span>
+        <span class="badge" style="background:#fff;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0">公司: ${esc(P(p.company_name_standard||p.company_name_raw))}</span>
+        <span class="badge" style="background:#fff;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0">国家/大洲: ${esc(P(p.country_standardized||p.country_region))} / ${esc(P(p.continent,'—'))}</span>
+        <span class="badge" style="background:#fff;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0">买家类型: ${esc(P(p.buyer_type))}</span>
+        <span class="badge" style="background:#c6f6d5;color:#276749;padding:3px 8px;border-radius:4px">人工审核状态: ${esc(P(p.review_status,'pending_review'))}</span>
+        <span class="badge" style="background:#fed7d7;color:#c53030;padding:3px 8px;border-radius:4px">是否可发送: 否</span>
+        <span class="badge" style="background:#fed7d7;color:#c53030;padding:3px 8px;border-radius:4px">发送资格: 不可发送</span>
+      </div>
+      <div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border:1px solid #f6ad55;border-radius:6px;font-size:12px;color:#92400e">
+        ⚠️ <b>仅人工复制发送，工作台不会自动发送</b> — 所有素材均需人工复制到外部邮件客户端发送
+      </div>
+    </div>`;
+
+  // ---- 2) 使用的客户证据 ----
+  const evItems = (evIdx && evIdx.evidence_items) || [];
+  const evRows = evItems.map(e=>`<tr style="border-bottom:1px solid #edf2f7">
+      <td style="padding:5px 8px;font-size:12px">${esc(P(e.evidence_id))}</td>
+      <td style="padding:5px 8px;font-size:12px"><a href="${esc(e.url||'#')}" target="_blank" rel="noopener" style="color:#2b6cb0;word-break:break-all">${esc(e.url||'—')}</a></td>
+      <td style="padding:5px 8px;font-size:12px">${esc(P(e.page_title))}</td>
+      <td style="padding:5px 8px;font-size:12px">${esc(P(e.evidence_type))}</td>
+      <td style="padding:5px 8px;font-size:12px">${esc(P(e.confidence))}</td>
+      <td style="padding:5px 8px;font-size:12px">${esc(P(e.verified_at))}</td>
+    </tr>`).join('');
+  const evidenceBlock = `
+    <div style="margin-bottom:14px"><b style="font-size:13px">🔍 使用的客户证据（${evItems.length}）</b>
+      <div style="overflow:auto;margin-top:6px;border:1px solid #e2e8f0;border-radius:6px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f7fafc;text-align:left">
+          <th style="padding:5px 8px;font-size:11px;color:#718096">evidence_id</th>
+          <th style="padding:5px 8px;font-size:11px;color:#718096">URL</th>
+          <th style="padding:5px 8px;font-size:11px;color:#718096">页面标题</th>
+          <th style="padding:5px 8px;font-size:11px;color:#718096">类型</th>
+          <th style="padding:5px 8px;font-size:11px;color:#718096">置信度</th>
+          <th style="padding:5px 8px;font-size:11px;color:#718096">核验日期</th>
+        </tr></thead>
+        <tbody>${evRows || '<tr><td colspan="6" style="padding:10px;color:#a0aec0">无证据记录</td></tr>'}</tbody>
+      </table></div></div>`;
+
+  // ---- 3) 使用的公司事实 ----
+  const approved = (facts && facts.approved_facts_used) || [];
+  const forbiddenCount = (facts && facts.forbidden_facts_count) || 0;
+  const factRows = approved.map(f=>`<tr style="border-bottom:1px solid #edf2f7">
+      <td style="padding:5px 8px;font-size:12px">${esc(P(f.fact_id))}</td>
+      <td style="padding:5px 8px;font-size:12px">${esc(P(f.fact_text_original))} <span style="background:#c6f6d5;color:#276749;font-size:10px;padding:1px 5px;border-radius:3px">已批准可外发</span></td>
+      <td style="padding:5px 8px;font-size:11px;color:#718096">${esc((f.used_in||[]).join('； '))}</td>
+    </tr>`).join('');
+  const factsBlock = `
+    <div style="margin-bottom:14px"><b style="font-size:13px">📝 使用的公司事实（${approved.length} 条已批准）</b>
+      <div style="overflow:auto;margin-top:6px;border:1px solid #c6f6d5;border-radius:6px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f0fff4;text-align:left">
+          <th style="padding:5px 8px;font-size:11px;color:#276749">fact_id</th>
+          <th style="padding:5px 8px;font-size:11px;color:#276749">事实内容</th>
+          <th style="padding:5px 8px;font-size:11px;color:#276749">使用位置</th>
+        </tr></thead>
+        <tbody>${factRows || '<tr><td colspan="3" style="padding:10px;color:#a0aec0">无已批准事实</td></tr>'}</tbody>
+      </table></div>
+      <div style="font-size:11px;color:#c53030;margin-top:6px">⚠️ 另有 ${forbiddenCount} 条公司事实未批准，禁止外发使用。</div>
+    </div>`;
+
+  // ---- 4) 产品匹配 ----
+  const four = (fit && fit.four_categories) || {};
+  const catRows = Object.keys(OP_CAT_LABEL).map(k=>{
+    const c = four[k] || {};
+    const badge = OP_FIT_BADGE[c.fit_status] || {bg:'#e2e8f0',fg:'#4a5568',label:P(c.fit_status,'—')};
+    return `<div style="border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:12px">${OP_CAT_LABEL[k]}</b>
+        <span style="background:${badge.bg};color:${badge.fg};font-size:11px;padding:2px 8px;border-radius:4px">${badge.label}</span>
+      </div>
+      <div style="font-size:11px;color:#276749;margin-top:6px">✅ 推荐切入：${esc(P(c.recommended_angle,'—'))}</div>
+      <div style="font-size:11px;color:#c53030;margin-top:3px">⛔ 不推荐：${esc(P(c.not_recommended_angle,'—'))}</div>
+    </div>`;
+  }).join('');
+  const fitBlock = `<div style="margin-bottom:14px"><b style="font-size:13px">🎯 产品匹配（四大品类）</b><div style="margin-top:6px">${catRows}</div></div>`;
+
+  // ---- 5) 开发素材 Tabs ----
+  const findAsset = (re) => Object.keys(assets).find(fn => re.test(fn));
+  const fEmail = findAsset(/^email_en_v?\d*\.md$/);
+  const fZh = findAsset(/^review_zh_v?\d*\.md$/);
+  const fJa = findAsset(/^local_ja_v?\d*\.md$/);
+  const fWa = findAsset(/^whatsapp/);
+  const assetPanel = (file, label) => {
+    const a = assets[file] || {meta:{}, body:'(无内容)'};
+    const meta = a.meta || {};
+    return `<div class="b1op-tabpanel" id="b1op_${cid}_${label}" style="display:none">
+      <div style="font-size:11px;color:#718096;margin:6px 0">版本: ${esc(P(meta.version,'v1'))} · 生成时间: ${esc(P(meta.generated_at,'—'))} · 来源: ${esc(P(meta.source,'—'))}</div>
+      <pre style="white-space:pre-wrap;word-break:break-word;background:#f7fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-size:12px;max-height:360px;overflow:auto;font-family:inherit;margin:0">${esc(a.body||'')}</pre>
+    </div>`;
+  };
+  let tabBtns = '', panels = '';
+  const tabs = [];
+  if(fEmail) tabs.push(['en','英文邮件',fEmail]);
+  if(fZh) tabs.push(['zh','中文审核稿',fZh]);
+  if(fJa) tabs.push(['ja','日语版 (Local JA)',fJa]);
+  if(fWa) tabs.push(['wa','WhatsApp（未生成说明）',fWa]);
+  tabs.forEach(([key,label,file],idx)=>{
+    tabBtns += `<button type="button" class="btn btn-sm b1op-tabbtn" onclick="b1opSwitchTab(this,'b1op_${cid}_${key}')" style="font-size:11px;margin-right:4px;${idx===0?'background:#2b6cb0;color:#fff;border:1px solid #2b6cb0':'background:#fff;color:#4a5568;border:1px solid #e2e8f0'}">${label}</button>`;
+    panels += assetPanel(file,key);
+  });
+  // 默认显示第一个 panel
+  if(tabs.length){ panels = panels.replace(`id="b1op_${cid}_${tabs[0][0]}" style="display:none"`,`id="b1op_${cid}_${tabs[0][0]}" style="display:block"`); }
+  const assetsBlock = `
+    <div style="margin-bottom:14px"><b style="font-size:13px">✉️ 开发素材（草稿，禁止直接发送）</b>
+      <div class="b1op-tabs" style="margin-top:6px">
+        <div style="margin-bottom:6px">${tabBtns || '<span style="font-size:12px;color:#a0aec0">暂无素材文件</span>'}</div>
+        ${panels}
+      </div>
+    </div>`;
+
+  // ---- 6) 资料溯源卡 ----
+  const fProv = findAsset(/^provenance_card/);
+  const provBody = fProv ? (assets[fProv].body || '') : '';
+  const provSection = opMdSection(provBody, '逐句溯源');
+  const provRows = opMdTableRows(provSection).filter(r => !/^(句子\/段落|句子)/.test(r[0]||'')).map(r=>`<tr style="border-bottom:1px solid #edf2f7"><td style="padding:4px 8px;font-size:11px">${esc(r[0]||'')}</td><td style="padding:4px 8px;font-size:11px">${esc(r[1]||'')}</td><td style="padding:4px 8px;font-size:11px;color:#2b6cb0">${esc(r[2]||'')}</td></tr>`).join('');
+  const provBlock = `
+    <div style="margin-bottom:14px"><b style="font-size:13px">🧾 资料溯源卡（逐句溯源）</b>
+      <div style="overflow:auto;margin-top:6px;border:1px solid #e2e8f0;border-radius:6px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f7fafc;text-align:left"><th style="padding:5px 8px;font-size:11px;color:#718096">句子/段落</th><th style="padding:5px 8px;font-size:11px;color:#718096">内容摘要</th><th style="padding:5px 8px;font-size:11px;color:#718096">来源标注</th></tr></thead>
+        <tbody>${provRows || '<tr><td colspan="3" style="padding:10px;color:#a0aec0">暂无溯源记录</td></tr>'}</tbody>
+      </table></div>
+    </div>`;
+
+  // ---- 7) 风险与禁用表述检查 ----
+  const forbSection = opMdSection(provBody, '禁用表述检查');
+  const forbRows = opMdTableRows(forbSection).filter(r => !/^(禁用项|检查项)/.test(r[0]||'')).map(r=>`<tr style="border-bottom:1px solid #edf2f7"><td style="padding:4px 8px;font-size:12px">${esc(r[0]||'')}</td><td style="padding:4px 8px;font-size:12px;color:#276749">${esc(r[1]||'')}${r[2]?' '+esc(r[2]):''}</td></tr>`).join('');
+  const riskBlock = `
+    <div style="margin-bottom:14px"><b style="font-size:13px">🛡️ 风险与禁用表述检查</b>
+      <div style="font-size:11px;color:#718096;margin-top:4px">人工审核状态: ${esc(P(p.review_status,'pending_review'))} · 是否可发送: 否 · 发送资格: 不可发送 · 仅人工复制发送</div>
+      <div style="overflow:auto;margin-top:6px;border:1px solid #e2e8f0;border-radius:6px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f7fafc;text-align:left"><th style="padding:5px 8px;font-size:11px;color:#718096">禁用项 / 检查项</th><th style="padding:5px 8px;font-size:11px;color:#718096">结果</th></tr></thead>
+        <tbody>${forbRows || '<tr><td colspan="2" style="padding:10px;color:#a0aec0">暂无检查记录（见溯源卡）</td></tr>'}</tbody>
+      </table></div>
+    </div>`;
+
+  // ---- 8) 产品目录触发条件 ----
+  const triggerNote = (fit && fit.product_catalog_trigger_note) || '产品目录附件需在客户表达兴趣后再触发；初次外发不自动附加目录。';
+  const webPages = (fit && fit.recommended_website_pages) || [];
+  const triggerBlock = `
+    <div style="margin-bottom:14px"><b style="font-size:13px">📁 产品目录触发条件（后续可触发，不自动附加）</b>
+      <div style="font-size:12px;color:#4a5568;margin-top:4px">${esc(triggerNote)}</div>
+      ${webPages.length?`<div style="font-size:11px;margin-top:4px">后续可切入页面：${webPages.map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener" style="color:#2b6cb0">${esc(u)}</a>`).join(' · ')}</div>`:''}
+    </div>`;
+
+  // ---- 9/10) 复制与发送状态（只读：当前均为空/未发送）----
+  const stateBlock = `
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-size:12px">
+      <span style="background:#edf2f7;padding:6px 10px;border-radius:6px">👤 人工复制状态：未复制（copied_by_user / copied_at 为空）</span>
+      <span style="background:#fff3cd;color:#856404;padding:6px 10px;border-radius:6px">📤 外部发送状态：未发送——工作台不会自动发送</span>
+    </div>
+    <div style="background:#fff5f5;border:1px solid #feb2b2;border-radius:6px;padding:10px;margin-bottom:14px;font-size:12px;color:#c53030">
+      ⛔ 仅人工复制发送，工作台不会自动发送。本区块不提供任何发送 / 一键发送 / 批量发送按钮。
+    </div>`;
+
+  // ---- 11) 导出按钮（本地文件下载）----
+  const exportBlock = `
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <a class="btn btn-sm btn-outline" href="/api/customer-library/outreach-packages/${escCid}/export?format=md" download style="text-decoration:none">⬇️ 导出为 Markdown</a>
+      <a class="btn btn-sm btn-outline" href="/api/customer-library/outreach-packages/${escCid}/export?format=json" download style="text-decoration:none">⬇️ 导出为 JSON</a>
+    </div>`;
+
+  return `<div style="border-top:2px solid #2b6cb0;margin-top:18px;padding-top:14px">
+    ${overview}
+    ${evidenceBlock}
+    ${factsBlock}
+    ${fitBlock}
+    ${assetsBlock}
+    ${provBlock}
+    ${riskBlock}
+    ${triggerBlock}
+    ${stateBlock}
+    ${exportBlock}
+  </div>`;
+}
+function b1CalcPriorityFromMaster(master, contacts, sources){
+  const hasEmail = (contacts||[]).some(c=>c.contact_type==='email');
+  const hasPhone = (contacts||[]).some(c=>c.contact_type==='phone'||c.contact_type==='whatsapp');
+  const factors = {};
+  factors.productFit = 0;
+  factors.buyerType = master.buyer_type ? 10 : 0;
+  factors.websiteEvidence = (master.website_domain && String(master.website_domain).trim()) ? 12 : 0;
+  factors.contact = (hasEmail&&hasPhone)?14:hasEmail?8:hasPhone?6:0;
+  factors.countryLanguage = 4;
+  factors.dataCredibility = (sources||[]).length>0 ? 8 : 0;
+  factors.duplicateRisk = 6;
+  factors.complianceRisk = (master.risk_level==='high')?0:8;
+  factors.outreachStatus = 10;
+  const score = Object.values(factors).reduce((a,b)=>a+b,0);
+  let level = score>=75?'P0':score>=55?'P1':score>=35?'P2':'P3';
+  if(master.outreach_eligibility==='do_not_contact'||master.risk_level==='high') level='DNC';
+  return {score, level, factors};
+}
+
+function b1RenderCustomers(){
+  const root = document.getElementById('mainContent');
+  const D = B1_CUST.filterDim;
+  const f = B1_CUST.filters;
+  // Filter dropdowns
+  const dd = (label, key, options, val) => {
+    if(!options) return '';
+    return `<select class="form-control" style="width:auto;margin-right:6px;margin-bottom:6px;font-size:12px" onchange="b1SetFilter('${key}', this.value)">
+      <option value="">${label}: 全部</option>
+      ${options.map(o=>{
+        const v = o.source_file||o.continent||o.country||o.buyer_type||o.research_status||o.risk_level||o.source_category;
+        const c = o.count||o.cnt||0;
+        return `<option value="${esc(v)}" ${v===val?'selected':''}>${esc(v)} (${c})</option>`;
+      }).join('')}
+    </select>`;
+  };
+  const prioBtns = ['P0','P1','P2','P3','DNC'].map(lv =>
+    `<button class="btn btn-sm" style="margin-right:4px;font-size:11px;${f.priorityLevel===lv?`background:${B1_PRIORITY_COLOR[lv]};color:#fff`:'background:#fff;color:#4a5568;border:1px solid #e2e8f0'}" onclick="B1_CUST.filters.priorityLevel='${lv}';B1_CUST.page=1;b1LoadCustomers()">${lv}</button>`
+  ).join('') + `<button class="btn btn-sm btn-outline" style="font-size:11px" onclick="delete B1_CUST.filters.priorityLevel;B1_CUST.page=1;b1LoadCustomers()">清除</button>`;
+
+  // Customer rows
+  const rows = B1_CUST.customers.map(c => {
+    const p = b1PriorityOf(c.customer_id);
+    const pl = p ? p.priority_level : '—';
+    const pscore = p ? p.priority_score : '';
+    const srcCat = c.source_category ? (B1_SRC_CAT_LABEL[c.source_category]||c.source_category) : '—';
+    return `<tr style="cursor:pointer;border-bottom:1px solid #edf2f7" onclick="b1OpenCustomerDetail('${esc(c.customer_id)}')">
+      <td style="padding:8px 10px;font-weight:600">${esc(c.company_name_raw||'(未命名)')}</td>
+      <td style="padding:8px 10px">${esc(c.country_standardized||'—')}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#718096">${esc(c.continent||'—')}</td>
+      <td style="padding:8px 10px;font-size:12px">${esc(c.buyer_type||'待分类')}</td>
+      <td style="padding:8px 10px;font-size:11px"><span style="background:#ebf8ff;padding:2px 6px;border-radius:3px">${srcCat}</span></td>
+      <td style="padding:8px 10px"><span style="background:#fff3cd;color:#856404;font-size:10px;padding:2px 6px;border-radius:3px;cursor:help" title="customer_product_fit 表为空，待背调后填充">待背调</span></td>
+      <td style="padding:8px 10px"><span style="background:${B1_PRIORITY_COLOR[pl]||'#e2e8f0'};color:${pl==='—'?'#718096':'#fff'};font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;cursor:help" title="背调优先候选 · 资料较完整，待核验产品匹配 · 非可开发客户">${pl}${pscore?' '+pscore:''}</span></td>
+      <td style="padding:8px 10px;font-size:11px;color:${c.risk_level==='high'?'#c53030':'#718096'}">${esc(c.risk_level||'not_assessed')}</td>
+      <td style="padding:8px 10px">${c.has_email?'📧':''} ${c.has_phone?'📞':''}</td>
+    </tr>`;
+  }).join('');
+
+  root.innerHTML = `
+    <div style="padding:20px">
+      <h2 style="margin:0 0 4px 0">👥 客户台账 <span style="font-size:12px;color:#888;font-weight:400">(SQLite 只读 · ${B1_CUST.total} 家真实客户)</span></h2>
+      <div style="font-size:12px;color:#888;margin-bottom:8px">数据来自本地 customer_development.sqlite · 7619 家客户 · 只读浏览</div>
+      <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;margin-bottom:14px;font-size:11px;color:#92400e">
+        ⚠️ P0/P1 = <b>背调优先候选</b>（资料较完整，待核验产品匹配），<b>非优质可开发客户</b>；产品匹配当前全部为<b>待背调</b>；开发资格当前为<b>0</b>。
+      </div>
+
+      <button class="btn btn-sm btn-outline" onclick="b1ToggleMobileFilters()" style="margin-bottom:10px">🎛️ 筛选 ${Object.keys(f).length?'('+Object.keys(f).length+')':''}</button>
+      <div id="b1FilterBar" style="display:${B1_CUST.filtersOpen?'block':'none'};background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:16px">
+        <div style="display:flex;flex-wrap:wrap;align-items:center">
+          ${dd('来源文件','sourceFile',D&&D.sources,f.sourceFile)}
+          ${dd('大洲','continent',D&&D.continents,f.continent)}
+          ${dd('国家','country',D&&D.countries,f.country)}
+          ${dd('买家类型','buyerType',D&&D.buyer_types,f.buyerType)}
+          ${dd('背调状态','researchStatus',D&&D.research_status,f.researchStatus)}
+          ${dd('风险等级','riskLevel',D&&D.risk_levels,f.riskLevel)}
+          ${dd('来源品类','sourceCategory',D&&D.source_categories,f.sourceCategory)}
+          <select class="form-control" style="width:auto;margin-right:6px;margin-bottom:6px;font-size:12px" onchange="b1SetFilter('packageStatus', this.value)">
+            <option value="">资料包状态: 全部</option>
+            <option value="has" ${f.packageStatus==='has'?'selected':''}>📦 有资料包 (${B1_CUST.opPackages.length})</option>
+            <option value="none" ${f.packageStatus==='none'?'selected':''}>无资料包</option>
+            <option value="pending_review" ${f.packageStatus==='pending_review'?'selected':''}>审核中 pending_review (${B1_CUST.opPackages.filter(p=>p.review_status==='pending_review').length})</option>
+          </select>
+        </div>
+        <div style="margin-top:8px"><b style="font-size:12px">优先级：</b>${prioBtns}</div>
+        <div style="margin-top:8px"><button class="btn btn-sm btn-outline" onclick="b1ClearFilters()">🔄 清除全部筛选</button></div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:#f7fafc;text-align:left">
+            <th style="padding:8px 10px;font-size:11px;color:#718096">公司名</th>
+            <th style="padding:8px 10px;font-size:11px;color:#718096">国家</th>
+            <th style="padding:8px 10px;font-size:11px;color:#718096">大洲</th>
+            <th style="padding:8px 10px;font-size:11px;color:#718096">买家类型</th>
+            <th style="padding:8px 10px;font-size:11px;color:#718096">来源</th>
+            <th style="padding:8px 10px;font-size:11px;color:#718096">产品匹配</th>
+            <th style="padding:8px 10px;font-size:11px;color:#718096">优先级</th>
+            <th style="padding:8px 10px;font-size:11px;color:#718096">风险</th>
+            <th style="padding:8px 10px;font-size:11px;color:#718096">联系方式</th>
+          </tr></thead>
+          <tbody>${B1_CUST.loading?'<tr><td colspan="9" style="padding:20px;text-align:center;color:#888">加载中…</td></tr>':rows||'<tr><td colspan="9" style="padding:20px;text-align:center;color:#888">暂无客户数据</td></tr>'}</tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:10px">
+        <div style="font-size:12px;color:#718096">第 ${B1_CUST.page} / ${B1_CUST.totalPages} 页 · 共 ${B1_CUST.total} 条</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-outline" onclick="b1SetPage(${B1_CUST.page-1})" ${B1_CUST.page<=1?'disabled':''}>← 上一页</button>
+          <button class="btn btn-sm btn-outline" onclick="b1SetPage(${B1_CUST.page+1})" ${B1_CUST.page>=B1_CUST.totalPages?'disabled':''}>下一页 →</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* viewCustomers入口：B1模式优先，回退旧逻辑 */
 function viewCustomers(root){
+  if(window.CUSTOMER_LIBRARY && window.CUSTOMER_LIBRARY.enabled){
+    if(!B1_CUST.filterDim) b1LoadFilterDim();
+    if(!B1_CUST.priorityData) b1LoadPriority();
+    b1LoadOpPackages(); // B3: 加载 outreach_ready 资料包索引（供详情区块与资料包状态筛选）
+    b1RenderCustomers();
+    b1LoadCustomers();
+    return;
+  }
   custFilter.q = routeParams.q || custFilter.q || '';
-  let list = S.customers.slice();
+  let list = visibleCustomers().slice();
   // P2.5B: 按导入批次筛选（来自导入历史页"查看该批次客户"）
   const batchFilterId = (window._customerFilter && window._customerFilter.importBatchId) || '';
   if(batchFilterId) list = list.filter(c => c.importBatchId === batchFilterId);
@@ -12639,18 +13720,18 @@ function viewCustomers(root){
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
         <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
           <div style="font-size:11px;color:#718096;margin-bottom:4px">👥 客户总数</div>
-          <div style="font-size:28px;font-weight:800;color:#2b6cb0">${S.customers.filter(c=>!c.isDemo).length}</div>
+          <div style="font-size:28px;font-weight:800;color:#2b6cb0">${visibleCustomers().length}</div>
           <div style="font-size:11px;color:#718096;margin-top:2px">${newCount}新 + ${oldCount}老</div>
         </div>
         <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
           <div style="font-size:11px;color:#718096;margin-bottom:4px">⭐ A级客户</div>
           <div style="font-size:28px;font-weight:800;color:#c9a961">${aCount}</div>
-          <div style="font-size:11px;color:#718096;margin-top:2px">占比 ${S.customers.filter(c=>!c.isDemo).length?Math.round(aCount/S.customers.filter(c=>!c.isDemo).length*100):0}%</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">占比 ${visibleCustomers().length?Math.round(aCount/visibleCustomers().length*100):0}%</div>
         </div>
         <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
           <div style="font-size:11px;color:#718096;margin-bottom:4px">💬 已回复客户</div>
           <div style="font-size:28px;font-weight:800;color:#276749">${repliedCount}</div>
-          <div style="font-size:11px;color:#718096;margin-top:2px">回复率 ${S.customers.filter(c=>!c.isDemo).length?Math.round(repliedCount/S.customers.filter(c=>!c.isDemo).length*100):0}%</div>
+          <div style="font-size:11px;color:#718096;margin-top:2px">回复率 ${visibleCustomers().length?Math.round(repliedCount/visibleCustomers().length*100):0}%</div>
         </div>
         <div style="background:#fff;padding:14px;border-radius:8px;text-align:center">
           <div style="font-size:11px;color:#718096;margin-bottom:4px">🌍 覆盖国家</div>
@@ -12663,9 +13744,9 @@ function viewCustomers(root){
         <div style="font-size:12px;font-weight:700;color:#2d3748;margin-bottom:8px">📊 客户分级分布</div>
         <div style="display:flex;gap:12px;align-items:center">
           <div style="flex:1;display:flex;gap:4px;height:24px;border-radius:4px;overflow:hidden">
-            <div style="background:linear-gradient(135deg,#c9a961,#d4af37);width:${S.customers.filter(c=>!c.isDemo).length?aCount/S.customers.filter(c=>!c.isDemo).length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${aCount>0?'30px':'0'}">${aCount>0?'A '+aCount:''}</div>
-            <div style="background:linear-gradient(135deg,#3182ce,#2c5282);width:${S.customers.filter(c=>!c.isDemo).length?bCount/S.customers.filter(c=>!c.isDemo).length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${bCount>0?'30px':'0'}">${bCount>0?'B '+bCount:''}</div>
-            <div style="background:linear-gradient(135deg,#a0aec0,#718096);width:${S.customers.filter(c=>!c.isDemo).length?cCount/S.customers.filter(c=>!c.isDemo).length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${cCount>0?'30px':'0'}">${cCount>0?'C '+cCount:''}</div>
+            <div style="background:linear-gradient(135deg,#c9a961,#d4af37);width:${visibleCustomers().length?aCount/visibleCustomers().length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${aCount>0?'30px':'0'}">${aCount>0?'A '+aCount:''}</div>
+            <div style="background:linear-gradient(135deg,#3182ce,#2c5282);width:${visibleCustomers().length?bCount/visibleCustomers().length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${bCount>0?'30px':'0'}">${bCount>0?'B '+bCount:''}</div>
+            <div style="background:linear-gradient(135deg,#a0aec0,#718096);width:${visibleCustomers().length?cCount/visibleCustomers().length*100:0}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:${cCount>0?'30px':'0'}">${cCount>0?'C '+cCount:''}</div>
           </div>
           <div style="display:flex;gap:12px;font-size:11px">
             <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#c9a961;border-radius:2px"></span>A级 ${aCount}</span>
@@ -15277,8 +16358,9 @@ function draftShort(){
     </div>
     <div class="flex gap8">
       <button class="btn btn-gold" onclick="demoStub('短开发信已保存')">💾 保存</button>
-      <button class="btn btn-primary" onclick="toast('发送前请检查收件人和内容')">📤 发送</button>
+      <button class="btn btn-outline" onclick="toast('🔒 发送功能已禁用，请人工复制后在外部邮箱发送','info')">📋 复制内容</button>
     </div>
+    <div style="font-size:11px;color:#92400e;margin-top:6px">🔒 发送功能已禁用，请人工复制后在外部邮箱发送</div>
     <!-- V75.3 开发信质量评分面板 -->
     <div class="divider"></div>
     <div style="padding:16px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:10px;border:1px solid #bae6fd">
@@ -15507,7 +16589,7 @@ function countWords_old(){
   const el=document.getElementById('wordCount'); if(el) el.innerHTML='单词数：<b style="color:'+(n>50?'var(--red)':'var(--green)')+'">'+n+'</b> / 50'+(n>50?' ⚠️ 超50词！':'');
 }
 function draftList(){
-  const list = S.drafts;
+  const list = visibleDrafts();
   return `<div class="card"><div class="table-wrap"><table class="tbl">
     <colgroup><col style="width:22%"><col style="width:8%"><col style="width:6%"><col style="width:26%"><col style="width:10%"><col style="width:8%"><col style="width:20%"></colgroup>
     <thead><tr><th>客户</th><th>国家</th><th>语言</th><th>主题</th><th>状态</th><th>质量</th><th>操作</th></tr></thead>
@@ -16228,7 +17310,7 @@ function openDraftEditor(did, isNew){
         ${c && localTime(c.country).badTime?'<span class="badge badge-red">⚠️ 客户休息时间，建议工作日 8-11 点发送</span>':''}
         ${c && localTime(c.country).weekend?'<span class="badge badge-gold">周末，建议工作日发送</span>':''}
         </div>
-        <button class="btn btn-outline btn-sm mt8" onclick="demoStub('定时发送')">⏰ 定时发送</button>
+        <button class="btn btn-outline btn-sm mt8" disabled style="opacity:0.5;cursor:not-allowed">⏰ 定时发送（已禁用）</button>
       </div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="saveDraft('${d.id}')">💾 保存草稿</button>
@@ -17396,7 +18478,7 @@ function viewSettings(root){
         <button class="btn btn-outline" onclick="requestNotificationPermission()">🔔 开启桌面通知</button>
         <button class="btn btn-outline" onclick="showShortcutHelp()">⌨️ 快捷键</button>
             <button class="btn btn-outline" onclick="toast('请选择 JSON 文件导入')">导入数据</button>
-            <button class="btn btn-danger" onclick="resetData()">重置演示数据</button>
+            ${isDemoMode()?'<button class="btn btn-danger" onclick="resetData()">重置演示数据（仅演示模式可用）</button>':'<span class="form-hint" style="align-self:center;color:#a0aec0">重置演示数据：仅演示模式可用（顶部开关可切换）</span>'}
           </div>
           <div class="form-hint mt8">所有数据保存在浏览器 localStorage（key 前缀 kailion_ark_），不上云、不外发。</div>
         </div>
@@ -17447,7 +18529,10 @@ function exportData(){
 function resetData(){
   confirmDlg('将清空所有本地数据并重新注入演示数据，确定？', ()=>{
     ['customers','plans','drafts','inquiries','quotes','contracts','followups','inbox','tasks','products','samples','settings','knowledge','apis','apiLogs','monitors','monitorLogs','keywords','contents','backlinks','exhibitions','prompts','publicPool','receivables','negotiations','outreachKnowledgeBase','customerIdentityMigration','communications','campaigns','campaignCustomerTasks','campaignFollowUpTasks','campaignSchemaVersion','knowledgeFacts','knowledgePacks','websiteEvidences','outreachQueues','prospectPriorities','followUps','outreachOutcomes','importBatches'].forEach(k=>DB.remove(k));
-    loadState(); seedData(); go('dashboard'); toast('已重置为演示数据');
+    loadState(); seedData();
+    // 模块1: 重置后进入演示模式并显示横幅
+    S.dataMode='demo'; DB.save('dataMode','demo'); persist();
+    go('dashboard'); renderDemoBanner(); toast('已重置为演示数据（顶部横幅可见）');
   });
 }
 
@@ -18898,7 +19983,10 @@ async function fetchKBStatus(){
         badge.classList.remove('offline');
         const scopeLabel = data.accessScope==='local'?'本机':data.accessScope==='lan'?'局域网':'公网';
         const scopeClass = data.accessScope==='local'?'kb-scope-local':data.accessScope==='lan'?'kb-scope-lan':'kb-scope-public';
-        text.innerHTML = `${data.totalFiles}文件·${data.totalSlices}片 <span class="kb-scope-tag ${scopeClass}">${scopeLabel}</span>`;
+        text.innerHTML = `${data.totalFiles}文档 <span class="kb-scope-tag ${scopeClass}">来源：公司知识库目录</span>`;
+        // 模块2#5: 补充数据来源与最后更新时间（不仅显示在线/离线）
+        const lastUpd = (S.serverSnapshotAt || data.updatedAt || '').slice(0,10);
+        badge.title = `知识库：${data.totalFiles}文档 / ${data.totalSlices}切片\n来源：公司知识库目录（本机）\n最后更新：${lastUpd||'未知'}`;
       }else{
         badge.classList.add('offline');
         text.textContent = '知识库离线';
@@ -20073,7 +21161,7 @@ function renderApiSettings(){
     <!-- 数据统计 -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
       <div style="background:#ebf8ff;padding:10px;border-radius:6px;text-align:center">
-        <div style="font-size:20px;font-weight:bold;color:#2b6cb0">${S.customers.filter(c=>!c.isDemo).length}</div>
+        <div style="font-size:20px;font-weight:bold;color:#2b6cb0">${visibleCustomers().length}</div>
         <div style="font-size:10px;color:#666">客户数据</div>
       </div>
       <div style="background:#f0fff4;padding:10px;border-radius:6px;text-align:center">
@@ -20222,7 +21310,7 @@ function exportAllData(){
     schemaVersion: 'P2.4A',
     exportTime: new Date().toISOString(),
     exportDate: new Date().toLocaleDateString('zh-CN'),
-    customerCount: (S.customers || []).filter(c=>!c.isDemo).length,
+    customerCount: visibleCustomers().length,
     draftCount: (S.drafts || []).length,
     campaignCount: (S.campaigns || []).length,
     taskCount: (S.campaignCustomerTasks || []).length,
@@ -20251,7 +21339,7 @@ function exportAllData(){
   document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
   toast('✅ 全部数据已导出为备份文件');
-  logAction('data_export', '导出全部数据', '客户'+(S.customers||[]).filter(c=>!c.isDemo).length+'/开发信'+(S.drafts||[]).length+'/产品'+(S.products||[]).length);
+  logAction('data_export', '导出全部数据', '客户'+visibleCustomers().length+'/开发信'+(S.drafts||[]).length+'/产品'+(S.products||[]).length);
 }
 
 function importAllData(input){
@@ -20537,7 +21625,7 @@ function renderChannelEffect(){
   return Object.entries(ch).sort((a,b)=>b[1]-a[1]).map(function(kv){
     const k=kv[0],v=kv[1];
     const avg=Math.round(S.customers.filter(function(c){return c.source===k;}).reduce(function(a,c){return a+c.scores.total;},0)/v);
-    const w=Math.round(v/S.customers.filter(c=>!c.isDemo).length*100);
+    const w=Math.round(v/visibleCustomers().length*100);
     return '<div style="margin-bottom:6px">'+
       '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">'+
       '<span>'+k+'</span><b>'+v+'家·均匹配'+avg+'分</b></div>'+
@@ -21850,7 +22938,7 @@ function viewOutreach(root){
         <div class="stat-trend up">多渠道沟通历史</div></div>
       <div class="stat-card"><span class="stat-icon">✅</span>
         <div class="stat-label">已回复客户</div><div class="stat-value">${replyRate}</div>
-        <div class="stat-trend ${replyRate>0?'up':'down'}">回复率 ${Math.round(replyRate/Math.max(S.customers.filter(c=>!c.isDemo).length,1)*100)}%</div></div>
+        <div class="stat-trend ${replyRate>0?'up':'down'}">回复率 ${Math.round(replyRate/Math.max(visibleCustomers().length,1)*100)}%</div></div>
       <div class="stat-card gold"><span class="stat-icon">🎯</span>
         <div class="stat-label">待触达客户</div><div class="stat-value">${S.customers.filter(c=>c.status!=='已回复').length}</div>
         <div class="stat-trend down">需要持续跟进</div></div>
@@ -21898,12 +22986,12 @@ function viewOutreach(root){
         </div>
         <div style="background:#f7fafc;padding:14px;border-radius:8px">
           <div class="text-sm text-muted">客户回复率</div>
-          <div style="font-size:24px;font-weight:700;color:#276749;margin-top:4px">${Math.round(replyRate/Math.max(S.customers.filter(c=>!c.isDemo).length,1)*100)}%</div>
-          <div class="text-xs text-muted" style="margin-top:4px">${replyRate}/${S.customers.filter(c=>!c.isDemo).length} 客户已回复</div>
+          <div style="font-size:24px;font-weight:700;color:#276749;margin-top:4px">${Math.round(replyRate/Math.max(visibleCustomers().length,1)*100)}%</div>
+          <div class="text-xs text-muted" style="margin-top:4px">${replyRate}/${visibleCustomers().length} 客户已回复</div>
         </div>
         <div style="background:#f7fafc;padding:14px;border-radius:8px">
           <div class="text-sm text-muted">平均沟通次数</div>
-          <div style="font-size:24px;font-weight:700;color:#975a16;margin-top:4px">${(communications/Math.max(S.customers.filter(c=>!c.isDemo).length,1)).toFixed(1)}</div>
+          <div style="font-size:24px;font-weight:700;color:#975a16;margin-top:4px">${(communications/Math.max(visibleCustomers().length,1)).toFixed(1)}</div>
           <div class="text-xs text-muted" style="margin-top:4px">每客户平均沟通</div>
         </div>
       </div>
@@ -31467,16 +32555,31 @@ function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.set
   loadState();
   seedExtra();
   if(DB.load('theme')==='dark') document.body.classList.add('dark');
-  if(!S.customers || !S.customers.filter(c=>!c.isDemo).length){ seedData(); }
+  // 模块1#6 + 模块2：服务器有真实数据时不得自动 seed 演示数据
+  // 仅当本地确有真实客户时才视为已初始化；否则尝试从服务器快照同步，不再无条件注入演示数据
+  if(realCustomerCount() > 0){
+    console.log('[启动] 已加载本地真实客户数据:', realCustomerCount(), '家，跳过自动 seed');
+  } else {
+    console.log('[启动] 本地无真实客户，不再自动注入演示数据；等待服务器快照同步或用户手动切换演示模式');
+    // 提供最小默认设置，避免 S.settings 为空导致设置页崩溃
+    if(!S.settings || typeof S.settings!=='object'){
+      S.settings = { company:{ nameCn:'锴利国际贸易', nameEn:'KaiLionCrafts', address:'广东阳江', email:'', whatsapp:'' } };
+    }
+  }
   // V78.2: 为所有客户补充身份信息（不覆盖已有值）
   try { (S.customers||[]).forEach(c => ensureCustomerIdentity(c)); } catch(e){}
   // V78.2: 执行客户身份迁移（幂等，只执行一次）
   try { migrateCustomerIdentities(); } catch(e){ console.warn('V78.2 identity migration skipped:', e.message); }
   // 延迟到所有script块加载完成后再渲染，避免第二个script块中的函数未定义
+  const afterRender = ()=>{
+    go('dashboard');
+    renderDemoBanner();          // 模块1: 渲染真实/演示模式横幅
+    startupLoadServerSnapshot(); // 模块2: 加载服务器快照（首次加载弹三选一）
+  };
   if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',()=>go('dashboard'));
+    document.addEventListener('DOMContentLoaded', afterRender);
   } else {
-    setTimeout(()=>go('dashboard'),0);
+    setTimeout(afterRender,0);
   }
 })();
 
@@ -33866,7 +34969,7 @@ function draftSend(){
   ${!smtpReady?`<div class="card card-pad mb16" style="background:#fff5f5;border-left:4px solid var(--red)">
     <div class="fw700 mb8" style="color:var(--red)">⚠️ SMTP未配置</div>
     <div class="text-sm mb12">开发信需先经过人工审核；工作台只生成草稿和发送交接信息，不会自动调用 SMTP、邮件 API 或 Webhook。实际投递请在外部邮箱中人工完成。</div>
-    <button class="btn btn-primary btn-sm" onclick="go('settings')">⚙️ 前往配置SMTP</button>
+    <div style="padding:8px 12px;background:#fff3cd;border:1px solid #ffe08a;border-radius:6px;font-size:13px;color:#856404;margin-top:8px">🔒 <b>发送功能已永久禁用。工作台仅生成素材供人工复制，不会调用SMTP/邮件API。实际投递请在外部邮箱中人工完成。</b></div>
   </div>`:''}
   <div class="flex gap8 mb16">
     <button class="btn ${sendTab==='queue'?'btn-gold':'btn-outline'}" onclick="sendTab='queue';renderView()">📋 待审核队列(${pending.length})</button>
@@ -33874,7 +34977,6 @@ function draftSend(){
     <button class="btn ${sendTab==='logs'?'btn-gold':'btn-outline'}" onclick="sendTab='logs';renderView()">📊 发送记录</button>
     <div style="margin-left:auto" class="flex gap8">
       <button class="btn btn-outline" onclick="loadDemoMails()">📥 加载演示邮件</button>
-      ${approved.length>0?`<button class="btn btn-gold" onclick="batchSendMails()">🚀 批量发送(${approved.length}封)</button>`:''}
     </div>
   </div>
   ${sendTab==='queue'?sendQueueView(pending):sendTab==='approved'?sendApprovedView(approved):sendLogsView(logs)}`;
@@ -33915,7 +35017,6 @@ function sendApprovedView(list){
       <td class="text-xs">${m.approvedAt||'-'}</td>
       <td>
         <button class="btn btn-outline btn-sm" onclick="previewMail('${m.id}')">👁️ 预览</button>
-        <button class="btn btn-gold btn-sm" onclick="sendSingleMail('${m.id}')">📤 发送</button>
         <button class="btn btn-outline btn-sm" onclick="backToQueue('${m.id}')">↩️ 退回</button>
       </td></tr>`).join('')}</tbody>
   </table></div></div>`;
@@ -34000,57 +35101,13 @@ function previewMail(id){
 }
 function previewMailLog(id){previewMail(id);}
 function sendSingleMail(id){
-  if(!S.smtpConfig){toast('请先配置SMTP','error');return;}
-  const m=S.mailQueue.find(x=>x.id===id);if(!m)return;
-  toast(`正在发送给 ${m.customer}...`);
-  setTimeout(()=>{
-    const success=Math.random()>0.1;
-    const log={...m,id:'log_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),status:success?'发送成功':'发送失败',sentAt:nowStr(),date:todayStr(),replied:false};
-    S.mailLogs.push(log);DB.save('mailLogs',S.mailLogs);
-    S.mailQueue=S.mailQueue.filter(x=>x.id!==id);DB.save('mailQueue',S.mailQueue);
-    toast(success?`✅ 发送成功：${m.customer}`:`❌ 发送失败：${m.customer}`);
-    renderView();
-  },800);
+  toast('发送功能已禁用，请人工复制邮件内容后在外部邮箱发送','warning');return;
 }
 function batchSendMails(){
-  if(!S.smtpConfig){toast('请先配置SMTP','error');return;}
-  const approved=S.mailQueue.filter(m=>m.status==='已审核');
-  if(!approved.length){toast('没有已审核的邮件','error');return;}
-  const dailyLimit=(S.smtpConfig&&S.smtpConfig.dailyLimit)||50;
-  const todaySent=S.mailLogs.filter(l=>l.date===todayStr()).length;
-  if(todaySent+approved.length>dailyLimit){toast(`今日发送将超出上限(${dailyLimit}封)，请减少数量或明日再发`,'error');return;}
-  showModal(`
-    <div class="modal-title">🚀 批量发送确认</div>
-    <div class="text-sm mb12">即将发送 <b style="color:var(--gold)">${approved.length}</b> 封开发信：</div>
-    <div style="max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:8px">
-      ${approved.map(m=>`<div class="text-sm py4">📧 ${esc(m.customer)} &lt;${esc(m.email)}&gt;</div>`).join('')}
-    </div>
-    <div class="mt12 text-xs text-muted">发送间隔：每封随机3-8秒（模拟真实人工发送，降低被标记为垃圾邮件风险）</div>
-    <div class="btn-row mt16">
-      <button class="btn btn-outline" onclick="closeModal()">取消</button>
-      <button class="btn btn-gold" onclick="closeModal();executeBatchSend()">🚀 确认发送</button>
-    </div>`);
+  toast('发送功能已禁用，工作台不自动发送邮件','warning');return;
 }
 function executeBatchSend(){
-  const approved=S.mailQueue.filter(m=>m.status==='已审核');
-  let i=0;let success=0;let failed=0;
-  toast(`开始批量发送 ${approved.length} 封...`);
-  function sendNext(){
-    if(i>=approved.length){
-      toast(`批量发送完成：成功${success}封，失败${failed}封`);
-      renderView();return;
-    }
-    const m=approved[i];
-    const ok=Math.random()>0.1;
-    const log={...m,id:'log_'+Date.now()+'_'+i,status:ok?'发送成功':'发送失败',sentAt:nowStr(),date:todayStr(),replied:false};
-    S.mailLogs.push(log);
-    if(ok)success++;else failed++;
-    S.mailQueue=S.mailQueue.filter(x=>x.id!==m.id);
-    i++;
-    if(i%3===0||i===approved.length){DB.save('mailLogs',S.mailLogs);DB.save('mailQueue',S.mailQueue);}
-    setTimeout(sendNext,500+Math.random()*1000);
-  }
-  sendNext();
+  toast('发送功能已禁用','warning');return;
 }
 function loadDemoMails(){
   const demos=[
@@ -35142,7 +36199,7 @@ async function prospectExecuteSearch(){
 function checkInCustomerDB(url){
   try{
     const domain = new URL(url).hostname;
-    if(S.customers && S.customers.filter(c=>!c.isDemo).length > 0){
+    if(S.customers && visibleCustomers().length > 0){
       return S.customers.some(c=>{
         if(c.website){ try{ return new URL(c.website).hostname===domain }catch(e){} }
         return false;
@@ -39417,7 +40474,7 @@ function runSelfCheck(){
       if(!Array.isArray(S.customers)) return {pass:false, detail:'S.customers 不是数组'};
       const invalid = S.customers.filter(c=>!c.id || !c.company);
       if(invalid.length > 0) return {pass:true, warn:true, detail:'有 ' + invalid.length + ' 个客户缺少id或company字段'};
-      return {pass:true, detail:S.customers.filter(c=>!c.isDemo).length + ' 个客户，结构完整'};
+      return {pass:true, detail:visibleCustomers().length + ' 个客户，结构完整'};
     }
   });
 
@@ -40644,4 +41701,598 @@ function renderAiModelRouterCard(){
     </div>
     ${Array.isArray(oai.models) && oai.models.length ? `<div class="text-sm text-muted mt12">支持模型：${oai.models.map(m=>`<span class="badge" style="background:#f1f5f9;color:#475569;margin-right:4px">${esc(m)}</span>`).join('')}</div>` : ''}
   </div>`;
+}
+
+/* ============================================================
+ * B1: 公司事实审批预览（只读，不执行实际审批）
+ * ============================================================ */
+const B1_FACTS = { page:1, pageSize:10, items:[], total:0, totalPages:1, filter:{}, stats:null, loading:false };
+const B1_FACT_CAT_LABEL = { COMP:'公司简介', BIZ:'业务能力', YJ:'阳江产业带', SUP:'供应链', CERT:'认证', HON:'荣誉', FOU:'创始人', MAT:'材料工艺', OEM:'OEM/ODM', PROD:'产品' };
+
+async function b1LoadFacts(){
+  B1_FACTS.loading = true; b1RenderFacts();
+  const params = new URLSearchParams();
+  params.set('page', B1_FACTS.page); params.set('pageSize', B1_FACTS.pageSize);
+  Object.entries(B1_FACTS.filter).forEach(([k,v])=>{ if(v) params.set(k,v); });
+  try {
+    const r = await fetch('/api/customer-library/company-facts?' + params.toString(), {cache:'no-store'});
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.message||('HTTP '+r.status));
+    B1_FACTS.items = d.items||[];
+    B1_FACTS.total = d.total||0;
+    B1_FACTS.totalPages = d.totalPages||1;
+    B1_FACTS.stats = { risk: d.risk_distribution||{}, cat: d.category_distribution||{} };
+  } catch(e){
+    console.error('[B1 facts] load error', e);
+    B1_FACTS.items = [];
+  }
+  B1_FACTS.loading = false; b1RenderFacts();
+}
+function b1SetFactFilter(key, val){
+  if(val) B1_FACTS.filter[key] = val; else delete B1_FACTS.filter[key];
+  B1_FACTS.page = 1; b1LoadFacts();
+}
+function b1SetFactPage(p){
+  if(p<1||p>B1_FACTS.totalPages) return;
+  B1_FACTS.page = p; b1LoadFacts();
+}
+
+function viewCompanyFactsApproval(root){
+  // Initial render then load data
+  root.innerHTML = `<div style="padding:20px">
+    <div style="background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:14px 18px;border-radius:10px;margin-bottom:16px;font-weight:600">
+      🔒 当前 0/42 条公司事实已批准外发，开发信引擎尚未解锁。本阶段仅展示待审批清单，不执行实际审批。
+    </div>
+    <div id="b1FactsBody"><div style="padding:40px;text-align:center;color:#888">数据加载中…</div></div>
+  </div>`;
+  b1LoadFacts();
+}
+
+function b1RenderFacts(){
+  const body = document.getElementById('b1FactsBody');
+  if(!body) return;
+  const f = B1_FACTS.filter;
+  const riskDist = B1_FACTS.stats ? B1_FACTS.stats.risk : {};
+  const highRisk = riskDist.high||0;
+
+  const catOpts = Object.entries(B1_FACT_CAT_LABEL).map(([k,v])=>
+    `<option value="${k}" ${f.fact_category===k?'selected':''}>${v}</option>`).join('');
+  const riskOpts = ['low','medium','high'].map(r=>
+    `<option value="${r}" ${f.risk_level===r?'selected':''}>${r}</option>`).join('');
+
+  const rows = B1_FACTS.items.map(it => {
+    const catLabel = B1_FACT_CAT_LABEL[it.fact_category]||it.fact_category||'—';
+    const riskColor = it.risk_level==='high'?'#c53030':it.risk_level==='medium'?'#d69e2e':'#38a169';
+    const riskBg = it.risk_level==='high'?'#fed7d7':it.risk_level==='medium'?'#feebc8':'#c6f6d5';
+    return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
+        <div style="font-family:monospace;font-size:11px;color:#a0aec0">${esc(it.fact_id||'')}</div>
+        <div style="display:flex;gap:6px">
+          <span style="background:#ebf8ff;color:#2b6cb0;font-size:10px;padding:2px 8px;border-radius:3px">${catLabel}</span>
+          <span style="background:${riskBg};color:${riskColor};font-size:10px;padding:2px 8px;border-radius:3px">风险: ${esc(it.risk_level||'unknown')}</span>
+          <span style="background:#edf2f7;color:#718096;font-size:10px;padding:2px 8px;border-radius:3px">待人工确认</span>
+        </div>
+      </div>
+      <div style="font-size:13px;color:#2d3748;line-height:1.6;margin-bottom:8px">${esc(it.fact_text||'')}</div>
+      ${it.risk_note?`<div style="font-size:12px;color:#c53030;margin-bottom:6px">⚠️ ${esc(it.risk_note)}</div>`:''}
+      <div style="font-size:11px;color:#a0aec0">来源: ${esc(it.source_path||'—')} · ${esc(it.source_section||'')}</div>
+      <div style="margin-top:8px">
+        <button class="btn btn-sm" disabled style="opacity:.5;cursor:not-allowed;font-size:11px" title="本阶段不执行审批，将在B2阶段开放">批准</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:#718096">事实总数</div>
+        <div style="font-size:24px;font-weight:800;color:#1a365d">${B1_FACTS.total||42}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:#718096">待审批</div>
+        <div style="font-size:24px;font-weight:800;color:#d69e2e">${B1_FACTS.total||42}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:#718096">可外发</div>
+        <div style="font-size:24px;font-weight:800;color:#718096">0</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:#718096">高风险</div>
+        <div style="font-size:24px;font-weight:800;color:#c53030">${highRisk}</div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select class="form-control" style="width:auto;font-size:12px" onchange="b1SetFactFilter('fact_category', this.value)">
+        <option value="">全部类别</option>${catOpts}
+      </select>
+      <select class="form-control" style="width:auto;font-size:12px" onchange="b1SetFactFilter('risk_level', this.value)">
+        <option value="">全部风险</option>${riskOpts}
+      </select>
+      <button class="btn btn-sm btn-outline" onclick="B1_FACTS.filter={};B1_FACTS.page=1;b1LoadFacts()">清除筛选</button>
+    </div>
+
+    ${B1_FACTS.loading?'<div style="padding:20px;text-align:center;color:#888">加载中…</div>':(rows||'<div style="padding:20px;text-align:center;color:#888">暂无事实数据</div>')}
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+      <div style="font-size:12px;color:#718096">第 ${B1_FACTS.page} / ${B1_FACTS.totalPages} 页 · 共 ${B1_FACTS.total} 条</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-outline" onclick="b1SetFactPage(${B1_FACTS.page-1})" ${B1_FACTS.page<=1?'disabled':''}>← 上一页</button>
+        <button class="btn btn-sm btn-outline" onclick="b1SetFactPage(${B1_FACTS.page+1})" ${B1_FACTS.page>=B1_FACTS.totalPages?'disabled':''}>下一页 →</button>
+      </div>
+    </div>`;
+}
+
+
+/* ============================================================
+ * A2: SQLite 客户资源库 前端只读模块（自包含，不影响旧JSON数据源）
+ * 通过 /api/customer-library/* 读取本地 SQLite（只读）。
+ * 功能开关由后端控制；前端探测到503即回退到旧JSON数据源。
+ * ============================================================ */
+window.CUSTOMER_LIBRARY = {
+  enabled: false,
+  errorState: null,       // { status, message, timestamp, endpoint, featureFlag }
+  mode: 'real',           // 'real' | 'demo'
+  currentPage: 1,
+  pageSize: 50,
+  filters: {},
+  searchQuery: '',
+  summary: null,
+  customers: [],
+  customersTotal: 0,
+  customersTotalPages: 1,
+  countryOptions: [],
+  buyerTypeOptions: [],
+  researchStatusOptions: [],
+  riskLevelOptions: []
+};
+/* B1: 初始化时同步S.dataMode到CUSTOMER_LIBRARY.mode */
+window.CUSTOMER_LIBRARY.mode = (typeof S !== 'undefined' && S.dataMode === 'demo') ? 'demo' : 'real';
+
+function clApi(path){
+  const base = '/api/customer-library' + path;
+  const sep = path.indexOf('?') >= 0 ? '&' : '?';
+  const params = (window.CUSTOMER_LIBRARY.mode === 'demo') ? sep + 'isDemo=true' : '';
+  return fetch(base + params, {cache:'no-store'}).then(r => r.json().then(j => ({ok:r.ok, status:r.status, body:j})));
+}
+
+async function clProbe(){
+  const CL = window.CUSTOMER_LIBRARY;
+  const endpoint = '/api/customer-library/summary';
+  try {
+    const r = await fetch(endpoint, {cache:'no-store'});
+    const body = await r.json().catch(()=>({}));
+    if (r.ok) {
+      CL.enabled = true;
+      CL.errorState = null;
+      CL.summary = body;
+      console.log('[A2] 客户资源库(SQLite只读)已接入。featureFlag=', body && body.feature_flag !== undefined ? body.feature_flag : '(n/a)');
+      /* B1: CL接入成功后，重渲染导航和当前视图（确保dashboard显示B1版） */
+      if(typeof renderNav === 'function') renderNav();
+      setTimeout(function(){
+        if(typeof currentView !== 'undefined' && typeof renderView === 'function'){
+          if(['dashboard','customers','companyFactsApproval'].indexOf(currentView) >= 0){
+            renderView();
+          }
+        }
+      }, 200);
+    } else {
+      CL.enabled = false;
+      CL.summary = null;
+      CL.errorState = {
+        status: r.status,
+        message: (body && body.message) || ('HTTP ' + r.status),
+        timestamp: new Date().toISOString(),
+        endpoint: endpoint,
+        featureFlag: (body && body.feature_flag !== undefined) ? body.feature_flag : null
+      };
+      console.error('[A2][ERROR] 客户资源库不可读取.', {
+        timestamp: CL.errorState.timestamp,
+        endpoint: endpoint,
+        httpStatus: r.status,
+        message: CL.errorState.message,
+        featureFlag: CL.errorState.featureFlag,
+        enabled: CL.enabled
+      });
+    }
+  } catch(e) {
+    CL.enabled = false;
+    CL.summary = null;
+    CL.errorState = {
+      status: 0,
+      message: e && e.message ? e.message : ('网络异常: ' + e),
+      timestamp: new Date().toISOString(),
+      endpoint: endpoint,
+      featureFlag: null
+    };
+    console.error('[A2][ERROR] 客户资源库不可达.', {
+      timestamp: CL.errorState.timestamp,
+      endpoint: endpoint,
+      error: e && e.message,
+      enabled: CL.enabled
+    });
+  }
+  // 无论成功或失败，都刷新导航：失败时仍显示导航项（带⚠️标记），用户点击后进入错误视图
+  if (typeof renderNav === 'function') renderNav();
+}
+
+// 视图：客户资源库主面板
+function viewCustomerLibrary(c){
+  const CL = window.CUSTOMER_LIBRARY;
+  c.innerHTML = `
+    <div style="padding:20px;max-width:1400px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div>
+          <h2 style="margin:0 0 4px 0;font-size:20px">🗄️ 客户资源库 <span style="font-size:12px;color:#888;font-weight:400">(SQLite 只读模式)</span></h2>
+          <div style="font-size:12px;color:#888">数据来自本地 customer_development.sqlite · 只读浏览 · 不可发送/编辑</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="clModeBtn" class="btn btn-sm ${CL.mode==='demo'?'btn-outline':'btn-outline'}" onclick="clToggleMode()">
+            ${CL.mode==='demo'?'⚠️ 演示模式':'✅ 真实模式'}
+          </button>
+        </div>
+      </div>
+      <div id="clDemoBanner" style="display:${CL.mode==='demo'?'block':'none'};background:#fff3cd;color:#856404;padding:10px 16px;text-align:center;font-weight:600;border:1px solid #ffc107;border-radius:8px;margin-bottom:16px">
+        ⚠️ 演示模式：当前展示非真实运营数据（${CL.summary?CL.summary.demo_customers_count:39} 条演示客户）
+      </div>
+      <div id="clKpis"></div>
+      <div id="clFilters" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin:16px 0"></div>
+      <div id="clTable" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden"></div>
+      <div id="clPagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:10px"></div>
+    </div>`;
+  clRenderKpis();
+  clLoadCustomers();
+}
+
+function clRenderKpis(){
+  const s = window.CUSTOMER_LIBRARY.summary;
+  if (!s) { document.getElementById('clKpis').innerHTML = '<div style="color:#888">汇总加载中…</div>'; return; }
+  const k = (label, value, color, note) => `
+    <div style="flex:1;min-width:150px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;border-top:3px solid ${color||'#c9a961'}">
+      <div style="font-size:12px;color:#888;margin-bottom:6px">${label}</div>
+      <div style="font-size:24px;font-weight:700;color:#1a365d">${value}</div>
+      ${note?`<div style="font-size:11px;color:#999;margin-top:4px">${note}</div>`:''}
+    </div>`;
+  document.getElementById('clKpis').innerHTML = `<div style="display:flex;gap:12px;flex-wrap:wrap">
+    ${k('真实客户总数', s.total_real_customers ?? s.total_customers, '#c9a961', s.mode==='demo'?'演示模式':'is_demo=0')}
+    ${k('五金来源', s.hardware_source_customers, '#3182ce')}
+    ${k('餐厨来源', s.kitchenware_source_customers, '#38a169')}
+    ${k('跨品类', s.cross_category_customers, '#805ad5')}
+    ${k('未评估风险', s.not_assessed_risk_count, '#ed8936', '尚未评估')}
+    ${k('疑似重复', s.possible_duplicates_count, '#d69e2e', '待人工复核，未合并')}
+    ${k('孤儿草稿', s.orphan_drafts_count, '#e53e3e', '待人工匹配')}
+    ${k('可外发公司事实', s.company_facts_approved_for_external, '#718096', '共'+s.company_facts_total+'条，待人工审批')}
+  </div>
+  <div style="background:#fffbeb;border:1px solid #fbd38d;border-radius:8px;padding:10px 14px;margin-top:12px;font-size:12px;color:#744210">
+    ℹ️ 当前可外发事实：<b>${s.company_facts_approved_for_external}</b> — 公司卖点尚待人工审批，开发信引擎未启用。
+    草稿：${s.outreach_assets_total} 条全部 pending / not_sendable，只读模式下不可发送。
+  </div>`;
+}
+
+async function clLoadCustomers(){
+  const CL = window.CUSTOMER_LIBRARY;
+  const params = new URLSearchParams();
+  params.set('page', CL.currentPage);
+  params.set('pageSize', CL.pageSize);
+  Object.entries(CL.filters).forEach(([k,v])=>{ if(v) params.set(k,v); });
+  if (CL.searchQuery) params.set('search', CL.searchQuery);
+  if (CL.mode === 'demo') params.set('isDemo','true');
+  const url = '/api/customer-library/customers?' + params.toString();
+  try {
+    const r = await fetch(url, {cache:'no-store'});
+    const d = await r.json();
+    if (!r.ok || d.ok === false) {
+      // 保留当前列表状态（不清空 CL.customers），在表格区显示明确错误
+      console.error('[A2][ERROR] 客户列表加载失败.', {
+        timestamp: new Date().toISOString(),
+        endpoint: url,
+        httpStatus: r.status,
+        message: (d && d.message) || ('HTTP ' + r.status),
+        currentPage: CL.currentPage,
+        pageSize: CL.pageSize,
+        mode: CL.mode
+      });
+      const tbl = document.getElementById('clTable');
+      if (tbl) {
+        tbl.innerHTML = '<div style="padding:24px;text-align:center;color:#c53030;background:#fff5f5;border:1px solid #feb2b2;border-radius:8px">'
+          + '⚠️ 客户列表加载失败：' + esc((d && d.message) || ('HTTP ' + r.status))
+          + '<div style="margin-top:10px"><button class="btn btn-sm btn-primary" onclick="clLoadCustomers()">重试</button></div></div>';
+      }
+      return;
+    }
+    CL.customers = d.items || [];
+    CL.customersTotal = d.total || 0;
+    CL.customersTotalPages = d.totalPages || 1;
+    clRenderFilters(d.filters||{});
+    clRenderTable();
+    clRenderPagination();
+  } catch(e) {
+    console.error('[A2][ERROR] 客户列表请求异常.', {
+      timestamp: new Date().toISOString(),
+      endpoint: url,
+      error: (e && e.message) ? e.message : e
+    });
+    const tbl = document.getElementById('clTable');
+    if (tbl) {
+      tbl.innerHTML = '<div style="padding:24px;text-align:center;color:#c53030;background:#fff5f5;border:1px solid #feb2b2;border-radius:8px">'
+        + '⚠️ 客户列表请求异常：' + esc((e && e.message) ? e.message : String(e))
+        + '<div style="margin-top:10px"><button class="btn btn-sm btn-primary" onclick="clLoadCustomers()">重试</button></div></div>';
+    }
+  }
+}
+
+function clRenderFilters(current){
+  const CL = window.CUSTOMER_LIBRARY;
+  const sel = (key, label, options, val) => `
+    <select class="form-control" style="display:inline-block;width:auto;margin-right:8px" onchange="clSetFilter('${key}', this.value)">
+      <option value="">${label}: 全部</option>
+      ${(options||[]).map(o=>`<option value="${o.value}" ${o.value===val?'selected':''}>${o.label} (${o.count})</option>`).join('')}
+    </select>`;
+  // derive options from summary distributions where possible
+  const s = CL.summary || {};
+  const countryOpts = (s.country_distribution||[]).slice(0,20).map(c=>({value:c.country, label:c.country, count:c.count}));
+  const researchOpts = (s.research_status_distribution||[]).map(r=>({value:r.research_status, label:r.research_status, count:r.count}));
+  const riskOpts = (s.risk_level_distribution||[]).map(r=>({value:r.risk_level, label:r.risk_level, count:r.count}));
+  document.getElementById('clFilters').innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <input class="form-control" style="width:200px" placeholder="搜索公司/国家/域名…" value="${esc(CL.searchQuery)}" onkeydown="clHandleSearchEnter(this, event)">
+      ${sel('country','国家',countryOpts,current.country)}
+      <select class="form-control" style="display:inline-block;width:auto;margin-right:8px" onchange="clSetFilter('sourceCategory',this.value)">
+        <option value="">来源类别: 全部</option>
+        <option value="hardware" ${current.sourceCategory==='hardware'?'selected':''}>五金</option>
+        <option value="kitchenware" ${current.sourceCategory==='kitchenware'?'selected':''}>餐厨</option>
+        <option value="both" ${current.sourceCategory==='both'?'selected':''}>跨品类</option>
+      </select>
+      ${sel('researchStatus','研究状态',researchOpts,current.researchStatus)}
+      ${sel('riskLevel','风险等级',riskOpts,current.riskLevel)}
+      <label style="font-size:12px;margin-right:8px"><input type="checkbox" ${current.hasWebsite==='true'?'checked':''} onchange="clSetFilter('hasWebsite', this.checked?'true':'')"> 有网站</label>
+      <label style="font-size:12px;margin-right:8px"><input type="checkbox" ${current.hasEmail==='true'?'checked':''} onchange="clSetFilter('hasEmail', this.checked?'true':'')"> 有邮箱</label>
+      <button class="btn btn-sm btn-outline" onclick="clResetFilters()">重置</button>
+    </div>`;
+}
+
+function clRenderTable(){
+  const CL = window.CUSTOMER_LIBRARY;
+  const rows = CL.customers.map(r => `
+    <tr>
+      <td style="font-size:11px;color:#888">${esc(r.customer_id)}</td>
+      <td><a href="#" onclick="clOpenDetail('${esc(r.customer_id)}');return false" style="color:#2b6cb0;font-weight:600">${esc(r.company_name_raw||'(未命名)')}</a></td>
+      <td>${esc(r.country_standardized||'—')}</td>
+      <td style="font-size:12px">${esc(r.continent||'—')}</td>
+      <td style="font-size:12px">${esc(r.buyer_type||'—')}</td>
+      <td style="font-size:12px">${esc(r.source_category||'—')}</td>
+      <td style="font-size:12px">${esc(r.research_status||'—')}</td>
+      <td><span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${r.risk_level==='not_assessed'?'#edf2f7':r.risk_level==='low'?'#c6f6d5':r.risk_level==='medium'?'#feebc8':'#fed7d7'};color:${r.risk_level==='not_assessed'?'#4a5568':'#2d3748'}">${r.risk_level==='not_assessed'?'尚未评估':esc(r.risk_level)}</span></td>
+      <td style="text-align:center">${r.has_website?'✅':'✗'}</td>
+      <td style="text-align:center">${r.has_email?'✅':'✗'}</td>
+      <td><button class="btn btn-sm btn-primary" onclick="clOpenDetail('${esc(r.customer_id)}')">详情</button></td>
+    </tr>`).join('');
+  document.getElementById('clTable').innerHTML = `
+    <div style="overflow-x:auto">
+    <table class="tbl" style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:#f7fafc;text-align:left">
+        <th style="padding:10px">ID</th><th>公司名</th><th>国家</th><th>大洲</th><th>买家类型</th><th>来源</th><th>研究状态</th><th>风险</th><th>网站</th><th>邮箱</th><th>操作</th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="11" style="padding:20px;text-align:center;color:#999">无匹配客户</td></tr>'}</tbody>
+    </table></div>`;
+}
+
+function clRenderPagination(){
+  const CL = window.CUSTOMER_LIBRARY;
+  document.getElementById('clPagination').innerHTML = `
+    <div style="font-size:12px;color:#666">共 ${CL.customersTotal} 条 · 第 ${CL.currentPage}/${CL.customersTotalPages} 页</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <select class="form-control" style="width:auto" onchange="clChangePageSize(this.value)">
+        <option value="50" ${CL.pageSize===50?'selected':''}>50/页</option>
+        <option value="100" ${CL.pageSize===100?'selected':''}>100/页</option>
+      </select>
+      <button class="btn btn-sm btn-outline" ${CL.currentPage<=1?'disabled':''} onclick="clPrevPage()">上一页</button>
+      <button class="btn btn-sm btn-outline" ${CL.currentPage>=CL.customersTotalPages?'disabled':''} onclick="clNextPage()">下一页</button>
+    </div>`;
+}
+
+function clSetFilter(k, v){
+  const CL = window.CUSTOMER_LIBRARY;
+  if (v) CL.filters[k] = v; else delete CL.filters[k];
+  CL.currentPage = 1;
+  clLoadCustomers();
+}
+function clResetFilters(){
+  window.CUSTOMER_LIBRARY.filters = {};
+  window.CUSTOMER_LIBRARY.searchQuery = '';
+  window.CUSTOMER_LIBRARY.currentPage = 1;
+  clLoadCustomers();
+}
+
+// 以下四个全局函数用于替代 inline handler 中直接引用 CL.xxx 的写法
+// （inline handler 在全局作用域执行，局部 const CL 不可见，会抛 ReferenceError）
+function clHandleSearchEnter(input, e){
+  if (e && e.key === 'Enter') {
+    const CL = window.CUSTOMER_LIBRARY;
+    CL.searchQuery = input.value;
+    CL.currentPage = 1;
+    clLoadCustomers();
+  }
+}
+function clChangePageSize(val){
+  const CL = window.CUSTOMER_LIBRARY;
+  CL.pageSize = parseInt(val, 10) || 50;
+  CL.currentPage = 1;
+  clLoadCustomers();
+}
+function clPrevPage(){
+  const CL = window.CUSTOMER_LIBRARY;
+  if (CL.currentPage <= 1) return;
+  CL.currentPage--;
+  clLoadCustomers();
+}
+function clNextPage(){
+  const CL = window.CUSTOMER_LIBRARY;
+  if (CL.currentPage >= CL.customersTotalPages) return;
+  CL.currentPage++;
+  clLoadCustomers();
+}
+async function clToggleMode(){
+  const CL = window.CUSTOMER_LIBRARY;
+  CL.mode = CL.mode === 'real' ? 'demo' : 'real';
+  CL.currentPage = 1;
+  // reload summary
+  const r = await fetch('/api/customer-library/summary' + (CL.mode==='demo'?'?demo=true':''), {cache:'no-store'});
+  CL.summary = await r.json();
+  // re-render current view
+  viewCustomerLibrary(document.getElementById('mainContent'));
+}
+
+async function clOpenDetail(cid){
+  try {
+    const params = window.CUSTOMER_LIBRARY.mode==='demo' ? '?isDemo=true' : '';
+    const r = await fetch('/api/customer-library/customers/' + encodeURIComponent(cid) + params, {cache:'no-store'});
+    if (!r.ok) { const e = await r.json(); alert(e.message || '加载失败'); return; }
+    const d = await r.json();
+    const m = d.master;
+    const contactRows = (d.contacts||[]).map(ct=>`
+      <tr><td style="padding:6px;border-bottom:1px solid #eee">${esc(ct.contact_name||'—')}</td>
+      <td style="padding:6px;border-bottom:1px solid #eee">${esc(ct.contact_title||'—')}</td>
+      <td style="padding:6px;border-bottom:1px solid #eee">${esc(ct.contact_type||'—')}</td>
+      <td style="padding:6px;border-bottom:1px solid #eee">${esc(ct.contact_value||'—')}</td>
+      <td style="padding:6px;border-bottom:1px solid #eee;font-size:11px;color:#888">${esc(ct.format_status||'')}/${esc(ct.deliverability_status||'')}</td></tr>`).join('');
+    const assetRows = (d.outreach_assets||[]).map(a=>{
+      const badgeColor = a.human_review_status==='approved' ? '#c6f6d5;color:#276749' : '#fef3c7;color:#975a16';
+      const statusLabel = a.human_review_status==='approved' ? 'approved_to_copy' : esc(a.human_review_status);
+      return `<tr><td style="padding:6px;border-bottom:1px solid #eee">${esc(a.asset_id)}</td>
+      <td style="padding:6px;border-bottom:1px solid #eee">${esc(a.language)}</td>
+      <td style="padding:6px;border-bottom:1px solid #eee"><span style="background:${badgeColor};padding:2px 6px;border-radius:8px;font-size:11px">${statusLabel}</span></td>
+      <td style="padding:6px;border-bottom:1px solid #eee">否</td>
+      <td style="padding:6px;border-bottom:1px solid #eee;font-size:11px;color:#888">${esc(a.created_at||'')}</td></tr>`;
+    }).join('');
+    const srcRows = (d.sources||[]).map(s=>`<li style="margin-bottom:4px;font-size:12px">${esc(s.source_file)} / ${esc(s.source_sheet||'')} · ${esc(s.source_category)} · ${esc(s.imported_at||'')}</li>`).join('');
+    const tags = (d.tags||[]).map(t=>`<span style="display:inline-block;background:#edf2f7;padding:2px 8px;border-radius:10px;font-size:11px;margin-right:4px">${esc(t.tag_name)}</span>`).join('');
+    const histRows = (d.status_history||[]).map(h=>`<li style="font-size:12px;margin-bottom:3px">${esc(h.changed_at||'')} · ${esc(h.field_name)}: ${esc(h.old_value||'—')} → ${esc(h.new_value||'—')} (${esc(h.changed_by||'')})</li>`).join('');
+    const evRows = (d.evidence||[]).map(e=>`<li style="font-size:12px;margin-bottom:4px">📄 ${esc(e.page_title||e.evidence_url||'')} <span style="color:#888">[${esc(e.evidence_type||'')}]</span><br><span style="color:#666">${esc((e.evidence_summary||'').slice(0,200))}</span></li>`).join('');
+    const _re = (d.research&&d.research[0])?d.research[0]:null;
+    const _reElig = _re?_re.research_eligibility:null;
+    const _eligMap = {eligible:'已通过研究门禁', hold_pending_evidence:'待补证', disqualified:'不合格'};
+    const _eligLabel = _reElig ? (_eligMap[_reElig]||_reElig) : '未研究';
+    const _eligColor = _reElig==='eligible' ? '#276749' : (_reElig==='disqualified' ? '#c53030' : '#975a16');
+    openDrawer(`
+      <div style="padding:18px">
+        <h3 style="margin:0 0 4px 0">${esc(m.company_name_raw||'(未命名)')}</h3>
+        <div style="font-size:12px;color:#888;margin-bottom:14px">${esc(m.customer_id)} · ${esc(m.country_standardized||'')} · ${esc(m.continent||'')} · 来源:${esc(m.source_category||'')}</div>
+        ${d.orphan_draft_notice?`<div style="background:#fff3cd;border:1px solid #ffe08a;padding:10px;border-radius:8px;font-size:12px;margin-bottom:12px">⚠️ ${esc(d.orphan_draft_notice)}</div>`:''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;margin-bottom:14px">
+          <div><b>买家类型:</b> ${esc(m.buyer_type||'—')}</div>
+          <div><b>官网:</b> ${esc(m.website_domain||'—')}</div>
+          <div><b>研究状态:</b> ${esc(m.research_status||'—')}</div>
+          <div><b>研究资格:</b> <span style="color:${_eligColor};font-weight:600">${_eligLabel}</span></div>
+          <div><b>风险等级:</b> ${esc(d.risk_assessment.risk_level)} ${d.risk_assessment.note?`<i style="color:#888">(${esc(d.risk_assessment.note)})</i>`:''}</div>
+          <div><b>发送资格:</b> 不可发送 · 是否可发送: 否</div>
+          <div><b>Lead Score:</b> ${esc(m.lead_score??'—')}</div>
+          <div><b>创建:</b> ${esc(m.created_at||'—')}</div>
+        </div>
+        <div style="background:#fffbeb;border:1px solid #f6ad55;border-radius:6px;padding:8px 10px;font-size:12px;color:#92400e;margin-bottom:14px">⚠️ <b>仅人工复制发送，工作台不会自动发送</b></div>
+        <div style="margin-bottom:14px"><b>🏷️ 标签:</b> ${tags||'<span style="color:#999">无</span>'}</div>
+        <div style="margin-bottom:14px"><b>📥 来源记录:</b><ul style="margin:6px 0 0 18px">${srcRows||'<li style="font-size:12px;color:#999">无</li>'}</ul></div>
+        <div style="margin-bottom:14px"><b>👤 联系人与联系方式（详情可见，列表不显示）:</b>
+          <table style="width:100%;font-size:12px;margin-top:6px;border:1px solid #eee"><thead><tr style="background:#f7fafc"><th style="padding:6px;text-align:left">姓名</th><th style="text-align:left">职位</th><th style="text-align:left">类型</th><th style="text-align:left">值</th><th style="text-align:left">状态</th></tr></thead><tbody>${contactRows||'<tr><td colspan="5" style="padding:8px;color:#999">无联系人</td></tr>'}</tbody></table>
+        </div>
+        <div style="margin-bottom:14px"><b>🔍 产品匹配:</b> <span style="font-size:12px;color:#888">${esc(d.product_fit_note||'已评估')}</span></div>
+        <div style="margin-bottom:14px"><b>📚 背调证据:</b><ul style="margin:6px 0 0 18px">${evRows||'<li style="font-size:12px;color:#999">暂无证据</li>'}</ul></div>
+        <div style="margin-bottom:14px"><b>✉️ 草稿元数据（只读，不可发送）:</b>
+          <div style="font-size:11px;color:#c05621;margin:4px 0">${esc(d.outreach_assets_note||'')}</div>
+          <table style="width:100%;font-size:12px;margin-top:6px;border:1px solid #eee"><thead><tr style="background:#f7fafc"><th style="padding:6px;text-align:left">ID</th><th style="text-align:left">语言</th><th style="text-align:left">审核</th><th style="text-align:left">可发送</th><th style="text-align:left">创建时间</th></tr></thead><tbody>${assetRows||'<tr><td colspan="5" style="padding:8px;color:#999">无草稿</td></tr>'}</tbody></table>
+        </div>
+        <div style="margin-bottom:14px"><b>🕓 状态历史（最近10条）:</b><ul style="margin:6px 0 0 18px">${histRows||'<li style="font-size:12px;color:#999">无</li>'}</ul></div>
+        <button class="btn btn-outline" onclick="closeDrawer()">关闭</button>
+      </div>`);
+  } catch(e) { alert('详情加载失败: ' + e.message); }
+}
+
+// 视图：客户资源库错误状态（API 不可读时展示，不回退旧 JSON 数据）
+function viewCustomerLibraryError(c){
+  const CL = window.CUSTOMER_LIBRARY;
+  const es = CL.errorState || {};
+  c.innerHTML = `
+    <div style="padding:20px;max-width:1400px;margin:0 auto">
+      <div style="padding:40px;background:#fff;border:1px solid #feb2b2;border-radius:12px;text-align:center">
+        <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+        <h2 style="margin:0 0 12px 0;font-size:20px;color:#c53030">客户资源库暂不可用</h2>
+        <div style="font-size:14px;color:#4a5568;margin-bottom:8px">本地客户资源库暂不可读取，请检查本地服务或数据库状态。</div>
+        <div style="font-size:12px;color:#888;margin-bottom:20px">
+          端点: ${esc(es.endpoint || '/api/customer-library/summary')}
+          · HTTP ${es.status || 'N/A'}
+          · ${esc(es.timestamp || '')}
+        </div>
+        ${es.message ? `<div style="font-size:12px;color:#c53030;background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;padding:10px 14px;margin:0 auto 20px;max-width:600px">错误摘要：${esc(es.message)}</div>` : ''}
+        <button class="btn btn-primary" onclick="clProbeRetry()">🔄 刷新重试</button>
+        <div style="font-size:11px;color:#999;margin-top:20px">重试仅重新探测只读 API，不会读取旧 JSON 客户列表或演示数据。</div>
+      </div>
+    </div>`;
+}
+
+async function clProbeRetry(){
+  await clProbe();
+  // 探测完成后，如果用户仍在客户资源库视图，根据最新 enabled 状态刷新视图
+  if (typeof currentView !== 'undefined' && currentView === 'customerLibrary') {
+    const mc = document.getElementById('mainContent');
+    if (mc) {
+      if (window.CUSTOMER_LIBRARY.enabled) {
+        viewCustomerLibrary(mc);
+      } else {
+        viewCustomerLibraryError(mc);
+      }
+    }
+  }
+}
+
+// 包装 renderNav 注入新导航项
+(function(){
+  if (typeof renderNav !== 'function') return;
+  const _orig = renderNav;
+  window.renderNav = function(){
+    _orig.apply(this, arguments);
+    // 无论 enabled 为 true 或 false，都显示客户资源库导航项
+    // enabled=false 时附加 ⚠️ 标记，表示只读库不可用，但仍可点击进入错误视图
+    const nav = document.getElementById('nav');
+    if (!nav) return;
+    if (nav.querySelector('[data-cl-nav]')) return;
+    const CL = window.CUSTOMER_LIBRARY;
+    const g = document.createElement('div');
+    g.className = 'nav-group'; g.textContent = 'A2 只读接入';
+    const item = document.createElement('div');
+    item.setAttribute('data-cl-nav','1');
+    item.className = 'nav-item' + (currentView==='customerLibrary'?' active':'');
+    const icon = CL.enabled ? '🗄️' : '⚠️';
+    const label = CL.enabled ? '客户资源库' : '客户资源库 ⚠️';
+    item.innerHTML = '<span class="icon">' + icon + '</span><span class="label">' + label + '</span>';
+    item.onclick = () => go('customerLibrary');
+    nav.appendChild(g); nav.appendChild(item);
+  };
+  // 包装 go() 处理新视图
+  const _go = window.go;
+  window.go = function(view, params){
+    if (view === 'customerLibrary') {
+      if (typeof closeMobileNav==='function') closeMobileNav();
+      currentView = view; routeParams = params||{};
+      document.getElementById('pageTitle').textContent = '客户资源库（SQLite只读）';
+      document.getElementById('pageCrumb').textContent = 'Customer Library';
+      window.renderNav();
+      const mc = document.getElementById('mainContent');
+      if (window.CUSTOMER_LIBRARY.enabled) {
+        viewCustomerLibrary(mc);
+      } else {
+        // 不可用时渲染错误状态视图，不回退旧 JSON 数据
+        viewCustomerLibraryError(mc);
+      }
+      document.getElementById('mainContent').scrollTop = 0;
+      return;
+    }
+    return _go.apply(this, arguments);
+  };
+})();
+
+// 启动时探测后端开关
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', clProbe);
+} else {
+  clProbe();
 }

@@ -382,6 +382,15 @@ select.form-control{appearance:none;background-image:url("data:image/svg+xml;utf
   .drawer{width:100vw}
 }
 
+/* ===== 模块1: 真实/演示数据模式横幅与切换开关 ===== */
+#demoModeBanner{display:none;background:linear-gradient(90deg,#c2410c,#ea580c);color:#fff;padding:8px 18px;font-size:13px;font-weight:600;text-align:center;box-shadow:0 2px 6px rgba(194,65,12,.3);z-index:50}
+#demoModeBanner b{color:#fef3c7}
+.data-mode-toggle{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:16px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #cbd5e0;background:#fff;color:#2d3748;white-space:nowrap;transition:all .15s}
+.data-mode-toggle:hover{border-color:#c9a961;color:#805ad5}
+.data-mode-toggle.demo{background:#fff7ed;border-color:#fb923c;color:#c2410c}
+.data-mode-toggle.real{background:#f0fff4;border-color:#68d391;color:#276749}
+.snapshot-source-hint{font-size:11px;color:#718096;padding:4px 18px;background:#f7fafc;border-top:1px solid #edf2f7}
+
 /* V77.1.1 手机端整体布局修复 */
 @media (max-width:768px){
   .app{overflow-x:hidden}
@@ -760,6 +769,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
 
   <!-- ===== 主区 ===== -->
   <div class="main">
+    <div id="demoModeBanner"></div>
     <header class="topbar">
       <button class="mobile-menu-btn" onclick="toggleMobileNav()" title="菜单" aria-label="打开导航菜单">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
@@ -772,6 +782,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
         <div class="crumb" id="pageCrumb">Dashboard</div>
       </div>
       <div class="topbar-right">
+        <button id="dataModeToggle" class="data-mode-toggle real" onclick="toggleDataMode()" title="切换真实业务数据 / 演示模拟数据">✅ 真实模式</button>
         <div id="kbStatusBadge" class="kb-status-badge" title="知识库状态" onclick="go('knowledge')">
           <span class="kb-status-icon">📚</span>
           <span class="kb-status-text" id="kbStatusText">加载中…</span>
@@ -1048,7 +1059,7 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
   </div>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=b1fix2"></script>
 <script src="customer-import.js"></script>
 <script src="draft-quality.js"></script>
 <script src="lead-quality.js"></script>

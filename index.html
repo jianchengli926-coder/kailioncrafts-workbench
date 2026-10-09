@@ -707,6 +707,26 @@ body.dark .form-control{background:#0f172a;color:var(--text)}
   .p2-task-card{flex-direction:column}
 }
 
+/* ===== Customer Library Responsive ===== */
+@media (max-width:1024px){
+  #clTable .cl-col-continent, #clTable .cl-col-evidence { display:none !important; }
+}
+@media (max-width:767px){
+  #clTable .cl-col-id, #clTable .cl-col-city, #clTable .cl-col-continent,
+  #clTable .cl-col-grade, #clTable .cl-col-category, #clTable .cl-col-source,
+  #clTable .cl-col-evidence, #clTable .cl-col-risk, #clTable .cl-col-website,
+  #clTable .cl-col-email { display:none !important; }
+  #clTable .cl-col-company, #clTable .cl-col-country,
+  #clTable .cl-col-research, #clTable .cl-col-outreach,
+  #clTable .cl-col-action { display:table-cell !important; }
+  #clTable .cl-col-company { max-width:140px; word-break:break-word; white-space:normal; }
+  #clTable .cl-col-outreach { white-space:nowrap; font-size:11px; }
+  #clFilters { flex-wrap:wrap; gap:6px; }
+  #clDetailTabs { overflow-x:auto; flex-wrap:nowrap !important; }
+}
+.cl-empty-result { padding:40px; text-align:center; color:#888; font-size:14px; }
+.cl-loading { padding:20px; text-align:center; color:#666; }
+
 </style>
 </head>
 <body>

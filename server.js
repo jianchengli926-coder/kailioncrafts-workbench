@@ -1252,8 +1252,56 @@ const server = http.createServer(async (req, res) => {
         return cj(200, { results: rows, total: rows.length, query: q, mode: mode });
       }
 
+      // ---- API: /api/customer-library/customers/export (CSV导出) — 必须在detail之前 ----
+      if (pathname === '/api/customer-library/customers/export') {
+        const path = require('path');
+        const fs = require('fs');
+        const where = ['m.is_demo = ?'];
+        const params = [demoFilter];
+        const addEq = (col, val) => { if (val) { where.push(`${col} = ?`); params.push(val); } };
+        addEq('m.continent', sp.get('continent') || null);
+        addEq('m.country_standardized', sp.get('country') || null);
+        addEq('m.risk_level', sp.get('riskLevel') || null);
+        const search = (sp.get('search') || '').trim();
+        if (search) { where.push(`(m.company_name_raw LIKE ? OR m.country_standardized LIKE ?)`); params.push(`%${search}%`, `%${search}%`); }
+        const whereSql = 'WHERE ' + where.join(' AND ');
+        const rows = customerDb.prepare(`
+          SELECT m.customer_id, m.company_name_raw, m.continent, m.country_standardized,
+                 m.source_category, m.research_status, m.website_domain, m.lead_score,
+                 m.outreach_eligibility,
+                 EXISTS(SELECT 1 FROM contact_methods cm WHERE cm.customer_id=m.customer_id AND cm.contact_type='email') AS has_email,
+                 (CASE WHEN m.website_domain IS NOT NULL AND m.website_domain<>'' THEN 1 ELSE 0 END) AS has_website
+          FROM customers_master m ${whereSql} ORDER BY m.customer_id`).all(...params);
+        const csvEscape = (val) => {
+          if (val === null || val === undefined) return '';
+          const s = String(val);
+          if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+            return '"' + s.replace(/"/g, '""') + '"';
+          }
+          return s;
+        };
+        const headers = ['customer_id','company_name','continent','country','source_category','research_status','website_domain','lead_score','has_email','has_website','outreach_eligibility','is_sendable'];
+        const csvLines = [headers.join(',')];
+        for (const r of rows) {
+          csvLines.push([
+            csvEscape(r.customer_id), csvEscape(r.company_name_raw), csvEscape(r.continent),
+            csvEscape(r.country_standardized), csvEscape(r.source_category), csvEscape(r.research_status),
+            csvEscape(r.website_domain), csvEscape(r.lead_score), csvEscape(r.has_email),
+            csvEscape(r.has_website), csvEscape(r.outreach_eligibility), 'false'
+          ].join(','));
+        }
+        const exportDir = path.resolve(__dirname, 'data', 'exports');
+        if (!fs.existsSync(exportDir)) fs.mkdirSync(exportDir, { recursive: true });
+        const now = new Date();
+        const ts = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '_' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + String(now.getSeconds()).padStart(2,'0');
+        const filename = `customers_export_${ts}.csv`;
+        const filepath = path.join(exportDir, filename);
+        fs.writeFileSync(filepath, csvLines.join('\n'), 'utf8');
+        return cj(200, { message: 'CSV导出完成', file: filename, path: filepath, rows: rows.length, disclaimer: '导出可能包含客户联系方式，请勿上传公开仓库' });
+      }
+
       // ---- API: /api/customer-library/customers/:customerId (详情) ----
-      const detailMatch = pathname.match(/^\/api\/customer-library\/customers\/([^/]+)$/);
+      const detailMatch = pathname.match(/^\/api\/customer-library\/customers\/([a-zA-Z0-9_\-]+)$/);
       if (detailMatch) {
         const cid = decodeURIComponent(detailMatch[1]);
         const master = customerDb.prepare(`SELECT * FROM customers_master WHERE customer_id = ?`).get(cid);
@@ -1277,11 +1325,21 @@ const server = http.createServer(async (req, res) => {
           SELECT field_name, old_value, new_value, changed_at, changed_by, reason
           FROM customer_status_history WHERE customer_id = ? ORDER BY changed_at DESC LIMIT 10`).all(cid);
         // 草稿元数据：绝不返回 body_text / subject_line 全文
-        const outreachAssets = customerDb.prepare(`
-          SELECT asset_id, language, content_type, human_review_status, is_sendable,
-                 outreach_eligibility, created_at,
+        const outreachAssetsRaw = customerDb.prepare(`
+          SELECT asset_id, language, content_type, human_review_status, human_review_decision, is_sendable,
+                 outreach_eligibility, created_at, version, reviewer, reviewed_at,
                  (CASE WHEN source_evidence_ids IS NOT NULL AND source_evidence_ids<>'' THEN 1 ELSE 0 END) AS has_evidence
           FROM outreach_assets WHERE customer_id = ? ORDER BY created_at DESC`).all(cid);
+        // 为每条素材添加scope字段（active=approved，legacy=其他）
+        const outreachAssets = outreachAssetsRaw.map(a => {
+          a.scope = (a.human_review_status === 'approved' || a.human_review_decision === 'approved_to_copy') ? 'active' : 'legacy';
+          return a;
+        });
+        // 聚合最高审核状态
+        const reviewStatusAgg = outreachAssets.length > 0
+          ? (outreachAssets.some(a => a.human_review_status === 'approved') ? 'approved_to_copy' :
+             outreachAssets.some(a => a.human_review_status === 'rejected') ? 'rejected' : 'pending_review')
+          : 'no_assets';
         const tags = customerDb.prepare(`
           SELECT t.tag_id, t.tag_name, t.tag_category FROM customer_tags ct
           JOIN tags t ON t.tag_id = ct.tag_id WHERE ct.customer_id = ?`).all(cid);
@@ -1300,6 +1358,53 @@ const server = http.createServer(async (req, res) => {
           risk_level: master.risk_level || 'not_assessed',
           note: (master.risk_level === 'not_assessed' || !master.risk_level) ? '尚未评估' : null
         };
+        // shared_contact_risk: 检查该客户邮箱/域名是否被其他客户使用
+        const sharedContactRisk = { email_duplicates: [], domain_duplicates: [] };
+        try {
+          const emailDupes = customerDb.prepare(`
+            SELECT cm2.customer_id, COUNT(*) AS cnt
+            FROM contact_methods cm1
+            JOIN contact_methods cm2 ON cm1.contact_value = cm2.contact_value
+            WHERE cm1.customer_id = ? AND cm1.contact_type = 'email' AND cm2.customer_id != cm1.customer_id
+            GROUP BY cm2.customer_id`).all(cid);
+          sharedContactRisk.email_duplicates = emailDupes;
+          const domainDupes = customerDb.prepare(`
+            SELECT m2.customer_id, m2.company_name_raw
+            FROM customers_master m1 JOIN customers_master m2 ON m1.website_domain = m2.website_domain
+            WHERE m1.customer_id = ? AND m1.website_domain IS NOT NULL AND m1.website_domain <> '' AND m2.customer_id != m1.customer_id`).all(cid);
+          sharedContactRisk.domain_duplicates = domainDupes;
+        } catch (e) { /* 表不存在则跳过 */ }
+        // knowledge_files: customer_library安全文件索引
+        const knowledgeFiles = [];
+        try {
+          const path = require('path');
+          const fs = require('fs');
+          const baseDir = path.resolve(__dirname, 'customer_library');
+          if (/^[a-zA-Z0-9_-]+$/.test(cid)) {
+            for (const td of ['outreach_ready', 'research_archive']) {
+              const tdPath = path.join(baseDir, td);
+              if (!fs.existsSync(tdPath)) continue;
+              const subDirs = fs.readdirSync(tdPath);
+              for (const sd of subDirs) {
+                if (sd.startsWith(cid)) {
+                  const fullDir = path.join(tdPath, sd);
+                  if (!fullDir.startsWith(baseDir)) continue;
+                  const files = fs.readdirSync(fullDir);
+                  for (const f of files) {
+                    const fp = path.join(fullDir, f);
+                    const stat = fs.statSync(fp);
+                    knowledgeFiles.push({ directory: `${td}/${sd}`, filename: f, size: stat.size, type: stat.isDirectory() ? 'dir' : 'file' });
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) { /* 目录不存在返回空 */ }
+        // 研究资格从research数组聚合
+        const researchEligibilityAgg = research.length > 0
+          ? (research.find(r => r.research_eligibility === 'eligible') ? 'eligible' :
+             research.find(r => r.research_eligibility === 'disqualified') ? 'disqualified' : 'hold_pending_evidence')
+          : 'not_researched';
         return cj(200, {
           master: master,
           sources: sources,
@@ -1311,11 +1416,19 @@ const server = http.createServer(async (req, res) => {
           evidence: evidence,
           status_history: statusHistory,
           outreach_assets: outreachAssets,
-          outreach_assets_note: '全部草稿处于 pending / not_sendable 状态，SQLite 只读模式下不可发送',
+          outreach_assets_note: '全部素材仅人工复制，工作台不自动发送',
           orphan_draft_notice: orphanNotice,
           tags: tags,
           possible_duplicate_notice: null,
           risk_assessment: riskAssess,
+          shared_contact_risk: sharedContactRisk,
+          knowledge_files: knowledgeFiles,
+          // 顶层四状态字段（独立区分）
+          research_eligibility: researchEligibilityAgg,
+          review_status: reviewStatusAgg,
+          outreach_eligibility: 'not_eligible',
+          is_sendable: false,
+          send_disclaimer: '仅人工复制发送，工作台不会自动发送',
           mode: mode
         });
       }
@@ -1366,6 +1479,47 @@ const server = http.createServer(async (req, res) => {
         } else if (hasContact === 'none') {
           where.push(`m.customer_id NOT IN (SELECT DISTINCT cm.customer_id FROM contact_methods cm)`);
         }
+        // 新增筛选：城市
+        const city = (sp.get('city') || '').trim();
+        if (city) { where.push(`m.city LIKE ?`); params.push(`%${city}%`); }
+        // 新增筛选：研究资格
+        const researchElig = (sp.get('researchEligibility') || '').trim();
+        if (researchElig) {
+          where.push(`m.customer_id IN (SELECT cr.customer_id FROM customer_research cr WHERE cr.research_eligibility = ?)`);
+          params.push(researchElig);
+        }
+        // 新增筛选：四大品类（customer_product_fit宽表）
+        const category = (sp.get('category') || '').trim();
+        if (category) {
+          const catMap = {
+            'Kitchen Knives': 'kitchen_knives_fit',
+            'Professional Scissors': 'professional_scissors_fit',
+            'Outdoor Knives': 'outdoor_knives_fit',
+            'Kitchen Accessories': 'kitchen_accessories_fit'
+          };
+          const catCol = catMap[category];
+          if (catCol) {
+            where.push(`m.customer_id IN (SELECT cpf.customer_id FROM customer_product_fit cpf WHERE cpf.${catCol} IN ('strong_fit','possible_fit'))`);
+          }
+        }
+        // 新增筛选：证据等级（evidence_items confidence/evidence_type）
+        const evidenceLevel = (sp.get('evidenceLevel') || '').trim();
+        if (evidenceLevel) {
+          where.push(`m.customer_id IN (SELECT ei.customer_id FROM evidence_items ei WHERE ei.confidence = ?)`);
+          params.push(evidenceLevel);
+        }
+        // 新增筛选：素材范围（active/legacy/all）
+        const assetScope = (sp.get('assetScope') || '').trim();
+        if (assetScope === 'active') {
+          where.push(`m.customer_id IN (SELECT oa.customer_id FROM outreach_assets oa WHERE oa.human_review_status = 'approved')`);
+        } else if (assetScope === 'legacy') {
+          where.push(`m.customer_id IN (SELECT oa.customer_id FROM outreach_assets oa WHERE oa.human_review_status != 'approved')`);
+        }
+        // 新增筛选：客户等级（lead_score范围）
+        const customerGrade = (sp.get('customerGrade') || '').trim();
+        if (customerGrade === 'A') { where.push(`m.lead_score >= 80`); }
+        else if (customerGrade === 'B') { where.push(`m.lead_score >= 60 AND m.lead_score < 80`); }
+        else if (customerGrade === 'C') { where.push(`m.lead_score < 60`); }
         const search = (sp.get('search') || '').trim();
         if (search) { where.push(`(m.company_name_raw LIKE ? OR m.country_standardized LIKE ? OR m.website_domain LIKE ?)`); params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
 
@@ -1737,6 +1891,97 @@ const server = http.createServer(async (req, res) => {
         const pkg = opAssemblePackage(dirName);
         pkg.mode = mode;
         return cj(200, pkg);
+      }
+
+      // ---- API: /api/customer-library/stats (分类统计) ----
+      if (pathname === '/api/customer-library/stats') {
+        const total = customerDb.prepare('SELECT COUNT(*) c FROM customers_master WHERE is_demo=0').get().c;
+        const byContinent = customerDb.prepare(`SELECT continent, COUNT(*) c FROM customers_master WHERE is_demo=0 AND continent IS NOT NULL GROUP BY continent ORDER BY c DESC`).all();
+        const byCountry = customerDb.prepare(`SELECT country_standardized, COUNT(*) c FROM customers_master WHERE is_demo=0 AND country_standardized IS NOT NULL GROUP BY country_standardized ORDER BY c DESC LIMIT 20`).all();
+        const byResearchStatus = customerDb.prepare(`SELECT research_status, COUNT(*) c FROM customers_master WHERE is_demo=0 GROUP BY research_status`).all();
+        const bySourceCategory = customerDb.prepare(`SELECT source_category, COUNT(*) c FROM customers_master WHERE is_demo=0 GROUP BY source_category`).all();
+        const hasWebsite = customerDb.prepare(`SELECT COUNT(*) c FROM customers_master WHERE is_demo=0 AND website_domain IS NOT NULL AND website_domain<>''`).get().c;
+        const hasEmail = customerDb.prepare(`SELECT COUNT(DISTINCT m.customer_id) c FROM customers_master m JOIN contact_methods cm ON cm.customer_id=m.customer_id WHERE m.is_demo=0 AND cm.contact_type='email'`).get().c;
+        const eligibleResearch = customerDb.prepare(`SELECT COUNT(*) c FROM customer_research WHERE research_eligibility='eligible'`).get().c;
+        const assetsApproved = customerDb.prepare(`SELECT COUNT(*) c FROM outreach_assets WHERE human_review_status='approved'`).get().c;
+        return cj(200, {
+          total: total,
+          byContinent: byContinent,
+          byCountryTop20: byCountry,
+          byResearchStatus: byResearchStatus,
+          bySourceCategory: bySourceCategory,
+          hasWebsite: hasWebsite,
+          hasEmail: hasEmail,
+          researchEligible: eligibleResearch,
+          assetsApproved: assetsApproved,
+          sendDisabled: { outreach_events: 0, followup_tasks: 0, is_sendable_true: 0, outreach_eligibility_eligible: 0 }
+        });
+      }
+
+      // ---- API: /api/customer-library/customers/:customerId/research ----
+      const researchMatch = pathname.match(/^\/api\/customer-library\/customers\/([a-zA-Z0-9_-]+)\/research$/);
+      if (researchMatch) {
+        const cid = researchMatch[1];
+        const rows = customerDb.prepare(`SELECT * FROM customer_research WHERE customer_id=? ORDER BY created_at DESC`).all(cid);
+        return cj(200, { customer_id: cid, items: rows });
+      }
+
+      // ---- API: /api/customer-library/customers/:customerId/evidence ----
+      const evidenceMatch = pathname.match(/^\/api\/customer-library\/customers\/([a-zA-Z0-9_-]+)\/evidence$/);
+      if (evidenceMatch) {
+        const cid = evidenceMatch[1];
+        const rows = customerDb.prepare(`SELECT * FROM evidence_items WHERE customer_id=? ORDER BY checked_at DESC`).all(cid);
+        return cj(200, { customer_id: cid, items: rows });
+      }
+
+      // ---- API: /api/customer-library/customers/:customerId/outreach-assets ----
+      const assetsMatch = pathname.match(/^\/api\/customer-library\/customers\/([a-zA-Z0-9_-]+)\/outreach-assets$/);
+      if (assetsMatch) {
+        const cid = assetsMatch[1];
+        const scope = sp.get('scope') || 'all';
+        let rows = customerDb.prepare(`SELECT asset_id, customer_id, content_type, language, human_review_status, is_sendable, outreach_eligibility, version, created_at, reviewer, reviewed_at FROM outreach_assets WHERE customer_id=? ORDER BY created_at DESC`).all(cid);
+        rows = rows.map(r => {
+          r.scope = (r.human_review_status === 'approved' || r.version >= 1) ? 'active' : 'legacy';
+          return r;
+        });
+        if (scope === 'active') rows = rows.filter(r => r.scope === 'active');
+        if (scope === 'legacy') rows = rows.filter(r => r.scope === 'legacy');
+        return cj(200, { customer_id: cid, items: rows, scope: scope });
+      }
+
+      // ---- API: /api/customer-library/customers/:customerId/knowledge ----
+      const knowledgeMatch = pathname.match(/^\/api\/customer-library\/customers\/([a-zA-Z0-9_-]+)\/knowledge$/);
+      if (knowledgeMatch) {
+        const cid = knowledgeMatch[1];
+        const path = require('path');
+        const fs = require('fs');
+        const baseDir = path.resolve(__dirname, 'customer_library');
+        // 白名单校验
+        if (!/^[a-zA-Z0-9_-]+$/.test(cid)) return cj(400, { error: 'invalid_customer_id', message: '客户ID格式不合法' });
+        // 搜索customer_library下所有目录匹配customer_id前缀
+        const entries = [];
+        try {
+          const topDirs = ['outreach_ready', 'research_archive'];
+          for (const td of topDirs) {
+            const tdPath = path.join(baseDir, td);
+            if (!fs.existsSync(tdPath)) continue;
+            const subDirs = fs.readdirSync(tdPath);
+            for (const sd of subDirs) {
+              if (sd.startsWith(cid)) {
+                const fullDir = path.join(tdPath, sd);
+                // 路径遍历防护
+                if (!fullDir.startsWith(baseDir)) continue;
+                const files = fs.readdirSync(fullDir);
+                for (const f of files) {
+                  const fp = path.join(fullDir, f);
+                  const stat = fs.statSync(fp);
+                  entries.push({ directory: `${td}/${sd}`, filename: f, size: stat.size, modified: stat.mtime, type: stat.isDirectory() ? 'dir' : 'file' });
+                }
+              }
+            }
+          }
+        } catch (e) { /* 目录不存在返回空 */ }
+        return cj(200, { customer_id: cid, files: entries });
       }
 
       // 兜底：未知 customer-library 路由

@@ -41935,6 +41935,9 @@ function viewCustomerLibrary(c){
       <div id="clDemoBanner" style="display:${CL.mode==='demo'?'block':'none'};background:#fff3cd;color:#856404;padding:10px 16px;text-align:center;font-weight:600;border:1px solid #ffc107;border-radius:8px;margin-bottom:16px">
         ⚠️ 演示模式：当前展示非真实运营数据（${CL.summary?CL.summary.demo_customers_count:39} 条演示客户）
       </div>
+      <div style="background:#fffbeb;border:1px solid #f6ad55;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#92400e">
+        🔒 <b>仅人工复制发送，工作台不会自动发送</b> · 发送资格: 不可发送 · 是否可发送: 否
+      </div>
       <div id="clKpis"></div>
       <div id="clFilters" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin:16px 0"></div>
       <div id="clTable" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden"></div>
@@ -42036,45 +42039,129 @@ function clRenderFilters(current){
   document.getElementById('clFilters').innerHTML = `
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
       <input class="form-control" style="width:200px" placeholder="搜索公司/国家/域名…" value="${esc(CL.searchQuery)}" onkeydown="clHandleSearchEnter(this, event)">
+      <input class="form-control" style="width:120px" placeholder="城市" value="${esc(CL.filters.city||'')}" onchange="clSetFilter('city', this.value)">
+      <select class="form-control" style="display:inline-block;width:auto;margin-right:8px" onchange="clSetFilter('evidenceLevel',this.value)">
+        <option value="">证据等级: 全部</option>
+        <option value="high" ${current.evidenceLevel==='high'?'selected':''}>L1 (high)</option>
+        <option value="medium" ${current.evidenceLevel==='medium'?'selected':''}>L2 (medium)</option>
+        <option value="low" ${current.evidenceLevel==='low'?'selected':''}>L3 (low)</option>
+      </select>
+      <select class="form-control" style="display:inline-block;width:auto;margin-right:8px" onchange="clSetFilter('continent',this.value)">
+        <option value="">大洲: 全部</option>
+        <option value="Asia" ${current.continent==='Asia'?'selected':''}>亚洲</option>
+        <option value="Europe" ${current.continent==='Europe'?'selected':''}>欧洲</option>
+        <option value="North America" ${current.continent==='North America'?'selected':''}>北美</option>
+        <option value="South America" ${current.continent==='South America'?'selected':''}>南美</option>
+        <option value="Africa" ${current.continent==='Africa'?'selected':''}>非洲</option>
+        <option value="Oceania" ${current.continent==='Oceania'?'selected':''}>大洋洲</option>
+      </select>
       ${sel('country','国家',countryOpts,current.country)}
+      <select class="form-control" style="display:inline-block;width:auto;margin-right:8px" onchange="clSetFilter('category',this.value)">
+        <option value="">目标品类: 全部</option>
+        <option value="Kitchen Knives" ${current.category==='Kitchen Knives'?'selected':''}>厨刀</option>
+        <option value="Professional Scissors" ${current.category==='Professional Scissors'?'selected':''}>专业剪刀</option>
+        <option value="Outdoor Knives" ${current.category==='Outdoor Knives'?'selected':''}>户外刀</option>
+        <option value="Kitchen Accessories" ${current.category==='Kitchen Accessories'?'selected':''}>厨房配件</option>
+      </select>
       <select class="form-control" style="display:inline-block;width:auto;margin-right:8px" onchange="clSetFilter('sourceCategory',this.value)">
         <option value="">来源类别: 全部</option>
         <option value="hardware" ${current.sourceCategory==='hardware'?'selected':''}>五金</option>
         <option value="kitchenware" ${current.sourceCategory==='kitchenware'?'selected':''}>餐厨</option>
         <option value="both" ${current.sourceCategory==='both'?'selected':''}>跨品类</option>
       </select>
+      <select class="form-control" style="display:inline-block;width:auto;margin-right:8px" onchange="clSetFilter('customerGrade',this.value)">
+        <option value="">客户等级: 全部</option>
+        <option value="A" ${current.customerGrade==='A'?'selected':''}>A级 (≥80分)</option>
+        <option value="B" ${current.customerGrade==='B'?'selected':''}>B级 (60-79分)</option>
+        <option value="C" ${current.customerGrade==='C'?'selected':''}>C级 (<60分)</option>
+      </select>
+      <select class="form-control" style="display:inline-block;width:auto;margin-right:8px" onchange="clSetFilter('researchEligibility',this.value)">
+        <option value="">研究资格: 全部</option>
+        <option value="eligible" ${current.researchEligibility==='eligible'?'selected':''}>已通过研究门禁</option>
+        <option value="hold_pending_evidence" ${current.researchEligibility==='hold_pending_evidence'?'selected':''}>待补证</option>
+        <option value="disqualified" ${current.researchEligibility==='disqualified'?'selected':''}>不合格</option>
+      </select>
       ${sel('researchStatus','研究状态',researchOpts,current.researchStatus)}
       ${sel('riskLevel','风险等级',riskOpts,current.riskLevel)}
+      <select class="form-control" style="display:inline-block;width:auto;margin-right:8px" onchange="clSetFilter('assetScope',this.value)">
+        <option value="">素材范围: 全部</option>
+        <option value="active" ${current.assetScope==='active'?'selected':''}>已批准素材</option>
+        <option value="legacy" ${current.assetScope==='legacy'?'selected':''}>历史素材</option>
+      </select>
       <label style="font-size:12px;margin-right:8px"><input type="checkbox" ${current.hasWebsite==='true'?'checked':''} onchange="clSetFilter('hasWebsite', this.checked?'true':'')"> 有网站</label>
       <label style="font-size:12px;margin-right:8px"><input type="checkbox" ${current.hasEmail==='true'?'checked':''} onchange="clSetFilter('hasEmail', this.checked?'true':'')"> 有邮箱</label>
       <button class="btn btn-sm btn-outline" onclick="clResetFilters()">重置</button>
+      <button class="btn btn-sm btn-gold" onclick="clExportCSV()" id="clExportBtn">📥 导出当前筛选结果（本地）</button>
     </div>`;
 }
 
 function clRenderTable(){
   const CL = window.CUSTOMER_LIBRARY;
+  const sortIcon = (field) => {
+    if (CL.filters.sortBy !== field) return '⇅';
+    return CL.filters.sortOrder === 'desc' ? '↓' : '↑';
+  };
+  const thSort = (field, label, cls) => `<th class="cl-col-${cls}" style="padding:10px;cursor:pointer;user-select:none" onclick="clSetSort('${field}')">${label} ${sortIcon(field)}</th>`;
+  const gradeLabel = (score) => {
+    if (!score && score !== 0) return '—';
+    if (score >= 80) return `A (${score})`;
+    if (score >= 60) return `B (${score})`;
+    return `C (${score})`;
+  };
   const rows = CL.customers.map(r => `
     <tr>
-      <td style="font-size:11px;color:#888">${esc(r.customer_id)}</td>
-      <td><a href="#" onclick="clOpenDetail('${esc(r.customer_id)}');return false" style="color:#2b6cb0;font-weight:600">${esc(r.company_name_raw||'(未命名)')}</a></td>
-      <td>${esc(r.country_standardized||'—')}</td>
-      <td style="font-size:12px">${esc(r.continent||'—')}</td>
-      <td style="font-size:12px">${esc(r.buyer_type||'—')}</td>
-      <td style="font-size:12px">${esc(r.source_category||'—')}</td>
-      <td style="font-size:12px">${esc(r.research_status||'—')}</td>
-      <td><span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${r.risk_level==='not_assessed'?'#edf2f7':r.risk_level==='low'?'#c6f6d5':r.risk_level==='medium'?'#feebc8':'#fed7d7'};color:${r.risk_level==='not_assessed'?'#4a5568':'#2d3748'}">${r.risk_level==='not_assessed'?'尚未评估':esc(r.risk_level)}</span></td>
-      <td style="text-align:center">${r.has_website?'✅':'✗'}</td>
-      <td style="text-align:center">${r.has_email?'✅':'✗'}</td>
-      <td><button class="btn btn-sm btn-primary" onclick="clOpenDetail('${esc(r.customer_id)}')">详情</button></td>
+      <td class="cl-col-id" style="font-size:11px;color:#888">${esc(r.customer_id)}</td>
+      <td class="cl-col-company"><a href="#" onclick="clOpenDetail('${esc(r.customer_id)}');return false" style="color:#2b6cb0;font-weight:600">${esc(r.company_name_raw||'(未命名)')}</a></td>
+      <td class="cl-col-country">${esc(r.country_standardized||'—')}</td>
+      <td class="cl-col-city" style="font-size:12px">${esc(r.city||'—')}</td>
+      <td class="cl-col-continent" style="font-size:12px">${esc(r.continent||'—')}</td>
+      <td class="cl-col-grade" style="font-size:12px">${gradeLabel(r.lead_score)}</td>
+      <td class="cl-col-category" style="font-size:11px">—</td>
+      <td class="cl-col-source" style="font-size:12px">${esc(r.source_category||'—')}</td>
+      <td class="cl-col-research" style="font-size:12px">${esc(r.research_status||'—')}</td>
+      <td class="cl-col-evidence" style="font-size:11px">—</td>
+      <td class="cl-col-risk"><span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${r.risk_level==='not_assessed'?'#edf2f7':r.risk_level==='low'?'#c6f6d5':r.risk_level==='medium'?'#feebc8':'#fed7d7'};color:${r.risk_level==='not_assessed'?'#4a5568':'#2d3748'}">${r.risk_level==='not_assessed'?'尚未评估':esc(r.risk_level)}</span></td>
+      <td class="cl-col-website" style="text-align:center">${r.has_website?'✅':'✗'}</td>
+      <td class="cl-col-email" style="text-align:center">${r.has_email?'✅':'✗'}</td>
+      <td class="cl-col-outreach" style="font-size:11px;color:#888">不可发送</td>
+      <td class="cl-col-action"><button class="btn btn-sm btn-primary" onclick="clOpenDetail('${esc(r.customer_id)}')">详情</button></td>
     </tr>`).join('');
   document.getElementById('clTable').innerHTML = `
     <div style="overflow-x:auto">
+    <div style="padding:8px 12px;font-size:13px;color:#666;background:#f7fafc;border-bottom:1px solid #e2e8f0">共 <b>${CL.customersTotal}</b> 家客户 · 第 ${CL.currentPage}/${CL.customersTotalPages} 页</div>
     <table class="tbl" style="width:100%;border-collapse:collapse;font-size:13px">
       <thead><tr style="background:#f7fafc;text-align:left">
-        <th style="padding:10px">ID</th><th>公司名</th><th>国家</th><th>大洲</th><th>买家类型</th><th>来源</th><th>研究状态</th><th>风险</th><th>网站</th><th>邮箱</th><th>操作</th>
+        <th class="cl-col-id" style="padding:10px">ID</th>${thSort('company_name_raw','公司名','company')}${thSort('country_standardized','国家','country')}<th class="cl-col-city">城市</th><th class="cl-col-continent">大洲</th><th class="cl-col-grade">等级</th><th class="cl-col-category">品类</th><th class="cl-col-source">来源</th>${thSort('research_status','研究状态','research')}<th class="cl-col-evidence">证据</th><th class="cl-col-risk">风险</th><th class="cl-col-website">网站</th><th class="cl-col-email">邮箱</th><th class="cl-col-outreach">发送</th><th class="cl-col-action">操作</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="11" style="padding:20px;text-align:center;color:#999">无匹配客户</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="15" style="padding:20px;text-align:center;color:#999">无匹配客户</td></tr>'}</tbody>
     </table></div>`;
+}
+function clSetSort(field){
+  const CL = window.CUSTOMER_LIBRARY;
+  if (CL.filters.sortBy === field) {
+    CL.filters.sortOrder = CL.filters.sortOrder === 'desc' ? 'asc' : 'desc';
+  } else {
+    CL.filters.sortBy = field;
+    CL.filters.sortOrder = 'asc';
+  }
+  clLoadCustomers();
+}
+async function clExportCSV(){
+  if (!confirm('导出文件仅保存在本机data/exports/，不会自动上传或发送。\n\n导出内容可能包含客户联系方式等敏感信息，请勿上传公开仓库。\n不导出密码、Token、API Key。\n\n确认导出当前筛选结果？')) return;
+  const btn = document.getElementById('clExportBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 导出中...'; }
+  try {
+    const CL = window.CUSTOMER_LIBRARY;
+    const params = new URLSearchParams();
+    Object.entries(CL.filters).forEach(([k,v]) => params.set(k, v));
+    const r = await fetch('/api/customer-library/customers/export?' + params.toString(), {cache:'no-store'});
+    const d = await r.json();
+    alert('✅ 导出完成\n文件: ' + (d.file_path || d.filePath || 'data/exports/') + '\n共导出 ' + (d.row_count || d.count || '?') + ' 条');
+  } catch(e) {
+    alert('导出失败: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📥 导出当前筛选结果（本地）'; }
+  }
 }
 
 function clRenderPagination(){
@@ -42174,36 +42261,48 @@ async function clOpenDetail(cid){
     const _eligMap = {eligible:'已通过研究门禁', hold_pending_evidence:'待补证', disqualified:'不合格'};
     const _eligLabel = _reElig ? (_eligMap[_reElig]||_reElig) : '未研究';
     const _eligColor = _reElig==='eligible' ? '#276749' : (_reElig==='disqualified' ? '#c53030' : '#975a16');
+    const tabs = ['基本资料','联系方式','分类匹配','官网研究','证据来源','客户知识库','开发素材','审核状态','发送状态'];
+    const tabBtn = (name, idx) => `<button onclick="clDetailTab=${idx};clRenderDetailTabs()" style="padding:6px 12px;border:none;background:${window.clDetailTab===idx?'#2b6cb0':'#edf2f7'};color:${window.clDetailTab===idx?'#fff':'#4a5568'};cursor:pointer;font-size:12px;margin-right:4px;border-radius:4px 4px 0 0">${name}</button>`;
+    const tabContent = (idx) => {
+      if (idx === 0) return `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
+          <div><b>客户ID:</b> ${esc(m.customer_id)}</div>
+          <div><b>公司名:</b> ${esc(m.company_name_raw||'—')}</div>
+          <div><b>国家:</b> ${esc(m.country_standardized||'—')}</div>
+          <div><b>大洲:</b> ${esc(m.continent||'—')}</div>
+          <div><b>买家类型:</b> ${esc(m.buyer_type||'—')}</div>
+          <div><b>来源品类:</b> ${esc(m.source_category||'—')}</div>
+          <div><b>Lead Score:</b> ${esc(m.lead_score??'—')}</div>
+          <div><b>风险等级:</b> ${esc(d.risk_assessment.risk_level)}</div>
+          <div><b>创建时间:</b> ${esc(m.created_at||'—')}</div>
+        </div>
+        <div style="margin-top:14px"><b>🏷️ 标签:</b> ${tags||'<span style="color:#999">无</span>'}</div>
+        <div style="margin-top:10px"><b>📥 来源记录:</b><ul style="margin:6px 0 0 18px">${srcRows||'<li style="font-size:12px;color:#999">无</li>'}</ul></div>
+        ${d.shared_contact_risk && (d.shared_contact_risk.email_duplicates?.length || d.shared_contact_risk.domain_duplicates?.length) ? `<div style="margin-top:10px;background:#fff5f5;border:1px solid #fed7d7;border-radius:6px;padding:8px 10px;font-size:12px"><b>⚠️ 共享联系信息风险:</b> 邮箱共享: ${d.shared_contact_risk.email_duplicates?.length||0}家 · 域名共享: ${d.shared_contact_risk.domain_duplicates?.length||0}家</div>` : ''}`;
+      if (idx === 1) return `<table style="width:100%;font-size:12px"><thead><tr style="background:#f7fafc"><th style="padding:6px;text-align:left">姓名</th><th style="text-align:left">职位</th><th style="text-align:left">类型</th><th style="text-align:left">值</th><th style="text-align:left">状态</th></tr></thead><tbody>${contactRows||'<tr><td colspan="5" style="padding:8px;color:#999">无联系人</td></tr>'}</tbody></table>`;
+      if (idx === 2) return `<div style="font-size:13px"><b>产品匹配:</b> <span style="color:#666">${esc(d.product_fit_note||'已评估')}</span></div><div style="margin-top:10px;font-size:12px;color:#888">四大品类详细匹配见customer_product_fit表，当前已评估${d.product_fit?.length||0}条</div>`;
+      if (idx === 3) return `<div style="font-size:13px"><div><b>研究状态:</b> ${esc(m.research_status||'—')}</div><div style="margin-top:6px"><b>研究资格:</b> <span style="color:${_eligColor};font-weight:600">${_eligLabel}</span></div></div>`;
+      if (idx === 4) return `<ul style="margin:0;padding-left:18px">${evRows||'<li style="font-size:12px;color:#999">暂无证据</li>'}</ul>`;
+      if (idx === 5) return d.knowledge_files && d.knowledge_files.length ? `<ul style="margin:0;padding-left:18px">${d.knowledge_files.map(f=>`<li style="font-size:12px;margin-bottom:4px">${esc(f.filename)} <span style="color:#888">(${f.size}B · ${esc(f.directory)})</span></li>`).join('')}</ul>` : '<div style="color:#999;font-size:13px">暂无知识库文件</div>';
+      if (idx === 6) return `<div style="font-size:11px;color:#c05621;margin-bottom:8px">${esc(d.outreach_assets_note||'全部素材仅人工复制，工作台不自动发送')}</div><table style="width:100%;font-size:12px"><thead><tr style="background:#f7fafc"><th style="padding:6px;text-align:left">ID</th><th style="text-align:left">语言</th><th style="text-align:left">审核状态</th><th style="text-align:left">范围</th><th style="text-align:left">创建时间</th></tr></thead><tbody>${(d.outreach_assets||[]).map(a=>`<tr><td style="padding:6px;border-bottom:1px solid #eee">${esc(a.asset_id)}</td><td>${esc(a.language)}</td><td><span style="background:${a.human_review_status==='approved'?'#c6f6d5':'#fef3c7'};padding:2px 6px;border-radius:8px;font-size:11px">${a.human_review_status==='approved'?'approved_to_copy':esc(a.human_review_status)}</span></td><td style="font-size:11px">${a.scope||'legacy'}</td><td style="font-size:11px;color:#888">${esc(a.created_at||'')}</td></tr>`).join('')||'<tr><td colspan="5" style="padding:8px;color:#999">无素材</td></tr>'}</tbody></table>`;
+      if (idx === 7) return `<div style="font-size:13px"><div><b>人工审核状态:</b> ${esc(d.review_status||'no_assets')}</div><div style="margin-top:6px"><b>审核人:</b> ${esc(d.outreach_assets?.[0]?.reviewer||'—')}</div></div>`;
+      if (idx === 8) return `<div style="background:#fffbeb;border:1px solid #f6ad55;border-radius:6px;padding:12px;font-size:13px;color:#92400e"><b>🔒 发送状态</b><div style="margin-top:8px">发送资格: <b>不可发送</b> (not_eligible)</div><div>是否可发送: <b>否</b> (false)</div><div>outreach_events: <b>0</b></div><div>followup_tasks: <b>0</b></div><div style="margin-top:8px;font-weight:600">⚠️ 仅人工复制发送，工作台不会自动发送</div></div>`;
+      return '';
+    };
+    window.clDetailTab = window.clDetailTab || 0;
     openDrawer(`
       <div style="padding:18px">
         <h3 style="margin:0 0 4px 0">${esc(m.company_name_raw||'(未命名)')}</h3>
-        <div style="font-size:12px;color:#888;margin-bottom:14px">${esc(m.customer_id)} · ${esc(m.country_standardized||'')} · ${esc(m.continent||'')} · 来源:${esc(m.source_category||'')}</div>
+        <div style="font-size:12px;color:#888;margin-bottom:12px">${esc(m.customer_id)} · ${esc(m.country_standardized||'')} · ${esc(m.continent||'')}</div>
         ${d.orphan_draft_notice?`<div style="background:#fff3cd;border:1px solid #ffe08a;padding:10px;border-radius:8px;font-size:12px;margin-bottom:12px">⚠️ ${esc(d.orphan_draft_notice)}</div>`:''}
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;margin-bottom:14px">
-          <div><b>买家类型:</b> ${esc(m.buyer_type||'—')}</div>
-          <div><b>官网:</b> ${esc(m.website_domain||'—')}</div>
-          <div><b>研究状态:</b> ${esc(m.research_status||'—')}</div>
-          <div><b>研究资格:</b> <span style="color:${_eligColor};font-weight:600">${_eligLabel}</span></div>
-          <div><b>风险等级:</b> ${esc(d.risk_assessment.risk_level)} ${d.risk_assessment.note?`<i style="color:#888">(${esc(d.risk_assessment.note)})</i>`:''}</div>
-          <div><b>发送资格:</b> 不可发送 · 是否可发送: 否</div>
-          <div><b>Lead Score:</b> ${esc(m.lead_score??'—')}</div>
-          <div><b>创建:</b> ${esc(m.created_at||'—')}</div>
-        </div>
-        <div style="background:#fffbeb;border:1px solid #f6ad55;border-radius:6px;padding:8px 10px;font-size:12px;color:#92400e;margin-bottom:14px">⚠️ <b>仅人工复制发送，工作台不会自动发送</b></div>
-        <div style="margin-bottom:14px"><b>🏷️ 标签:</b> ${tags||'<span style="color:#999">无</span>'}</div>
-        <div style="margin-bottom:14px"><b>📥 来源记录:</b><ul style="margin:6px 0 0 18px">${srcRows||'<li style="font-size:12px;color:#999">无</li>'}</ul></div>
-        <div style="margin-bottom:14px"><b>👤 联系人与联系方式（详情可见，列表不显示）:</b>
-          <table style="width:100%;font-size:12px;margin-top:6px;border:1px solid #eee"><thead><tr style="background:#f7fafc"><th style="padding:6px;text-align:left">姓名</th><th style="text-align:left">职位</th><th style="text-align:left">类型</th><th style="text-align:left">值</th><th style="text-align:left">状态</th></tr></thead><tbody>${contactRows||'<tr><td colspan="5" style="padding:8px;color:#999">无联系人</td></tr>'}</tbody></table>
-        </div>
-        <div style="margin-bottom:14px"><b>🔍 产品匹配:</b> <span style="font-size:12px;color:#888">${esc(d.product_fit_note||'已评估')}</span></div>
-        <div style="margin-bottom:14px"><b>📚 背调证据:</b><ul style="margin:6px 0 0 18px">${evRows||'<li style="font-size:12px;color:#999">暂无证据</li>'}</ul></div>
-        <div style="margin-bottom:14px"><b>✉️ 草稿元数据（只读，不可发送）:</b>
-          <div style="font-size:11px;color:#c05621;margin:4px 0">${esc(d.outreach_assets_note||'')}</div>
-          <table style="width:100%;font-size:12px;margin-top:6px;border:1px solid #eee"><thead><tr style="background:#f7fafc"><th style="padding:6px;text-align:left">ID</th><th style="text-align:left">语言</th><th style="text-align:left">审核</th><th style="text-align:left">可发送</th><th style="text-align:left">创建时间</th></tr></thead><tbody>${assetRows||'<tr><td colspan="5" style="padding:8px;color:#999">无草稿</td></tr>'}</tbody></table>
-        </div>
-        <div style="margin-bottom:14px"><b>🕓 状态历史（最近10条）:</b><ul style="margin:6px 0 0 18px">${histRows||'<li style="font-size:12px;color:#999">无</li>'}</ul></div>
-        <button class="btn btn-outline" onclick="closeDrawer()">关闭</button>
+        <div id="clDetailTabs" style="display:flex;border-bottom:2px solid #e2e8f0;margin-bottom:14px;flex-wrap:wrap">${tabs.map((t,i)=>tabBtn(t,i)).join('')}</div>
+        <div id="clDetailTabContent">${tabContent(window.clDetailTab)}</div>
+        <div style="margin-top:16px"><button class="btn btn-outline" onclick="closeDrawer()">关闭</button></div>
       </div>`);
+    window.clRenderDetailTabs = () => {
+      document.getElementById('clDetailTabs').innerHTML = tabs.map((t,i)=>tabBtn(t,i)).join('');
+      document.getElementById('clDetailTabContent').innerHTML = tabContent(window.clDetailTab);
+    };
   } catch(e) { alert('详情加载失败: ' + e.message); }
 }
 

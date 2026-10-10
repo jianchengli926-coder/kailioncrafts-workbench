@@ -668,15 +668,11 @@ html.kc-locked body>*:not(#kcGate){visibility:hidden!important}
         一律只留源目录、绝不上线（由 _sync_deploy.py 强制排除）。 -->
 <script src="thumbs.js"></script>
 <script src="_xlsx.js"></script>
-<!-- ☁️ 云同步通道（v4 · 2026-10-09）：https 下让**多台电脑共享同一份数据**。
-     必须在 _editor_app.js **之前**加载 —— 后者的 loadData() 要用到 window.KC_CLOUD。
-     file:// 本地双击时它整个不生效（KC_CLOUD.on === false），行为与以前完全一致。 -->
-<script src="_cloud.js"></script>
-<!-- 🔒 本地内嵌版禁用云端同步：直接使用本地静态数据，避免云端空数据覆盖。
-     需要最新数据时点击顶部「打开原工具」按钮访问云端版。 -->
-<script>
-  try { if (window.KC_CLOUD) window.KC_CLOUD.on = false; } catch (e) {}
-</script>
+<!-- 🔒 本地内嵌版（Streamlit工作台内嵌）不加载云端同步 _cloud.js：
+     直接使用本地静态加密数据（data/kc-*.json），避免云端连接尝试和"云端连不上"提示。
+     _editor_app.js 中所有云端调用都有 if(!cloud||!cloud.on) 保护，不加载完全安全。
+     需要云端实时同步/多设备共享时，点击顶部「打开原工具 ↗」按钮访问云端版。 -->
+<!-- <script src="_cloud.js"></script> -->
 <script src="_editor_app.js"></script>
 </body>
 </html>

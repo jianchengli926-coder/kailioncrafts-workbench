@@ -672,6 +672,11 @@ html.kc-locked body>*:not(#kcGate){visibility:hidden!important}
      必须在 _editor_app.js **之前**加载 —— 后者的 loadData() 要用到 window.KC_CLOUD。
      file:// 本地双击时它整个不生效（KC_CLOUD.on === false），行为与以前完全一致。 -->
 <script src="_cloud.js"></script>
+<!-- 🔒 本地内嵌版禁用云端同步：直接使用本地静态数据，避免云端空数据覆盖。
+     需要最新数据时点击顶部「打开原工具」按钮访问云端版。 -->
+<script>
+  try { if (window.KC_CLOUD) window.KC_CLOUD.on = false; } catch (e) {}
+</script>
 <script src="_editor_app.js"></script>
 </body>
 </html>

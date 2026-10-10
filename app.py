@@ -8307,8 +8307,8 @@ JPG文件（未匹配）：
 
             _pc_iframe_url = "/app/static/product_catalog/产品目录编辑器.html"
             try:
-                # st.iframe is built-in, no import needed
-                st.iframe(_pc_iframe_url, height=780, scrolling=True)
+                # st.iframe is built-in, no import needed; scrolling not supported by st.iframe (default scrollable)
+                st.iframe(_pc_iframe_url, height=780)
             except Exception as _pc_e:
                 st.warning(f"iframe嵌入加载中，如无法显示请点击上方「打开原工具 ↗」按钮在新窗口打开。错误：{_pc_e}")
                 st.link_button("↗ 在新窗口打开产品目录编辑器", _pc_iframe_url, width='stretch')

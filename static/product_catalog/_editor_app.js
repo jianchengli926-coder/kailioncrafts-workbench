@@ -480,6 +480,13 @@
           });
         });
     }
+    /* 🔓 非安全上下文降级：http://局域网IP 下 crypto.subtle 不可用，
+       AES密文解不开。此时读明文 data/catalog.json（局域网内部使用，安全性可降低）。
+       localhost 和 https:// 仍走加密路径，不受影响。 */
+    if (!(window.crypto && crypto.subtle && crypto.subtle.decrypt)) {
+      console.warn('[KC] 非安全上下文（crypto.subtle不可用），降级读取明文catalog.json');
+      return fetchData('data/catalog.json');
+    }
     var cloud = window.KC_CLOUD;
     if (cloud && cloud.on) {
       return cloud.load(pass).then(function (d) {

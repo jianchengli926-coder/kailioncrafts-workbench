@@ -49,3 +49,9 @@ _shots/
 
 # 临时测试数据库
 data/test_*.db
+
+# 产品目录编辑器明文数据（含报价，仅本地局域网降级用，不提交公开仓库）
+static/product_catalog/data/catalog.json
+# 产品目录编辑器本地备份文件
+static/product_catalog/*_backup_*.js
+static/product_catalog/*_backup_*.html

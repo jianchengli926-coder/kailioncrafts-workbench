@@ -22,8 +22,11 @@ company_kb_content.py
 
 # 订单与财务中心
 *.db
+*.db-shm
+*.db-wal
 data/workbench.db
 _backup/
+_backup_*/
 
 # Python 缓存
 __pycache__/
@@ -32,6 +35,7 @@ __pycache__/
 # 备份文件
 *.bak_*
 *~
+app_backup_*.py
 
 # 运行时认证状态（含失败计数/锁定）
 data/auth_lock.json

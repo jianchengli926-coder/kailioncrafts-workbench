@@ -6,6 +6,7 @@ enableCORS = false
 enableXsrfProtection = false
 maxUploadSize = 200
 maxMessageSize = 200
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false

@@ -50,6 +50,29 @@ from prompts import (
 
 # ============ 通用：原子JSON写入（tempfile + os.replace） ============
 import tempfile as _tempfile
+
+# ============ 性能优化：缓存装饰器 ============
+@st.cache_data(show_spinner=False)
+def _get_logo_base64(logo_path_str: str) -> str:
+    """缓存logo图片的base64编码，避免每次rerun重新读取编码"""
+    from pathlib import Path as _Path
+    _p = _Path(logo_path_str)
+    if _p.exists():
+        return base64.b64encode(_p.read_bytes()).decode()
+    return ""
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def _load_products_cached(json_path_str: str) -> list:
+    """缓存产品库统一数据库（1小时TTL，产品数据相对静态）"""
+    from pathlib import Path as _Path
+    import json as _json
+    _p = _Path(json_path_str)
+    if _p.exists():
+        products = _json.loads(_p.read_text(encoding='utf-8'))
+        products.sort(key=lambda x: x.get('sku', ''))
+        return products
+    return []
+
 def _atomic_write_json(path, data):
     """原子写入JSON：先写同目录临时文件，flush后os.replace替换。失败时保留原文件。"""
     path = Path(path)
@@ -136,6 +159,7 @@ def save_to_kb_button(content, output_folder, title="生成结果", fmt="md"):
 
 # ============ 通用：我的语气档案（蒸馏作者风格） ============
 VOICE_FILE = Path("data/voice_profile.json")
+@st.cache_data(show_spinner=False, ttl=1800)
 def _load_voice():
     try:
         return _json.loads(VOICE_FILE.read_text(encoding="utf-8"))
@@ -243,7 +267,9 @@ if not st.session_state["authed"]:
     _, col_c, _ = st.columns([1, 2, 1])
     with col_c:
         if logo_path.exists():
-            st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{base64.b64encode(open(logo_path,"rb").read()).decode()}" width="320"></div>', unsafe_allow_html=True)
+            _logo_b64 = _get_logo_base64(str(logo_path))
+            if _logo_b64:
+                st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{_logo_b64}" width="320"></div>', unsafe_allow_html=True)
         st.markdown("""
         <div style="text-align:center;margin-top:16px;">
         <div style="font-size:32px;font-weight:900;color:#1a1a2e;letter-spacing:-1px;">KaiLion<span style="color:#D4AF37;">Crafts</span></div>
@@ -268,8 +294,8 @@ if not st.session_state["authed"]:
         else:
             # P2密码门增强：用 st.form 包裹输入框与提交按钮，支持回车键提交
             with st.form("__login_form", clear_on_submit=False):
-                pwd = st.text_input("", type="password", label_visibility="collapsed", placeholder="输入访问密码")
-                _submitted = st.form_submit_button("进 入", use_container_width=True, type="primary")
+                pwd = st.text_input("访问密码", type="password", label_visibility="collapsed", placeholder="输入访问密码")
+                _submitted = st.form_submit_button("进 入", width='stretch', type="primary")
             if _submitted:
                 # 重新读取锁定状态（防止并发绕过）
                 _lock_state = _read_auth_lock()
@@ -451,6 +477,9 @@ with st.sidebar:
         "  └ 场景图反推": "scene_reverse",
         "  └ 白平衡校正": "white_balance",
         "  └ 选片与RAW对齐": "raw_alignment",
+        "  └ 爆款视频反推": "video_reverse",
+        "  └ AI作图工作台": "ai_image_studio",
+        "  └ 产品目录编辑器": "product_catalog",
     }
 
     nav_options = [
@@ -537,7 +566,7 @@ with st.sidebar:
                 unsafe_allow_html=True)
     except Exception:
         pass
-    if st.button("🔌 测试 AI 连接", use_container_width=True):
+    if st.button("🔌 测试 AI 连接", width='stretch'):
         with st.spinner("正在测试连接..."):
             ok, msg = ai.test_connection()
             (st.success if ok else st.error)(msg)
@@ -617,12 +646,12 @@ with st.sidebar:
                             pass
                         st.success(f"已切换：{p['name']}（文本路由恢复自动故障转移链）")
                     st.rerun()
-        if st.button("⚙️ 模型管理", use_container_width=True, key='goto_model_mgmt'):
+        if st.button("⚙️ 模型管理", width='stretch', key='goto_model_mgmt'):
             st.session_state["_show_model_mgmt"] = True
             st.rerun()
     else:
         st.warning("未配置模型")
-        if st.button("⚙️ 去配置", use_container_width=True):
+        if st.button("⚙️ 去配置", width='stretch'):
             st.session_state["_show_model_mgmt"] = True
             st.rerun()
 
@@ -635,7 +664,7 @@ with st.sidebar:
                                placeholder="例如：帮我写一封跟进德国客户的邮件...")
         col_q1, col_q2 = st.columns(2)
         with col_q1:
-            if st.button("🚀 发送", use_container_width=True, key="sidebar_quick_send"):
+            if st.button("🚀 发送", width='stretch', key="sidebar_quick_send"):
                 if quick_q.strip():
                     with st.spinner("AI思考中..."):
                         quick_a = ai.chat(quick_q, task_name="侧边栏快速问答")
@@ -643,7 +672,7 @@ with st.sidebar:
                 else:
                     st.warning("请输入问题")
         with col_q2:
-            if st.button("🗑 清空", use_container_width=True, key="sidebar_quick_clear"):
+            if st.button("🗑 清空", width='stretch', key="sidebar_quick_clear"):
                 if '_sidebar_quick_answer' in st.session_state:
                     del st.session_state['_sidebar_quick_answer']
                 st.rerun()
@@ -889,7 +918,7 @@ if page == "🏠 仪表盘":
     # ===== AI今日工作建议 =====
     st.markdown("##### 🤖 AI今日工作建议")
     st.caption("综合客户、待办、订单数据，AI生成今日工作重点")
-    if st.button("✨ 生成今日工作建议", use_container_width=True, key="dash_ai_suggest"):
+    if st.button("✨ 生成今日工作建议", width='stretch', key="dash_ai_suggest"):
         with st.spinner("AI正在分析今日工作重点..."):
             try:
                 # 收集数据
@@ -1012,11 +1041,11 @@ if page == "🏠 仪表盘":
 
         col_aibtn1, col_aibtn2 = st.columns(2)
         with col_aibtn1:
-            if st.button("🔌 测试AI连接", use_container_width=True, key="dash_test_ai"):
+            if st.button("🔌 测试AI连接", width='stretch', key="dash_test_ai"):
                 _ok, _msg = _dash_ai.test_connection()
                 (st.success if _ok else st.error)(_msg)
         with col_aibtn2:
-            if st.button("⚙️ 进入模型管理", use_container_width=True, key="dash_goto_model"):
+            if st.button("⚙️ 进入模型管理", width='stretch', key="dash_goto_model"):
                 st.session_state["_show_model_mgmt"] = True
                 st.rerun()
     except Exception as _e:
@@ -1045,7 +1074,7 @@ if page == "🏠 仪表盘":
         for j, item in enumerate(row_items):
             with cols[j]:
                 if st.button(f"{item['icon']}  {item['name']}", key=f"quick_{item['target']}",
-                             use_container_width=True):
+                             width='stretch'):
                     st.session_state.pop("main_nav", None)
                     st.session_state["main_nav"] = item["target"]
                     st.rerun()
@@ -1066,7 +1095,7 @@ if page == "🏠 仪表盘":
         else:
             todos = []
         new_todo = st.text_input("添加待办", placeholder="跟进德国客户OEM...", key="new_todo_input", label_visibility="collapsed")
-        if st.button("➕ 添加", use_container_width=True):
+        if st.button("➕ 添加", width='stretch'):
             if new_todo.strip():
                 todos.append({"task": new_todo.strip(), "done": False, "date": datetime.now().strftime("%Y-%m-%d")})
                 _atomic_write_json(todo_file, todos)
@@ -1138,7 +1167,7 @@ if page == "🏠 仪表盘":
                 with cols[i % 2]:
                     new_count = st.number_input(f"{name}", min_value=0, value=info.get("count", 0), key=f"src_{name}")
                     new_sources[name] = {"count": new_count, "color": info.get("color", "#9E9E9E")}
-            if st.button("💾 保存数据", use_container_width=True, type="primary"):
+            if st.button("💾 保存数据", width='stretch', type="primary"):
                 _atomic_write_json(source_file, new_sources)
                 st.success("已保存！")
                 st.rerun()
@@ -1181,7 +1210,7 @@ if page == "🏠 仪表盘":
             paper_bgcolor="rgba(0,0,0,0)",
             bargap=0.3,
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
     st.markdown("---")
 
@@ -1352,7 +1381,7 @@ elif page == "🖥️ 独立站管理":
             followup -> deal [label="有意向"];
             followup -> fail [label="无回复"];
         }
-        """, use_container_width=True)
+        """, width='stretch')
         st.caption("SOP流程：询盘到达 → 录入 → 背调 → AI分析 → 知识库匹配 → 生成回复 → 人工审核 → 发送 → 跟进 → 成交/冷藏")
 
     # 子Tab
@@ -1540,7 +1569,7 @@ elif page == "🖥️ 独立站管理":
         st.markdown("---")
         st.markdown("##### 🤖 AI询盘分析")
         st.caption("基于所有询盘数据，AI生成客户需求洞察和回复策略")
-        if st.button("✨ 生成询盘分析报告", use_container_width=True, key="ai_inquiry_analysis"):
+        if st.button("✨ 生成询盘分析报告", width='stretch', key="ai_inquiry_analysis"):
             if inquiries:
                 with st.spinner("AI正在分析询盘数据..."):
                     try:
@@ -1637,7 +1666,7 @@ elif page == "🖥️ 独立站管理":
                     "国家": o.get('billing',{}).get('country',''),
                     "日期": o.get('date_created','')[:10],
                 } for o in orders])
-                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.dataframe(df, width='stretch', hide_index=True)
 
     with wc_tab2:
         if st.button("🔄 拉取最新评论", key="wc_reviews"):
@@ -1688,7 +1717,7 @@ elif page == "🌅 晨间简报":
     # AI生成简报
     brief_col1, brief_col2 = st.columns([2, 1])
     with brief_col1:
-        if st.button("✨ AI生成今日简报", use_container_width=True, type="primary"):
+        if st.button("✨ AI生成今日简报", width='stretch', type="primary"):
             with st.spinner("AI正在生成晨间简报..."):
                 follow_up_text = "\n".join([
                     f"- [{c.get('grade','C')}级] {c.get('company_name','')} ({c.get('country','')}) - {c.get('products','')[:40]}"
@@ -1716,7 +1745,7 @@ elif page == "🌅 晨间简报":
                 brief = ai.chat(prompt, use_lite=True)
             st.markdown(brief)
     with brief_col2:
-        if st.button("🔥 AI深度简报+待办", use_container_width=True, type="secondary"):
+        if st.button("🔥 AI深度简报+待办", width='stretch', type="secondary"):
             with st.spinner("AI正在深度分析并生成待办..."):
                 # 收集更多数据
                 a_grade = [c for c in follow_up_today if c.get('grade') == 'A']
@@ -1750,7 +1779,7 @@ elif page == "🌅 晨间简报":
             st.markdown(deep_brief)
             
             # 一键生成待办
-            if st.button("📋 将AI建议转为今日待办", key="brief_to_todo", use_container_width=True):
+            if st.button("📋 将AI建议转为今日待办", key="brief_to_todo", width='stretch'):
                 try:
                     import re as _re
                     # 从简报中提取待办项
@@ -1851,7 +1880,7 @@ elif page == "👥 客户中心":
             st.markdown("**🏢 锘利企业客户管理CRM工作台**")
             st.caption("独立部署的企业CRM系统 · 更专注的客户管理 · 一键跳转")
         with _c2:
-            st.link_button("打开CRM工作台 ↗", "https://crm.kailioncrafts.com", use_container_width=True, type="primary")
+            st.link_button("打开CRM工作台 ↗", "https://crm.kailioncrafts.com", width='stretch', type="primary")
 
     cc_sections = {
         "🎯 客户分析": "客户背调 · 智能分析",
@@ -1867,7 +1896,7 @@ elif page == "👥 客户中心":
     for i, (name, desc) in enumerate(cc_sections.items()):
         with cc_cols[i]:
             is_active = st.session_state["cc_sub"] == name
-            if st.button(name, key=f"ccbtn_{name}", use_container_width=True,
+            if st.button(name, key=f"ccbtn_{name}", width='stretch',
                          type="primary" if is_active else "secondary"):
                 st.session_state["cc_sub"] = name
                 st.rerun()
@@ -1891,7 +1920,7 @@ elif page == "👥 客户中心":
                 with col2:
                     ca_products = st.text_area("主营产品 *", height=80)
                     ca_extra = st.text_input("补充信息（规模/采购量，可选）")
-                ca_submit = st.form_submit_button("🔍 AI分析", use_container_width=True, type="primary")
+                ca_submit = st.form_submit_button("🔍 AI分析", width='stretch', type="primary")
             if ca_submit and ca_company and ca_country and ca_products:
                 with st.spinner("AI分析中..."):
                     try:
@@ -1915,7 +1944,7 @@ elif page == "👥 客户中心":
                     bg_country = st.text_input("国家（可选）")
                 with col2:
                     bg_products = st.text_input("对方主营产品（可选）")
-                bg_submit = st.form_submit_button("🔍 开始背调", use_container_width=True, type="primary")
+                bg_submit = st.form_submit_button("🔍 开始背调", width='stretch', type="primary")
             if bg_submit and bg_company:
                 with st.spinner("背调中..."):
                     try:
@@ -1954,7 +1983,7 @@ elif page == "👥 客户中心":
             st.markdown("---")
             st.markdown("**📌 现在适不适合联系某国客户？**")
             cc_country_sel = st.selectbox("选择客户所在国家", list(COUNTRY_TZ.keys()), key="cc_tz_sel")
-            if st.button("🕐 判断最佳联系时间", key="cc_tz_btn", use_container_width=True):
+            if st.button("🕐 判断最佳联系时间", key="cc_tz_btn", width='stretch'):
                 tzname = COUNTRY_TZ[cc_country_sel]
                 now, is_work, is_weekend, holiday = _city_status(cc_country_sel, cc_country_sel, tzname)
                 with st.spinner("结合知识库分析联系节奏..."):
@@ -1972,7 +2001,7 @@ elif page == "👥 客户中心":
             st.caption("选市场+主题，AI 结合我方知识库做采购影响研判（实时新闻源后续接入，当前为基于行业常识与知识库的研判框架）")
             cc_mkt = st.selectbox("关注市场", ["中东", "欧美", "东南亚", "非洲", "南美"], key="cc_mkt")
             cc_topic = st.selectbox("关注主题", ["汇率波动", "关税/贸易政策", "采购旺季/节日备货", "海运物流", "原材料价格", "竞争对手动向"], key="cc_topic")
-            if st.button("📡 生成研判", key="cc_news_btn", type="primary", use_container_width=True):
+            if st.button("📡 生成研判", key="cc_news_btn", type="primary", width='stretch'):
                 with st.spinner("AI研判中..."):
                     try:
                         prompt = f"""你是资深B2B外贸市场分析师，服务阳江刀剪厨具出口企业。
@@ -1988,12 +2017,12 @@ elif page == "👥 客户中心":
             st.caption("五金刀剪/餐厨行业主要展会台账；选客户国家，AI 推荐该重点约见哪个展")
             expos_df = pd.DataFrame(EXPOS_2026)
             expos_df.columns = ["展会", "国家/城市", "月份", "品类", "相关度", "备注"]
-            st.dataframe(expos_df, use_container_width=True, hide_index=True)
+            st.dataframe(expos_df, width='stretch', hide_index=True)
             st.markdown("---")
             cc_expo_country = st.selectbox("客户所在国家/地区",
                 ["美国", "德国", "英国", "阿联酋", "沙特", "日本", "澳大利亚", "俄罗斯/独联体", "东南亚", "南美"], key="cc_expo_country")
             cc_expo_note = st.text_input("客户主营（可选）", placeholder="如:连锁厨具零售商/批发商", key="cc_expo_note")
-            if st.button("🎯 AI推荐参展/观展价值", key="cc_expo_btn", use_container_width=True):
+            if st.button("🎯 AI推荐参展/观展价值", key="cc_expo_btn", width='stretch'):
                 with st.spinner("AI分析中..."):
                     try:
                         expos_txt = "\n".join([f"- {e['name']}（{e['country']}，{e['month']}，相关度{e['fit']}）：{e['note']}" for e in EXPOS_2026])
@@ -2082,7 +2111,7 @@ elif page == "👥 客户中心":
                         })
                 ca_col1, ca_col2 = st.columns(2)
                 with ca_col1:
-                    if st.button("➕ 新增一个案例", key="ep_add_case", use_container_width=True):
+                    if st.button("➕ 新增一个案例", key="ep_add_case", width='stretch'):
                         cases.append({"行业": "", "地区": "", "做什么": "", "解决问题": "", "结果": ""})
                         cases_save = {
                             "cn_name": e_cn, "en_name": e_en, "founded": e_founded, "staff": e_staff,
@@ -2093,7 +2122,7 @@ elif page == "👥 客户中心":
                         _atomic_write_json(EP_FILE, cases_save)
                         st.rerun()
                 with ca_col2:
-                    if st.button("🗑 删除最后一个案例", key="ep_del_case", use_container_width=True):
+                    if st.button("🗑 删除最后一个案例", key="ep_del_case", width='stretch'):
                         if len(cases) > 0:
                             cases.pop()
                             cases_save = {
@@ -2105,7 +2134,7 @@ elif page == "👥 客户中心":
                             _atomic_write_json(EP_FILE, cases_save)
                             st.rerun()
 
-                if st.button("💾 保存企业信息与案例", type="primary", key="ep_save", use_container_width=True):
+                if st.button("💾 保存企业信息与案例", type="primary", key="ep_save", width='stretch'):
                     saved_cases = []
                     for i, cs in enumerate(cases):
                         # P1-6 修复：UI将"解决问题"与"结果"合并为一个输入框，
@@ -2136,7 +2165,7 @@ elif page == "👥 客户中心":
                                           placeholder="如：西班牙/德国/阿联酋/巴西", key="pc_country")
             cust_extra = st.text_input("补充客户信息（网址打不开时手动填，可选）",
                                        placeholder="公司名/主营/地区...", key="pc_extra")
-            if st.button("🚀 生成个性化开发信", type="primary", use_container_width=True):
+            if st.button("🚀 生成个性化开发信", type="primary", width='stretch'):
                 if not (cust_url or cust_extra):
                     st.warning("请填写客户网址，或手动补充客户信息")
                 else:
@@ -2202,7 +2231,7 @@ EN: ...
                             st.markdown(result)
                             # 一键存档为客户
                             if st.button("💾 存档为客户（自动进客户管理，阶段=已发开发信）",
-                                         use_container_width=True, type="primary"):
+                                         width='stretch', type="primary"):
                                 _name = (cust_extra or cust_url or "未命名客户").split("\n")[0][:40]
                                 # P2-12 修复：检查 add_customer 返回值，重复客户/仓库不可用时不再静默假成功
                                 _arc = cm.add_customer({
@@ -2229,7 +2258,7 @@ EN: ...
                 with st.form("voice_sample"):
                     vs_type = st.selectbox("样本类型", ["开发信", "WhatsApp/即时回复", "报价邮件", "其他"])
                     vs_text = st.text_area("粘贴你过去写过的原文（英文最好，可中英混合）", height=120)
-                    if st.form_submit_button("保存样本", use_container_width=True):
+                    if st.form_submit_button("保存样本", width='stretch'):
                         if vs_text.strip():
                             _v.setdefault("samples", []).append(
                                 {"type": vs_type, "content": vs_text.strip(),
@@ -2238,7 +2267,7 @@ EN: ...
                         else:
                             st.warning("请先粘贴内容")
                 if _v.get("samples"):
-                    if st.button("✨ 蒸馏我的语气风格", type="primary", use_container_width=True):
+                    if st.button("✨ 蒸馏我的语气风格", type="primary", width='stretch'):
                         _sample_txt = "\n\n---\n\n".join(
                             [f"[{s.get('type','')}] {s.get('content','')}" for s in _v["samples"][-20:]])
                         _dp = ("你是文案风格分析师。以下是我过去真实发过的外贸开发信/客户沟通原文。"
@@ -2264,7 +2293,7 @@ EN: ...
                     ce_product = st.selectbox("推荐产品", ["厨房刀具", "专业剪刀", "户外刀具", "厨房用品"])
                 ce_analysis = st.text_area("客户分析结论（可选，贴上去信更准）", height=60,
                                            placeholder="可粘贴上面客户分析的结果")
-                ce_submit = st.form_submit_button("✉️ 生成", use_container_width=True, type="primary")
+                ce_submit = st.form_submit_button("✉️ 生成", width='stretch', type="primary")
             if ce_submit and ce_company and ce_country:
                 with st.spinner("生成中..."):
                     try:
@@ -2290,7 +2319,7 @@ EN: ...
                     fol_num = st.selectbox("第几轮", [1, 2, 3, 4])
                 with col2:
                     fol_reply = st.selectbox("客户状态", ["未回复", "已读未回", "有回复但在比价", "明确拒绝过"])
-                fol_submit = st.form_submit_button("🔄 生成跟进", use_container_width=True, type="primary")
+                fol_submit = st.form_submit_button("🔄 生成跟进", width='stretch', type="primary")
             if fol_submit and fol_company:
                 with st.spinner("生成中..."):
                     try:
@@ -2325,7 +2354,7 @@ EN: ...
                     ], key="seq_signal")
                 seq_first_email = st.text_area("首封开发信内容（可选，贴进来更准）", height=80, key="seq_first_email",
                                                placeholder="如果首封已发，贴进来AI会基于它设计跟进序列；留空则AI从头设计")
-                seq_submit = st.form_submit_button("📋 设计完整跟进序列", type="primary", use_container_width=True)
+                seq_submit = st.form_submit_button("📋 设计完整跟进序列", type="primary", width='stretch')
             if seq_submit and seq_company:
                 with st.spinner("AI设计邮件序列中..."):
                     try:
@@ -2410,7 +2439,7 @@ EN: ...
                 t_deal = st.number_input("本月目标成交(单)", min_value=0, value=int(_cur.get("deals", 2)), step=1, key="pt_deals")
             with cg4:
                 t_amt = st.number_input("本月目标成交额(USD)", min_value=0, value=int(_cur.get("amount", 50000)), step=5000, key="pt_amt")
-            if st.button("💾 保存本月目标", key="pt_save", use_container_width=True):
+            if st.button("💾 保存本月目标", key="pt_save", width='stretch'):
                 _targets[_ym] = {"dev": t_dev, "leads": t_lead, "deals": t_deal, "amount": t_amt}
                 _perf_save(_targets)
                 st.success(f"✅ 已保存 {_ym} 业绩目标")
@@ -2444,7 +2473,7 @@ EN: ...
                 fk3, fk4 = st.columns(2)
                 fk_type = fk3.selectbox("目标客户类型", ["进口商/分销商", "品牌商/私有标签", "批发商", "电商卖家", "全部都要"])
                 fk_exclude = fk4.text_input("要排除的词（空格分隔）", value="amazon walmart aliexpress")
-                fk_submit = st.form_submit_button("🚀 生成搜索关键词", type="primary", use_container_width=True)
+                fk_submit = st.form_submit_button("🚀 生成搜索关键词", type="primary", width='stretch')
             if fk_submit:
                 if not fk_market.strip():
                     st.warning("请填目标市场")
@@ -2483,7 +2512,7 @@ EN: ...
             with st.form("qa_form"):
                 q = st.text_area("客户问题 *", height=100)
                 qa_company = st.text_input("客户公司（可选）")
-                qa_submit = st.form_submit_button("🤖 AI回复", use_container_width=True, type="primary")
+                qa_submit = st.form_submit_button("🤖 AI回复", width='stretch', type="primary")
             if qa_submit and q:
                 with st.spinner("生成中..."):
                     try:
@@ -2506,7 +2535,7 @@ EN: ...
             cc_q_scene = st.selectbox("沟通场景",
                 ["首次开发/破冰", "报价后客户嫌贵", "客户比价/压价", "催下单/催定金", "交期延误解释", "售后/投诉处理", "节日问候维护关系"], key="cq_scene")
             cc_q_extra = st.text_input("客户情况补充（可选）", placeholder="如:首次询价/已合作3年/正在跟竞品谈...", key="cq_extra")
-            if st.button("🗣️ 生成沟通建议与话术", key="cq_btn", type="primary", use_container_width=True):
+            if st.button("🗣️ 生成沟通建议与话术", key="cq_btn", type="primary", width='stretch'):
                 with st.spinner("AI生成中..."):
                     try:
                         prompt = f"""你是资深B2B外贸沟通教练，服务阳江刀剪厨具出口企业。
@@ -2579,7 +2608,7 @@ EN: ...
                         height=300,
                         showlegend=False,
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                 except Exception as _pe:
                     # plotly失败时降级到HTML条形图
                     _maxc = max([v["count"] for v in _pdata.values()] + [1])
@@ -2606,7 +2635,7 @@ EN: ...
                         rate = f"{int(cur/prev*100)}%" if prev > 0 else "—"
                         cum = f"{int(cur/stages_list[0]['count']*100)}%" if stages_list[0]["count"] > 0 else "—"
                         conv_rows.append({"阶段": v["name"], "客户数": cur, "本阶段转化率": rate, "累计转化率": cum})
-                st.dataframe(conv_rows, use_container_width=True, hide_index=True)
+                st.dataframe(conv_rows, width='stretch', hide_index=True)
 
                 # 找出流失最多的阶段
                 if len(stages_list) >= 2:
@@ -2721,7 +2750,7 @@ EN: ...
                         for _src, _cnt in sorted(_by_src.items(), key=lambda x: -x[1]):
                             _rate = _src_rate.get(_src, 0.0)
                             _src_rows.append({"来源": _src, "线索数": _cnt, "有效率": f"{_rate*100:.1f}%"})
-                        st.dataframe(pd.DataFrame(_src_rows), use_container_width=True, hide_index=True)
+                        st.dataframe(pd.DataFrame(_src_rows), width='stretch', hide_index=True)
                     else:
                         st.info("暂无来源数据")
 
@@ -2733,7 +2762,7 @@ EN: ...
                         if _bg:
                             st.dataframe(
                                 pd.DataFrame([{"等级": g, "数量": _bg.get(g, 0)} for g in ["A", "B", "C", "D", "unknown"] if _bg.get(g, 0)]),
-                                use_container_width=True, hide_index=True)
+                                width='stretch', hide_index=True)
                         else:
                             st.info("暂无等级数据")
                     with _dg2:
@@ -2742,7 +2771,7 @@ EN: ...
                         if _bst:
                             st.dataframe(
                                 pd.DataFrame([{"阶段": k, "数量": v} for k, v in _bst.items()]),
-                                use_container_width=True, hide_index=True)
+                                width='stretch', hide_index=True)
                         else:
                             st.info("暂无阶段数据")
 
@@ -2766,7 +2795,7 @@ EN: ...
                             {"转化环节": "已报价→成交", "转化率": f"{_cr.get('quoted_to_closed',0)*100:.1f}%"},
                             {"转化环节": "线索→成交", "转化率": f"{_cr.get('lead_to_closed',0)*100:.1f}%"},
                         ]
-                        st.dataframe(pd.DataFrame(_cr_rows), use_container_width=True, hide_index=True)
+                        st.dataframe(pd.DataFrame(_cr_rows), width='stretch', hide_index=True)
                     else:
                         st.info("暂无转化率数据")
 
@@ -3003,7 +3032,7 @@ EN: ...
                             file_name=f"customers_export_{_export_date}.csv",
                             mime="text/csv",
                             key="export_filtered_dl",
-                            use_container_width=True,
+                            width='stretch',
                         )
                         with st.expander("💾 保存到知识库"):
                             _csv_content = "﻿" + _buf.getvalue()
@@ -3018,7 +3047,7 @@ EN: ...
 
                 if rows:
                     _tbl_sel = st.dataframe(
-                        pd.DataFrame(rows), use_container_width=True, hide_index=True,
+                        pd.DataFrame(rows), width='stretch', hide_index=True,
                         on_select="rerun", selection_mode="single-row", key="cl_table_sel")
                     # ===== 选中行 → 添加跟进任务 =====
                     _sel_rows = _tbl_sel.selection.get("rows", []) if _tbl_sel and _tbl_sel.selection else []
@@ -3036,7 +3065,7 @@ EN: ...
                                     _task_due = st.date_input("截止日期")
                                 with _t3:
                                     _task_pri = st.selectbox("优先级", ["high", "medium", "low"])
-                                if st.form_submit_button("💾 保存跟进任务", use_container_width=True):
+                                if st.form_submit_button("💾 保存跟进任务", width='stretch'):
                                     try:
                                         _res = cm.add_follow_up_task(
                                             _target_cid, _task_action,
@@ -3130,7 +3159,7 @@ EN: ...
                                     if _tk.get("status") == "pending":
                                         with st.form(f"complete_task_{_tk.get('task_id')}"):
                                             _close_reason = st.text_input("关闭原因（可选）", key=f"cr_{_tk.get('task_id')}")
-                                            if st.form_submit_button("完成此任务", use_container_width=True):
+                                            if st.form_submit_button("完成此任务", width='stretch'):
                                                 try:
                                                     _dr2.complete_task(_tk.get("task_id"), close_reason=_close_reason)
                                                     st.success("✅ 任务已完成")
@@ -3151,7 +3180,7 @@ EN: ...
                                     _nt_owner = st.text_input("负责人", value="")
                                 with _nt4:
                                     _nt_pri = st.selectbox("优先级", ["high", "medium", "low"])
-                                if st.form_submit_button("💾 新增任务", use_container_width=True):
+                                if st.form_submit_button("💾 新增任务", width='stretch'):
                                     try:
                                         _r = cm.add_follow_up_task(
                                             _scid, _nt_action, _nt_due.strftime("%Y-%m-%d"),
@@ -3217,7 +3246,7 @@ EN: ...
                                     _new_act_type = st.selectbox("类型", ["note", "email", "whatsapp", "call", "meeting", "quote", "sample"])
                                 with _at2:
                                     _new_act_desc = st.text_area("描述", height=68)
-                                if st.form_submit_button("💾 记录活动", use_container_width=True):
+                                if st.form_submit_button("💾 记录活动", width='stretch'):
                                     try:
                                         _dr2.add_activity(_scid, _new_act_type, _new_act_desc, created_by="ui")
                                         st.success("✅ 活动已记录")
@@ -3398,7 +3427,7 @@ EN: ...
                                 "订单号": o["order_no"], "产品": o["product_summary"],
                                 "金额": f"${o['total_amount']:,.0f}", "状态": o["status"],
                                 "下单日": o["order_date"], "交期": o["delivery_date"],
-                            } for o in _orders]), use_container_width=True, hide_index=True)
+                            } for o in _orders]), width='stretch', hide_index=True)
                     except Exception as _e:
                         st.caption(f"订单关联暂不可用：{_e}")
                     # ---- 快捷话术 ----
@@ -3414,7 +3443,7 @@ EN: ...
                     _acts_txt = "；".join([f"{(a.get('created_at','') or '')[:10]} {a.get('description','')}" for a in acts[-5:]]) or "无记录"
                     _qcols = st.columns(3)
                     for i, _sc in enumerate(_scenarios.keys()):
-                        if _qcols[i % 3].button(_sc, key=f"detail_qk_{sel}_{_sc}", use_container_width=True):
+                        if _qcols[i % 3].button(_sc, key=f"detail_qk_{sel}_{_sc}", width='stretch'):
                             with st.spinner("AI 生成中..."):
                                 try:
                                     _vstyle = _load_voice().get("style_notes", "")
@@ -3449,7 +3478,7 @@ EN: ...
                             adesc = st.text_input("跟进内容/客户反馈", placeholder="如:客户嫌贵5%,要求再降3%")
                         with af3:
                             adays = st.number_input("几天后再跟进", 0, 90, 3)
-                        if st.form_submit_button("💾 保存跟进并设下次提醒", use_container_width=True):
+                        if st.form_submit_button("💾 保存跟进并设下次提醒", width='stretch'):
                             cm.add_activity(sel, atype, adesc)
                             cm.set_next_follow_up(sel, int(adays))
                             st.success("✅ 已记录跟进并更新下次跟进时间")
@@ -3662,7 +3691,7 @@ EN: ...
                                     else:
                                         st.info(f"今日到期")
                                 with c3:
-                                    if st.button(f"✓ 已完成", key=f"seq_done_{fu['customer_id']}_{fu['step_idx']}", use_container_width=True):
+                                    if st.button(f"✓ 已完成", key=f"seq_done_{fu['customer_id']}_{fu['step_idx']}", width='stretch'):
                                         # 标记为已完成
                                         cust_data = cm.get_customer(fu["customer_id"])
                                         completed = cust_data.get("completed_steps", [])
@@ -3843,7 +3872,7 @@ EN: ...
                         })
 
                 if filtered:
-                    st.dataframe(pd.DataFrame(filtered), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.DataFrame(filtered), width='stretch', hide_index=True)
                 else:
                     st.info("该等级暂无客户")
 
@@ -3914,7 +3943,7 @@ EN: ...
                 st.markdown("---")
                 st.markdown("**🤖 AI分层分析报告**")
                 st.caption("根据客户分层数据，AI生成分析报告和跟进策略建议")
-                if st.button("✨ 生成AI分层分析报告", key="ai_grade_analysis", use_container_width=True):
+                if st.button("✨ 生成AI分层分析报告", key="ai_grade_analysis", width='stretch'):
                     with st.spinner("AI正在分析客户分层..."):
                         try:
                             a_customers = [c for c in customers_all if c.get("grade") == "A"]
@@ -3993,7 +4022,7 @@ EN: ...
                             "cust_id": c["id"],
                         })
                     st.dataframe(pd.DataFrame([{k:v for k,v in r.items() if k != "cust_id"} for r in pool_rows]),
-                                use_container_width=True, hide_index=True)
+                                width='stretch', hide_index=True)
 
                     # 认领客户
                     st.markdown("**📥 认领客户**")
@@ -4026,7 +4055,7 @@ EN: ...
                             "cust_id": c["id"],
                         })
                     st.dataframe(pd.DataFrame([{k:v for k,v in r.items() if k != "cust_id"} for r in my_rows]),
-                                use_container_width=True, hide_index=True)
+                                width='stretch', hide_index=True)
 
                     # 释放客户
                     st.markdown("**📤 释放客户到公池**")
@@ -4100,7 +4129,7 @@ EN: ...
                             })
                             break  # 只取最新一条
                 if clean_records:
-                    st.dataframe(pd.DataFrame(clean_records[:20]), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.DataFrame(clean_records[:20]), width='stretch', hide_index=True)
                 else:
                     st.info("暂无清洗记录")
 
@@ -4108,7 +4137,7 @@ EN: ...
                 st.markdown("---")
                 st.markdown("**🤖 AI公池客户分析**")
                 st.caption("根据公池客户数据，AI生成认领优先级和跟进策略建议")
-                if st.button("✨ 生成公池客户分析", key="ai_pool_analysis", use_container_width=True):
+                if st.button("✨ 生成公池客户分析", key="ai_pool_analysis", width='stretch'):
                     if pool_customers:
                         with st.spinner("AI正在分析公池客户..."):
                             try:
@@ -4201,7 +4230,7 @@ EN: ...
                             next_stage = PIPELINE_STAGES[i + 1]["key"] if i + 1 < len(PIPELINE_STAGES) else stage["key"]
                             next_stage_name = PIPELINE_STAGES[i + 1]["name"] if i + 1 < len(PIPELINE_STAGES) else stage["name"]
                             btn_key = f"mv_{c['id']}_{stage['key']}"
-                            if st.button(f"→ {next_stage_name}", key=btn_key, use_container_width=True):
+                            if st.button(f"→ {next_stage_name}", key=btn_key, width='stretch'):
                                 # 记录阶段变更到知识库
                                 from datetime import datetime as _dt
                                 old_stage_name = stage["name"]
@@ -4391,7 +4420,7 @@ EN: ...
                 nc_status_name = st.selectbox("初始状态", list(_status_opts.keys()), index=0)
                 nc_stage = st.selectbox("初始阶段", [s["name"] for s in PIPELINE_STAGES])
                 nc_fu = st.number_input("几天后首次跟进提醒（0=不提醒）", 0, 60, 0)
-                if st.form_submit_button("✅ 保存客户", type="primary", use_container_width=True):
+                if st.form_submit_button("✅ 保存客户", type="primary", width='stretch'):
                     if not nc_name or not nc_country:
                         st.warning("请填写公司名称和国家")
                     else:
@@ -4477,7 +4506,7 @@ EN: ...
                             df = pd.read_excel(uploaded_file)
 
                         st.write(f"文件包含 {len(df)} 行，{len(df.columns)} 列")
-                        st.dataframe(df.head(), use_container_width=True, hide_index=True)
+                        st.dataframe(df.head(), width='stretch', hide_index=True)
 
                         # 字段映射
                         st.markdown("**字段映射（自动识别，可调整）**")
@@ -4551,7 +4580,7 @@ elif page == "🎯 客户分析":
             size = st.selectbox("公司规模", ["未知", "小型(<50人)", "中型(50-500人)", "大型(500+人)", "集团/上市"])
         additional = st.text_area("其他信息（可选）", placeholder="LinkedIn信息、采购记录、展会接触等...", height=80)
 
-        submitted = st.form_submit_button("🔍 AI分析客户", use_container_width=True)
+        submitted = st.form_submit_button("🔍 AI分析客户", width='stretch')
 
     if submitted and company_name and country and products:
         with st.spinner("AI正在分析客户..."):
@@ -4588,7 +4617,7 @@ elif page == "🎯 客户分析":
         with col3:
             st.metric("建议动作", CUSTOMER_GRADES[grade]["action"])
 
-        if st.button("💾 保存到客户管理", type="primary", use_container_width=True):
+        if st.button("💾 保存到客户管理", type="primary", width='stretch'):
             customer = cm.add_customer({
                 "company_name": company_name,
                 "website": website,
@@ -4637,7 +4666,7 @@ elif page == "🔍 客户背调":
         if dd_name:
             search_keywords.append(f"{dd_name} {dd_company}")
 
-        if st.button("🌐 开始联网背调", use_container_width=True, type="primary") and dd_company:
+        if st.button("🌐 开始联网背调", width='stretch', type="primary") and dd_company:
             with st.spinner("正在联网搜索客户信息..."):
                 # 模拟联网搜索（实际部署时可接入SerpAPI/Google Custom Search）
                 st.info("🔍 正在搜索以下关键词：")
@@ -4775,7 +4804,7 @@ elif page == "🔍 客户背调":
                 country = st.text_input("国家", placeholder="例如：USA")
                 products = st.text_area("主营产品", placeholder="客户卖什么？", height=80)
 
-        if st.button("🔬 AI深度背调", use_container_width=True, type="primary") and company_name:
+        if st.button("🔬 AI深度背调", width='stretch', type="primary") and company_name:
             with st.spinner("AI正在进行6层背调分析..."):
                 prompt = DUE_DILIGENCE_PROMPT.format(
                     company_name=company_name,
@@ -4814,7 +4843,7 @@ elif page == "✉️ 开发信生成":
         customer_analysis = st.text_area("客户分析（可选，从客户分析页复制）", height=80,
                                          placeholder="粘贴AI客户分析结果，开发信会更精准...")
 
-        submitted = st.form_submit_button("✍️ AI生成开发信", use_container_width=True)
+        submitted = st.form_submit_button("✍️ AI生成开发信", width='stretch')
 
     if submitted and company_name and country and products:
         with st.spinner("AI正在撰写开发信..."):
@@ -4842,7 +4871,7 @@ elif page == "✉️ 开发信生成":
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button("🔄 重新生成", use_container_width=True):
+            if st.button("🔄 重新生成", width='stretch'):
                 _p = st.session_state.get('_last_cold_email_prompt', '')
                 if _p:
                     with st.spinner("AI正在重新撰写开发信..."):
@@ -4854,13 +4883,13 @@ elif page == "✉️ 开发信生成":
                         st.session_state['last_email_result'] = result
                     st.rerun()
         with col2:
-            if st.button("📋 复制到剪贴板", use_container_width=True):
+            if st.button("📋 复制到剪贴板", width='stretch'):
                 st.toast("已复制！（请手动选择文本复制）")
         with col3:
             # 保存到当前成员工作空间
             member_key = st.session_state.get('current_member', 'leo')
             member = TEAM_MEMBERS[member_key]
-            if st.button(f"💾 保存到{member['name']}工作空间", use_container_width=True):
+            if st.button(f"💾 保存到{member['name']}工作空间", width='stretch'):
                 workspace_dir = Path(__file__).parent / "data" / member['workspace_dir'] / "generated_emails"
                 workspace_dir.mkdir(parents=True, exist_ok=True)
                 email_file = workspace_dir / f"{company_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.md"
@@ -4899,7 +4928,7 @@ elif page == "🔄 跟进序列":
         with col3:
             reply_status = st.selectbox("客户回复状态", ["未回复", "已读未回", "回复但犹豫", "明确拒绝"])
 
-        if st.button("✍️ 生成跟进邮件", use_container_width=True):
+        if st.button("✍️ 生成跟进邮件", width='stretch'):
             with st.spinner("AI正在撰写跟进邮件..."):
                 days = EMAIL_CONFIG["follow_up_days"][follow_up_num - 1] if follow_up_num <= len(EMAIL_CONFIG["follow_up_days"]) else 21
                 prompt = FOLLOW_UP_PROMPT.format(
@@ -4935,7 +4964,7 @@ elif page == "💬 客户问答":
         country = st.text_input("客户国家", placeholder="可选")
         conversation = st.text_area("之前的沟通", placeholder="可选", height=60)
 
-    if st.button("🤖 AI生成回复", use_container_width=True) and question:
+    if st.button("🤖 AI生成回复", width='stretch') and question:
         with st.spinner("AI正在分析问题并生成回复..."):
             prompt = FAQ_PROMPT.format(
                 question=question,
@@ -4968,7 +4997,7 @@ elif page == "📦 产品推荐":
             order_volume = st.text_input("订单量预估", placeholder="例如：500-2000件")
             category = st.selectbox("优先品类", ["全部"] + COMPANY["categories"])
 
-        submitted = st.form_submit_button("🔍 AI推荐产品", use_container_width=True)
+        submitted = st.form_submit_button("🔍 AI推荐产品", width='stretch')
 
     if submitted and requirement:
         with st.spinner("AI正在匹配产品..."):
@@ -5003,7 +5032,7 @@ elif page == "📦 产品推荐":
         if sku_data:
             df = pd.DataFrame(sku_data[:20])
             display_cols = [c for c in ["SKU", "中文名", "英文名", "一级类目", "材质", "规格", "MOQ", "价格带"] if c in df.columns]
-            st.dataframe(df[display_cols], use_container_width=True)
+            st.dataframe(df[display_cols], width='stretch')
 
 # ============ 产品库页面（增强版：统一产品数据库 + 智能推荐） ============
 elif page == "📦 产品库":
@@ -5031,7 +5060,7 @@ elif page == "📦 产品库":
                 order_volume = st.text_input("订单量预估", placeholder="例如：500-2000件")
                 category = st.selectbox("优先品类", ["全部"] + COMPANY["categories"])
 
-            submitted = st.form_submit_button("🔍 AI推荐产品", use_container_width=True)
+            submitted = st.form_submit_button("🔍 AI推荐产品", width='stretch')
 
         if submitted and requirement:
             with st.spinner("AI正在匹配产品..."):
@@ -5065,26 +5094,25 @@ elif page == "📦 产品库":
             if sku_data:
                 df = pd.DataFrame(sku_data[:20])
                 display_cols = [c for c in ["SKU", "中文名", "英文名", "一级类目", "材质", "规格", "MOQ", "价格带"] if c in df.columns]
-                st.dataframe(df[display_cols], use_container_width=True)
+                st.dataframe(df[display_cols], width='stretch')
 
         st.stop()
 
     st.title("🏭 产品图片与SEO知识库")
     st.caption("127个已上架产品 · 827张SEO优化图片 · 输入SKU快速查询产品图片和SEO资料")
 
-    # 加载统一产品数据库
+    # 加载统一产品数据库（已缓存，1小时TTL）
     unified_json_path = KB_DIR / "15_产品图片与SEO知识库" / "07_统一产品数据库" / "products_unified.json"
     products_list = []
     if unified_json_path.exists():
-        import json as _json
-        products_list = _json.loads(unified_json_path.read_text(encoding='utf-8'))
-        # 按SKU排序（P2-6 修复：缺 sku 字段时回退空串，避免 KeyError）
-        products_list.sort(key=lambda x: x.get('sku', ''))
+        products_list = _load_products_cached(str(unified_json_path))
     else:
         # 回退到旧索引
         products_json_path = KB_DIR / "15_产品图片与SEO知识库" / "products_index.json"
         if products_json_path.exists():
+            import json as _json
             products_list = _json.loads(products_json_path.read_text(encoding='utf-8'))
+            products_list.sort(key=lambda x: x.get('sku', ''))
 
     if not products_list:
         st.warning("产品数据库未找到")
@@ -5165,12 +5193,12 @@ elif page == "📦 产品库":
         if 'product_cat_pill' not in st.session_state:
             st.session_state['product_cat_pill'] = "全部"
         pill_cols = st.columns(5)
-        if pill_cols[0].button(f"全部 ({len(products_list)})", use_container_width=True,
+        if pill_cols[0].button(f"全部 ({len(products_list)})", width='stretch',
                                type="primary" if st.session_state['product_cat_pill'] == "全部" else "secondary"):
             st.session_state['product_cat_pill'] = "全部"
             st.session_state.pop('selected_product', None)
         for i, c in enumerate(all_cats, 1):
-            if pill_cols[i].button(f"{c} ({cat_counts[c]})", use_container_width=True,
+            if pill_cols[i].button(f"{c} ({cat_counts[c]})", width='stretch',
                                   type="primary" if st.session_state['product_cat_pill'] == c else "secondary"):
                 st.session_state['product_cat_pill'] = c
                 st.session_state.pop('selected_product', None)
@@ -5243,7 +5271,7 @@ elif page == "📦 产品库":
                         if not mp or not Path(mp).exists():
                             mp = product.get('main_image_path', '')
                         if mp and Path(mp).exists():
-                            st.image(str(mp), use_container_width=True)
+                            st.image(str(mp), width='stretch')
                         else:
                             st.info("📷 无图片")
 
@@ -5258,7 +5286,7 @@ elif page == "📦 产品库":
                         st.caption(f"{product.get('category','')} · 💰{price_map.get(product['sku'], '价格待补')}")
 
                         # 查看详情按钮
-                        if st.button(f"查看SEO资料", key=f"detail_{product['sku']}", use_container_width=True):
+                        if st.button(f"查看SEO资料", key=f"detail_{product['sku']}", width='stretch'):
                             st.session_state['selected_product'] = product['sku']
                             st.session_state['_scroll_to_detail'] = True
 
@@ -5283,7 +5311,7 @@ elif page == "📦 产品库":
                     if not mp or not Path(mp).exists():
                         mp = product.get('main_image_path', '')
                     if mp and Path(mp).exists():
-                        st.image(str(mp), use_container_width=True)
+                        st.image(str(mp), width='stretch')
                     else:
                         st.info("📷 无图片")
 
@@ -5311,7 +5339,7 @@ elif page == "📦 产品库":
                     st.session_state[_input_key] = '' if _cur_v in ('', '待补') else _cur_v
                 st.text_input("价格（格式如 $22.00–$38.00）", key=_input_key)
                 _ba, _bb = st.columns(2)
-                if _ba.button("💾 保存此价格", key=f"save_price_{product['sku']}", use_container_width=True):
+                if _ba.button("💾 保存此价格", key=f"save_price_{product['sku']}", width='stretch'):
                     _ov_path = Path("data/price_overrides.json")
                     _ov = {}
                     if _ov_path.exists():
@@ -5331,7 +5359,7 @@ elif page == "📦 产品库":
                     st.session_state['product_price_map'] = price_map
                     st.success(f"✅ 已保存价格：{_val or '已清空'}")
                     st.rerun()
-                if _bb.button("↩️ 恢复 txt 默认", key=f"reset_price_{product['sku']}", use_container_width=True):
+                if _bb.button("↩️ 恢复 txt 默认", key=f"reset_price_{product['sku']}", width='stretch'):
                     _ov_path = Path("data/price_overrides.json")
                     _ov = {}
                     if _ov_path.exists():
@@ -5410,7 +5438,7 @@ elif page == "📦 产品库":
                             icols = st.columns(3)
                             for k, fn in enumerate(all_imgs[r:r+3]):
                                 with icols[k]:
-                                    st.image(str(Path(folder) / fn), use_container_width=True)
+                                    st.image(str(Path(folder) / fn), width='stretch')
                                     info = seo_map.get(fn.lower())
                                     if info:
                                         st.caption(f"角度: {info.get('angle', '')}")
@@ -5459,6 +5487,7 @@ elif page == "🤖 锴利自研AI工具库":
         {"id": "raw_alignment", "name": "选片与RAW对齐", "icon": "📸", "category": "图片处理", "description": "JPG选片匹配RAW原片", "status": "✅ 已上线", "features": "批量上传JPG选片+RAW原片→自动匹配"},
         {"id": "video_reverse", "name": "爆款视频反推", "icon": "🎬", "category": "视频解析", "description": "丢爆款视频→反推分镜→生成剪辑脚本", "status": "✅ 已上线", "features": "链接解析/上传视频→反推分镜表→结合素材+要求→输出剪辑脚本"},
         {"id": "ai_image_studio", "name": "AI作图工作台", "icon": "🖌️", "category": "AI生图", "description": "一站式电商AI作图·主图/详情/风格复刻", "status": "✅ 已上线", "features": "接豆包/GPT/本地模型·主图/详情图/风格复刻·导出HTML"},
+        {"id": "product_catalog", "name": "产品目录编辑器", "icon": "📖", "category": "产品管理", "description": "B2B产品目录可视化编辑·8本册子·报价管理·PDF/Excel导出", "status": "✅ 已上线", "features": "4品类×公开/报价版·333产品图·AES加密·FOB自动算价·一键导出PDF/Excel"},
     ]
 
     # 统计
@@ -5468,7 +5497,7 @@ elif page == "🤖 锴利自研AI工具库":
     with col2:
         st.metric("已上线", len(TOOLS))
     with col3:
-        st.metric("工具分类", 4)
+        st.metric("工具分类", 5)
     with col4:
         st.metric("运行方式", "Streamlit原生")
 
@@ -5482,7 +5511,7 @@ elif page == "🤖 锴利自研AI工具库":
     # 未选中工具时才显示工具列表
     if 'selected_tool_id' not in st.session_state:
         # 分类标签
-        categories_order = ["全部", "产品命名", "图片处理", "AI生图", "视频解析"]
+        categories_order = ["全部", "产品命名", "图片处理", "AI生图", "视频解析", "产品管理"]
         selected_cat = st.radio("🔍 选择工具分类", categories_order, horizontal=True, key="tool_cat_filter")
 
         if selected_cat == "全部":
@@ -5515,7 +5544,7 @@ elif page == "🤖 锴利自研AI工具库":
                         <div style="font-size: 0.85rem; color: #90EE90;">{tool['status']}</div>
                     </div>
                     """, unsafe_allow_html=True)
-                    if st.button(f"🚀 打开工作台", key=f"tool_{tool['id']}", use_container_width=True):
+                    if st.button(f"🚀 打开工作台", key=f"tool_{tool['id']}", width='stretch'):
                         st.session_state['selected_tool_id'] = tool['id']
                         st.rerun()
 
@@ -5545,16 +5574,17 @@ elif page == "🤖 锴利自研AI工具库":
             "raw_alignment": "https://58c26070f39e4dcd872cddf189e2519a.app.workbuddy.host",
             "video_reverse": "https://video-reverse-prompt.app.workbuddy.host/",
             "ai_image_studio": "https://www.51aic.com/",
+            "product_catalog": "https://video-reverse-prompt.app.workbuddy.host/%E4%BA%A7%E5%93%81%E7%9B%AE%E5%BD%95%E7%BC%96%E8%BE%91%E5%99%A8/%E4%BA%A7%E5%93%81%E7%9B%AE%E5%BD%95%E7%BC%96%E8%BE%91%E5%99%A8.html",
         }
         _html_url = _html_links.get(tool_id)
         if _html_url:
             with st.container(border=True):
                 _c1, _c2 = st.columns([3, 1])
                 with _c1:
-                    st.markdown("**🌐 原AI作图工作台网址**")
-                    st.caption("跳转至51aic在线版 · 含全部原始功能；下方为本机 Streamlit 原生版")
+                    st.markdown(f"**🌐 原{tool['name']}网址**")
+                    st.caption("跳转至在线版 · 含全部原始功能；下方为本机 Streamlit 嵌入版")
                 with _c2:
-                    st.link_button("打开原工具 ↗", _html_url, use_container_width=True, type="primary")
+                    st.link_button("打开原工具 ↗", _html_url, width='stretch', type="primary")
 
         st.markdown("---")
 
@@ -5640,7 +5670,7 @@ elif page == "🤖 锴利自研AI工具库":
                     with ai_col2:
                         sku_ai_style = st.text_input("款式号（可选）", placeholder="如：001", key="sku_ai_style")
                         sku_ai_count = st.number_input("生成图片数", 1, 20, 5, key="sku_ai_count")
-                    if st.button("✨ AI智能生成SKU", key="sku_ai_gen", use_container_width=True, type="primary", disabled=not ai.is_configured()):
+                    if st.button("✨ AI智能生成SKU", key="sku_ai_gen", width='stretch', type="primary", disabled=not ai.is_configured()):
                         if not sku_ai_desc:
                             st.warning("请先填写产品描述")
                         else:
@@ -5792,7 +5822,7 @@ SKU格式：KL-品类-材质-款式号
                                     <div style="font-size:11px; color:#888;">{prod['material']}</div>
                                 </div>
                                 """, unsafe_allow_html=True)
-                                if st.button(f"选择 {prod['sku']}", key=f"prod_{prod['sku']}", use_container_width=True):
+                                if st.button(f"选择 {prod['sku']}", key=f"prod_{prod['sku']}", width='stretch'):
                                     st.session_state['selected_product_sku'] = prod['sku']
                                     st.session_state['selected_product_name'] = prod['name']
                                     st.success(f"已选择：{prod['sku']} - {prod['name']}")
@@ -6259,10 +6289,10 @@ SKU格式：KL-品类-材质-款式号
                         col1, col2 = st.columns(2)
                         with col1:
                             st.markdown("**📷 原始图片**")
-                            st.image(img, caption=current_file.name, use_container_width=True)
+                            st.image(img, caption=current_file.name, width='stretch')
                         with col2:
                             st.markdown("**✏️ 线稿效果**")
-                            st.image(result, caption=f"风格: {selected_preset}", use_container_width=True)
+                            st.image(result, caption=f"风格: {selected_preset}", width='stretch')
     
                         # 导出按钮
                         st.markdown("---")
@@ -6276,11 +6306,11 @@ SKU格式：KL-品类-材质-款式号
                                 buf,
                                 file_name=f"{current_file.name.rsplit('.',1)[0]}_lineart.png",
                                 mime="image/png",
-                                use_container_width=True,
+                                width='stretch',
                                 type="primary"
                             )
                         with col2:
-                            if st.button("⚡ 批量导出全部", use_container_width=True):
+                            if st.button("⚡ 批量导出全部", width='stretch'):
                                 if len(uploaded_files) == 0:
                                     st.warning("请先上传图片")
                                 else:
@@ -6327,7 +6357,7 @@ SKU格式：KL-品类-材质-款式号
                                             zip_buf.getvalue(),
                                             file_name="lineart_batch.zip",
                                             mime="application/zip",
-                                            use_container_width=True,
+                                            width='stretch',
                                             type="primary"
                                         )
     
@@ -6496,31 +6526,31 @@ SKU格式：KL-品类-材质-款式号
                         # 一键按钮（在slider之前，直接修改session_state是安全的）
                         qc = st.columns(6)
                         with qc[0]:
-                            if st.button("➖水平", use_container_width=True,key="vc_qh"):
+                            if st.button("➖水平", width='stretch',key="vc_qh"):
                                 st.session_state["vc_ga"] = 0.0
                                 st.rerun()
                         with qc[1]:
-                            if st.button("⏫垂直", use_container_width=True,key="vc_qv"):
+                            if st.button("⏫垂直", width='stretch',key="vc_qv"):
                                 st.session_state["vc_ga"] = 90.0
                                 st.rerun()
                         with qc[2]:
-                            if st.button("📐+45°", use_container_width=True,key="vc_q45"):
+                            if st.button("📐+45°", width='stretch',key="vc_q45"):
                                 cur = st.session_state.get("vc_ga", 0.0)
                                 st.session_state["vc_ga"] = float(cur + 45)
                                 st.rerun()
                         with qc[3]:
-                            if st.button("⇄全员左右", use_container_width=True,key="vc_qf"):
+                            if st.button("⇄全员左右", width='stretch',key="vc_qf"):
                                 st.session_state["vc_gfh"] = not st.session_state.get("vc_gfh", False)
                                 st.rerun()
                         with qc[4]:
-                            if st.button("🔄全部复位", use_container_width=True,type="primary",key="vc_qr"):
+                            if st.button("🔄全部复位", width='stretch',type="primary",key="vc_qr"):
                                 # 只复位参数，保留上传的图片
                                 for k in list(st.session_state.keys()):
                                     if k.startswith("vc_") and k != "vc_upload":
                                         del st.session_state[k]
                                 st.rerun()
                         with qc[5]:
-                            if st.button("🗑️全部清理", use_container_width=True,type="secondary",key="vc_qclear"):
+                            if st.button("🗑️全部清理", width='stretch',type="secondary",key="vc_qclear"):
                                 # 清空所有，包括上传的图片
                                 for k in list(st.session_state.keys()):
                                     if k.startswith("vc_") or k.startswith("_vc_"):
@@ -6534,7 +6564,7 @@ SKU格式：KL-品类-材质-款式号
                         st.caption("使用AI视觉模型分析第一张图片，推荐最佳角度和分类，比传统算法更准确")
                         ai_cols = st.columns([2, 1])
                         with ai_cols[0]:
-                            if st.button("✨ AI智能检测角度与分类", key="vc_ai_detect", use_container_width=True, type="primary"):
+                            if st.button("✨ AI智能检测角度与分类", key="vc_ai_detect", width='stretch', type="primary"):
                                 if uploaded_files:
                                     with st.spinner("AI正在分析图片..."):
                                         try:
@@ -6628,7 +6658,7 @@ SKU格式：KL-品类-材质-款式号
                                     # 按钮区（在slider之前，直接修改session_state是安全的）
                                     bc = st.columns(2)
                                     with bc[0]:
-                                        if st.button("📐几何对齐(推荐)", use_container_width=True,key=pf+"geo"):
+                                        if st.button("📐几何对齐(推荐)", width='stretch',key=pf+"geo"):
                                             st.session_state[pf+"ang"] = 0.0
                                             st.session_state[pf+"tx"] = 0
                                             st.session_state[pf+"ty"] = 0
@@ -6637,7 +6667,7 @@ SKU格式：KL-品类-材质-款式号
                                             st.session_state[pf+"sk"] = 0
                                             st.rerun()
                                     with bc[1]:
-                                        if st.button("🎯视觉重心", use_container_width=True,key=pf+"cg"):
+                                        if st.button("🎯视觉重心", width='stretch',key=pf+"cg"):
                                             st.session_state[pf+"tx"] = 0
                                             st.session_state[pf+"ty"] = 0
                                             st.rerun()
@@ -6645,20 +6675,20 @@ SKU格式：KL-品类-材质-款式号
                                     # 底部按钮
                                     bb = st.columns(4)
                                     with bb[0]:
-                                        if st.button("⇄左右", use_container_width=True,key=pf+"flh"):
+                                        if st.button("⇄左右", width='stretch',key=pf+"flh"):
                                             st.session_state[pf+"fh"] = not st.session_state.get(pf+"fh", False)
                                             st.rerun()
                                     with bb[1]:
-                                        if st.button("⇅上下", use_container_width=True,key=pf+"flv"):
+                                        if st.button("⇅上下", width='stretch',key=pf+"flv"):
                                             st.session_state[pf+"fv"] = not st.session_state.get(pf+"fv", False)
                                             st.rerun()
                                     with bb[2]:
-                                        if st.button("🔁90°", use_container_width=True,key=pf+"r90"):
+                                        if st.button("🔁90°", width='stretch',key=pf+"r90"):
                                             cur = st.session_state.get(pf+"ang", 0.0)
                                             st.session_state[pf+"ang"] = float(cur + 90)
                                             st.rerun()
                                     with bb[3]:
-                                        if st.button("🔄复位", use_container_width=True,key=pf+"rst"):
+                                        if st.button("🔄复位", width='stretch',key=pf+"rst"):
                                             st.session_state[pf+"ang"] = 0.0
                                             st.session_state[pf+"sc"] = 100
                                             st.session_state[pf+"tx"] = 0
@@ -6687,7 +6717,7 @@ SKU格式：KL-品类-材质-款式号
                                                 st.session_state[pf+"ty"],
                                                 show_grid
                                             )
-                                            st.image(result, use_container_width=True)
+                                            st.image(result, width='stretch')
                                         except Exception as e:
                                             st.error(f"处理失败: {e}")
     
@@ -6713,12 +6743,12 @@ SKU格式：KL-品类-材质-款式号
                                         sbuf.seek(0)
                                         st.download_button("📥下载", sbuf,
                                                          file_name=f"{up.name.rsplit('.',1)[0]}_corrected.png",
-                                                         mime="image/png",use_container_width=True,key=pf+"dl")
+                                                         mime="image/png",width='stretch',key=pf+"dl")
     
                     # 批量导出
                     st.markdown("---")
                     st.markdown("### 📦 批量导出")
-                    if st.button("✨ 一键导出4K ZIP", type="primary",use_container_width=True):
+                    if st.button("✨ 一键导出4K ZIP", type="primary",width='stretch'):
                         st.info("🚀 正在生成4K PNG...")
                         zbuf = io.BytesIO()
                         with zipfile.ZipFile(zbuf,'w',zipfile.ZIP_DEFLATED) as zf:
@@ -6745,7 +6775,7 @@ SKU格式：KL-品类-材质-款式号
                         zbuf.seek(0)
                         st.success("✅ 4K ZIP已生成！")
                         st.download_button("📦下载ZIP", zbuf, file_name="corrected_4k.zip",
-                                         mime="application/zip",use_container_width=True)
+                                         mime="application/zip",width='stretch')
     
         # ========== 4. 刀剪产品提示词 ==========
         elif tool_id == 'prompt_library':
@@ -6785,7 +6815,7 @@ SKU格式：KL-品类-材质-款式号
                         pl_style = st.selectbox("风格", ["商业摄影", "生活方式", "极简白底", "户外露营", "工业风", "高端杂志"], key="pl_ai_style")
                         pl_ratio = st.selectbox("比例", ["1:1", "16:9", "4:3", "3:4", "9:16"], key="pl_ai_ratio")
                     pl_extra = st.text_area("补充要求（可选）", placeholder="如：突出刀刃细节，浅景深，暖色调...", height=60, key="pl_ai_extra")
-                    if st.button("✨ AI生成提示词", key="pl_ai_gen", use_container_width=True, type="primary", disabled=not ai.is_configured()):
+                    if st.button("✨ AI生成提示词", key="pl_ai_gen", width='stretch', type="primary", disabled=not ai.is_configured()):
                         if not pl_product:
                             st.warning("请先填写产品描述")
                         else:
@@ -6911,7 +6941,7 @@ SKU格式：KL-品类-材质-款式号
                                     ratios_card = ["1:1", "16:9", "4:3", "3:2"]
                                     for j, r in enumerate(ratios_card):
                                         with rcols[j]:
-                                            if st.button(r, key=f"{rk}_{r}", use_container_width=True):
+                                            if st.button(r, key=f"{rk}_{r}", width='stretch'):
                                                 st.session_state[rk] = r
                                     # 显示当前选中比例
                                     cur_ratio = st.session_state[rk]
@@ -6930,7 +6960,7 @@ SKU格式：KL-品类-材质-款式号
                                         st.code(display_text, language='text', height=220)
                                     with mid_right:
                                         if scene_file.exists():
-                                            st.image(str(scene_file), use_container_width=True)
+                                            st.image(str(scene_file), width='stretch')
                                         else:
                                             st.markdown("<div style='background:#f5f5f5;height:220px;display:flex;align-items:center;justify-content:center;color:#999;font-size:11px;border-radius:6px;'>场景图待生成</div>", unsafe_allow_html=True)
     
@@ -6938,7 +6968,7 @@ SKU格式：KL-品类-材质-款式号
                                     import streamlit.components.v1 as components
                                     btn1, btn2 = st.columns(2)
                                     with btn1:
-                                        if st.button("🌐 切换为中文" if st.session_state[lk] == "en" else "🇬🇧 切换为英文", key=f"pl_tg_{global_idx}", use_container_width=True):
+                                        if st.button("🌐 切换为中文" if st.session_state[lk] == "en" else "🇬🇧 切换为英文", key=f"pl_tg_{global_idx}", width='stretch'):
                                             st.session_state[lk] = "zh" if st.session_state[lk] == "en" else "en"
                                             st.rerun()
                                     with btn2:
@@ -7021,19 +7051,19 @@ SKU格式：KL-品类-材质-款式号
                     st.markdown("**01 · 上传参考场景图**")
                     ref_file = st.file_uploader("参考场景图", type=['jpg','jpeg','png','webp'], key="sr_ref", label_visibility="collapsed")
                     if ref_file:
-                        st.image(ref_file, caption="参考场景图", use_container_width=True)
+                        st.image(ref_file, caption="参考场景图", width='stretch')
                     st.markdown("**02 · 选择产品品类**")
                     category = st.selectbox("品类", ["kitchen_knife · 厨房刀", "outdoor_knife · 户外刀", "scissors · 剪刀", "kitchen_accessory · 厨房用品"], key="sr_cat")
                     st.markdown("**03 · 上传产品白底图**")
                     prod_file = st.file_uploader("产品白底图", type=['jpg','jpeg','png','webp'], key="sr_prod", label_visibility="collapsed")
                     if prod_file:
-                        st.image(prod_file, caption="产品白底图", use_container_width=True)
+                        st.image(prod_file, caption="产品白底图", width='stretch')
                     st.markdown("**04 · 商业渲染微调**")
                     lighting = st.multiselect("光影氛围", ["📸 商业摄影光效", "✨ 真实金属反射", "🌅 暖阳侧逆光", "🔪 浅景深焦外虚化", "💡 影棚柔光", "🌙 冷调工业风"], default=["📸 商业摄影光效", "✨ 真实金属反射"], key="sr_light")
                     st.markdown("**05 · 模型API设置**")
                     model_choice = st.selectbox("视觉多模态大模型", ["豆包 Doubao-vision-pro", "通义千问 VL-Max", "GPT-4o", "Gemini Pro Vision"], key="sr_model")
                     api_key = st.text_input("API Key", type="password", key="sr_apikey")
-                    if st.button("🚀 开始反推", type="primary", use_container_width=True, key="sr_run"):
+                    if st.button("🚀 开始反推", type="primary", width='stretch', key="sr_run"):
                         if not ref_file:
                             st.error("请先上传参考场景图")
                         else:
@@ -7128,7 +7158,7 @@ SKU格式：KL-品类-材质-款式号
                         save_to_kb_button(final_prompt, "场景反推", f"场景反推_{datetime.now().strftime('%Y%m%d_%H%M')}")
                         # 复制按钮
                         copy_btn_key = "sr_copy_" + str(global_idx) if 'global_idx' in dir() else "sr_copy_main"
-                        if st.button("📋 复制当前Prompt", key=copy_btn_key, use_container_width=True, type="primary"):
+                        if st.button("📋 复制当前Prompt", key=copy_btn_key, width='stretch', type="primary"):
                             st.success("✅ 已复制！请到上方代码块右上角点复制按钮，或全选文本复制。")
                     else:
                         st.info("👈 请在左侧上传参考场景图，点击「开始反推」")
@@ -7159,15 +7189,15 @@ SKU格式：KL-品类-材质-款式号
                 # 顶部工具栏
                 tc1, tc2, tc3, tc4, tc5 = st.columns(5)
                 with tc1:
-                    st.button("+ 批量导入照片", key="wb_import_btn", use_container_width=True, type="primary", disabled=True, help="批量功能暂未开放")
+                    st.button("+ 批量导入照片", key="wb_import_btn", width='stretch', type="primary", disabled=True, help="批量功能暂未开放")
                 with tc2:
-                    st.button("⚡ 批量自动校正", key="wb_batch_auto", use_container_width=True, disabled=True, help="批量功能暂未开放")
+                    st.button("⚡ 批量自动校正", key="wb_batch_auto", width='stretch', disabled=True, help="批量功能暂未开放")
                 with tc3:
-                    st.button("💾 导出当前", key="wb_export_cur", use_container_width=True, disabled=True, help="该功能开发中")
+                    st.button("💾 导出当前", key="wb_export_cur", width='stretch', disabled=True, help="该功能开发中")
                 with tc4:
-                    st.button("📦 导出全部(多文件)", key="wb_export_all", use_container_width=True, disabled=True, help="该功能开发中")
+                    st.button("📦 导出全部(多文件)", key="wb_export_all", width='stretch', disabled=True, help="该功能开发中")
                 with tc5:
-                    st.button("🗜️ 批量打包(ZIP)", key="wb_zip_btn", use_container_width=True, disabled=True, help="该功能开发中")
+                    st.button("🗜️ 批量打包(ZIP)", key="wb_zip_btn", width='stretch', disabled=True, help="该功能开发中")
                 st.caption("📦 批量导入/校正/导出功能待开放")
     
                 # 左右布局：左主舞台，右控制面板
@@ -7180,9 +7210,9 @@ SKU格式：KL-品类-材质-款式号
                         <div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">⚡ AI 智能校正引擎</div>
                     </div>
                     """, unsafe_allow_html=True)
-                    if st.button("🔵 自动推演白平衡 (AUTO AWB)", key="wb_auto_awb", use_container_width=True, type="primary"):
+                    if st.button("🔵 自动推演白平衡 (AUTO AWB)", key="wb_auto_awb", width='stretch', type="primary"):
                         st.session_state["wb_auto"] = True
-                    if st.button("🤖 AI智能推荐参数", key="wb_ai_recommend", use_container_width=True):
+                    if st.button("🤖 AI智能推荐参数", key="wb_ai_recommend", width='stretch'):
                         wb_files = st.session_state.get("wb_upload", [])
                         if not wb_files:
                             st.warning("请先在右侧上传产品图")
@@ -7228,7 +7258,7 @@ SKU格式：KL-品类-材质-款式号
                                     st.error(f"AI分析失败：{e}")
                     if "wb_ai_reason" in st.session_state:
                         st.caption(f"💡 AI推荐理由：{st.session_state['wb_ai_reason']}")
-                    st.button("🎯 吸管手动取色校准", key="wb_picker", use_container_width=True, disabled=True, help="该功能开发中")
+                    st.button("🎯 吸管手动取色校准", key="wb_picker", width='stretch', disabled=True, help="该功能开发中")
     
                     # 专业色彩预设
                     st.markdown("""
@@ -7251,7 +7281,7 @@ SKU格式：KL-品类-材质-款式号
                     for pk, plabel in presets_group1:
                         is_active = cur_preset == pk
                         btn_type = "primary" if is_active else "secondary"
-                        if st.button(plabel, key=f"preset_{pk}", use_container_width=True, type=btn_type):
+                        if st.button(plabel, key=f"preset_{pk}", width='stretch', type=btn_type):
                             st.session_state["wb_preset_key"] = pk
                             st.rerun()
     
@@ -7259,7 +7289,7 @@ SKU格式：KL-品类-材质-款式号
                     for pk, plabel in presets_group2:
                         is_active = cur_preset == pk
                         btn_type = "primary" if is_active else "secondary"
-                        if st.button(plabel, key=f"preset_{pk}", use_container_width=True, type=btn_type):
+                        if st.button(plabel, key=f"preset_{pk}", width='stretch', type=btn_type):
                             st.session_state["wb_preset_key"] = pk
                             st.rerun()
     
@@ -7267,7 +7297,7 @@ SKU格式：KL-品类-材质-款式号
                     for pk, plabel in presets_group3:
                         is_active = cur_preset == pk
                         btn_type = "primary" if is_active else "secondary"
-                        if st.button(plabel, key=f"preset_{pk}", use_container_width=True, type=btn_type):
+                        if st.button(plabel, key=f"preset_{pk}", width='stretch', type=btn_type):
                             st.session_state["wb_preset_key"] = pk
                             st.rerun()
     
@@ -7284,7 +7314,7 @@ SKU格式：KL-品类-材质-款式号
                     exposure = st.slider("曝光微调 (Exposure)", -100, 100, 0, key="wb_exp")
                     contrast = st.slider("对比度 (Contrast)", -100, 100, 0, key="wb_cont")
                     saturation = st.slider("饱和度 (Saturation)", -100, 100, 0, key="wb_sat")
-                    if st.button("重置所有参数", key="wb_reset", use_container_width=True):
+                    if st.button("重置所有参数", key="wb_reset", width='stretch'):
                         for k in ["wb_temp","wb_tint","wb_exp","wb_cont","wb_sat","wb_str","wb_preset_key","wb_auto"]:
                             if k in st.session_state:
                                 del st.session_state[k]
@@ -7404,9 +7434,9 @@ SKU格式：KL-品类-材质-款式号
                             with st.expander(f"📷 {name} | AI: {at}K tint={atint} | 预设: {cur_preset}", expanded=(idx==0)):
                                 c1, c2 = st.columns(2)
                                 with c1:
-                                    st.image(orig, caption="原始", use_container_width=True)
+                                    st.image(orig, caption="原始", width='stretch')
                                 with c2:
-                                    st.image(proc, caption="校正后", use_container_width=True)
+                                    st.image(proc, caption="校正后", width='stretch')
                                 buf = _io.BytesIO(); proc.save(buf, format='PNG'); buf.seek(0)
                                 st.download_button(f"📥 下载 {name}", buf, file_name=f"wb_{name}", mime="image/png", key=f"dl_{idx}")
     
@@ -7535,7 +7565,7 @@ SKU格式：KL-品类-材质-款式号
                         with st.container(border=True):
                             st.markdown("**🤖 AI智能匹配（分析文件名相似度）**")
                             st.caption(f"有 {len(missing)} 张JPG未找到RAW，使用AI分析文件名相似度推荐匹配")
-                            if st.button("✨ AI智能匹配未找到的JPG", key="raw_ai_match", use_container_width=True, type="primary"):
+                            if st.button("✨ AI智能匹配未找到的JPG", key="raw_ai_match", width='stretch', type="primary"):
                                 with st.spinner("AI正在分析文件名相似度..."):
                                     try:
                                         missing_names = [j.name for j in missing]
@@ -7616,7 +7646,7 @@ JPG文件（未匹配）：
                             if status == "matched":
                                 c1, c2 = st.columns(2)
                                 with c1:
-                                    st.image(jpg, caption=f"JPG: {jpg.name}", use_container_width=True)
+                                    st.image(jpg, caption=f"JPG: {jpg.name}", width='stretch')
                                 with c2:
                                     st.info(f"RAW: {raw.name}\n大小: {raw.size/1024/1024:.1f}MB")
                                     st.caption("RAW文件在浏览器中无法直接预览，请下载后用Lightroom/Camera Raw打开")
@@ -7697,7 +7727,7 @@ JPG文件（未匹配）：
                     ai_product = st.text_input("产品类型", placeholder="如：厨房刀/剪刀/户外刀/锅具", key="vr_ai_product")
                     ai_theme = st.text_input("视频主题", placeholder="如：工厂工艺展示/产品使用场景/品牌故事", key="vr_ai_theme")
                     ai_count = st.slider("生成镜头数量", 3, 10, 6, key="vr_ai_count")
-                    if st.button("✨ AI生成镜头素材", key="vr_ai_gen", use_container_width=True):
+                    if st.button("✨ AI生成镜头素材", key="vr_ai_gen", width='stretch'):
                         if not ai_product:
                             st.warning("请先填写产品类型")
                         else:
@@ -7771,7 +7801,7 @@ JPG文件（未匹配）：
             st.markdown("---")
             st.markdown("#### 4️⃣ 生成结果")
 
-            if st.button("🚀 生成爆款反推 + 剪辑脚本", type="primary", use_container_width=True, key="vr_generate"):
+            if st.button("🚀 生成爆款反推 + 剪辑脚本", type="primary", width='stretch', key="vr_generate"):
                 if not st.session_state.get('vr_parsed'):
                     st.warning("👆 请先输入视频链接或上传视频文件")
                 elif len(st.session_state['vr_shots']) == 0:
@@ -7957,7 +7987,7 @@ JPG文件（未匹配）：
                 except Exception:
                     pass
 
-                if st.button("🚀 生成图片", type="primary", use_container_width=True, key="ais_gen"):
+                if st.button("🚀 生成图片", type="primary", width='stretch', key="ais_gen"):
                     # 比例映射
                     ratio_map = {
                         '1:1 方图': '1024x1024',
@@ -7981,10 +8011,10 @@ JPG文件（未匹配）：
                                 st.markdown(f"**图片 {gen_idx+1}/{_count}**（模型：{result['model']}，{size}）")
                                 if result.get('local_path'):
                                     # FLUX 本地生成的图片
-                                    st.image(result['local_path'], use_container_width=True)
+                                    st.image(result['local_path'], width='stretch')
                                     st.caption(f"本地文件: {result['local_path']}")
                                 elif result.get('url'):
-                                    st.image(result['url'], use_container_width=True)
+                                    st.image(result['url'], width='stretch')
                                     st.markdown(f"[🔗 打开原图]({result['url']})")
                             else:
                                 st.error(f"图片 {gen_idx+1} 生成失败：{result['error']}")
@@ -8123,7 +8153,7 @@ JPG文件（未匹配）：
                             _rs_out = _rs_pil.resize((int(_rs_new_w), int(_rs_new_h)), PILImage.LANCZOS)
                             _rs_buf = io.BytesIO()
                             _rs_out.save(_rs_buf, format="PNG")
-                            st.image(_rs_out, caption=f"结果：{_rs_new_w}x{_rs_new_h}", use_container_width=True)
+                            st.image(_rs_out, caption=f"结果：{_rs_new_w}x{_rs_new_h}", width='stretch')
                             st.download_button("⬇️ 下载PNG", _rs_buf.getvalue(), file_name="resized.png", mime="image/png", key="tool_rs_dl")
                 
                 # 旋转翻转
@@ -8147,7 +8177,7 @@ JPG文件（未匹配）：
                                 _rot_out = _rot_pil.transpose(PILImage.FLIP_TOP_BOTTOM)
                             _rot_buf = io.BytesIO()
                             _rot_out.save(_rot_buf, format="PNG")
-                            st.image(_rot_out, caption="结果", use_container_width=True)
+                            st.image(_rot_out, caption="结果", width='stretch')
                             st.download_button("⬇️ 下载PNG", _rot_buf.getvalue(), file_name="rotated.png", mime="image/png", key="tool_rot_dl")
                 
                 # 加水印
@@ -8188,7 +8218,7 @@ JPG文件（未匹配）：
                             _wm_out = PILImage.alpha_composite(_wm_pil, _wm_layer).convert("RGB")
                             _wm_buf = io.BytesIO()
                             _wm_out.save(_wm_buf, format="PNG")
-                            st.image(_wm_out, caption="结果", use_container_width=True)
+                            st.image(_wm_out, caption="结果", width='stretch')
                             st.download_button("⬇️ 下载PNG", _wm_buf.getvalue(), file_name="watermarked.png", mime="image/png", key="tool_wm_dl")
                 
                 # 加文字
@@ -8229,7 +8259,7 @@ JPG文件（未匹配）：
                             _tx_out = PILImage.alpha_composite(_tx_pil, _tx_layer).convert("RGB")
                             _tx_buf = io.BytesIO()
                             _tx_out.save(_tx_buf, format="PNG")
-                            st.image(_tx_out, caption="结果", use_container_width=True)
+                            st.image(_tx_out, caption="结果", width='stretch')
                             st.download_button("⬇️ 下载PNG", _tx_buf.getvalue(), file_name="text_added.png", mime="image/png", key="tool_tx_dl")
                 
                 # 画笔涂鸦和橡皮擦（需要前端画布，暂不支持）
@@ -8240,6 +8270,121 @@ JPG文件（未匹配）：
                 st.markdown("#### 📁 资产库")
                 st.info("本地存储的所有生成图片，可导出、重命名、删除")
                 st.markdown("*（资产库数据存储在浏览器本地IndexedDB中）*")
+
+        # ========== 第10个工具：产品目录编辑器 ==========
+        elif tool_id == 'product_catalog':
+            # 工具头部介绍
+            st.markdown("""
+            <div style="background:linear-gradient(135deg,#1a1f2e 0%,#252d3d 100%);border-radius:12px;padding:1.5rem;margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;gap:1rem;">
+                    <div style="font-size:3rem;">📖</div>
+                    <div>
+                        <h2 style="color:#fff;margin:0;font-size:1.4rem;">产品目录编辑器</h2>
+                        <div style="color:#9aa3b8;font-size:0.9rem;margin-top:0.3rem;">
+                            KaiLionCrafts B2B产品目录可视化编辑工作台 · 8本册子 · 报价管理 · PDF/Excel一键导出
+                        </div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # 功能概览卡片
+            _pc_cols = st.columns(4)
+            with _pc_cols[0]:
+                st.metric("产品册子", "8本", "4品类×公开/报价版")
+            with _pc_cols[1]:
+                st.metric("产品原图", "333张", "内置图库+缩略图")
+            with _pc_cols[2]:
+                st.metric("数据加密", "AES-256", "本地密码保护")
+            with _pc_cols[3]:
+                st.metric("导出格式", "PDF+Excel", "零压缩原图字节")
+
+            st.markdown("---")
+
+            # 本地内嵌版本（iframe，随Streamlit工作台一起启动，无需单独启动HTTP服务）
+            st.markdown("#### 🖥️ 产品目录编辑器（本地内嵌版）")
+            st.caption("已完整内嵌至本工作台，随工作台一起启动，无需单独部署；以下为直接嵌入操作界面，可在本页面内直接使用")
+
+            _pc_iframe_url = "/app/static/product_catalog/产品目录编辑器.html"
+            try:
+                # st.iframe is built-in, no import needed
+                st.iframe(_pc_iframe_url, height=780, scrolling=True)
+            except Exception as _pc_e:
+                st.warning(f"iframe嵌入加载中，如无法显示请点击上方「打开原工具 ↗」按钮在新窗口打开。错误：{_pc_e}")
+                st.link_button("↗ 在新窗口打开产品目录编辑器", _pc_iframe_url, width='stretch')
+
+            st.markdown("---")
+
+            # 功能说明
+            st.markdown("#### ✨ 核心功能")
+            _pc_f1, _pc_f2 = st.columns(2)
+            with _pc_f1:
+                st.markdown("""
+                **📋 目录编辑**
+                - 8本产品册子（厨刀/套刀/剪刀/配件/户外刀 × 公开版/报价版）
+                - 三栏布局：左名片列表 · 中编辑区 · 右A4纸面预览
+                - 名片拖拽排序、复制、删除、新增
+                - 撤销/重做（Ctrl+Z / Ctrl+Y）
+                - 产品图片选择（内置图库 + H盘候选图）
+
+                **💰 报价管理**
+                - FOB单价自动算阶梯价（500件×0.94 / 1000件×0.88）
+                - HTS美国海关编码自动匹配（按品类+段码规则）
+                - 交期、MOQ等贸易字段管理
+                - 报价版与公开版分离，客户只看到公开版
+                """)
+            with _pc_f2:
+                st.markdown("""
+                **📤 导出功能**
+                - PDF导出：A4 3列×3行/页，图片零压缩走原始字节
+                - Excel导出：先预览确认再下载，多Sheet按册子分
+                - 支持单册导出 / 全部册子批量导出
+                - 导出PDF与预览逐像素一致
+
+                **🔒 安全机制**
+                - 本地HTTP环境AES-256-GCM加密，6位密码访问
+                - 密码不落前端文件，解密成功即验证通过
+                - file://协议自动跳过密码（本内嵌版走HTTP，需密码）
+                - 数据文件随机命名，防直接抓取
+
+                **🔄 其他功能**
+                - 规格校准报告（174条改动明细可查）
+                - 批量导SKU（选文件夹自动建名片）
+                - 导入资料（粘贴AI分析JSON）
+                - 云同步（多设备共享同一份数据）
+                """)
+
+            st.markdown("---")
+
+            # 使用提示
+            with st.expander("💡 使用提示与注意事项", expanded=True):
+                st.markdown("""
+                **🔑 本地内嵌版（本页面）免密码**
+                - 本页面内嵌的是**本地免密码版**，已进入企业AI工作台，无需重复输入密码，直接使用
+                - 数据解密在后台自动完成，用户无感知
+                - 编辑后的数据保存在浏览器localStorage，同一浏览器同一设备可保留
+
+                **🌐 顶部「打开原工具 ↗」= 云端版**
+                - 点击上方红色「打开原工具 ↗」按钮，打开的是**云端独立部署版**
+                - 云端版数据实时更新，适合在其他设备/异地/客户演示时使用
+                - 云端版需输入访问密码：**441723**（6位数字）
+                - 两个版本数据独立存储，本地修改不会自动同步到云端
+
+                **🖥️ 使用方式**
+                - 日常编辑：直接在本页面iframe内操作即可，免密码
+                - 如需更大操作空间：可点击上方「打开原工具 ↗」在新窗口打开云端版全屏使用
+                - 导出PDF时建议在新窗口全屏打开后操作，iframe内打印可能受浏览器限制
+
+                **📂 代码位置**
+                - 本地内嵌版完整源码：`AI客户开发工作台/static/product_catalog/`
+                - 包含：主程序HTML（已预设免密码）、核心JS引擎（5400行）、333张产品原图、AES加密数据文件
+                - 随Streamlit工作台一起启动，**无需单独启动HTTP服务器**
+
+                **⚠️ 数据说明**
+                - 当前数据为2026-10-09打包快照（8本册子 / 333张产品图）
+                - 云同步功能（_cloud.js）在本地HTTP环境下自动停用，不影响任何功能
+                - 如需重置本地数据：清除浏览器localStorage中 `kc_editor_v2_*` 相关项即可
+                """)
 
         # 知识库连接说明（所有工具都显示）
         with st.expander("📚 本工具连接的公司知识库", expanded=False):
@@ -8262,7 +8407,7 @@ JPG文件（未匹配）：
         # 新员工指南
         with st.expander("👋 新员工使用指南", expanded=False):
             st.markdown("""
-                **8个工具快速上手：**
+                **10个工具快速上手：**
 
                 1. 🏷️ **SKU命名工具** - 选品类+材质，一键生成SKU和SEO命名
                 2. ✏️ **产品线稿工具** - 上传产品图，转线稿效果
@@ -8272,11 +8417,14 @@ JPG文件（未匹配）：
                 6. 🌈 **白平衡校正工具** - 自动校正图片白平衡
                 7. 📸 **选片与RAW对齐** - JPG选片匹配RAW原片
                 8. 🎬 **爆款视频反推** - 丢爆款视频→反推分镜→生成剪辑脚本
+                9. 🖌️ **AI作图工作台** - 一站式电商AI作图·主图/详情/风格复刻
+                10. 📖 **产品目录编辑器** - B2B产品目录可视化编辑·8本册子·PDF/Excel导出
 
                 **注意事项：**
             - 所有图片处理在浏览器本地完成
             - 支持JPG/PNG格式
             - 处理后的图片可直接下载使用
+            - 产品目录编辑器线上版访问密码：441723
             """)
 
 # ============ 独立站SEO中心（合并三个SEO功能） ============
@@ -8294,7 +8442,7 @@ elif page == "🔍 独立站SEO中心" and "seo_sub" not in st.session_state:
         <div style="font-size:12px;color:#1e40af;margin-top:4px;">关键词密度 · 表格分析</div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("进入SEO表格", key="goto_seo_table", use_container_width=True):
+        if st.button("进入SEO表格", key="goto_seo_table", width='stretch'):
             st.session_state["seo_sub"] = "table"
             st.rerun()
     with s2:
@@ -8305,7 +8453,7 @@ elif page == "🔍 独立站SEO中心" and "seo_sub" not in st.session_state:
         <div style="font-size:12px;color:#92400e;margin-top:4px;">SKU命名 · 上品优化</div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("进入上品SEO", key="goto_seo_listing", use_container_width=True):
+        if st.button("进入上品SEO", key="goto_seo_listing", width='stretch'):
             st.session_state["seo_sub"] = "listing"
             st.rerun()
     s3, s4 = st.columns(2)
@@ -8317,7 +8465,7 @@ elif page == "🔍 独立站SEO中心" and "seo_sub" not in st.session_state:
         <div style="font-size:12px;color:#9d174d;margin-top:4px;">SKU+白底图→SEO文件名/ALT</div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("进入图片SEO命名", key="goto_image_seo", use_container_width=True):
+        if st.button("进入图片SEO命名", key="goto_image_seo", width='stretch'):
             st.session_state["seo_sub"] = "image"
             st.rerun()
     with s4:
@@ -8328,7 +8476,7 @@ elif page == "🔍 独立站SEO中心" and "seo_sub" not in st.session_state:
         <div style="font-size:12px;color:#065f46;margin-top:4px;">博客内容 · SEO写作</div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("进入博客SEO", key="goto_seo_blog", use_container_width=True):
+        if st.button("进入博客SEO", key="goto_seo_blog", width='stretch'):
             st.session_state["seo_sub"] = "blog"
             st.rerun()
     s5, s6 = st.columns(2)
@@ -8340,7 +8488,7 @@ elif page == "🔍 独立站SEO中心" and "seo_sub" not in st.session_state:
         <div style="font-size:12px;color:#5b21b6;margin-top:4px;">内容集群 · 技术检查 · 评分卡</div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("进入SEO策略", key="goto_seo_strategy", use_container_width=True):
+        if st.button("进入SEO策略", key="goto_seo_strategy", width='stretch'):
             st.session_state["seo_sub"] = "strategy"
             st.rerun()
     with s6:
@@ -8351,7 +8499,7 @@ elif page == "🔍 独立站SEO中心" and "seo_sub" not in st.session_state:
         <div style="font-size:12px;color:#9a3412;margin-top:4px;">市场×竞争×利润×合规</div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("进入产品评分卡", key="goto_seo_scorecard", use_container_width=True):
+        if st.button("进入产品评分卡", key="goto_seo_scorecard", width='stretch'):
             st.session_state["seo_sub"] = "scorecard"
             st.rerun()
 
@@ -8382,7 +8530,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "i
         with col_analyze:
             st.markdown("**🔍 AI视觉分析**")
             st.caption("用glm-4.6v-flash看懂图片，自动识别产品类型/材质/角度")
-            if st.button("🤖 AI分析图片内容", use_container_width=True, key="ai_analyze_image"):
+            if st.button("🤖 AI分析图片内容", width='stretch', key="ai_analyze_image"):
                 with st.spinner("AI正在分析图片..."):
                     import base64
                     img_bytes = uploaded_img.getvalue()
@@ -8417,7 +8565,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "i
 
     # 第三步：生成SEO命名
     st.markdown("### 🎯 第三步：生成SEO命名")
-    if st.button("⚡ 生成图片SEO命名", type="primary", use_container_width=True):
+    if st.button("⚡ 生成图片SEO命名", type="primary", width='stretch'):
         if not sku_input:
             st.warning("请先输入产品SKU")
         else:
@@ -8507,7 +8655,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "l
     # 第三步：生成联网搜索Prompt
     st.markdown("### 🔍 第三步：生成联网搜索Prompt（复制到豆包专家模式）")
     
-    if st.button("⚡ 生成联网搜索Prompt", use_container_width=True, type="primary"):
+    if st.button("⚡ 生成联网搜索Prompt", width='stretch', type="primary"):
         if not sku:
             st.warning("请先填写产品SKU")
         else:
@@ -8573,7 +8721,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "l
     # 第四步：生成完整SEO内容Prompt
     st.markdown("### 🎯 第四步：生成完整SEO内容Prompt（22模块输出）")
     
-    if st.button("⚡ 生成SEO内容生成Prompt", use_container_width=True, type="primary"):
+    if st.button("⚡ 生成SEO内容生成Prompt", width='stretch', type="primary"):
         if not sku:
             st.warning("请先填写产品SKU")
         else:
@@ -8633,7 +8781,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "l
         st.markdown("---")
         st.markdown("#### 🚀 或直接用工作台AI生成完整SEO内容")
         st.caption("直接调用当前AI模型生成22模块完整SEO内容，无需复制到其他工具")
-        if st.button("🤖 AI直接生成SEO内容", use_container_width=True, type="primary", key="ai_gen_seo_content"):
+        if st.button("🤖 AI直接生成SEO内容", width='stretch', type="primary", key="ai_gen_seo_content"):
             if not sku:
                 st.warning("请先填写产品SKU")
             else:
@@ -8657,7 +8805,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "l
             st.download_button("📋 下载SEO内容.txt",
                 st.session_state['seo_result'],
                 file_name=f"SEO_{sku}_{datetime.now().strftime('%Y%m%d')}.txt",
-                use_container_width=True)
+                width='stretch')
             # Trace显示
             if ai.last_trace:
                 t = ai.last_trace
@@ -8777,7 +8925,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "t
     # 第三步：生成完整Prompt
     st.markdown("### 🚀 第三步：生成AI识别+联网搜索+表格生成Prompt")
 
-    if st.button("⚡ 生成完整工作流Prompt", use_container_width=True, type="primary"):
+    if st.button("⚡ 生成完整工作流Prompt", width='stretch', type="primary"):
         if not uploaded_image:
             st.warning("请先上传产品图片")
         else:
@@ -8902,7 +9050,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "t
     
     gen_col1, gen_col2 = st.columns([2, 1])
     with gen_col1:
-        if st.button("✨ AI直接生成SEO表格", key="seo_table_ai_gen", use_container_width=True, type="primary"):
+        if st.button("✨ AI直接生成SEO表格", key="seo_table_ai_gen", width='stretch', type="primary"):
             if not uploaded_image:
                 st.warning("请先上传产品图片")
             else:
@@ -9023,7 +9171,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "t
                     except Exception as e:
                         st.error(f"AI生成失败：{e}")
     with gen_col2:
-        if st.button("📋 复制表格内容", key="seo_table_copy", use_container_width=True):
+        if st.button("📋 复制表格内容", key="seo_table_copy", width='stretch'):
             if 'seo_table_result' in st.session_state:
                 st.success("✅ 已复制到剪贴板（请手动选择文本复制）")
             else:
@@ -9057,7 +9205,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "t
                 data=f,
                 file_name="KaiLionCrafts_产品SEO表格模板.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
+                width='stretch'
             )
         st.caption("模板包含5大板块：基础SKU、识别特征、SEO命名、市场定位、中英文描述")
     else:
@@ -9151,11 +9299,11 @@ elif page == "📈 销售管道":
                         stage_idx = next(i for i, s in enumerate(PIPELINE_STAGES) if s["key"] == stage["key"])
                         if stage_idx < len(PIPELINE_STAGES) - 1:
                             next_stage = PIPELINE_STAGES[stage_idx + 1]
-                            if st.button(f"→ {next_stage['name']}", key=f"move_{c['id']}", use_container_width=True):
+                            if st.button(f"→ {next_stage['name']}", key=f"move_{c['id']}", width='stretch'):
                                 cm.move_stage(c["id"], next_stage["key"])
                                 st.rerun()
                     with col3:
-                        if st.button("👁️ 详情", key=f"view_{c['id']}", use_container_width=True):
+                        if st.button("👁️ 详情", key=f"view_{c['id']}", width='stretch'):
                             st.session_state["view_customer"] = c["id"]
                             st.toast(f"已选中：{c.get('company_name','')}（请到「👥 客户中心 → 客户管理」查看完整档案）")
             else:
@@ -9177,7 +9325,7 @@ elif page == "📈 销售管道":
     st.subheader("🤖 AI管道智能分析")
     st.caption("AI分析销售管道瓶颈、转化率、重点客户，给出推进建议")
     
-    if st.button("✨ AI分析销售管道", key="pipeline_ai_analysis", use_container_width=True, type="primary"):
+    if st.button("✨ AI分析销售管道", key="pipeline_ai_analysis", width='stretch', type="primary"):
         with st.spinner("AI正在分析销售管道..."):
             try:
                 # 收集管道数据
@@ -9332,7 +9480,7 @@ elif page == "👥 客户管理":
                         _status_opts,
                         index=_status_idx,
                         key=f"status_{c['id']}")
-                    if st.button("💾 更新状态", key=f"update_{c['id']}", use_container_width=True):
+                    if st.button("💾 更新状态", key=f"update_{c['id']}", width='stretch'):
                         cm.update_customer(c["id"], {"status": new_status})
                         cm.add_activity(c["id"], "状态变更", f"状态更新为: {new_status}")
                         st.success("已更新！")
@@ -9341,7 +9489,7 @@ elif page == "👥 客户管理":
                     # 跟进提醒设置
                     st.markdown("**⏰ 跟进提醒**")
                     follow_days = st.selectbox("几天后跟进", [1, 3, 7, 14, 30], index=1, key=f"follow_days_{c['id']}")
-                    if st.button("📅 设置跟进", key=f"set_follow_{c['id']}", use_container_width=True):
+                    if st.button("📅 设置跟进", key=f"set_follow_{c['id']}", width='stretch'):
                         cm.set_next_follow_up(c["id"], days=follow_days)
                         cm.add_activity(c["id"], "设置提醒", f"设置{follow_days}天后跟进")
                         st.success(f"已设置{follow_days}天后跟进")
@@ -9359,7 +9507,7 @@ elif page == "👥 客户管理":
                 if c.get("analysis"):
                     with st.expander("查看已有AI分析", expanded=False):
                         st.markdown(c["analysis"])
-                if st.button("🔍 一键AI分析客户", key=f"ai_analyze_{c['id']}", use_container_width=True):
+                if st.button("🔍 一键AI分析客户", key=f"ai_analyze_{c['id']}", width='stretch'):
                     with st.spinner("AI正在分析客户..."):
                         prompt = f"""请对以下外贸客户进行深度分析，并给出跟进策略：
 
@@ -9456,7 +9604,7 @@ elif page == "📈 市场与产品分析":
     for i, (name, desc) in enumerate(mp_sections.items()):
         with mp_cols[i]:
             is_active = st.session_state["mp_sub"] == name
-            if st.button(name, key=f"mpbtn_{name}", use_container_width=True,
+            if st.button(name, key=f"mpbtn_{name}", width='stretch',
                          type="primary" if is_active else "secondary"):
                 st.session_state["mp_sub"] = name
                 st.rerun()
@@ -9479,7 +9627,7 @@ elif page == "📈 市场与产品分析":
                 target_market = st.selectbox("目标市场", ["美国 (USA)", "德国 (Germany)", "英国 (UK)", "日本 (Japan)", "澳大利亚 (Australia)", "加拿大 (Canada)", "其他"])
             with col2:
                 product_category = st.selectbox("产品品类", COMPANY["categories"], key="mp_entry_cat")
-            if st.button("🔬 AI生成入市分析", use_container_width=True, type="primary"):
+            if st.button("🔬 AI生成入市分析", width='stretch', type="primary"):
                 with st.spinner("AI分析中..."):
                     prompt = MARKET_ANALYSIS_PROMPT.format(target_market=target_market, product_category=product_category, company_profile=kb.get_company_brief())
                     result = ai.chat(prompt)
@@ -9500,7 +9648,7 @@ elif page == "📈 市场与产品分析":
             with col3:
                 bs_price = st.selectbox("目标价格带", ["<$5", "$5-20", "$20-50", "$50-100", ">$100"], key="bs_price")
             bs_extra = st.text_input("补充想法（可选）", placeholder="例如：带包装/可激光刻字/套装", key="bs_extra")
-            if st.button("🌊 AI蓝海选品分析", use_container_width=True, type="primary"):
+            if st.button("🌊 AI蓝海选品分析", width='stretch', type="primary"):
                 with st.spinner("AI分析蓝海机会..."):
                     prompt = f"""# 刀剪五金品类 · 蓝海选品调研（对标 amazon-blue-ocean-research 工作流）
 
@@ -9537,7 +9685,7 @@ elif page == "📈 市场与产品分析":
             with col2:
                 voc_source = st.selectbox("评价来源（可选）", ["亚马逊", "独立站评论", "速卖通", "综合"], key="voc_source")
             voc_review = st.text_area("粘贴客户评价/差评原文（可选）", placeholder="粘贴几条真实评价，AI会更准；留空则让AI基于行业经验分析", height=90, key="voc_review")
-            if st.button("💬 AI分析VOC", use_container_width=True, type="primary"):
+            if st.button("💬 AI分析VOC", width='stretch', type="primary"):
                 with st.spinner("AI提炼客户之声..."):
                     review_txt = voc_review.strip() if voc_review else "（未提供原文，请基于该品类行业普遍评价经验分析）"
                     prompt = f"""# 刀剪产品 · VOC客户之声（对标 amazon-voc-consumer-insights）
@@ -9567,7 +9715,7 @@ elif page == "📈 市场与产品分析":
                 kw_product = st.text_input("产品/品类", placeholder="例如：bamboo cutting board", key="kw_product")
             with col2:
                 kw_lang = st.selectbox("输出语言", ["英文", "中文", "中英"], key="kw_lang")
-            if st.button("🔑 AI挖掘关键词", use_container_width=True, type="primary"):
+            if st.button("🔑 AI挖掘关键词", width='stretch', type="primary"):
                 with st.spinner("AI挖掘关键词..."):
                     prompt = f"""# 刀剪产品 · 关键词资产库（对标 amazon-keyword-library）
 
@@ -9620,7 +9768,7 @@ elif page == "📈 市场与产品分析":
             st.markdown("##### Listing健康度诊断")
             st.caption("对标 amazon-listing-health-diagnostic：基线→生命周期/资产保护→关键词与竞品→评论内容属性→问题与修改边界")
             asin = st.text_input("输入ASIN或产品SKU", placeholder="B0XXXXXX 或 KL-KN-HM-003")
-            if st.button("🔍 AI诊断", use_container_width=True, type="primary"):
+            if st.button("🔍 AI诊断", width='stretch', type="primary"):
                 if asin:
                     with st.spinner("AI正在诊断Listing..."):
                         prompt = f"""# Amazon Listing 健康诊断（对标 amazon-listing-health-diagnostic）
@@ -9651,7 +9799,7 @@ elif page == "📈 市场与产品分析":
             with col2:
                 p_target = st.selectbox("目标市场", ["美国", "欧洲", "日本", "澳大利亚"])
                 p_style = st.selectbox("文案风格", ["B2B批发专业风", "Amazon零售风", "独立站品牌风"])
-            if st.button("✍️ 生成Listing文案", use_container_width=True, type="primary"):
+            if st.button("✍️ 生成Listing文案", width='stretch', type="primary"):
                 with st.spinner("AI正在生成..."):
                     prompt = f"""# 产品Listing文案生成（对标 amazon-listing-optimizer）
 
@@ -9679,7 +9827,7 @@ elif page == "📈 市场与产品分析":
                 my_asin = st.text_input("我方产品ASIN/SKU", key="my_asin")
             with col2:
                 comp_asin = st.text_input("竞品ASIN/SKU", key="comp_asin")
-            if st.button("⚖️ AI对比分析", use_container_width=True, type="primary"):
+            if st.button("⚖️ AI对比分析", width='stretch', type="primary"):
                 with st.spinner("对比分析中..."):
                     prompt = f"""# 竞品对比分析任务
 
@@ -9710,7 +9858,7 @@ elif page == "📈 市场与产品分析":
             pp_reviews = st.text_area("粘贴竞品1-3星评论（可选，有就贴，没有AI会基于常识推理）",
                                       height=100, key="pp_reviews",
                                       placeholder="如：Sharp but rusts easily / Handle broke after 2 months / Not worth the price...")
-            pp_submit = st.form_submit_button("🔍 挖掘竞品痛点", type="primary", use_container_width=True)
+            pp_submit = st.form_submit_button("🔍 挖掘竞品痛点", type="primary", width='stretch')
 
         if pp_submit and pp_asin:
             with st.spinner("AI分析竞品痛点..."):
@@ -9770,7 +9918,7 @@ elif page == "📈 市场与产品分析":
             with col2:
                 ad_sales = st.number_input("日均广告销售额($)", min_value=0, value=200)
                 ad_acos = st.number_input("ACOS(%)", min_value=0, max_value=200, value=35)
-            if st.button("🎯 AI判断产品角色", use_container_width=True, type="primary"):
+            if st.button("🎯 AI判断产品角色", width='stretch', type="primary"):
                 with st.spinner("分析中..."):
                     prompt = f"""# Amazon广告产品角色与打法（对标 ad-strategy-commander）
 
@@ -9823,16 +9971,16 @@ ACOS: {ad_acos}%
                         st.markdown("##### ✅ 高转化词（建议加价/转精准）")
                         if ord_col:
                             top = g[g[ord_col] > 0].head(15)
-                            st.dataframe(top, use_container_width=True)
+                            st.dataframe(top, width='stretch')
                         st.markdown("##### ❌ 零转化高花费词（建议否定）")
                         if ord_col and cost_col:
                             neg = g[(g[ord_col] == 0) & (g[cost_col] > 0)].sort_values(cost_col, ascending=False).head(15)
-                            st.dataframe(neg, use_container_width=True)
+                            st.dataframe(neg, width='stretch')
                             if len(neg) > 0:
                                 st.code("请把以下词加入否定精确/词组：\n" + "\n".join(neg[kw_col].astype(str).tolist()))
                         else:
                             st.info("该报告缺少订单/花费列，无法判断，仅展示原始数据")
-                            st.dataframe(g.head(20), use_container_width=True)
+                            st.dataframe(g.head(20), width='stretch')
                     else:
                         st.warning("未识别到搜索词列，请确认是亚马逊搜索词报告")
                 except Exception as e:
@@ -9858,7 +10006,7 @@ ACOS: {ad_acos}%
             with col2:
                 v_style = st.selectbox("风格", ["亚马逊高端白底", "独立站品牌风", "极简白底", "生活方式"], key="v_style2")
                 v_ratio = st.selectbox("主图比例", ["1:1 (1000x1000)", "3:4 (750x1000)", "4:5"], key="v_ratio2")
-            if st.button("🎨 生成整套图片方案", use_container_width=True, type="primary"):
+            if st.button("🎨 生成整套图片方案", width='stretch', type="primary"):
                 with st.spinner("生成整套图片方案..."):
                     prompt = f"""# 亚马逊主副图整套方案（对标 listing-image-workflow + kailioncrafts-image-seo）
 
@@ -9884,7 +10032,7 @@ ACOS: {ad_acos}%
                 a_product = st.text_input("产品名称", key="a_plus_product")
             with col2:
                 a_level = st.radio("A+类型", ["基础版 A+ (Basic)", "高级版 Premium A+"], horizontal=True, key="a_level")
-            if st.button("📐 生成A+布局", use_container_width=True, type="primary"):
+            if st.button("📐 生成A+布局", width='stretch', type="primary"):
                 with st.spinner("生成中..."):
                     prompt = f"""# Amazon A+ Content 布局规划（对标 amazon-aplus-image-workflow）
 
@@ -9933,7 +10081,7 @@ elif page == "📚 公司知识库":
     for i, (name, desc) in enumerate(kb_sections.items()):
         with kb_cols[i]:
             is_active = st.session_state["kb_sub"] == name
-            if st.button(name, key=f"kbbtn_{name}", use_container_width=True,
+            if st.button(name, key=f"kbbtn_{name}", width='stretch',
                          type="primary" if is_active else "secondary"):
                 st.session_state["kb_sub"] = name
                 st.rerun()
@@ -9965,7 +10113,7 @@ elif page == "📚 公司知识库":
         quick_cols = st.columns(4)
         for i, mod in enumerate(ckb.QUICK_MODULES):
             with quick_cols[i % 4]:
-                if st.button(f"{mod['icon']} {mod['name']}", key=f"kb7_quick_{i}", use_container_width=True):
+                if st.button(f"{mod['icon']} {mod['name']}", key=f"kb7_quick_{i}", width='stretch'):
                     st.session_state["kb7_search_input"] = mod['keyword']
                     st.rerun()
         
@@ -10046,7 +10194,7 @@ elif page == "📚 公司知识库":
                                     if summary:
                                         st.caption(summary[:100])
                                 with col2:
-                                    if st.button("📖 查看", key=f"kb7_file_{f_idx}", use_container_width=True):
+                                    if st.button("📖 查看", key=f"kb7_file_{f_idx}", width='stretch'):
                                         st.session_state['kb7_view_file'] = f['path']
                                         st.session_state['kb7_view_title'] = title
                                         st.rerun()
@@ -10101,7 +10249,7 @@ elif page == "📚 公司知识库":
         qcols = st.columns(4)
         for i, (btn_label, kw) in enumerate(quick):
             with qcols[i % 4]:
-                if st.button(btn_label, use_container_width=True, key=f"kbquick_{i}"):
+                if st.button(btn_label, width='stretch', key=f"kbquick_{i}"):
                     st.session_state["kb_search_input"] = kw
                     st.rerun()
 
@@ -10137,7 +10285,7 @@ elif page == "📚 公司知识库":
             key="kb_ai_question",
             label_visibility="collapsed"
         )
-        if st.button("🔍 AI智能回答", use_container_width=True, key="kb_ai_ask_btn"):
+        if st.button("🔍 AI智能回答", width='stretch', key="kb_ai_ask_btn"):
             if kb_question:
                 with st.spinner("AI正在搜索知识库并生成回答..."):
                     try:
@@ -10309,7 +10457,7 @@ elif page == "📚 公司知识库":
                         "体积": _fmt_size(sz),
                     })
                 import pandas as _pd
-                st.dataframe(_pd.DataFrame(rows_recent), use_container_width=True, hide_index=True)
+                st.dataframe(_pd.DataFrame(rows_recent), width='stretch', hide_index=True)
                 today = _time.strftime("%Y-%m-%d")
                 today_cnt = sum(1 for mt, *_ in recent if _time.strftime("%Y-%m-%d", _time.localtime(mt)) == today)
                 st.success(f"📅 今天新增/更新了 {today_cnt} 个文件")
@@ -10331,7 +10479,7 @@ elif page == "📚 公司知识库":
         add_body = st.text_area("文档内容（Markdown）", height=180, placeholder="粘贴/撰写知识正文...")
         add_file = st.file_uploader("或直接上传文档", type=['md', 'txt', 'csv'], key="add_kb_file")
 
-        if st.button("💾 保存到知识库", type="primary", use_container_width=True):
+        if st.button("💾 保存到知识库", type="primary", width='stretch'):
             import re as _re
             safe_name = _re.sub(r'[\\/:\*\?"<>\|]+', "_", (add_title or "未命名文档")).strip()
             target_dir = kb_root / add_cat
@@ -10358,7 +10506,7 @@ elif page == "📚 公司知识库":
         st.markdown("##### 🤖 对话记录 → 知识")
         st.caption("把一段工作对话/问答贴进来，AI 自动提炼成结构化知识后存入选定分类")
         conv = st.text_area("粘贴对话/笔记原文", height=160, key="kb_conv")
-        if st.button("✨ AI 提炼成知识", type="primary", use_container_width=True):
+        if st.button("✨ AI 提炼成知识", type="primary", width='stretch'):
             if not conv.strip():
                 st.warning("请先粘贴内容")
             else:
@@ -10376,7 +10524,7 @@ elif page == "📚 公司知识库":
             import re as _re
             d_cat = st.selectbox("保存到分类", cat_dirs, key="distill_cat")
             d_title = st.text_input("文档标题", value="提炼知识文档", key="distill_title")
-            if st.button("💾 保存提炼结果", use_container_width=True):
+            if st.button("💾 保存提炼结果", width='stretch'):
                 safe_name = _re.sub(r'[\\/:\*\?"<>\|]+', "_", d_title).strip()
                 dest = kb_root / d_cat / f"{safe_name}.md"
                 dest.parent.mkdir(parents=True, exist_ok=True)
@@ -10438,7 +10586,7 @@ elif page == "📚 公司知识库":
                     df.to_csv(index=False).encode('utf-8-sig'),
                     file_name="五金刀剪行业独立站资源库.csv",
                     mime="text/csv",
-                    use_container_width=True,
+                    width='stretch',
                 )
             with c2:
                 st.info("💡 建议：优先研究「阳江本地工厂」和「同行竞品」的建站风格，「零售平台」可作为潜在B2B客户开发")
@@ -10464,7 +10612,7 @@ elif page == "📚 公司知识库":
         st.caption("飞书应用 App ID：cli_aa2c7e3b30b8dbd88（以下操作实时调用飞书开放平台 API）")
         f_t1, f_t2, f_t3 = st.tabs(["🔌 连接测试", "📁 云盘文件", "🔔 发消息 / 建文档"])
         with f_t1:
-            if st.button("🧪 测试飞书连接", type="primary", use_container_width=True):
+            if st.button("🧪 测试飞书连接", type="primary", width='stretch'):
                 if _fs:
                     with st.spinner("正在连接飞书..."):
                         try:
@@ -10476,7 +10624,7 @@ elif page == "📚 公司知识库":
                 else:
                     st.error("feishu_client 不可用")
         with f_t2:
-            if st.button("📂 拉取云盘文件列表", use_container_width=True):
+            if st.button("📂 拉取云盘文件列表", width='stretch'):
                 if _fs:
                     with st.spinner("拉取中..."):
                         try:
@@ -10490,7 +10638,7 @@ elif page == "📚 公司知识库":
                                 st.success(f"共 {len(files)} 个文件/文件夹")
                                 st.dataframe([{"名称": f.get("name"), "类型": f.get("type"),
                                                "token": f.get("token")} for f in files],
-                                             use_container_width=True, hide_index=True)
+                                             width='stretch', hide_index=True)
                         except Exception as e:
                             st.error(f"拉取失败：{e}")
                 else:
@@ -10499,7 +10647,7 @@ elif page == "📚 公司知识库":
             st.markdown("##### 发送群消息")
             chat_id = st.text_input("群聊 chat_id", placeholder="oc_xxxxxx（需机器人已在群里）")
             msg_text = st.text_area("消息内容", placeholder="工作台告警 / 新询盘提醒...")
-            if st.button("📤 发送", use_container_width=True):
+            if st.button("📤 发送", width='stretch'):
                 if not chat_id or not msg_text:
                     st.warning("请填 chat_id 和消息内容")
                 elif _fs:
@@ -10515,7 +10663,7 @@ elif page == "📚 公司知识库":
             st.markdown("##### 在飞书云盘新建文档")
             doc_title = st.text_input("文档标题", placeholder="例如：本周询盘周报")
             doc_body = st.text_area("文档正文", height=100)
-            if st.button("📄 创建飞书文档", use_container_width=True):
+            if st.button("📄 创建飞书文档", width='stretch'):
                 if not doc_title:
                     st.warning("请填文档标题")
                 elif _fs:
@@ -10572,7 +10720,7 @@ elif page == "🎯 精准客户开发":
             # 抓取网站证据复选框（默认勾选）
             fetch_evidence = st.checkbox("抓取网站证据（自动访问客户官网核实信息）", value=True, key="eval_fetch_evidence")
 
-            submitted = st.form_submit_button("开始评估", use_container_width=True)
+            submitted = st.form_submit_button("开始评估", width='stretch')
 
         if submitted:
             if not company_name or not website:
@@ -10758,7 +10906,7 @@ elif page == "🎯 精准客户开发":
                 _outreach_allowed = False
                 st.error(f"🚫 触达检查不可用，已阻止生成：{_oc_e}")
 
-        if st.button("生成草稿", use_container_width=True, type="primary",
+        if st.button("生成草稿", width='stretch', type="primary",
                      disabled=(not _outreach_allowed)):
             if not customer_id_input:
                 st.error("请先在评估页面完成客户评估")
@@ -11053,7 +11201,7 @@ elif page == "👥 团队工作空间":
     st.subheader("🤖 AI团队工作智能分析")
     st.caption("AI分析团队成员工作产出、协作效率，给出任务分配和优化建议")
     
-    if st.button("✨ AI分析团队工作", key="team_ai_analysis", use_container_width=True, type="primary"):
+    if st.button("✨ AI分析团队工作", key="team_ai_analysis", width='stretch', type="primary"):
         with st.spinner("AI正在分析团队工作..."):
             try:
                 # 收集所有成员的工作数据
@@ -11255,7 +11403,7 @@ elif page == "🤖 模型管理":
     with col_hc1:
         st.caption("测试所有活动模型的可用性、响应速度和冷却状态")
     with col_hc2:
-        if st.button("🔍 一键检测所有模型", type="primary", use_container_width=True, key="health_check_all"):
+        if st.button("🔍 一键检测所有模型", type="primary", width='stretch', key="health_check_all"):
             st.session_state['_health_results'] = None
             try:
                 import time as _hc_time
@@ -11481,7 +11629,7 @@ elif page == "🤖 模型管理":
                 avg_t = round(s['total_time'] / s['count'], 2) if s['count'] > 0 else 0
                 sr = round(s['success'] / s['count'] * 100, 1) if s['count'] > 0 else 0
                 stat_rows.append({'模型': m, '调用次数': s['count'], '成功': s['success'], '成功率': f"{sr}%", '平均耗时': f"{avg_t}s"})
-            st.dataframe(stat_rows, use_container_width=True, hide_index=True)
+            st.dataframe(stat_rows, width='stretch', hide_index=True)
             st.caption(f"基于最近 {len(traces)} 条调用记录统计")
         else:
             st.info("暂无调用记录，使用AI功能后这里会显示统计")
@@ -11553,7 +11701,7 @@ elif page == "🤖 模型管理":
                     st.caption(f"  • {m}")
                 st.caption("⚠️ 本地 Ollama 模型不支持图像生成；生图请使用云端 CogView-3。")
         with col2:
-            if st.button("🔄 刷新模型列表", use_container_width=True):
+            if st.button("🔄 刷新模型列表", width='stretch'):
                 refresh_ollama_models()
                 st.success("已刷新本地模型列表")
                 st.rerun()
@@ -11608,7 +11756,7 @@ elif page == "🤖 模型管理":
 
         with col2:
             if not is_active:
-                if st.button("✅ 切换到此供应商", key=f"switch_{p['id']}", use_container_width=True):
+                if st.button("✅ 切换到此供应商", key=f"switch_{p['id']}", width='stretch'):
                     provider = set_active_provider(p['id'])
                     if provider:
                         # 同步到.env配置
@@ -11624,7 +11772,7 @@ elif page == "🤖 模型管理":
                 st.success("当前使用中")
 
         with col3:
-            if st.button("🔗 测试连接", key=f"test_{p['id']}", use_container_width=True, disabled=not p.get('api_key', '')):
+            if st.button("🔗 测试连接", key=f"test_{p['id']}", width='stretch', disabled=not p.get('api_key', '')):
                 result = test_provider(p['id'])
                 if result['success']:
                     st.success(f"✅ {result['message']}")
@@ -11680,7 +11828,7 @@ elif page == "🤖 模型管理":
         with col2:
             new_key = st.text_input("API Key *", type="password", placeholder="sk-...")
         new_models = st.text_area("模型列表（可选，每行一个，留空自动检测）", height=80)
-        submitted = st.form_submit_button("✅ 添加供应商", use_container_width=True)
+        submitted = st.form_submit_button("✅ 添加供应商", width='stretch')
     if submitted and new_name and new_url and new_key:
         models_list = [m.strip() for m in new_models.split('\n') if m.strip()] if new_models else None
         provider = add_provider(new_name, new_url, new_key, models_list)
@@ -11773,7 +11921,7 @@ elif page == "📋 今日待办":
         ai_todo_prompt = st.text_area("告诉AI你的情况（可选）", height=60, 
             placeholder="例如：这周有3个德国客户要跟进，还有2个样品要发...",
             key="ai_todo_prompt")
-        if st.button("✨ AI生成今日待办", use_container_width=True, key="ai_gen_todo"):
+        if st.button("✨ AI生成今日待办", width='stretch', key="ai_gen_todo"):
             with st.spinner("AI正在分析并生成待办..."):
                 # 获取客户数据
                 try:
@@ -11844,7 +11992,7 @@ elif page == "📋 今日待办":
             new_category = st.selectbox("分类", ["客户跟进", "内容创作", "订单处理", "其他"])
         with c4:
             new_due = st.date_input("截止日期", value=None)
-        submitted = st.form_submit_button("➕ 添加待办", use_container_width=True)
+        submitted = st.form_submit_button("➕ 添加待办", width='stretch')
     
     if submitted and new_todo.strip():
         todos.append({
@@ -11928,18 +12076,18 @@ elif page == "📋 今日待办":
         st.markdown("---")
         b1, b2, b3 = st.columns(3)
         with b1:
-            if st.button("✅ 全部标记完成", use_container_width=True):
+            if st.button("✅ 全部标记完成", width='stretch'):
                 for t in todos:
                     t["done"] = True
                 _atomic_write_json(todo_file, todos)
                 st.rerun()
         with b2:
-            if st.button("🧹 清除已完成", use_container_width=True):
+            if st.button("🧹 清除已完成", width='stretch'):
                 todos = [t for t in todos if not t.get("done")]
                 _atomic_write_json(todo_file, todos)
                 st.rerun()
         with b3:
-            if st.button("🗑 清空全部", use_container_width=True):
+            if st.button("🗑 清空全部", width='stretch'):
                 if two_step_delete("确认清空", "clear_all_todos", "将删除所有待办，不可恢复") == "yes":
                     todos = []
                     _atomic_write_json(todo_file, todos)
@@ -11978,7 +12126,7 @@ elif page == "🌍 海外社媒矩阵":
         st.markdown("---")
         st.markdown("##### 🤖 AI社媒运营分析")
         st.caption("根据社媒数据，AI生成运营分析和优化建议")
-        if st.button("✨ 生成社媒运营分析报告", key="ai_social_analysis", use_container_width=True):
+        if st.button("✨ 生成社媒运营分析报告", key="ai_social_analysis", width='stretch'):
             with st.spinner("AI正在分析社媒运营数据..."):
                 try:
                     # 收集数据
@@ -12044,7 +12192,7 @@ elif page == "🌍 海外社媒矩阵":
                 acct_url = y2.text_input("账号主页链接")
                 email = st.text_input("联系邮箱")
                 status = st.selectbox("状态", ["Active", "Inactive", "Pending", "Suspended"])
-                if st.form_submit_button("保存", type="primary", use_container_width=True):
+                if st.form_submit_button("保存", type="primary", width='stretch'):
                     if not acct_name:
                         st.warning("账号名称必填")
                     else:
@@ -12064,7 +12212,7 @@ elif page == "🌍 海外社媒矩阵":
                     <b style="color:#FFF3E0;font-size:15px;">{cat}</b><br>
                     <span style="color:#aaa;font-size:12px;">负责人 {owner}</span><br>
                     <span style="color:#D4AF37;font-size:12px;">已绑账号 {n_acc}/8</span></div>""", unsafe_allow_html=True)
-                    if st.button(f"进入 {cat} →", key=f"catbtn_{cat}", use_container_width=True):
+                    if st.button(f"进入 {cat} →", key=f"catbtn_{cat}", width='stretch'):
                         st.session_state["sm_cat"] = cat
                         st.session_state["sm_level"] = "accounts"
                         st.rerun()
@@ -12086,7 +12234,7 @@ elif page == "🌍 海外社媒矩阵":
                             badge = "🟢" if a.get("status") == "Active" else "⚪"
                             st.markdown(f"""<div style="background:#1f2733;border-left:4px solid #D4AF37;border-radius:6px;padding:8px;margin:4px 0;font-size:12px;">
                             {badge} <b>{plat}</b><br><span style="color:#ccc;">{a.get('account_name','')}</span></div>""", unsafe_allow_html=True)
-                            if st.button(f"📂 打开", key=f"open_{a['id']}", use_container_width=True):
+                            if st.button(f"📂 打开", key=f"open_{a['id']}", width='stretch'):
                                 st.session_state["sm_acc_id"] = a["id"]
                                 st.session_state["sm_level"] = "contents"
                                 st.rerun()
@@ -12131,7 +12279,7 @@ elif page == "🌍 海外社媒矩阵":
                 ai_sm_type = st.selectbox("内容类型", ["产品展示", "工厂实拍", "使用场景", "客户案例", "行业知识"], key="ai_sm_type")
                 ai_sm_product = st.text_input("产品/主题描述", placeholder="例如：新款大马士革厨刀套装", key="ai_sm_product")
             
-            if st.button("🤖 生成社媒文案", use_container_width=True, key="ai_gen_social"):
+            if st.button("🤖 生成社媒文案", width='stretch', key="ai_gen_social"):
                 if ai_sm_product.strip():
                     with st.spinner("AI正在生成社媒文案..."):
                         prompt = f"""你是KaiLionCrafts（阳江锘利匠心）的海外社媒运营专家。
@@ -12162,7 +12310,7 @@ elif page == "🌍 海外社媒矩阵":
                 st.download_button("📋 下载文案.txt", 
                     st.session_state['_ai_social_result'], 
                     file_name=f"social_caption_{ai_sm_plat}_{datetime.now().strftime('%Y%m%d')}.txt",
-                    use_container_width=True)
+                    width='stretch')
         
         with st.expander("➕ 新增内容", expanded=False):
             with st.form("new_content"):
@@ -12197,7 +12345,7 @@ elif page == "🌍 海外社媒矩阵":
                 cap_in = st.text_area("📝 平台文案/Caption", height=60)
                 tags = st.text_input("#️⃣ Hashtags（空格分隔）")
                 notes = st.text_input("备注")
-                if st.form_submit_button("保存内容", type="primary", use_container_width=True):
+                if st.form_submit_button("保存内容", type="primary", width='stretch'):
                     if not title:
                         st.warning("标题必填")
                     else:
@@ -12235,7 +12383,7 @@ elif page == "🌍 海外社媒矩阵":
                              "publish_date", "views", "link_clicks", "website_visits",
                              "inquiries", "orders"]
                 st.dataframe(pd.DataFrame([{k: c.get(k) for k in cols_show}]),
-                             use_container_width=True, hide_index=True)
+                             width='stretch', hide_index=True)
                 if c.get("cover_path") and Path(c["cover_path"]).exists():
                     st.image(c["cover_path"], width=240)
                 if c.get("publish_url"):
@@ -12266,7 +12414,7 @@ elif page == "🌍 海外社媒矩阵":
             with c2:
                 lc_market = st.text_input("目标市场", value="美国/欧洲", key="lc_market")
                 lc_week = st.date_input("本周起始日期", key="lc_week")
-            lc_submit = st.form_submit_button("📅 生成本周LinkedIn内容日历", type="primary", use_container_width=True)
+            lc_submit = st.form_submit_button("📅 生成本周LinkedIn内容日历", type="primary", width='stretch')
 
         if lc_submit:
             with st.spinner("AI生成本周内容日历..."):
@@ -12361,7 +12509,7 @@ elif page == "🧾 订单台账":
                     pcs_per_ctn = t5.number_input("每箱件数(Pcs/CTN)", min_value=0, step=1)
                     gw_per_ctn = t6.number_input("每箱毛重(kg)", min_value=0.0, step=0.5)
                 notes = st.text_input("备注")
-                if st.form_submit_button("💾 保存订单", type="primary", use_container_width=True):
+                if st.form_submit_button("💾 保存订单", type="primary", width='stretch'):
                     if not customer or total_amount <= 0:
                         st.warning("客户公司和订单金额必填")
                     else:
@@ -12381,7 +12529,7 @@ elif page == "🧾 订单台账":
         orders = fdb.list_sales_orders()
         if orders:
             st.dataframe(pd.DataFrame(orders)[["order_no","owner","customer","product_summary","total_amount","currency","status","order_date","delivery_date"]],
-                         use_container_width=True, hide_index=True)
+                         width='stretch', hide_index=True)
             # 快捷改状态
             with st.expander("🔄 快速更新订单状态"):
                 upd_no = st.selectbox("选择订单", [o["order_no"] for o in orders])
@@ -12391,13 +12539,13 @@ elif page == "🧾 订单台账":
 
             with st.expander("🔍 客户历史查询（谁还欠钱/下过几单）"):
                 cu_rows = fdb.list_customers()
-                st.dataframe(pd.DataFrame(cu_rows), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(cu_rows), width='stretch', hide_index=True)
                 picks = [r["客户"] for r in cu_rows]
                 if picks:
                     sel_cu = st.selectbox("选客户看明细", picks)
                     cu_orders = [o for o in orders if (o["customer"] or "(未填)") == sel_cu]
                     st.dataframe(pd.DataFrame(cu_orders)[["order_no","product_summary","total_amount","currency","status","order_date"]],
-                                 use_container_width=True, hide_index=True)
+                                 width='stretch', hide_index=True)
         else:
             st.info("还没有订单，点上方新建第一笔")
 
@@ -12420,7 +12568,7 @@ elif page == "🧾 订单台账":
             with st.expander("🏭 工厂资料库（资质/产能/认证/合作备注，一次录入后采购单可直接选）", expanded=False):
                 facs = _load_fac()
                 if facs:
-                    st.dataframe(pd.DataFrame(facs), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.DataFrame(facs), width='stretch', hide_index=True)
                 with st.form("new_factory"):
                     ff1, ff2 = st.columns(2)
                     fn = ff1.text_input("工厂名 *")
@@ -12430,7 +12578,7 @@ elif page == "🧾 订单台账":
                     fcert = ff4.text_input("认证（ISO/BSCI等）")
                     fcontact = st.text_input("联系人/电话/微信")
                     fnote = st.text_area("合作备注（历史/价格/质量/交期）")
-                    if st.form_submit_button("💾 保存工厂档案", type="primary", use_container_width=True):
+                    if st.form_submit_button("💾 保存工厂档案", type="primary", width='stretch'):
                         if not fn:
                             st.warning("工厂名必填")
                         else:
@@ -12466,7 +12614,7 @@ elif page == "🧾 订单台账":
                     with qcd7:
                         qcd_cert = st.text_input("现有认证", key="qcd_cert", placeholder="ISO9001/BSCI等")
                     qcd_note = st.text_area("备注", key="qcd_note", placeholder="历史合作问题/优势...")
-                    qcd_submit = st.form_submit_button("📊 计算QCD评分", type="primary", use_container_width=True)
+                    qcd_submit = st.form_submit_button("📊 计算QCD评分", type="primary", width='stretch')
 
                 if qcd_submit and qcd_name:
                     total = q_quality + c_cost + d_delivery
@@ -12535,7 +12683,7 @@ elif page == "🧾 订单台账":
                 po_curr = p4.selectbox("币种", ["USD","CNY","EUR"], key="po_curr")
                 pay_status = p5.selectbox("付款进度", ["未付","部分付款","已付清"])
                 notes = st.text_input("备注")
-                if st.form_submit_button("💾 保存采购", type="primary", use_container_width=True):
+                if st.form_submit_button("💾 保存采购", type="primary", width='stretch'):
                     if not factory or cost_amount <= 0:
                         st.warning("工厂名和采购成本必填")
                     else:
@@ -12546,7 +12694,7 @@ elif page == "🧾 订单台账":
             pos = fdb.list_purchase_orders()
             if pos:
                 st.dataframe(pd.DataFrame(pos)[["po_no","sales_order_no","factory","cost_amount","currency","pay_status","delivery_status","po_date"]],
-                             use_container_width=True, hide_index=True)
+                             width='stretch', hide_index=True)
 
     # ---- 收付款 ----
     with oc:
@@ -12566,7 +12714,7 @@ elif page == "🧾 订单台账":
                 rate = d5.number_input("汇率(折人民币)", min_value=0.0, value=1.0, step=0.1)
                 method = d6.selectbox("方式", ["T/T","西联","信用证","PayPal","其他"])
                 notes = st.text_input("备注，如：30%定金 / 70%尾款")
-                if st.form_submit_button("💾 登记", type="primary", use_container_width=True):
+                if st.form_submit_button("💾 登记", type="primary", width='stretch'):
                     if amount <= 0:
                         st.warning("金额要大于0")
                     else:
@@ -12577,7 +12725,7 @@ elif page == "🧾 订单台账":
             pays = fdb.list_payments()
             if pays:
                 st.dataframe(pd.DataFrame(pays)[["pay_date","direction","ref_order_no","amount","currency","exchange_rate","method","notes"]],
-                             use_container_width=True, hide_index=True)
+                             width='stretch', hide_index=True)
 
     # ---- 经营看板 ----
     with od:
@@ -12599,7 +12747,7 @@ elif page == "🧾 订单台账":
         st.markdown("##### ⏰ 应收账龄（未收回尾款）")
         ar_rows = fdb.list_receivables()
         if ar_rows:
-            st.dataframe(pd.DataFrame(ar_rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(ar_rows), width='stretch', hide_index=True)
             over = [r for r in ar_rows if r["账龄天数"] > 30]
             if over:
                 st.error("🔴 账龄超30天未收：" + "、".join(f"{r['客户']}(${r['未收']:,.0f}/{r['账龄天数']}天)" for r in over))
@@ -12609,7 +12757,7 @@ elif page == "🧾 订单台账":
         # ===== AI经营分析 =====
         st.markdown("##### 🤖 AI经营分析")
         st.caption("基于订单、采购、收付款数据，AI生成经营洞察和建议")
-        if st.button("✨ 生成经营分析报告", use_container_width=True, key="ai_finance_analysis"):
+        if st.button("✨ 生成经营分析报告", width='stretch', key="ai_finance_analysis"):
             with st.spinner("AI正在分析经营数据..."):
                 try:
                     # 收集数据
@@ -12678,13 +12826,13 @@ elif page == "🧾 订单台账":
         exp1, exp2, exp3 = st.columns(3)
         sales_df = pd.DataFrame(fdb.list_sales_orders())
         exp1.download_button("导出销售订单CSV", sales_df.to_csv(index=False).encode("utf-8-sig"),
-                            "sales_orders.csv", "text/csv", use_container_width=True)
+                            "sales_orders.csv", "text/csv", width='stretch')
         po_df = pd.DataFrame(fdb.list_purchase_orders())
         exp2.download_button("导出采购CSV", po_df.to_csv(index=False).encode("utf-8-sig"),
-                            "purchase_orders.csv", "text/csv", use_container_width=True)
+                            "purchase_orders.csv", "text/csv", width='stretch')
         pay_df = pd.DataFrame(fdb.list_payments())
         exp3.download_button("导出收付款CSV", pay_df.to_csv(index=False).encode("utf-8-sig"),
-                            "payments.csv", "text/csv", use_container_width=True)
+                            "payments.csv", "text/csv", width='stretch')
 
     # ---- 报价单/PI ----
     with oe:
@@ -12719,7 +12867,7 @@ elif page == "🧾 订单台账":
                 with tq2:
                     tq_target_margin = st.number_input("目标毛利率（%）", min_value=5, max_value=80, value=30)
                     tq_exchange = st.number_input("汇率（USD/CNY）", min_value=0.0, step=0.01, value=7.2)
-                tq_submit = st.form_submit_button("📊 生成阶梯报价", type="primary", use_container_width=True)
+                tq_submit = st.form_submit_button("📊 生成阶梯报价", type="primary", width='stretch')
 
             if tq_submit and tq_product and tq_cost > 0:
                 # 阶梯数量
@@ -12742,7 +12890,7 @@ elif page == "🧾 订单台账":
                         "总金额(USD)": round(final_price * qty, 0),
                     })
                 st.markdown("**阶梯报价表**")
-                st.dataframe(rows, use_container_width=True, hide_index=True)
+                st.dataframe(rows, width='stretch', hide_index=True)
 
                 # 生成英文报价单文本
                 quote_lines = [
@@ -12817,7 +12965,7 @@ Delivery:   {so.get('delivery_date') or 'To be confirmed'}
 Thank you for your business!
 """
             st.text(pi_text)
-            st.download_button("⬇️ 下载PI(.txt)", pi_text, f"PI_{so['order_no']}.txt", "text/plain", use_container_width=True)
+            st.download_button("⬇️ 下载PI(.txt)", pi_text, f"PI_{so['order_no']}.txt", "text/plain", width='stretch')
 
             # ===== 一份数据自动出：合同 / 装箱单 / 商业发票 =====
             _te = {}
@@ -12949,12 +13097,12 @@ Price Term: {incoterm}
             _full_html = f"<html><head><meta charset='utf-8'></head><body>{_pi_html}{_sc_html}{_ci_html}{_pl_html}</body></html>"
             st.download_button("🖨️ 打印版（HTML，打开后 Ctrl+P 存 PDF）",
                                _full_html, f"Docs_{so['order_no']}.html", "text/html",
-                               use_container_width=True, type="primary")
+                               width='stretch', type="primary")
 
             # ===== 存档到知识库 =====
             st.markdown("---")
             st.markdown("**💾 存档到知识库**")
-            if st.button("📁 保存所有单据到知识库", key="save_docs_to_kb", use_container_width=True):
+            if st.button("📁 保存所有单据到知识库", key="save_docs_to_kb", width='stretch'):
                 # 生成完整的单据内容
                 docs_content = f"""# 贸易单据 - {so['order_no']}
 
@@ -13015,7 +13163,7 @@ Price Term: {incoterm}
                 est_qty = st.number_input("预计月销量（个）", min_value=0, step=100, value=1000)
                 exchange_rate = st.number_input("美元汇率", min_value=0.0, step=0.01, value=7.2)
                 other_cost = st.number_input("其他费用占比（%，平台/物流/退款等）", min_value=0.0, max_value=100.0, step=1.0, value=15.0)
-            pr_submit = st.form_submit_button("📊 计算定价敏感度", type="primary", use_container_width=True)
+            pr_submit = st.form_submit_button("📊 计算定价敏感度", type="primary", width='stretch')
 
         if pr_submit and prd_name and unit_cost > 0 and sell_price > 0:
             # 计算不同价格下的利润
@@ -13036,7 +13184,7 @@ Price Term: {incoterm}
                     "月总利润(USD)": round(total_profit, 0),
                 })
             st.markdown("### 定价敏感度分析表")
-            st.dataframe(results, use_container_width=True, hide_index=True)
+            st.dataframe(results, width='stretch', hide_index=True)
 
             # 最优价格建议
             best = max(results, key=lambda x: x["月总利润(USD)"])
@@ -13248,7 +13396,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "s
         with col2:
             cluster_market = st.text_input("目标市场", value="美国", key="cluster_market")
             cluster_products = st.text_input("相关产品", value="厨房刀/厨师刀/剪刀", key="cluster_products")
-        cluster_submit = st.form_submit_button("🗺️ 规划内容集群", type="primary", use_container_width=True)
+        cluster_submit = st.form_submit_button("🗺️ 规划内容集群", type="primary", width='stretch')
     if cluster_submit and cluster_topic:
         with st.spinner("AI规划内容集群中..."):
             try:
@@ -13346,7 +13494,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "s
             sc_margin = st.selectbox("预估毛利率", ["<10%", "10-20%", "20-35%", ">35%"], index=2)
         sc_cert = st.selectbox("目标市场认证要求", ["无特殊要求", "FDA/LFGB", "CE", "BSCI验厂", "多项认证"], index=1)
         sc_seasonal = st.selectbox("季节性", ["全年稳定", "有一定季节性", "强季节性"], index=0)
-        sc_submit = st.form_submit_button("📊 计算评分", type="primary", use_container_width=True)
+        sc_submit = st.form_submit_button("📊 计算评分", type="primary", width='stretch')
 
     if sc_submit and sc_product:
         # 评分计算
@@ -13372,7 +13520,7 @@ elif page == "🔍 独立站SEO中心" and st.session_state.get("seo_sub") == "s
             "满分": [10, 10, 10, 10, 10, 10],
             "说明": [sc_market_size, sc_competition, sc_price, sc_margin, sc_cert, sc_seasonal],
         }
-        st.dataframe(score_data, use_container_width=True, hide_index=True)
+        st.dataframe(score_data, width='stretch', hide_index=True)
 
         st.markdown("---")
         col1, col2, col3 = st.columns(3)
@@ -13434,7 +13582,7 @@ elif page == "⚙️ 设置中心":
     for i, (name, desc) in enumerate(sc_sections.items()):
         with sc_cols[i]:
             is_active = st.session_state["sc_sub"] == name
-            if st.button(name, key=f"scbtn_{name}", use_container_width=True,
+            if st.button(name, key=f"scbtn_{name}", width='stretch',
                          type="primary" if is_active else "secondary"):
                 st.session_state["sc_sub"] = name
                 st.rerun()
@@ -13470,7 +13618,7 @@ elif page == "⚙️ 设置中心":
                 for m in ollama_models:
                     st.caption(f"  • {m}")
             with col2:
-                if st.button("🔄 刷新模型列表", use_container_width=True):
+                if st.button("🔄 刷新模型列表", width='stretch'):
                     refresh_ollama_models()
                     st.success("已刷新本地模型列表")
                     st.rerun()
@@ -13520,7 +13668,7 @@ elif page == "⚙️ 设置中心":
 
             with col2:
                 if not is_active:
-                    if st.button("✅ 切换到此供应商", key=f"sc_switch_{p['id']}", use_container_width=True):
+                    if st.button("✅ 切换到此供应商", key=f"sc_switch_{p['id']}", width='stretch'):
                         provider = set_active_provider(p['id'])
                         if provider:
                             save_config(
@@ -13535,7 +13683,7 @@ elif page == "⚙️ 设置中心":
                     st.success("当前使用中")
 
             with col3:
-                if st.button("🔗 测试连接", key=f"sc_test_{p['id']}", use_container_width=True, disabled=not p.get('api_key', '')):
+                if st.button("🔗 测试连接", key=f"sc_test_{p['id']}", width='stretch', disabled=not p.get('api_key', '')):
                     result = test_provider(p['id'])
                     if result['success']:
                         st.success(f"✅ {result['message']}")
@@ -13590,7 +13738,7 @@ elif page == "⚙️ 设置中心":
             with col2:
                 new_key = st.text_input("API Key *", type="password", placeholder="sk-...")
             new_models = st.text_area("模型列表（可选，每行一个，留空自动检测）", height=80)
-            submitted = st.form_submit_button("✅ 添加供应商", use_container_width=True)
+            submitted = st.form_submit_button("✅ 添加供应商", width='stretch')
         if submitted and new_name and new_url and new_key:
             models_list = [m.strip() for m in new_models.split('\n') if m.strip()] if new_models else None
             provider = add_provider(new_name, new_url, new_key, models_list)
@@ -13712,7 +13860,7 @@ elif page == "⚙️ 设置中心":
                         by_model[m] = by_model.get(m, 0) + 1
                     model_rows = [{"模型": m, "请求数": cnt} for m, cnt in sorted(by_model.items(), key=lambda x: -x[1])]
                     model_df = pd.DataFrame(model_rows)
-                    st.dataframe(model_df, use_container_width=True, hide_index=True)
+                    st.dataframe(model_df, width='stretch', hide_index=True)
 
                 with c2:
                     st.markdown("**📋 任务分布**")
@@ -13722,7 +13870,7 @@ elif page == "⚙️ 设置中心":
                         by_task[task] = by_task.get(task, 0) + 1
                     task_rows = [{"任务": task_name, "请求数": cnt} for task_name, cnt in sorted(by_task.items(), key=lambda x: -x[1])]
                     task_df = pd.DataFrame(task_rows)
-                    st.dataframe(task_df, use_container_width=True, hide_index=True)
+                    st.dataframe(task_df, width='stretch', hide_index=True)
 
                 st.markdown("---")
 
@@ -13737,7 +13885,7 @@ elif page == "⚙️ 设置中心":
                         pass
                 if by_day:
                     trend_df = pd.DataFrame([{"日期": d, "调用次数": c} for d, c in sorted(by_day.items())])
-                    st.line_chart(trend_df.set_index("日期"), use_container_width=True)
+                    st.line_chart(trend_df.set_index("日期"), width='stretch')
 
                 st.markdown("---")
 
@@ -13756,17 +13904,17 @@ elif page == "⚙️ 设置中心":
                         "输出Token": trace.get("completion_tokens", ""),
                         "总Token": trace.get("total_tokens", ""),
                     })
-                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
 
                 # 导出CSV
                 csv = pd.DataFrame(rows).to_csv(index=False).encode("utf-8-sig")
-                st.download_button("📥 导出CSV", csv, f"ai_usage_{now.strftime('%Y%m%d_%H%M')}.csv", "text/csv", use_container_width=True)
+                st.download_button("📥 导出CSV", csv, f"ai_usage_{now.strftime('%Y%m%d_%H%M')}.csv", "text/csv", width='stretch')
 
                 # ===== AI调用智能分析 =====
                 st.markdown("---")
                 st.markdown("##### 🤖 AI调用智能分析")
                 st.caption("根据调用数据，AI生成模型使用分析和优化建议")
-                if st.button("✨ 生成AI调用分析报告", key="ai_usage_analysis", use_container_width=True):
+                if st.button("✨ 生成AI调用分析报告", key="ai_usage_analysis", width='stretch'):
                     with st.spinner("AI正在分析调用数据..."):
                         try:
                             # 收集数据
@@ -13935,13 +14083,13 @@ elif page == "⚙️ 设置中心":
         else:
             reversed_ops = list(reversed(op_logs[-50:]))
             op_df = pd.DataFrame(reversed_ops)
-            st.dataframe(op_df, use_container_width=True, hide_index=True)
+            st.dataframe(op_df, width='stretch', hide_index=True)
 
         # ===== AI访问安全分析 =====
         st.markdown("---")
         st.markdown("##### 🤖 AI访问安全分析")
         st.caption("根据访问数据，AI生成安全分析和防护建议")
-        if st.button("✨ 生成访问安全分析报告", key="ai_access_analysis", use_container_width=True):
+        if st.button("✨ 生成访问安全分析报告", key="ai_access_analysis", width='stretch'):
             with st.spinner("AI正在分析访问安全数据..."):
                 try:
                     from collections import Counter
@@ -14157,7 +14305,7 @@ elif page == "⚙️ 设置":
             quick_cols = st.columns(min(4, len(model_presets)))
             for i, m in enumerate(model_presets[:4]):
                 with quick_cols[i]:
-                    if st.button(m["name"][:15], key=f"quick_{m['name']}", use_container_width=True):
+                    if st.button(m["name"][:15], key=f"quick_{m['name']}", width='stretch'):
                         # P2-8 修复：写入 session_state 并由 selectbox index 读取，使选择在重跑后生效
                         st.session_state["_quick_model_override"] = m["name"]
                         st.rerun()
@@ -14166,7 +14314,7 @@ elif page == "⚙️ 设置":
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔌 测试连接", use_container_width=True):
+            if st.button("🔌 测试连接", width='stretch'):
                 if not api_key:
                     st.error("请先填写API Key")
                 else:
@@ -14178,7 +14326,7 @@ elif page == "⚙️ 设置":
                         st.error(msg)
 
         with col2:
-            if st.button("💾 保存配置", type="primary", use_container_width=True):
+            if st.button("💾 保存配置", type="primary", width='stretch'):
                 if not api_key:
                     st.error("API Key不能为空")
                 elif not model:
@@ -14379,7 +14527,7 @@ elif page == "📖 工作台说明书":
                         if _kw in _sec_name:
                             _full_path = Path(__file__).parent / _img_path
                             if _full_path.exists():
-                                st.image(str(_full_path), caption=f"📸 {_sec_name} - 操作界面截图", use_container_width=True)
+                                st.image(str(_full_path), caption=f"📸 {_sec_name} - 操作界面截图", width='stretch')
                             break
 
 # ============ 页脚 ============

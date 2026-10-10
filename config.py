@@ -323,6 +323,21 @@ ALL_PROVIDERS = {
         ],
         "signup_url": "https://platform.openai.com/api-keys",
     },
+    "wawapi": {
+        "name": "WawAPI（GPT系列中转站）",
+        "base_url": "https://wawapi.top/v1",
+        "models": [
+            {"name": "gpt-6.1-sol", "desc": "GPT-6.1 Sol（最新旗舰，推荐）"},
+            {"name": "gpt-6-sol", "desc": "GPT-6 Sol（旗舰推理）"},
+            {"name": "gpt-6-astra", "desc": "GPT-6 Astra（高性能）"},
+            {"name": "gpt-5.6-terra", "desc": "GPT-5.6 Terra（均衡型）"},
+            {"name": "gpt-5.6-sol", "desc": "GPT-5.6 Sol（推理优化）"},
+            {"name": "gpt-5.5", "desc": "GPT-5.5（稳定版）"},
+            {"name": "codex-auto-review", "desc": "Codex Auto Review（代码审查专用）"},
+        ],
+        "signup_url": "https://wawapi.top",
+        "note": "OpenAI兼容接口，支持GPT-5/6系列，可作为主力模型故障转移",
+    },
     "deepseek": {
         "name": "DeepSeek（深度求索）",
         "base_url": "https://api.deepseek.com/v1",

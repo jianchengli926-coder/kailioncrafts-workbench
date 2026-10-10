@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>KaiLionCrafts 产品目录编辑器</title>
+<script>
+/* ===================================================================
+   本地内嵌版免密码（Streamlit 企业AI工作台内嵌专用 · 2026-10-09）
+   已进入企业AI工作台，无需重复输入密码。
+   预设 sessionStorage：门禁脚本检测到已解锁即跳过密码页，
+   _editor_app.js 启动时自动取此密码解密数据，用户无感知。
+   ⚠️ 仅本地内嵌副本生效；云端独立部署版是另一份文件，仍保留密码。
+   =================================================================== */
+try {
+  sessionStorage.setItem('kc_gate_ok', '1');
+  sessionStorage.setItem('kc_pass', '441723');
+} catch (e) {}
+</script>
+<script>
+/* ===================================================================
+   门禁开关（2026-10-09 · v3 真加密）
+   只有 http/https（线上链接）才加锁；本地 file:// 双击直接放行 ——
+   利的要求：「本地的不要密码、部署后的链接要密码」。
+   🔴 放在 <head> 里（而不是 body 末尾）是为了「首帧即门禁」：
+      否则会先渲染出编辑器界面、再被盖住，闪一下很难看。
+   🔑 密码**不写在本文件任何地方**。密码对不对由数据层裁定：
+      拿输入的密码当 AES 密钥去解密 data/kc-<TOKEN>.json，解得开才算对。
+      所以即使有人把这段 js 改成无条件放行，没有真密码照样白屏。
+   ⚠️ 免密条件必须同时满足 kc_gate_ok==='1' **且** kc_pass 存在 ——
+      只看前者会出现「显示已解锁但数据解不开」的死局（旧版残留时就会）。
+   =================================================================== */
+(function () {
+  var on = /^https?:$/.test(location.protocol);
+  if (on) {
+    try {
+      if (sessionStorage.getItem('kc_gate_ok') === '1' && sessionStorage.getItem('kc_pass')) on = false;
+    } catch (e) {}
+  }
+  if (on) document.documentElement.className += ' kc-locked';
+})();
+</script>
+<style>
+/* ===================================================================
+   KaiLionCrafts 产品目录编辑器 v2
+   —— 8 个册子（4 品类 × 公开版/报价版 + 户外刀 2 本 + 厨房配件 2 本）
+   品牌色沿用目录成书：navy #1B2A41 · gold #C8A24B · gold2 #E3C87F
+   =================================================================== */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1B2A41; --navy2:#243A57; --navy3:#31465F;
+  --gold:#C8A24B; --gold2:#E3C87F; --gold-d:#8A6A16;
+  --ink:#1B2A41; --mute:#5C6B7A; --faint:#8A97A5;
+  --line:#DDE3E9; --line2:#EEF2F6; --paper:#fff; --soft:#F6F8FA;
+  --ok:#1F8A5F; --warn:#C8791B; --err:#C0392B; --info:#2563EB;
+  --ui:13px;
+}
+html,body{height:100%}
+body{font-family:'Segoe UI','Microsoft YaHei',Arial,sans-serif;font-size:var(--ui);
+     color:var(--ink);background:var(--soft);overflow:hidden}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#C6CFD9;border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:#A8B4C2}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------------- 顶栏 ---------------- */
+.top{background:var(--navy);color:#fff;display:flex;align-items:center;
+     gap:12px;padding:0 16px;flex:0 0 auto;box-shadow:0 2px 8px rgba(27,42,65,.2);z-index:40}
+.brandwrap{display:flex;align-items:center;gap:9px;padding-right:14px;
+           border-right:1px solid rgba(255,255,255,.16);flex:0 0 auto}
+.brandwrap img{width:28px;height:28px;object-fit:contain;filter:brightness(1.25)}
+.bname{font-size:14.5px;font-weight:700;letter-spacing:.02em;line-height:1.15}
+.bsub{font-size:9px;color:#93A6B9;letter-spacing:.03em;margin-top:1px}
+.top .sp{flex:1}
+.tbtn{padding:6px 11px;font-size:11.5px;border:1px solid rgba(255,255,255,.22);
+     background:transparent;color:#DCE6F0;border-radius:3px;cursor:pointer;white-space:nowrap}
+.tbtn:hover{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.4)}
+.tbtn.pri{background:var(--gold);border-color:var(--gold);color:#1B2A41;font-weight:700}
+.tbtn.pri:hover{background:var(--gold2)}
+.savedot{font-size:10.5px;color:#7E8FA3;display:flex;align-items:center;gap:5px;flex:0 0 auto}
+.savedot i{width:7px;height:7px;border-radius:50%;background:#4A5D74;display:block}
+.savedot.dirty i{background:var(--warn)}
+.savedot.ok i{background:#3FBF7F}
+
+/* ---------------- 册子切换条（8 个） ---------------- */
+.bookbar{background:#fff;border-bottom:1px solid var(--line);flex:0 0 auto;
+        display:flex;align-items:stretch;overflow-x:auto;box-shadow:0 1px 3px rgba(27,42,65,.05)}
+.catgrp{display:flex;align-items:center;gap:0;border-right:1px solid var(--line);
+        padding:0 8px 0 0;flex:0 0 auto}
+.catgrp>.gtitle{font-size:10px;color:var(--faint);font-weight:700;letter-spacing:.05em;
+   writing-mode:vertical-rl;text-orientation:upright;padding:8px 3px;line-height:1;
+   border-right:1px dashed var(--line);margin-right:7px;flex:0 0 auto}
+.book{padding:8px 13px;font-size:12px;cursor:pointer;color:var(--mute);
+      white-space:nowrap;user-select:none;transition:.12s;position:relative;
+      border-bottom:2.5px solid transparent;display:flex;flex-direction:column;gap:1px}
+.book:hover{background:#FAFCFD;color:var(--ink)}
+.book.on{color:var(--navy);font-weight:700;border-bottom-color:var(--gold);background:#FDFBF4}
+.book .bn{font-size:9.5px;color:var(--faint);font-variant-numeric:tabular-nums;font-weight:400}
+.book.on .bn{color:var(--gold-d)}
+.book .pd{position:absolute;right:4px;top:4px;width:5px;height:5px;border-radius:50%;background:var(--gold)}
+
+/* ---------------- 主体三栏 ---------------- */
+.body{display:flex;height:calc(100% - 100px)}
+
+/* 左：名片列表 */
+.left{width:270px;flex:0 0 270px;background:var(--paper);border-right:1px solid var(--line);
+      display:flex;flex-direction:column}
+.lhead{padding:9px 11px;border-bottom:1px solid var(--line);display:flex;gap:6px;flex:0 0 auto}
+.lhead input{width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:3px;
+     font-size:12px;background:var(--soft)}
+.lhead input:focus{outline:none;border-color:var(--gold);background:#fff}
+.lcount{padding:6px 11px;font-size:10.5px;color:var(--faint);border-bottom:1px solid var(--line2);
+       display:flex;justify-content:space-between;flex:0 0 auto}
+.lcount b{color:var(--ink);font-variant-numeric:tabular-nums}
+.lbody{flex:1;overflow-y:auto;overflow-x:hidden}
+.litem{padding:7px 9px;border-bottom:1px solid var(--line2);cursor:pointer;
+       display:flex;gap:8px;align-items:flex-start;transition:.1s;position:relative}
+.litem:hover{background:#FAFCFD}
+.litem.on{background:#F5F1E4;box-shadow:inset 3px 0 0 var(--gold)}
+/* 🔴 名片拖拽排序（2026-10-05）：⠿ 手柄 + 拖动/插入位置指示 */
+.litem[draggable=true]{cursor:grab}
+.litem.dragging{opacity:.42;background:#EEF2F6}
+.litem.dropbefore::before,.litem.dropafter::after{content:'';position:absolute;left:6px;right:6px;
+  height:2px;background:var(--gold);border-radius:1px;z-index:3}
+.litem.dropbefore::before{top:-1px}
+.litem.dropafter::after{bottom:-1px}
+.lgrip{flex:0 0 12px;width:12px;align-self:stretch;display:flex;align-items:center;
+  justify-content:center;color:#C6CFD9;font-size:13px;line-height:1;cursor:grab;
+  user-select:none;-webkit-user-select:none;border-radius:3px}
+.lgrip:hover{color:var(--gold-d);background:#EFF3F6}
+.lgrip:active{cursor:grabbing}
+.lthumb{width:40px;height:40px;flex:0 0 40px;background:#fff;border:1px solid var(--line);
+        border-radius:3px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.lthumb img{max-width:100%;max-height:100%;object-fit:contain}
+.lmeta{min-width:0;flex:1}
+.lsku{font-family:Consolas,monospace;font-size:11.5px;font-weight:700;color:var(--gold-d);
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lnm{font-size:10.5px;color:var(--mute);line-height:1.3;max-height:26px;overflow:hidden;margin-top:1px}
+.ltag{font-size:9px;color:var(--faint);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap}
+.badge{font-size:8.5px;padding:1px 4px;border-radius:2px;background:#FFF3D6;color:#8A6A16;font-weight:700}
+.badge.v{background:#FDE8E7;color:#B03A2E}
+.badge.n{background:#E8F3EC;color:#1F7A4D}
+.lfoot{padding:8px;border-top:1px solid var(--line);display:flex;gap:5px;flex:0 0 auto}
+.lfoot button{flex:1;padding:6px;font-size:11.5px;border:1px solid var(--line);
+     background:var(--paper);border-radius:3px;cursor:pointer}
+.lfoot button:hover{border-color:var(--navy);background:var(--soft)}
+
+/* 中：编辑区 */
+.mid{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--soft)}
+.mhead{padding:10px 16px;background:var(--paper);border-bottom:1px solid var(--line);
+       display:flex;gap:8px;align-items:center;flex:0 0 auto;flex-wrap:wrap}
+.mhead .ttl{font-size:14px;font-weight:700}
+.mhead .hint{font-size:11px;color:var(--faint)}
+.mhead .sp{flex:1}
+.mbtn{padding:5.5px 10px;font-size:11.5px;border:1px solid var(--line);background:var(--paper);
+      border-radius:3px;cursor:pointer;white-space:nowrap}
+.mbtn:hover{border-color:var(--navy);background:var(--soft)}
+.mbtn.danger:hover{border-color:var(--err);color:var(--err);background:#FDF3F2}
+.mbody{flex:1;overflow-y:auto;padding:16px}
+
+.ncard{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:15px;max-width:780px}
+.nchead{display:flex;align-items:center;gap:9px;margin-bottom:13px;
+        padding-bottom:10px;border-bottom:1px solid var(--line2)}
+.nchead .no{width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;
+     font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700;flex:0 0 22px}
+.nchead .st{font-size:12.5px;font-weight:700}
+.nchead .sp{flex:1}
+.fld{margin-bottom:11px}
+.fld>label{display:block;font-size:10.5px;color:var(--mute);letter-spacing:.04em;
+     text-transform:uppercase;margin-bottom:4px;font-weight:600}
+.fld input[type=text],.fld select,.fld textarea{width:100%;padding:6.5px 9px;
+     border:1px solid var(--line);border-radius:3px;background:#fff;transition:.12s}
+.fld input[type=text]:focus,.fld select:focus{outline:none;border-color:var(--gold);
+     box-shadow:0 0 0 2px rgba(200,162,75,.14)}
+.fld input.mono{font-family:Consolas,monospace;font-size:12.5px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+
+/* 校准提示条 */
+.vbar{background:#FFFBEB;border-left:3px solid var(--warn);padding:8px 11px;font-size:11.5px;
+      color:#6B5518;line-height:1.65;border-radius:0 4px 4px 0;margin-bottom:12px}
+.vbar b{color:#8A4B08}
+
+/* 图片区 */
+.imgpick{position:relative;border:1.5px dashed var(--line);border-radius:5px;background:#fff;
+     min-height:190px;display:flex;align-items:center;justify-content:center;padding:14px;
+     cursor:pointer;transition:.14s;overflow:hidden}
+.imgpick:hover{border-color:var(--gold);background:#FFFDF7}
+.imgpick img{max-width:100%;max-height:230px;object-fit:contain}
+.imgpick .ph{text-align:center;color:var(--faint);font-size:11.5px;line-height:1.9;padding:20px}
+.imgpick .ph b{display:block;font-size:26px;margin-bottom:6px;opacity:.42}
+.imgacts{position:absolute;right:7px;top:7px;display:flex;gap:4px;opacity:0;transition:.14s}
+.imgpick:hover .imgacts{opacity:1}
+.imgacts button{padding:4px 8px;font-size:10.5px;border:1px solid var(--line);
+     background:rgba(255,255,255,.96);border-radius:3px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.imgacts button:hover{border-color:var(--navy)}
+.imginfo{font-size:10.5px;color:var(--faint);margin-top:5px;display:flex;gap:12px;flex-wrap:wrap}
+.imginfo b{color:var(--mute);font-weight:600}
+
+/* 规格行 */
+.rows{border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.rrow{display:flex;align-items:center;border-bottom:1px solid var(--line2);background:#fff}
+.rrow:hover{background:#FCFDFE}
+.rrow .k{width:180px;flex:0 0 180px}
+.rrow .v{flex:1;min-width:0}
+.rrow input{width:100%;border:0;padding:6.5px 8px;background:transparent;transition:.1s}
+.rrow input:focus{outline:none;background:#FFF9E8;box-shadow:inset 0 0 0 1px var(--gold)}
+.rrow input.k{font-weight:600;color:var(--navy);font-size:11.5px}
+.rrow .del{flex:0 0 30px;width:30px;height:28px;margin:0 4px;border:1px solid transparent;
+     background:transparent;color:var(--faint);border-radius:3px;cursor:pointer;font-size:14px}
+.rrow .del:hover{color:var(--err);border-color:#F0C8C4;background:#FDF3F2}
+.rhead{display:flex;background:var(--soft);border-bottom:1px solid var(--line);
+      font-size:9.5px;color:var(--mute);letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.rhead .k{width:180px;flex:0 0 180px;padding:5px 8px}
+.rhead .v{padding:5px 8px}
+.radd{padding:7px;text-align:center;background:#FAFCFD;border-top:1px solid var(--line2)}
+.radd button{padding:4px 12px;font-size:11px;border:1px solid var(--line);background:#fff;
+     border-radius:3px;cursor:pointer;color:var(--mute)}
+.radd button:hover{border-color:var(--gold);color:var(--gold-d);background:#FFFDF7}
+
+.pbox{border:1px solid var(--line);border-radius:4px;background:#FFFDF7;padding:11px 12px}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.pgrid .fld{margin:0}
+.pgrid .fld input{background:#fff}
+.pgrid .fld input[inputmode=decimal]{font-family:Consolas,monospace;font-size:13px;font-weight:600}
+.linkbtn{margin-left:8px;border:0;background:transparent;color:var(--info);cursor:pointer;
+   font-size:10.5px;padding:0;text-decoration:underline;vertical-align:baseline}
+.linkbtn:hover{color:#1D4ED8}
+
+/* 算价条 */
+.calcbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:8px;
+   margin-bottom:9px;border-bottom:1px dashed var(--line);font-size:11.5px;color:var(--mute)}
+.calcbar .ck{display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none}
+.calcbar .ck input{margin:0;cursor:pointer;accent-color:var(--gold)}
+.calcbar .cinfo{margin-left:auto;font-size:10.5px;color:var(--faint);font-family:Consolas,monospace}
+.lock{font-size:9px;margin-left:2px;opacity:.55;cursor:default}
+.calcmini{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:9px;padding-top:8px;
+   border-top:1px dashed var(--line);font-size:11px;color:var(--mute)}
+.calcmini .t{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;
+   color:var(--faint);background:var(--soft);padding:2px 6px;border-radius:2px}
+.calcmini .r b{font-family:Consolas,monospace;color:var(--gold-d);font-size:12.5px;
+   margin-left:3px;font-weight:700}
+
+.tips{background:#F2F7FF;border-left:3px solid var(--info);padding:9px 12px;
+      font-size:11.5px;color:#1E3A5F;line-height:1.7;border-radius:0 4px 4px 0;margin-top:11px}
+.tips b{color:#123}
+
+.empty{text-align:center;padding:80px 20px;color:var(--faint)}
+.empty .big{font-size:44px;opacity:.3;margin-bottom:12px}
+.empty p{font-size:13px;line-height:1.8}
+
+/* 右：预览 */
+.right{width:336px;flex:0 0 336px;background:var(--paper);border-left:1px solid var(--line);
+       display:flex;flex-direction:column}
+.rhead2{padding:9px 12px;border-bottom:1px solid var(--line);font-size:11.5px;font-weight:700;
+     display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.rhead2 .sp{flex:1}
+.rhead2 select{padding:3px 6px;border:1px solid var(--line);border-radius:3px;font-size:11px;background:#fff}
+.rbody{flex:1;overflow-y:auto;padding:14px;background:#EFF2F5}
+.a4{background:#fff;box-shadow:0 2px 12px rgba(27,42,65,.16);margin:0 auto;position:relative;overflow:hidden}
+.pvnote{padding:7px 12px;font-size:10px;color:var(--faint);border-top:1px solid var(--line);
+     line-height:1.6;flex:0 0 auto;background:var(--soft)}
+
+/* 弹窗 */
+.mask{position:fixed;inset:0;background:rgba(27,42,65,.55);z-index:100;display:none;
+      align-items:center;justify-content:center;padding:24px}
+.mask.on{display:flex}
+.modal{background:#fff;border-radius:7px;max-width:560px;width:100%;max-height:86vh;
+     overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.modal.wide{max-width:1100px}
+.mhead3{padding:13px 17px;border-bottom:1px solid var(--line);font-size:14px;font-weight:700;
+     display:flex;align-items:center}
+.mhead3 .sp{flex:1}
+.mhead3 .x{cursor:pointer;font-size:20px;color:var(--faint);line-height:1;padding:0 3px}
+.mhead3 .x:hover{color:var(--ink)}
+.mbody2{padding:16px 17px;font-size:12.5px;line-height:1.75}
+.mbody2 h4{font-size:11px;color:var(--mute);letter-spacing:.05em;text-transform:uppercase;
+     margin:14px 0 6px;font-weight:700}
+.mbody2 h4:first-child{margin-top:0}
+.mbody2 ul{margin:4px 0 4px 17px}
+.mbody2 li{margin-bottom:3px}
+.kbd{display:inline-block;padding:1px 5px;border:1px solid var(--line);border-bottom-width:2px;
+     border-radius:3px;background:var(--soft);font-family:Consolas,monospace;font-size:10.5px}
+.mfoot{padding:11px 17px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+.mfoot button{padding:7px 15px;font-size:12.5px;border:1px solid var(--line);background:#fff;
+     border-radius:3px;cursor:pointer}
+.mfoot button:hover{border-color:var(--navy);background:var(--soft)}
+.mfoot button.pri{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
+.mfoot button.pri:hover{background:var(--navy2)}
+
+/* 表格（校准报告 / H盘图库） */
+table.rt{width:100%;border-collapse:collapse;font-size:11.5px}
+table.rt th{text-align:left;background:var(--soft);padding:6px 8px;font-size:10px;
+     text-transform:uppercase;letter-spacing:.05em;color:var(--mute);border-bottom:1px solid var(--line);
+     position:sticky;top:0;z-index:2}
+table.rt td{padding:5px 8px;border-bottom:1px solid var(--line2);vertical-align:top}
+table.rt tr:hover td{background:#FAFCFD}
+
+/* ================= Excel 导出预览（2026-10-05） =================
+   要求：预览 = 下载所见。所以直接用 HTML 表格渲染 xlsx 的同一份数据。 */
+table.pvchk{margin:6px 0 10px;font-size:11.5px}
+table.pvchk td{padding:4px 8px}
+.pvtabs{display:flex;gap:0;border-bottom:1px solid var(--line);margin-bottom:0}
+.pvtabs .pvt{background:none;border:1px solid var(--line);border-bottom:none;
+  padding:6px 14px;font-size:11.5px;cursor:pointer;border-radius:4px 4px 0 0;margin-right:2px;
+  color:var(--mute)}
+.pvtabs .pvt.on{background:var(--gold);color:#fff;border-color:var(--gold);font-weight:500}
+/* 🔴 2026-10-06 类名冲突修复：Excel 预览表格原来也用 .pvbox，
+   与**纸面预览**的 .pvbox 撞名 ⇒ 纸面预览被套上 max-height:340px，
+   只显示第 1 页、下方大片空白、滚不动（利截图）。
+   ⇒ 纸面预览恢复由外层 .rbody 滚动；Excel 预览表格改用 .xlpvbox。 */
+
+/* 🔴 纸面预览要与 PDF **逐像素一致**（利：「PDF 导出是正确的，只是这个纸面预览…���你不要像这样子拉满」）
+   问题：全部版式 CSS 都锁在 `#paper .xxx` 下（215 条），而预览页挂在 `#pvBody` 里
+   ⇒ 预览**拿不到任何版式规则**：.page 没有 210×297mm 尺寸、.grid .grow 撑不开
+   ⇒ 末页 2 张卡片被拉成半页高。
+   ⚠️ 试过把 215 条全改成 `#paper,#pvBody`（选择器并列）—— **不行**：
+      `#paper *{box-sizing:border-box}` 这类通配会把预览容器也管住，
+      实测卡片直接塌成 `0×18 px`。⇒ 只能**补最关键的几条**（页面尺寸 + 卡片网格定宽定高）。*/
+#pvBody .page{width:210mm;height:297mm;padding:12mm 13mm 10mm;position:relative;
+  overflow:hidden;background:#fff;display:flex;flex-direction:column;
+  margin:0 auto 6mm;box-sizing:border-box}
+#pvBody .page *{box-sizing:border-box}
+#pvBody .grid{display:flex;flex-direction:column;gap:4mm;flex:1 1 auto;min-height:0}
+#pvBody .grid .grow{display:flex;gap:4.6mm;flex:0 0 calc((100% - 8mm) / 3);min-height:0}
+#pvBody .grid .grow > .card{flex:0 0 calc((100% - 9.2mm) / 3);min-width:0}
+#pvBody .card{height:100%;overflow:hidden;display:flex;flex-direction:column;
+  border:.25mm solid #DDE3E9;border-radius:1.2mm;padding:1.5mm 2mm 1.8mm;background:#fff}
+#pvBody .card .imgbox{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center}
+#pvBody .card .imgbox img{max-width:46mm;max-height:100%;width:auto;height:auto;object-fit:contain}
+#pvBody .ph{display:flex;align-items:baseline;justify-content:space-between;
+  border-bottom:.6mm solid #C8A24B;padding-bottom:1.4mm;margin-bottom:3.4mm;flex:0 0 auto}
+#pvBody .ph .t{font-size:10.5pt;font-weight:700;color:#1B2A41}
+#pvBody .ph .r{font-size:7pt;color:#5C6B7A;letter-spacing:.06em;text-transform:uppercase}
+#pvBody .foot{font-size:7pt;color:#5C6B7A;border-top:.25mm solid #C8A24B;
+  padding-top:1.4mm;margin-top:auto;display:flex;justify-content:space-between;flex:0 0 auto}
+.xlpvbox{max-height:340px;overflow:auto;border:1px solid var(--line);border-top:none;
+  background:#FCFDFE}
+table.pv{border-collapse:collapse;font-size:10.5px;width:100%}
+table.pv th{position:sticky;top:0;background:var(--navy);color:#fff;text-align:left;
+  padding:5px 7px;font-size:9.5px;white-space:nowrap;z-index:2;font-weight:500}
+table.pv td{padding:3px 7px;border-bottom:1px solid #EEF1F4;white-space:nowrap;
+  max-width:230px;overflow:hidden;text-overflow:ellipsis}
+table.pv tr:hover td{background:#F6FAFC}
+table.pv tr.hd td{background:#F4F1E8;font-weight:500;color:var(--navy)}
+table.pv td.c-photo{background:#FAFCFD;color:var(--faint);text-align:center;width:46px}
+table.pv th.c-photo{background:var(--navy);color:#fff}
+table.pv td.c-opt,table.pv th.c-opt{color:#5C6B7A}
+.pvm{padding:7px 10px;font-size:10.5px;color:var(--mute);background:#FAFCFD;
+  border-top:1px solid var(--line)}
+table.rt code{font-family:Consolas,monospace;font-size:10.5px;color:var(--gold-d)}
+
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(14px);
+  background:var(--navy);color:#fff;padding:9px 18px;border-radius:4px;font-size:12.5px;
+  opacity:0;pointer-events:none;transition:.2s;z-index:200;box-shadow:0 6px 20px rgba(0,0,0,.24)}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ================= ★ H 盘候选区：折叠（2026-10-09） =================
+   利的要求：选图弹窗最上面「读 H 盘」那一行加下拉箭头，**初始收起**。
+   原因：H 盘是他这台电脑的移动盘，换台电脑打开时那一排图全是空框，
+   视觉上像程序坏了。默认折起来就不刺眼，要用时点一下展开。
+   ⚠️ 用原生 <details>/<summary> —— 零 JS、默认收起、无状态；
+      不跟 applyFilter()（遍历 h4）冲突，也不影响 [data-lib] 点击委托。*/
+details.hdisk{margin-bottom:13px;border:1px solid var(--line);border-radius:5px;
+  background:#FBFCFD;overflow:hidden}
+details.hdisk>summary{cursor:pointer;padding:9px 12px;font-size:12px;font-weight:700;
+  color:var(--navy);display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  list-style:none;user-select:none;background:#F4F6F9;transition:.12s}
+details.hdisk>summary::-webkit-details-marker{display:none}
+details.hdisk>summary::before{content:'▸';color:var(--gold-d);font-size:14px;line-height:1;
+  display:inline-block;transition:transform .16s;flex:0 0 auto}
+details.hdisk[open]>summary::before{transform:rotate(90deg)}
+details.hdisk[open]>summary{border-bottom:1px solid var(--line);background:#EFF3F7}
+details.hdisk>summary:hover{background:#EAEFF4}
+details.hdisk>summary .hdt{flex:0 0 auto}
+details.hdisk>summary .hds{font-weight:400;color:var(--mute);font-size:11.5px}
+details.hdisk>summary .hdh{font-weight:400;color:var(--faint);font-size:10.5px;margin-left:auto}
+details.hdisk .hdbd{padding:12px 12px 5px}
+
+/* ================= 门禁（只有线上 http/https 显示；本地 file:// 双击直接跳过） =================
+   🔴 说明（给未来的自己）：这是**前端密码**，只能挡住「随手点开链接的人」，
+      挡不住会按 F12 的人 —— 真要保密得靠后端。所以配套做了：
+      ① 数据文件改成随机名 data/kc-1bc995ca.json 且内容是 base64；
+      ② 发布时把明文 catalog.json / catalog.js 从线上删掉（见 _sync_deploy.py）。
+   逻辑：<html> 上有 .kc-locked 才显示 → 由 <head> 里那段极短脚本决定加不加，
+   这样首帧就是门禁，不会闪一下编辑器界面。密码对了就摘掉这个类。*/
+#kcGate{display:none}
+html.kc-locked #kcGate{display:flex}
+html.kc-locked body>*:not(#kcGate){visibility:hidden!important}
+#kcGate{position:fixed;inset:0;z-index:900;align-items:center;justify-content:center;
+  background:radial-gradient(1150px 640px at 50% 16%,#2A4162 0%,#1B2A41 54%,#111C2B 100%);
+  padding:24px;font-size:var(--ui)}
+#kcGate::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(560px 320px at 50% 10%,rgba(200,162,75,.14),transparent 72%)}
+#kcGate .gcard{position:relative;z-index:2;width:100%;max-width:394px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(200,162,75,.3);border-radius:11px;
+  padding:36px 30px 22px;text-align:center;
+  box-shadow:0 26px 74px rgba(0,0,0,.52),inset 0 1px 0 rgba(255,255,255,.08)}
+#kcGate .gcard::before{content:'';position:absolute;left:50%;top:0;transform:translateX(-50%);
+  width:104px;height:3px;border-radius:0 0 3px 3px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+#kcGate .gcard::after{content:'';position:absolute;left:16px;right:16px;bottom:12px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.14),transparent)}
+#kcGate .glogo{width:108px;height:auto;margin:2px auto 13px;display:block;
+  filter:drop-shadow(0 5px 16px rgba(200,162,75,.4))}
+#kcGate .gname{font-size:23px;font-weight:700;color:#fff;letter-spacing:.07em}
+#kcGate .gsub{font-size:10px;color:#8FA3B8;letter-spacing:.24em;text-transform:uppercase;
+  margin-top:6px}
+#kcGate .grule{height:1px;margin:20px 0 17px;
+  background:linear-gradient(90deg,transparent,rgba(200,162,75,.5),transparent)}
+#kcGate .gtip{font-size:11.5px;color:#9FB0C2;letter-spacing:.02em}
+#kcGate .gtip b{color:#D9C68C;font-weight:600}
+#kcGate .gpins{display:flex;gap:9px;justify-content:center;margin:15px 0 6px}
+#kcGate .gpins input{width:44px;height:54px;text-align:center;font-size:23px;font-weight:700;
+  font-family:Consolas,monospace;color:#fff;background:rgba(0,0,0,.3);
+  border:1.5px solid rgba(200,162,75,.32);border-radius:7px;outline:none;
+  transition:.14s;caret-color:var(--gold2);padding:0}
+#kcGate .gpins input:focus{border-color:var(--gold);background:rgba(200,162,75,.14);
+  box-shadow:0 0 0 3px rgba(200,162,75,.17)}
+#kcGate .gpins input.filled{border-color:rgba(200,162,75,.62);background:rgba(200,162,75,.09)}
+#kcGate .gerr{font-size:11.5px;color:#F0A48F;min-height:17px;margin:7px 0 12px;
+  letter-spacing:.02em}
+#kcGate .gbtn{width:100%;padding:10px;font-size:13.5px;font-weight:700;letter-spacing:.08em;
+  border:0;border-radius:6px;cursor:pointer;color:#1B2A41;
+  background:linear-gradient(180deg,var(--gold2),var(--gold));
+  box-shadow:0 6px 18px rgba(200,162,75,.28);transition:.14s}
+#kcGate .gbtn:hover{filter:brightness(1.06)}
+#kcGate .gbtn:active{transform:translateY(1px)}
+#kcGate .gfoot{margin-top:16px;font-size:10px;color:#6E819A;line-height:1.75;letter-spacing:.02em}
+#kcGate .gfoot i{color:#8FA3B8;font-style:normal}
+@keyframes kcshake{0%,100%{transform:translateX(0)}
+  18%{transform:translateX(-10px)}38%{transform:translateX(9px)}
+  58%{transform:translateX(-6px)}78%{transform:translateX(4px)}}
+#kcGate.err .gcard{animation:kcshake .44s cubic-bezier(.36,.07,.19,.97);
+  border-color:rgba(192,57,43,.72)}
+#kcGate.err .gpins input{border-color:rgba(192,57,43,.72);background:rgba(192,57,43,.1)}
+#kcGate.out{opacity:0;transition:opacity .3s}
+
+/* 打印：隐藏全部 UI，只留纸面 */
+#paper{position:fixed;left:-9999px;top:0;width:210mm}
+@media print{
+  @page{size:A4 portrait;margin:0}
+  /* ⚠️ html/body 必须 height:auto —— 否则多出一张全空白首页 */
+  html,body{height:auto;overflow:visible;background:#fff;margin:0;padding:0}
+  .top,.bookbar,.left,.mid,.right,.mask,#toast{display:none!important}
+  #paper{position:static;left:auto;width:auto}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= 门禁封面（线上才出现；本地 file:// 自动跳过） ================= -->
+<div id="kcGate">
+  <div class="gcard">
+    <img class="glogo" src="logo.png" alt="KaiLionCrafts">
+    <div class="gname">KaiLionCrafts</div>
+    <div class="gsub">Product Catalog Editor</div>
+    <div class="grule"></div>
+    <div class="gtip">请输入访问密码进入 <b>产品目录编辑器</b></div>
+    <div class="gpins">
+      <input class="gpin" type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="密码第 1 位">
+      <input class="gpin" type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="密码第 2 位">
+      <input class="gpin" type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="密码第 3 位">
+      <input class="gpin" type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="密码第 4 位">
+      <input class="gpin" type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="密码第 5 位">
+      <input class="gpin" type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="密码第 6 位">
+    </div>
+    <div class="gerr" id="kcGateErr"></div>
+    <button class="gbtn" id="kcGateBtn">进 入</button>
+    <div class="gfoot">
+      <i>阳江市锴利国际贸易有限公司</i><br>
+      Yangjiang Kaili International Trading Co., Ltd.<br>
+      kailioncrafts.com
+    </div>
+  </div>
+</div>
+
+<!-- ================= 顶栏 ================= -->
+<div class="top">
+  <div class="brandwrap">
+    <img id="brandLogo" alt="">
+    <div>
+      <div class="bname" id="brandName">KaiLionCrafts</div>
+      <div class="bsub" id="brandSub">Product Catalog Editor</div>
+    </div>
+  </div>
+  <div class="sp"></div>
+  <div class="savedot" id="saveDot"><i></i><span id="saveTxt">已保存</span></div>
+  <button class="tbtn" id="btnUndo" title="撤销 (Ctrl+Z)">↶ 撤销</button>
+  <button class="tbtn" id="btnRedo" title="重做 (Ctrl+Y)">↷ 重做</button>
+  <button class="tbtn" id="btnCalib" title="查看规格校准报告">📋 校准报告</button>
+  <button class="tbtn" id="btnBulk" title="批量导入：选一个文件夹，每个子文件夹自动建一张名片">📥 批量导 SKU</button>
+  <button class="tbtn" id="btnPaste" title="导入产品资料：粘贴 AI 分析出来的 JSON（截图识别结果）">📋 导入资料</button>
+  <button class="tbtn" id="btnExport" title="导出当前册子为 PDF">⤓ 导出 PDF</button>
+  <button class="tbtn" id="btnXlsx" title="导出 Excel 产品目录：先弹预览确认，再下载">⊞ 导出 Excel</button>
+  <button class="tbtn pri" id="btnExportAll" title="依次导出全部册子">⤓ 导出全部</button>
+</div>
+
+<!-- ================= 册子切换（8 个） ================= -->
+<div class="bookbar" id="bookbar"></div>
+
+<!-- ================= 主体 ================= -->
+<div class="body">
+  <div class="left">
+    <div class="lhead"><input id="lsearch" placeholder="搜 SKU / 产品名 / 规格…"></div>
+    <div class="lcount"><span id="lcountTxt">0 张名片</span><span id="lpageTxt"></span></div>
+    <div class="lbody" id="lbody"></div>
+    <div class="lfoot">
+      <button id="btnDup" title="复制选中名片">复制</button>
+      <button id="btnDel" title="删除选中名片">删除</button>
+      <button id="btnAdd" style="border-color:var(--gold);color:var(--gold-d)"
+              title="新增一张空白名片">＋ 新增</button>
+    </div>
+  </div>
+
+  <div class="mid">
+    <div class="mhead">
+      <span class="ttl" id="edTitle">编辑</span>
+      <span class="hint" id="edHint"></span>
+      <span class="sp"></span>
+      <button class="mbtn" id="btnImgFromLib" title="从内置图库或 H 盘图库选图">🖼 选图</button>
+      <button class="mbtn" id="btnMoveUp" title="上移">↑ 上移</button>
+      <button class="mbtn" id="btnMoveDn" title="下移">↓ 下移</button>
+      <button class="mbtn" id="btnRestore" title="拖动排序后可一键还原为默认顺序">⇄ 恢复默认排序</button>
+      <button class="mbtn danger" id="btnDel2">删除本张</button>
+    </div>
+    <div class="mbody" id="edBody"></div>
+  </div>
+
+  <div class="right">
+    <div class="rhead2">
+      纸面预览 <span class="sp"></span>
+      <select id="pvScale">
+        <option value="0.3">30%</option>
+        <option value="0.38" selected>38%</option>
+        <option value="0.5">50%</option>
+        <option value="0.75">75%</option>
+        <option value="1">100%</option>
+      </select>
+    </div>
+    <div class="rbody" id="pvBody"></div>
+    <div class="pvnote">预览按 A4 210×297mm 真实比例（3 列 × 3 行 / 页）。<br>
+      导出 PDF 时图片走<b>原始文件字节</b>，浏览器不重压缩。</div>
+  </div>
+</div>
+
+<div id="paper"></div>
+
+<div class="mask" id="mask"><div class="modal" id="modal">
+  <div class="mhead3"><span id="mdTitle">标题</span><span class="sp"></span>
+    <span class="x" id="mdX">&times;</span></div>
+  <div class="mbody2" id="mdBody"></div>
+  <div class="mfoot" id="mdFoot"></div>
+</div></div>
+
+<div id="toast"></div>
+
+<!-- ================= 门禁逻辑 =================
+     放在 app 脚本**之前**：即使后面某个脚本报错，门禁仍然可用。 -->
+<script>
+(function () {
+  /* 🔑 这里**没有密码常量**，也不做任何本地比对。
+     密码对不对由数据层裁定：window.KC_BOOT(密码) 拿它当 AES 密钥去解
+     data/kc-<TOKEN>.json，解得开 = 对，解不开 = 错。
+     所以就算有人把这段 js 改成无条件 unlock()，没有真密码依旧是一片白屏。 */
+  var K = 'kc_gate_ok';
+  var KP = 'kc_pass';
+  var gate = document.getElementById('kcGate');
+  if (!gate) return;
+  if (!document.documentElement.className.match(/\bkc-locked\b/)) {
+    /* 本地 file:// 或已解锁 —— 直接移除门禁节点，连 DOM 都不留 */
+    gate.parentNode.removeChild(gate);
+    return;
+  }
+
+  var pins = [].slice.call(gate.querySelectorAll('.gpin'));
+  var errEl = document.getElementById('kcGateErr');
+  var btn = document.getElementById('kcGateBtn');
+  var busy = false;
+
+  function val() { return pins.map(function (i) { return i.value; }).join(''); }
+
+  function shake(msg) {
+    gate.classList.add('err');
+    errEl.textContent = msg;
+    setTimeout(function () {
+      gate.classList.remove('err');
+      pins.forEach(function (p) { p.value = ''; p.classList.remove('filled'); });
+      pins[0].focus();
+    }, 460);
+  }
+
+  function unlock() {
+    /* kc_pass 一并存下：刷新后要靠它重新解密。
+       只存在本标签页的会话存储里，关掉标签页即失效。 */
+    try { sessionStorage.setItem(K, '1'); sessionStorage.setItem(KP, val()); } catch (e) {}
+    gate.classList.add('out');
+    document.documentElement.className =
+      document.documentElement.className.replace(/\s*kc-locked\b/, '');
+    setTimeout(function () { if (gate.parentNode) gate.parentNode.removeChild(gate); }, 320);
+  }
+
+  function submit() {
+    var v = val();
+    if (busy) return;                                   /* 防抖：解密期间不重复触发 */
+    if (v.length < 6) { shake('请输入完整的 6 位密码'); return; }
+    /* 数据层的启动函数由 _editor_app.js 挂到 window.KC_BOOT。
+       它在门禁脚本之后加载，用户开始输入时必然已就绪；万一没有，给明确提示。 */
+    if (typeof window.KC_BOOT !== 'function') { shake('编辑器尚未就绪，请稍候再试'); return; }
+    busy = true;
+    if (btn) btn.disabled = true;
+    errEl.textContent = '正在验证…';
+    window.KC_BOOT(v).then(function () {
+      busy = false;
+      if (btn) btn.disabled = false;
+      unlock();
+    }).catch(function (e) {
+      busy = false;
+      if (btn) btn.disabled = false;
+      /* 密码错时 WebCrypto 抛的是 OperationError，原文对用户没意义，只在控制台留痕 */
+      if (e) console.warn('[KC Gate] 解锁失败：', e.message || e);
+      shake('密码不正确，请重新输入');
+    });
+  }
+
+  pins.forEach(function (inp, i) {
+    inp.addEventListener('input', function () {
+      inp.value = inp.value.replace(/\D/g, '').slice(-1);
+      inp.classList.toggle('filled', !!inp.value);
+      errEl.textContent = '';
+      if (inp.value && i < pins.length - 1) pins[i + 1].focus();
+      if (val().length === 6) submit();
+    });
+    inp.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Backspace') {
+        if (!inp.value && i > 0) {
+          pins[i - 1].value = '';
+          pins[i - 1].classList.remove('filled');
+          pins[i - 1].focus();
+          ev.preventDefault();
+        }
+      } else if (ev.key === 'ArrowLeft' && i > 0) { pins[i - 1].focus(); ev.preventDefault(); }
+      else if (ev.key === 'ArrowRight' && i < pins.length - 1) { pins[i + 1].focus(); ev.preventDefault(); }
+      else if (ev.key === 'Enter') submit();
+    });
+    inp.addEventListener('paste', function (ev) {
+      var t = ((ev.clipboardData || window.clipboardData).getData('text') || '')
+              .replace(/\D/g, '').slice(0, 6);
+      if (!t) return;
+      ev.preventDefault();
+      pins.forEach(function (p, k) {
+        p.value = t[k] || '';
+        p.classList.toggle('filled', !!p.value);
+      });
+      errEl.textContent = '';
+      if (t.length === 6) submit(); else pins[Math.min(t.length, 5)].focus();
+    });
+  });
+  btn.addEventListener('click', submit);
+  setTimeout(function () { try { pins[0].focus(); } catch (e) {} }, 130);
+})();
+</script>
+
+<!-- 数据层：线上只有 data/kc-1bc995ca.json 一份 —— **AES-256-GCM 密文**，
+     密钥由上面的门禁密码 PBKDF2-SHA256(150000 次) 派生。密码不落任何前端文件。
+     file:// 本地双击走另一条路：明文 data/catalog.json → 退路 data/catalog.js。
+     ⚠️ 明文 catalog.json / catalog.js，以及曾经的 kc-<TOKEN>.js（也是明文），
+        一律只留源目录、绝不上线（由 _sync_deploy.py 强制排除）。 -->
+<script src="thumbs.js"></script>
+<script src="_xlsx.js"></script>
+<!-- ☁️ 云同步通道（v4 · 2026-10-09）：https 下让**多台电脑共享同一份数据**。
+     必须在 _editor_app.js **之前**加载 —— 后者的 loadData() 要用到 window.KC_CLOUD。
+     file:// 本地双击时它整个不生效（KC_CLOUD.on === false），行为与以前完全一致。 -->
+<script src="_cloud.js"></script>
+<script src="_editor_app.js"></script>
+</body>
+</html>
